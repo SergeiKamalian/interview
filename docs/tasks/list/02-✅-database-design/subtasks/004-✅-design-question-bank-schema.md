@@ -1,6 +1,6 @@
 # ⬜ TASK-02.4 — Спроектировать схему question bank
 
-Status: [ ] todo
+Status: [x] done
 Priority: High
 Parent block: `02-⬜-database-design`
 Owner: Cursor / Sergey

@@ -1,8 +1,8 @@
-# ⬜ TASK-02.2 — Определить систему миграций
+# ✅ TASK-02.2 — Определить систему миграций
 
-Status: [ ] todo
+Status: [x] done
 Priority: High
-Parent block: `02-⬜-database-design`
+Parent block: `02-🟡-database-design`
 Owner: Cursor / Sergey
 Last updated: 2026-06-12
 
@@ -90,4 +90,31 @@ rg "schema_migrations" docs/database/MIGRATIONS.md
 
 ## Completion Notes
 
-_Заполнить после выполнения: что сделано, компромиссы, follow-ups, ссылки на design-документы._
+**Сделано:**
+
+- Создан `docs/database/MIGRATIONS.md` (415 строк): runner flow (mermaid), naming `NNN_description.sql`, UP-only policy, rollback/destructive rules, Docker workflows, domain migration groups 002–012.
+- Создан `docs/database/schema_migrations.bootstrap.sql.example` — reference DDL, совпадает с `backend/migrations/001_create_schema_migrations.sql`.
+- Добавлена ссылка в README блока 02.
+
+**Компромиссы / расхождения с исходным subtask scope:**
+
+- Subtask упоминал формат `YYYYMMDDHHMMSS_` и `version VARCHAR(255) PRIMARY KEY` — задокументирован **фактический** runner из блока 01: `NNN_` prefix, `schema_migrations(id, version VARCHAR(64), applied_at TIMESTAMP)`.
+- Checksum tracking (как в captcha-back) не в MVP — зафиксировано policy «never edit applied files».
+
+**Follow-ups:**
+
+- TASK-02.3: `docs/database/schemas/auth-company.md`
+- TASK-02.11: точные номера migrations в `IMPLEMENTATION_PLAN.md`
+
+**Проверки:**
+
+| Команда / действие | Ожидание | Результат |
+|--------------------|----------|-----------|
+| `test -f docs/database/MIGRATIONS.md && wc -l` | файл >100 строк | 415 строк |
+| `grep -c schema_migrations MIGRATIONS.md` | множественные упоминания | 23 |
+| Bootstrap example vs `001_*.sql` | DDL идентичен | совпадает (кроме header comments) |
+| `pnpm run migrate` (backend) | up to date, exit 0 | `Database schema is up to date` |
+| `SHOW CREATE TABLE schema_migrations` | id, version VARCHAR(64), applied_at TIMESTAMP | совпадает с документацией |
+| `SELECT * FROM schema_migrations` | `001_create_schema_migrations` applied | 1 row |
+| grep prisma/typeorm в docs/database | только prohibitions | OK |
+| Согласованность с `CONVENTIONS.md` | формат `NNN_` | OK |

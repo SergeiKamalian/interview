@@ -1,8 +1,8 @@
-# ⬜ TASK-02.1 — Определить конвенции базы данных
+# ✅ TASK-02.1 — Определить конвенции базы данных
 
-Status: [ ] todo
+Status: [x] done
 Priority: High
-Parent block: `02-⬜-database-design`
+Parent block: `02-🟡-database-design`
 Owner: Cursor / Sergey
 Last updated: 2026-06-12
 
@@ -47,7 +47,7 @@ Last updated: 2026-06-12
 
 ```txt
 docs/database/CONVENTIONS.md
-docs/tasks/list/02-⬜-database-design/README.md (ссылка на conventions)
+docs/tasks/list/02-🟡-database-design/README.md (ссылка на conventions)
 ```
 
 ---
@@ -94,4 +94,25 @@ rg -i "prisma|typeorm|mongodb|postgresql" docs/database/CONVENTIONS.md && echo "
 
 ## Completion Notes
 
-_Заполнить после выполнения: что сделано, компромиссы, follow-ups, ссылки на design-документы._
+**Сделано:**
+
+- Создан `docs/database/CONVENTIONS.md` (542 строки).
+- Выбран PK: `BIGINT UNSIGNED AUTO_INCREMENT`; UUID только как `public_token`.
+- Задокументированы: tables/columns/indexes/FK naming, charset, types, JSON policy, multi-tenant, public entities, soft delete.
+- Примеры DDL для `users`, `companies`, `questions`, `interview_attempts`.
+- Добавлена ссылка в README блока 02.
+
+**Компромиссы:**
+
+- FK naming: `fk_<child>_<parent>` без column suffix (как в `captcha-back`), column hint только при коллизиях.
+
+**Follow-ups:**
+
+- TASK-02.2: `docs/database/MIGRATIONS.md`.
+
+**Проверки:**
+
+| Команда | Ожидание | Результат |
+|---------|----------|-----------|
+| `test -f docs/database/CONVENTIONS.md && wc -l ...` | файл существует, >100 строк | 542 строк |
+| grep prisma/typeorm/mongodb/postgresql | только в разделе «Запрещено» | 3 строки в prohibitions |

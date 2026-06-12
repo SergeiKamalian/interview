@@ -1,8 +1,8 @@
-# ⬜ TASK-02.3 — Спроектировать схему auth и companies
+# ✅ TASK-02.3 — Спроектировать схему auth и companies
 
-Status: [ ] todo
+Status: [x] done
 Priority: High
-Parent block: `02-⬜-database-design`
+Parent block: `02-🟡-database-design`
 Owner: Cursor / Sergey
 Last updated: 2026-06-12
 
@@ -90,4 +90,34 @@ rg "users|companies|company_memberships" docs/database/schemas/auth-company.md
 
 ## Completion Notes
 
-_Заполнить после выполнения: что сделано, компромиссы, follow-ups, ссылки на design-документы._
+**Сделано:**
+
+- Создан `docs/database/schemas/auth-company.md` (361 строка).
+- ER diagram (mermaid), column specs, indexes, FK, register/login flows.
+- DDL reference для migrations `002`–`004`.
+- Ссылка в README блока 02.
+
+**Компромиссы:**
+
+- Subtask scope упоминал FK `users → companies` — по `CONVENTIONS.md` `users` global **без** `company_id`; tenant access только через `company_memberships`.
+- Добавлен `is_active` на `companies` и `users` (не в TASK-04.1, но согласован с CONVENTIONS examples).
+- Три migration files (002–004) вместо одного — как в TASK-04.1.
+
+**Follow-ups:**
+
+- TASK-02.4: `docs/database/schemas/question-bank.md`
+- Block 04: реальные SQL migrations по этому design doc
+
+**Проверки:**
+
+| Команда / действие | Ожидание | Результат |
+|--------------------|----------|-----------|
+| `test -f docs/database/schemas/auth-company.md` | exists | OK |
+| grep users/companies/memberships | множественные | 72 строки |
+| `password_hash VARCHAR(255)` | documented | 7 упоминаний |
+| `deleted_at` on users | нет в DDL | только в out-of-scope |
+| `users` без `company_id` | per CONVENTIONS | явно задокументировано |
+| FK CASCADE on memberships | yes | OK |
+| roles owner/member | ENUM | OK |
+| TASK-04.1 fields match | companies, users, memberships | OK (+ is_active) |
+| Migration filenames | 002, 003, 004 | совпадает с TASK-04.1 |

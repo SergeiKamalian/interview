@@ -62,19 +62,19 @@
 Active block:
 
 ```txt
-docs/tasks/list/02-⬜-database-design/
+docs/tasks/list/03-⬜-frontend-foundation/
 ```
 
 Block status:
 
 ```txt
-⬜ todo — следующий по порядку, ждёт команды
+⬜ todo — следующий по порядку
 ```
 
 Block title:
 
 ```txt
-Database Design
+Frontend Foundation
 ```
 
 ---
@@ -84,31 +84,31 @@ Database Design
 Active subtask ID:
 
 ```txt
-Нет активного subtask — блок `01-✅-backend-foundation` завершён.
+Нет активного subtask — блок `02-✅-database-design` завершён.
 ```
 
 Last completed subtask:
 
 ```txt
-TASK-01.12 — Backend README and env examples
+TASK-02.11 — Database design: implementation plan (+ migrations 002–010 applied)
 ```
 
 Next recommended subtask:
 
 ```txt
-TASK-02.1
+TASK-03.1 (frontend foundation)
 ```
 
 Next subtask file:
 
 ```txt
-docs/tasks/list/02-⬜-database-design/subtasks/001-⬜-define-database-conventions.md
+docs/tasks/list/03-⬜-frontend-foundation/subtasks/
 ```
 
 Status:
 
 ```txt
-[ ] todo — начать только по явной команде
+[ ] todo — начать по команде
 ```
 
 Last updated:
@@ -151,19 +151,30 @@ Last updated:
 - [x] `TASK-01.11` — Base logging and error handling
 - [x] `TASK-01.12` — Backend README and env examples
 - [x] Block `01-✅-backend-foundation` completed
+- [x] `TASK-02.1` — Database design: define conventions
+- [x] `TASK-02.2` — Database design: define migration system
+- [x] `TASK-02.3` — Database design: auth & company schema
+- [x] `TASK-02.4` — Database design: question bank schema
+- [x] `TASK-02.5` — Database design: interview core schema
+- [x] `TASK-02.6` — Database design: AI evaluation schema
+- [x] `TASK-02.7` — Database design: media storage schema
+- [x] `TASK-02.8` — Database design: analytics & AI cost schema
+- [x] `TASK-02.9` — Database design: ATS integrations schema
+- [x] `TASK-02.10` — Database design: indexes & performance catalog
+- [x] `TASK-02.11` — Database design: implementation plan
+- [x] Block `02-✅-database-design` completed (migrations 001–010 applied to MySQL)
 
 ---
 
 ## In Progress
 
-No active subtask. Следующий блок: `02-⬜-database-design`.
+No active subtask.
 
 ---
 
 ## Next
 
-- [ ] `TASK-02.1` — Database design: define conventions
-  - File: `docs/tasks/list/02-⬜-database-design/subtasks/001-⬜-define-database-conventions.md`
+- [ ] Block `03-⬜-frontend-foundation` — или `04-⬜-auth-company` (backend app code; DB tables уже есть)
 
 ---
 
@@ -197,13 +208,13 @@ docs/tasks/
         ...
         012-✅-add-backend-readme-env-examples.md
 
-    02-⬜-database-design/
+    02-✅-database-design/
       README.md
       TASKS.md
       subtasks/
-        001-⬜-define-database-conventions.md
+        001-✅-define-database-conventions.md
         ...
-        011-⬜-prepare-database-implementation-plan.md
+        011-✅-prepare-database-implementation-plan.md
 
     03-⬜-frontend-foundation/
       README.md
