@@ -718,7 +718,9 @@ Architecture: average score 5.5/10
 
 ## 19. Backend Stack
 
-Backend должен быть похож на архитектуру существующего проекта `captcha-back`.
+Backend должен быть похож на архитектуру `captcha-back` (`/Users/sergeykamalyan/Desktop/russkiy/капча/captcha-back`).
+
+Frontend — по структуре `captcha-panel` (`/Users/sergeykamalyan/Desktop/russkiy/капча/captcha-panel`); data layer — RTK Query + GraphQL.
 
 Выбранный backend stack:
 

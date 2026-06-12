@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   createPool,
   type Pool,
+  type PoolConnection,
   type RowDataPacket,
   type ResultSetHeader,
 } from 'mysql2/promise';
@@ -60,6 +61,31 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     return rows as T;
   }
 
+  async withTransaction<T>(
+    fn: (
+      query: <R extends RowDataPacket[] | ResultSetHeader>(
+        sql: string,
+        params?: DbQueryParam[],
+      ) => Promise<R>,
+    ) => Promise<T>,
+  ): Promise<T> {
+    const connection = await this.getPool().getConnection();
+
+    try {
+      await connection.beginTransaction();
+      const result = await fn((sql, params = []) =>
+        this.executeOnConnection(connection, sql, params),
+      );
+      await connection.commit();
+      return result;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
   async ping(): Promise<boolean> {
     try {
       await this.query<RowDataPacket[]>('SELECT 1 AS ok');
@@ -68,6 +94,17 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       this.logger.error('MySQL ping failed', error);
       return false;
     }
+  }
+
+  private async executeOnConnection<
+    T extends RowDataPacket[] | ResultSetHeader,
+  >(
+    connection: PoolConnection,
+    sql: string,
+    params: DbQueryParam[] = [],
+  ): Promise<T> {
+    const [rows] = await connection.execute(sql, params);
+    return rows as T;
   }
 
   private getPool(): Pool {

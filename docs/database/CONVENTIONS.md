@@ -4,7 +4,7 @@
 
 **Database:** MySQL 8+  
 **Подход:** SQL-first, raw migration files, `schema_migrations`, без ORM  
-**Эталон:** архитектура миграций как в `captcha-back`
+**Эталон:** архитектура миграций как в `captcha-back` — `/Users/sergeykamalyan/Desktop/russkiy/капча/captcha-back`
 
 Design docs в `docs/database/` — source of truth для схемы. Реальные `.sql` files создаются позже в feature-блоках строго по этим правилам.
 

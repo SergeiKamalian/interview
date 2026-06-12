@@ -25,6 +25,12 @@ export const envValidationSchema: ObjectSchema = Joi.object({
     .required(),
 
   JWT_SECRET: Joi.string().trim().min(1).required(),
+  JWT_EXPIRES_IN: Joi.string().trim().min(1).default('15m'),
+  JWT_REFRESH_SECRET: Joi.string().trim().min(1).required(),
+  JWT_REFRESH_EXPIRES_IN: Joi.string().trim().min(1).default('7d'),
+  BCRYPT_SALT_ROUNDS: Joi.alternatives()
+    .try(Joi.number().integer().min(4).max(20), Joi.string().pattern(/^\d+$/))
+    .default(12),
 
   LOG_LEVEL: Joi.string()
     .valid('error', 'warn', 'log', 'debug', 'verbose')
@@ -51,6 +57,11 @@ export type AppConfig = {
     port: number;
   };
   jwtSecret: string;
+  jwtExpiresIn: string;
+  jwtRefreshSecret: string;
+  jwtRefreshExpiresIn: string;
+  jwtRefreshExpiresInSeconds: number;
+  bcryptSaltRounds: number;
   logLevel?: string;
   graphqlPlayground?: boolean;
 };
@@ -72,6 +83,13 @@ export const appConfig = registerAs(
       port: Number(process.env.REDIS_PORT),
     },
     jwtSecret: process.env.JWT_SECRET!,
+    jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '15m',
+    jwtRefreshSecret: process.env.JWT_REFRESH_SECRET!,
+    jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
+    jwtRefreshExpiresInSeconds: parseDurationToSeconds(
+      process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
+    ),
+    bcryptSaltRounds: Number(process.env.BCRYPT_SALT_ROUNDS ?? 12),
     logLevel: process.env.LOG_LEVEL,
     graphqlPlayground:
       process.env.GRAPHQL_PLAYGROUND === undefined
@@ -84,4 +102,27 @@ export const appConfig = registerAs(
 
 export function getEnv(config: ConfigService): AppConfig {
   return config.getOrThrow<AppConfig>('app');
+}
+
+function parseDurationToSeconds(value: string): number {
+  const match = /^(\d+)([smhd])$/.exec(value.trim());
+  if (!match) {
+    return 7 * 24 * 60 * 60;
+  }
+
+  const amount = Number(match[1]);
+  const unit = match[2];
+
+  switch (unit) {
+    case 's':
+      return amount;
+    case 'm':
+      return amount * 60;
+    case 'h':
+      return amount * 60 * 60;
+    case 'd':
+      return amount * 24 * 60 * 60;
+    default:
+      return 7 * 24 * 60 * 60;
+  }
 }

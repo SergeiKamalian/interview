@@ -147,6 +147,33 @@ Backend будем строить по похожему принципу:
 
 ---
 
+## 2026-06-12 — Frontend делать по образцу captcha-panel
+
+### Решение
+
+Frontend должен быть похож на структуру и паттерны существующего проекта `captcha-panel`.
+
+Эталон frontend для Cursor: `/Users/sergeykamalyan/Desktop/russkiy/капча/captcha-panel`.
+
+Сверяться с эталоном по:
+
+- организации `src/` (pages, features, shared, components);
+- routing и layout-подходам;
+- API-слою и naming;
+- UI-паттернам (Tailwind, переиспользуемые компоненты).
+
+### Причина
+
+У команды уже есть рабочий Vite/React dashboard в `captcha-panel`. Проще повторить знакомую структуру, чем изобретать новую с нуля.
+
+### Последствия
+
+- Cursor перед значимыми frontend-решениями сверяется с `captcha-panel`.
+- **Data layer не копируется один в один:** в AI Interviewer — RTK Query + GraphQL; в эталоне — Effector + REST/axios.
+- FSD-like слои (`app/`, `pages/`, `widgets/`, `features/`, `entities/`, `shared/`) согласуются с эталоном, где это применимо.
+
+---
+
 ## 2026-06-12 — Использовать MySQL как основную базу данных
 
 ### Решение

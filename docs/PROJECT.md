@@ -720,6 +720,8 @@ Architecture: average score 5.5/10
 
 Backend должен быть похож на архитектуру существующего проекта `captcha-back`.
 
+**Эталон backend для Cursor:** `/Users/sergeykamalyan/Desktop/russkiy/капча/captcha-back`
+
 Выбранный backend stack:
 
 - NestJS;
@@ -772,6 +774,10 @@ backend/
 
 ## 20. Frontend Stack
 
+Frontend ориентируется на структуру и паттерны `captcha-panel`.
+
+**Эталон frontend для Cursor:** `/Users/sergeykamalyan/Desktop/russkiy/капча/captcha-panel`
+
 Выбранный frontend stack:
 
 - React;
@@ -783,6 +789,8 @@ backend/
 - GraphQL;
 - React Router;
 - FSD-like структура.
+
+**Отличие от эталона `captcha-panel`:** data layer — Redux Toolkit + RTK Query + GraphQL (в эталоне Effector + REST/axios). Копируем организацию `pages/`, `features/`, `shared/`, routing и UI-подходы, не state manager эталона.
 
 Frontend использует RTK Query как основной слой работы с сервером.
 

@@ -3,6 +3,7 @@ import { AppConfigModule } from './common/config/config.module';
 import { DatabaseModule } from './common/database/database.module';
 import { AppLoggerModule } from './common/logger/logger.module';
 import { RedisModule } from './common/redis/redis.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { AppGraphQLModule } from './modules/graphql/graphql.module';
 import { HealthModule } from './modules/health/health.module';
 import { AppController } from './app.controller';
@@ -15,6 +16,7 @@ import { AppService } from './app.service';
     DatabaseModule,
     RedisModule,
     HealthModule,
+    AuthModule,
     AppGraphQLModule,
   ],
   controllers: [AppController],

@@ -2,6 +2,8 @@
 
 NestJS backend для AI Interviewer Platform: GraphQL API, MySQL (raw SQL), Redis, SQL migrations.
 
+**Эталон backend:** `/Users/sergeykamalyan/Desktop/russkiy/капча/captcha-back` — структура modules, migrations, config.
+
 Архитектурные решения: [docs/DECISIONS.md](../docs/DECISIONS.md) — SQL-first, без Prisma/ORM.
 
 ## Prerequisites
@@ -30,20 +32,38 @@ curl -s -X POST http://localhost:3000/graphql \
 ## Local dev (without Docker backend)
 
 ```bash
-# 1. Поднять только инфраструктуру
+# Вариант 1 — один скрипт: infra + migrate + backend + frontend (как captcha-back)
+cd backend
+pnpm install
+cp .env.example .env   # если ещё нет
+pnpm run dev:local
+
+# Вариант 2 — только backend вручную
 docker compose up -d mysql redis
-
-# 2. Env
 cp .env.example backend/.env
-
-# 3. Зависимости и миграции
 cd backend
 pnpm install
 pnpm run migrate
-
-# 4. Dev server
 pnpm run start:dev
 ```
+
+`dev:local` поднимает `mysql` и `redis` через docker compose, прогоняет миграции, останавливает docker-контейнер `backend` (если занят порт `3000`), затем параллельно запускает NestJS и Vite.
+
+Переменные окружения для скрипта (optional):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `FRONTEND_DIR` | `../frontend` | Путь к frontend |
+| `FRONTEND_PORT` | `5173` | Vite port |
+| `PORT` | `3000` | Backend port |
+| `SKIP_DOCKER` | `0` | `1` — не трогать docker compose |
+| `SKIP_MIGRATE` | `0` | `1` — пропустить migrate |
+
+Endpoints после старта:
+
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:3000`
+- GraphQL Playground: `http://localhost:3000/graphql` (если `GRAPHQL_PLAYGROUND=true`)
 
 Endpoints:
 
@@ -55,6 +75,7 @@ Endpoints:
 
 | Command | Description |
 |---------|-------------|
+| `pnpm run dev:local` | Docker mysql/redis + migrate + backend + frontend |
 | `pnpm run start:dev` | NestJS watch mode |
 | `pnpm run build` | Production build → `dist/` |
 | `pnpm run start:prod` | `node dist/main.js` |
@@ -112,7 +133,10 @@ backend/
 | `REDIS_HOST` | yes | `localhost` | Redis host (`redis` in Docker) |
 | `REDIS_PORT` | yes | `6379` | Redis port |
 | `REDIS_PASSWORD` | no | — | Redis password (if set) |
-| `JWT_SECRET` | yes | `local-dev-secret` | Auth placeholder (block 04) |
+| `JWT_SECRET` | yes | `local-dev-secret` | Access token signing secret |
+| `JWT_EXPIRES_IN` | no | `15m` | Access token TTL |
+| `JWT_REFRESH_SECRET` | yes | `local-dev-refresh-secret` | Refresh token signing secret |
+| `JWT_REFRESH_EXPIRES_IN` | no | `7d` | Refresh token TTL |
 | `GRAPHQL_PLAYGROUND` | no | `true` | Enable GraphQL playground |
 | `LOG_LEVEL` | no | `log` | Nest log level |
 

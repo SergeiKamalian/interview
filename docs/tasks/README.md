@@ -27,12 +27,12 @@ docs/tasks/
       TASKS.md
       subtasks/
 
-    02-⬜-database-design/
+    02-✅-database-design/
       README.md
       TASKS.md
       subtasks/
 
-    03-⬜-frontend-foundation/
+    03-✅-frontend-foundation/
       README.md
       TASKS.md
       subtasks/
@@ -54,7 +54,7 @@ docs/tasks/
 ```txt
 00 — project-setup
 01 — backend-foundation      (NestJS, MySQL, Redis, GraphQL, migration runner)
-02 — database-design         (SQL-first design docs, без реальных migrations)
+02 — database-design         (SQL schema + migrations 001–010)
 03 — frontend-foundation     (React Vite RTK Query GraphQL)
 04 — auth-company
 05 — question-bank           (source of truth)
@@ -66,7 +66,18 @@ docs/tasks/
 11 — deployment
 ```
 
-Важно: блок `02-database-design` должен быть завершён **до** реализации SQL migrations в feature-блоках 04+.
+Важно: design docs в `docs/database/` и SQL migrations — source of truth для feature-блоков 04+.
+
+---
+
+## Эталонные проекты
+
+| Часть | Проект | Путь |
+|-------|--------|------|
+| Backend | `captcha-back` | `/Users/sergeykamalyan/Desktop/russkiy/капча/captcha-back` |
+| Frontend | `captcha-panel` | `/Users/sergeykamalyan/Desktop/russkiy/капча/captcha-panel` |
+
+Подробнее: `docs/DECISIONS.md`, `.cursor/rules/architecture-constraints.mdc`.
 
 ---
 

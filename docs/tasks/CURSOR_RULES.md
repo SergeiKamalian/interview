@@ -208,7 +208,8 @@ Cursor НЕ должен:
 - frontend внутри `frontend/`;
 - tasks внутри `docs/tasks/list/`;
 - backend похож на `captcha-back`;
-- эталон backend для сравнения структуры: `/Users/sergeykamalyan/Desktop/russkiy/капча/captcha-back`;
+- **эталон backend:** `/Users/sergeykamalyan/Desktop/russkiy/капча/captcha-back`;
+- **эталон frontend:** `/Users/sergeykamalyan/Desktop/russkiy/капча/captcha-panel`;
 - TypeScript imports в backend должны быть как в `captcha-back`: без `.js` suffix (`./app.module`, не `./app.module.js`);
 - backend stack:
   - NestJS;
@@ -229,6 +230,8 @@ Cursor НЕ должен:
   - GraphQL;
   - React Router;
   - FSD-like structure;
+- frontend по образцу `captcha-panel` (структура, routing, UI); эталон: `/Users/sergeykamalyan/Desktop/russkiy/капча/captcha-panel`;
+- data layer frontend — RTK Query + GraphQL (не Effector/axios из эталона);
 - AI не источник правды;
 - источник правды — question bank, ideal answers, checkpoints.
 
@@ -238,7 +241,7 @@ Cursor НЕ должен:
 
 Проектирование и реализация базы данных — **два разных этапа**.
 
-### Блок `02-⬜-database-design` (design only)
+### Блок `02-✅-database-design`
 
 - Создаёт только документацию в `docs/database/`.
 - **Не создаёт** реальные `.sql` files в `backend/migrations/`.

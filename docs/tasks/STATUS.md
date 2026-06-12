@@ -62,19 +62,19 @@
 Active block:
 
 ```txt
-docs/tasks/list/03-⬜-frontend-foundation/
+docs/tasks/list/05-⬜-question-bank/
 ```
 
 Block status:
 
 ```txt
-⬜ todo — следующий по порядку
+⬜ todo
 ```
 
 Block title:
 
 ```txt
-Frontend Foundation
+Question Bank
 ```
 
 ---
@@ -84,31 +84,25 @@ Frontend Foundation
 Active subtask ID:
 
 ```txt
-Нет активного subtask — блок `02-✅-database-design` завершён.
+Нет активного subtask — блок 05 ещё не начат.
 ```
 
 Last completed subtask:
 
 ```txt
-TASK-02.11 — Database design: implementation plan (+ migrations 002–010 applied)
+TASK-04.10 — Add current user state
 ```
 
 Next recommended subtask:
 
 ```txt
-TASK-03.1 (frontend foundation)
+TASK-05.1
 ```
 
 Next subtask file:
 
 ```txt
-docs/tasks/list/03-⬜-frontend-foundation/subtasks/
-```
-
-Status:
-
-```txt
-[ ] todo — начать по команде
+docs/tasks/list/05-⬜-question-bank/subtasks/001-⬜-add-question-bank-database-tables.md
 ```
 
 Last updated:
@@ -163,18 +157,41 @@ Last updated:
 - [x] `TASK-02.10` — Database design: indexes & performance catalog
 - [x] `TASK-02.11` — Database design: implementation plan
 - [x] Block `02-✅-database-design` completed (migrations 001–010 applied to MySQL)
+- [x] `TASK-03.1` — Create Vite React TypeScript app
+- [x] `TASK-03.2` — Add Tailwind CSS
+- [x] `TASK-03.3` — Add React Router
+- [x] `TASK-03.4` — Add Redux Toolkit store
+- [x] `TASK-03.5` — Add RTK Query base setup
+- [x] `TASK-03.6` — Add GraphQL baseQuery for RTK Query
+- [x] `TASK-03.7` — Add FSD-like folder structure
+- [x] `TASK-03.8` — Add base layouts
+- [x] `TASK-03.9` — Add frontend env config
+- [x] `TASK-03.10` — Add basic UI primitives
+- [x] Block `03-✅-frontend-foundation` completed
+- [x] `TASK-04.1` — Auth DB tables (verified migrations 002–004 from block 02)
+- [x] `TASK-04.2` — Backend AuthModule + repositories + DTO
+- [x] `TASK-04.3` — bcrypt password hashing
+- [x] `TASK-04.4` — JWT access token
+- [x] `TASK-04.5` — GraphQL register/login/me
+- [x] `TASK-04.6` — Company creation on register (owner membership)
+- [x] `TASK-04.7` — GqlAuthGuard + @CurrentUser()
+- [x] `TASK-04.8` — Frontend login/register forms
+- [x] `TASK-04.9` — Protected dashboard routes
+- [x] `TASK-04.10` — currentUser state + JWT in GraphQL headers
+- [x] Block `04-✅-auth-company` completed
 
 ---
 
 ## In Progress
 
-No active subtask.
+Block `05-⬜-question-bank` — следующий блок (ещё не начат).
 
 ---
 
 ## Next
 
-- [ ] Block `03-⬜-frontend-foundation` — или `04-⬜-auth-company` (backend app code; DB tables уже есть)
+- [ ] `TASK-04.1` — Add users & companies database tables
+  - File: `docs/tasks/list/04-⬜-auth-company/subtasks/001-⬜-add-users-companies-database-tables.md`
 
 ---
 
@@ -216,15 +233,21 @@ docs/tasks/
         ...
         011-✅-prepare-database-implementation-plan.md
 
-    03-⬜-frontend-foundation/
+    03-✅-frontend-foundation/
       README.md
       TASKS.md
       subtasks/
+        001-✅-create-vite-react-typescript-app.md
+        ...
+        010-✅-add-basic-ui-primitives.md
 
-    04-⬜-auth-company/
+    04-✅-auth-company/
       README.md
       TASKS.md
       subtasks/
+        001-✅-add-users-companies-database-tables.md
+        ...
+        010-✅-add-current-user-state.md
 
     05-⬜-question-bank/
       README.md
