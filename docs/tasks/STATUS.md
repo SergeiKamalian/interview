@@ -62,19 +62,19 @@
 Active block:
 
 ```txt
-docs/tasks/list/01-🟡-backend-foundation/
+docs/tasks/list/02-⬜-database-design/
 ```
 
 Block status:
 
 ```txt
-🟡 in progress
+⬜ todo — следующий по порядку, ждёт команды
 ```
 
 Block title:
 
 ```txt
-Backend Foundation
+Database Design
 ```
 
 ---
@@ -84,25 +84,25 @@ Backend Foundation
 Active subtask ID:
 
 ```txt
-Нет активного subtask — `TASK-01.4` завершён, следующий ожидает команды.
+Нет активного subtask — блок `01-✅-backend-foundation` завершён.
 ```
 
 Last completed subtask:
 
 ```txt
-TASK-01.4 — GraphQL foundation (Apollo)
+TASK-01.12 — Backend README and env examples
 ```
 
 Next recommended subtask:
 
 ```txt
-TASK-01.5
+TASK-02.1
 ```
 
 Next subtask file:
 
 ```txt
-docs/tasks/list/01-🟡-backend-foundation/subtasks/005-⬜-add-mysql-connection-module.md
+docs/tasks/list/02-⬜-database-design/subtasks/001-⬜-define-database-conventions.md
 ```
 
 Status:
@@ -142,20 +142,28 @@ Last updated:
 - [x] `TASK-01.2` — Base config and env validation
 - [x] `TASK-01.3` — Health endpoint for monitoring
 - [x] `TASK-01.4` — GraphQL foundation (Apollo)
+- [x] `TASK-01.5` — MySQL connection module
+- [x] `TASK-01.7` — SQL migration runner
+- [x] `TASK-01.8` — schema_migrations table
+- [x] `TASK-01.6` — Redis connection module
+- [x] `TASK-01.9` — Dockerfile for backend
+- [x] `TASK-01.10` — docker-compose services
+- [x] `TASK-01.11` — Base logging and error handling
+- [x] `TASK-01.12` — Backend README and env examples
+- [x] Block `01-✅-backend-foundation` completed
 
 ---
 
 ## In Progress
 
-No active subtask. Block `01-🟡-backend-foundation` is in progress.
+No active subtask. Следующий блок: `02-⬜-database-design`.
 
 ---
 
 ## Next
 
-- [ ] `TASK-01.5` — MySQL connection module
-  - File: `docs/tasks/list/01-🟡-backend-foundation/subtasks/005-⬜-add-mysql-connection-module.md`
-- [ ] `TASK-02.1` — Database design: define conventions (после infrastructure из блока 01)
+- [ ] `TASK-02.1` — Database design: define conventions
+  - File: `docs/tasks/list/02-⬜-database-design/subtasks/001-⬜-define-database-conventions.md`
 
 ---
 
@@ -181,10 +189,13 @@ docs/tasks/
         002-✅-create-main-task-block-folders.md
         003-✅-finalize-project-setup-status.md
 
-    01-🟡-backend-foundation/
+    01-✅-backend-foundation/
       README.md
       TASKS.md
       subtasks/
+        001-✅-create-nestjs-app-structure.md
+        ...
+        012-✅-add-backend-readme-env-examples.md
 
     02-⬜-database-design/
       README.md

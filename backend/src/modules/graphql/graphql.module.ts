@@ -17,7 +17,10 @@ import { HelloResolver } from './hello.resolver';
           env.graphqlPlayground ?? env.nodeEnv === 'development';
 
         return {
-          autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
+          autoSchemaFile:
+            env.nodeEnv === 'production'
+              ? true
+              : join(process.cwd(), 'src/schema.gql'),
           sortSchema: true,
           playground: playgroundEnabled,
           introspection: playgroundEnabled,

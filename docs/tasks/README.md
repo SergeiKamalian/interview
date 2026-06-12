@@ -22,7 +22,7 @@ docs/tasks/
         002-✅-create-main-task-block-folders.md
         003-✅-finalize-project-setup-status.md
 
-    01-🟡-backend-foundation/
+    01-✅-backend-foundation/
       README.md
       TASKS.md
       subtasks/

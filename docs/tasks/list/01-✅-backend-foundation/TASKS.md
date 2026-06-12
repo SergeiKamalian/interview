@@ -1,6 +1,6 @@
 # 01 — Фундамент backend Tasks
 
-Overall status: 🟡 in progress
+Overall status: ✅ done
 
 ---
 
@@ -68,11 +68,11 @@ Goal:
 
 ### TASK-01.5 — Модуль подключения MySQL
 
-Status: [ ] todo  
+Status: [x] done  
 File:
 
 ```txt
-subtasks/005-⬜-add-mysql-connection-module.md
+subtasks/005-✅-add-mysql-connection-module.md
 ```
 
 Goal:
@@ -83,11 +83,11 @@ Goal:
 
 ### TASK-01.6 — Модуль подключения Redis
 
-Status: [ ] todo  
+Status: [x] done  
 File:
 
 ```txt
-subtasks/006-⬜-add-redis-connection-module.md
+subtasks/006-✅-add-redis-connection-module.md
 ```
 
 Goal:
@@ -98,11 +98,11 @@ Goal:
 
 ### TASK-01.7 — SQL migration runner
 
-Status: [ ] todo  
+Status: [x] done  
 File:
 
 ```txt
-subtasks/007-⬜-add-sql-migration-runner.md
+subtasks/007-✅-add-sql-migration-runner.md
 ```
 
 Goal:
@@ -113,11 +113,11 @@ Goal:
 
 ### TASK-01.8 — Таблица schema_migrations
 
-Status: [ ] todo  
+Status: [x] done  
 File:
 
 ```txt
-subtasks/008-⬜-add-schema-migrations-table.md
+subtasks/008-✅-add-schema-migrations-table.md
 ```
 
 Goal:
@@ -128,11 +128,11 @@ Goal:
 
 ### TASK-01.9 — Dockerfile для backend
 
-Status: [ ] todo  
+Status: [x] done  
 File:
 
 ```txt
-subtasks/009-⬜-add-dockerfile.md
+subtasks/009-✅-add-dockerfile.md
 ```
 
 Goal:
@@ -143,11 +143,11 @@ Goal:
 
 ### TASK-01.10 — docker-compose сервисы
 
-Status: [ ] todo  
+Status: [x] done  
 File:
 
 ```txt
-subtasks/010-⬜-add-docker-compose-services.md
+subtasks/010-✅-add-docker-compose-services.md
 ```
 
 Goal:
@@ -158,11 +158,11 @@ Goal:
 
 ### TASK-01.11 — Базовое логирование и обработка ошибок
 
-Status: [ ] todo  
+Status: [x] done  
 File:
 
 ```txt
-subtasks/011-⬜-add-base-logging-error-handling.md
+subtasks/011-✅-add-base-logging-error-handling.md
 ```
 
 Goal:
@@ -173,11 +173,11 @@ Goal:
 
 ### TASK-01.12 — README backend и примеры .env
 
-Status: [ ] todo  
+Status: [x] done  
 File:
 
 ```txt
-subtasks/012-⬜-add-backend-readme-env-examples.md
+subtasks/012-✅-add-backend-readme-env-examples.md
 ```
 
 Goal:
@@ -188,4 +188,4 @@ Goal:
 
 ## Completion rule
 
-Блок `01-🟡-backend-foundation` считается completed только когда все subtasks `01.1`–`01.12` имеют status `[x] done`; папка переименована в `01-✅-backend-foundation`.
+Блок `01-✅-backend-foundation` completed: все subtasks `01.1`–`01.12` имеют status `[x] done`.

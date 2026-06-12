@@ -1,4 +1,4 @@
-# 01-🟡-backend-foundation — Фундамент backend
+# 01-✅-backend-foundation — Фундамент backend
 
 ## Цель блока
 
