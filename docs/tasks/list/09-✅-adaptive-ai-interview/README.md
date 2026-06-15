@@ -96,6 +96,8 @@ Final evaluation использует per-question summaries/evidence, а не �
 
 Подробный design: [`docs/database/schemas/adaptive-ai-interview.md`](../../database/schemas/adaptive-ai-interview.md).
 
+Latency design для временного OpenAI server-side state: [`docs/OPENAI_SERVER_STATE.md`](../../../OPENAI_SERVER_STATE.md).
+
 ## Realtime frontend через WebSocket
 
 Для плавного UX используем best-practice split:

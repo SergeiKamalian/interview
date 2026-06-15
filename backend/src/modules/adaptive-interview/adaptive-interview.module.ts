@@ -8,6 +8,7 @@ import { CheckpointStateRepository } from './repositories/checkpoint-state.repos
 import { QuestionSummaryRepository } from './repositories/question-summary.repository';
 import { AdaptiveInterviewContextService } from './services/adaptive-interview-context.service';
 import { AdaptiveAiConversationService } from './services/adaptive-ai-conversation.service';
+import { AdaptiveOpenAiResponseStateService } from './services/adaptive-openai-response-state.service';
 import { AdaptiveInterviewSubmitService } from './services/adaptive-interview-submit.service';
 import { CheckpointStateService } from './services/checkpoint-state.service';
 import { FollowUpPlannerService } from './services/follow-up-planner.service';
@@ -31,6 +32,7 @@ import { QuestionSummaryService } from './services/question-summary.service';
     CheckpointStateService,
     AdaptiveInterviewContextService,
     AdaptiveAiConversationService,
+    AdaptiveOpenAiResponseStateService,
     PerTurnEvaluationValidatorService,
     PerTurnCheckpointEvaluatorService,
     FollowUpPolicyService,
@@ -46,6 +48,7 @@ import { QuestionSummaryService } from './services/question-summary.service';
     QuestionSummaryRepository,
     AdaptiveInterviewContextService,
     AdaptiveAiConversationService,
+    AdaptiveOpenAiResponseStateService,
     PerTurnCheckpointEvaluatorService,
     PerTurnEvaluationValidatorService,
     FollowUpPolicyService,

@@ -17,6 +17,7 @@ import { CheckpointStateService } from './checkpoint-state.service';
 import { QuestionSummaryService } from './question-summary.service';
 import { AdaptiveInterviewContextService } from './adaptive-interview-context.service';
 import { AdaptiveAiConversationService } from './adaptive-ai-conversation.service';
+import { AdaptiveOpenAiResponseStateService } from './adaptive-openai-response-state.service';
 import {
   logAdaptiveAiDebug,
   startAdaptiveAiPhaseTimer,
@@ -44,6 +45,7 @@ export class AdaptiveInterviewSubmitService {
     private readonly aiMessageStreamService: InterviewAiMessageStreamService,
     private readonly adaptiveInterviewContextService: AdaptiveInterviewContextService,
     private readonly adaptiveAiConversationService: AdaptiveAiConversationService,
+    private readonly adaptiveOpenAiResponseStateService: AdaptiveOpenAiResponseStateService,
   ) {}
 
   async assertCanSubmit(
@@ -63,7 +65,44 @@ export class AdaptiveInterviewSubmitService {
     }
   }
 
-  async submitAnswer(input: AdaptiveSubmitInput): Promise<AdaptiveSubmitResult> {
+  async initializeQuestionAiState(input: {
+    companyId: number;
+    attemptId: number;
+    interviewQuestionId: number;
+  }): Promise<void> {
+    const timer = startAdaptiveAiPhaseTimer(
+      this.logger,
+      'start_interview.prewarm_openai_state',
+      {
+        attemptId: input.attemptId,
+        interviewQuestionId: input.interviewQuestionId,
+      },
+    );
+
+    try {
+      const result =
+        await this.perTurnCheckpointEvaluatorService.initializeOpenAiEvaluateState(
+          {
+            companyId: input.companyId,
+            attemptId: input.attemptId,
+            interviewQuestionId: input.interviewQuestionId,
+          },
+        );
+
+      timer.finish({ status: result.status });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Unknown prewarm error';
+      this.logger.warn(
+        `Adaptive OpenAI state prewarm skipped attempt=${input.attemptId} question=${input.interviewQuestionId}: ${message}`,
+      );
+      timer.finish({ status: 'skipped', error: message });
+    }
+  }
+
+  async submitAnswer(
+    input: AdaptiveSubmitInput,
+  ): Promise<AdaptiveSubmitResult> {
     const { attempt, questions, trimmedAnswer } = input;
     const attemptId = attempt.id;
     const totalMainQuestions = questions.length;
@@ -130,9 +169,7 @@ export class AdaptiveInterviewSubmitService {
           role: 'candidate',
           content: trimmedAnswer,
           sequenceOrder,
-          messageKind: isFollowUpAnswer
-            ? 'follow_up_answer'
-            : 'main_answer',
+          messageKind: isFollowUpAnswer ? 'follow_up_answer' : 'main_answer',
           parentMessageId: isFollowUpAnswer
             ? awaitingFollowUp.followUpQuestionMessageId
             : null,
@@ -254,8 +291,7 @@ export class AdaptiveInterviewSubmitService {
       shouldSkipFollowUps({
         answer: trimmedAnswer,
         aiDisposition: evaluation.candidateDisposition,
-        followUpsUsedForQuestion:
-          contextPacket.followUpLimits.usedForQuestion,
+        followUpsUsedForQuestion: contextPacket.followUpLimits.usedForQuestion,
       }) &&
       !isFullQuestionDecline(trimmedAnswer)
     ) {
@@ -425,6 +461,10 @@ export class AdaptiveInterviewSubmitService {
       attemptId,
       input.currentQuestion.id,
     );
+    await this.adaptiveOpenAiResponseStateService.clearEvaluateState(
+      attemptId,
+      input.currentQuestion.id,
+    );
 
     await this.questionSummaryService.buildAndPersist({
       companyId: input.attempt.companyId,
@@ -543,7 +583,8 @@ export function resolveSessionProgress(input: {
   currentQuestionId: number | null;
 } {
   if (!input.adaptiveEnabled) {
-    const currentQuestion = input.questions[input.answeredMainQuestions] ?? null;
+    const currentQuestion =
+      input.questions[input.answeredMainQuestions] ?? null;
 
     return {
       currentQuestionText: currentQuestion?.questionText ?? null,

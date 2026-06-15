@@ -1,5 +1,4 @@
 import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview-context.types';
-import type { CandidateAnswerDisposition } from '../types/candidate-answer-disposition.type';
 import type { CheckpointStateStatus } from '../types/checkpoint-state-status.type';
 import type {
   PerTurnCheckpointEvaluationAiResponse,
@@ -7,96 +6,11 @@ import type {
 } from '../types/per-turn-evaluation.types';
 import { mergeCheckpointEvaluation } from './merge-checkpoint-evaluation.util';
 
-const STOP_WORDS = new Set([
-  'кандидат',
-  'говорит',
-  'объясняет',
-  'что',
-  'для',
-  'или',
-  'через',
-  'без',
-  'the',
-  'and',
-  'that',
-  'with',
-  'from',
-  'this',
-  'when',
-  'как',
-  'это',
-  'нужен',
-  'нужно',
-  'может',
-  'типа',
-  'есть',
-  'про',
-  'при',
-  'после',
-]);
-
-const FULL_CREDIT_SIGNALS: Record<string, RegExp[]> = {
-  type_parameter: [
-    /какого\s+типа\s+(?:его\s+)?(?:data|данн)/i,
-    /(?:таблиц|компонент|функци|класс|интерфейс).{0,120}(?:тип|data|generic|<t>)/i,
-    /(?:тип|data|generic).{0,120}(?:таблиц|компонент|переда[её]м|рендер)/i,
-    /items:\s*t\[\]/i,
-    /\b<t>\b/i,
-  ],
-};
-
-const STRONG_SIGNALS: Record<string, RegExp[]> = {
-  type_parameter: [
-    /\b<t>\b/i,
-    /items:\s*t\[\]/i,
-    /t\[\]/i,
-    /параметр\s+тип/i,
-    /generic/i,
-    /дженерик/i,
-    /основной\s+тип/i,
-    /разных\s+тип/i,
-    /общих\s+тип/i,
-    /переда[её]м\s+.*\bтип/i,
-    /ui\s+таблиц/i,
-    /таблиц[аы].{0,100}тип/i,
-    /тип.{0,60}(?:data|данн)/i,
-    /знать\s+какого\s+типа/i,
-    /переда[её]м\s+(?:ему|его|данн)/i,
-    /generic\s+компонент/i,
-    /параметриз/i,
-  ],
-  reusability: [
-    /не\s+переписы/i,
-    /не\s+пересозд/i,
-    /переиспольз/i,
-    /дублир/i,
-    /в\s+каждом\s+месте/i,
-    /один\s+и\s+тот\s+же\s+тип/i,
-    /не\s+нужно\s+менять/i,
-    /поменять\s+в\s+каждом/i,
-    /каждый\s+раз\s+таблиц/i,
-    /для\s+каждого\s+нового\s+типа/i,
-  ],
-  type_safety: [
-    /type\s+safety/i,
-    /связь\s+между\s+вход/i,
-    /входн.*выходн/i,
-    /\bany\b/i,
-  ],
-  constraints: [/extends/i, /огранич/i, /constraint/i],
-  side_effects: [/побочн/i, /side\s+effect/i, /api/i, /запрос/i],
-  dependency_array: [/dependenc/i, /зависимост/i, /deps/i],
-  cleanup: [/cleanup/i, /очист/i, /unsubscribe/i, /listener/i, /таймер/i],
-  run_timing: [/после\s+рендер/i, /after\s+render/i, /при\s+измен/i],
-  example: [/например/i, /for\s+example/i, /usecase/i],
-};
-
 export function applyCheckpointScoreFloors(
   evaluation: PerTurnCheckpointEvaluationAiResponse,
   context: AdaptiveInterviewContextPacket,
 ): PerTurnCheckpointEvaluationAiResponse {
   const candidateText = collectCandidateText(context);
-  const disposition = evaluation.candidateDisposition;
 
   const checkpointResults = evaluation.checkpointResults.map((result) => {
     const checkpoint = context.checkpoints.find(
@@ -110,24 +24,21 @@ export function applyCheckpointScoreFloors(
       return result;
     }
 
-    const keywordFloor = inferKeywordPartialFloor({
-      checkpointKey: checkpoint.checkpointKey,
-      title: checkpoint.title,
-      expected: checkpoint.expected,
-      maxScore: checkpoint.score,
+    const guardedResult = applySemanticContradictionCap(
+      result,
       candidateText,
-      disposition,
-    });
+      checkpoint.score,
+    );
 
     const merged = mergeCheckpointEvaluation({
       currentScoreAwarded: priorState?.scoreAwarded ?? 0,
       currentStatus: (priorState?.status ?? 'unseen') as CheckpointStateStatus,
       currentEvidenceSummary: null,
       currentRationale: null,
-      incomingScoreAwarded: Math.max(result.scoreAwarded, keywordFloor),
-      incomingStatus: result.status,
-      incomingEvidenceSummary: result.evidenceSummary,
-      incomingRationale: result.rationale,
+      incomingScoreAwarded: guardedResult.scoreAwarded,
+      incomingStatus: guardedResult.status,
+      incomingEvidenceSummary: guardedResult.evidenceSummary,
+      incomingRationale: guardedResult.rationale,
       maxScore: checkpoint.score,
     });
 
@@ -157,48 +68,98 @@ function collectCandidateText(context: AdaptiveInterviewContextPacket): string {
     .toLowerCase();
 }
 
-function inferKeywordPartialFloor(input: {
-  checkpointKey: string;
-  title: string;
-  expected: string;
-  maxScore: number;
-  candidateText: string;
-  disposition: CandidateAnswerDisposition;
-}): number {
-  // Floors use cumulative candidate turns — scoped decline on the latest answer
-  // must not erase credit earned from earlier substantive answers.
-  if (input.disposition === 'off_topic') {
-    return 0;
+function applySemanticContradictionCap(
+  result: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
+  candidateText: string,
+  maxScore: number,
+): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
+  const cap = getContradictionScoreCap(result.checkpointKey, candidateText);
+  if (cap === null || result.scoreAwarded <= cap) {
+    return result;
   }
 
-  if (input.candidateText.trim().length < 12) {
-    return 0;
-  }
-
-  const fullCreditSignals = FULL_CREDIT_SIGNALS[input.checkpointKey] ?? [];
-  if (fullCreditSignals.some((pattern) => pattern.test(input.candidateText))) {
-    return input.maxScore;
-  }
-
-  const strongSignals = STRONG_SIGNALS[input.checkpointKey] ?? [];
-  if (strongSignals.some((pattern) => pattern.test(input.candidateText))) {
-    return Math.min(input.maxScore, input.maxScore * 0.5);
-  }
-
-  const keywords = extractKeywords(`${input.title} ${input.expected}`);
-  const matched = keywords.filter((word) =>
-    input.candidateText.includes(word),
-  ).length;
-
-  if (matched >= 2) {
-    return Math.min(input.maxScore, input.maxScore * 0.5);
-  }
-
-  return 0;
+  const scoreAwarded = Math.min(maxScore, cap);
+  return {
+    ...result,
+    scoreAwarded,
+    status: scoreAwarded > 0 ? 'partial' : 'missed',
+    rationale: `${result.rationale} Semantic guard capped score because candidate evidence contains a direct contradiction.`,
+  };
 }
 
-function extractKeywords(text: string): string[] {
-  return [...new Set(text.toLowerCase().match(/[a-z0-9_]{3,}|[а-яё]{4,}/gi) ?? [])]
-    .map((word) => word.toLowerCase())
-    .filter((word) => !STOP_WORDS.has(word));
+function getContradictionScoreCap(
+  checkpointKey: string,
+  candidateText: string,
+): number | null {
+  const has = (patterns: RegExp[]) =>
+    patterns.some((pattern) => pattern.test(candidateText));
+
+  if (
+    checkpointKey === 'type_safety' &&
+    has([
+      /строк.{0,80}(?:выход|верн).{0,40}числ/i,
+      /string.{0,80}(?:return|верн|выход).{0,40}number/i,
+      /не\s+связывает\s+вход\s+и\s+выход/i,
+      /вернуть\s+уже\s+другой\s+t/i,
+      /любой\s+тип\s+результата\s+независимо\s+от\s+вход/i,
+    ])
+  ) {
+    return 0;
+  }
+
+  if (
+    checkpointKey === 'type_parameter' &&
+    has([/generic.{0,40}(?:как|вроде)\s+any/i, /почти\s+как\s+any/i])
+  ) {
+    return 0.5;
+  }
+
+  if (
+    checkpointKey === 'constraints' &&
+    has([
+      /сам\s+(?:узна[её]т|пойм[её]т)\s+все\s+поля/i,
+      /можно\s+обращаться\s+к\s+любому\s+полю/i,
+    ])
+  ) {
+    return 0;
+  }
+
+  if (
+    checkpointKey === 'run_timing' &&
+    has([/до\s+рендер/i, /before\s+render/i, /заранее\s+подготовить\s+dom/i])
+  ) {
+    return 0;
+  }
+
+  if (
+    checkpointKey === 'dependency_array' &&
+    has([
+      /зависимост.{0,80}заново\s+отрис/i,
+      /эффект\s+запускает\s+(?:этот\s+)?ререндер/i,
+      /react\s+понимал\s+когда\s+надо\s+заново\s+отрис/i,
+    ])
+  ) {
+    return 0;
+  }
+
+  if (
+    checkpointKey === 'cleanup' &&
+    has([
+      /сразу.{0,80}(?:clearinterval|unsubscribe|отпис)/i,
+      /react\s+.*сам\s+.*чист/i,
+      /cleanup\s+не\s+.*обязательно/i,
+      /return\s+cleanup\s+.*не\s+нуж/i,
+    ])
+  ) {
+    return 0.5;
+  }
+
+  if (
+    checkpointKey === 'side_effects' &&
+    has([/вместо\s+usestate/i, /нужен.{0,80}перерис/i])
+  ) {
+    return 0.5;
+  }
+
+  return null;
 }

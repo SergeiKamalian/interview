@@ -45,9 +45,11 @@ export function mergeCheckpointEvaluation(
     status = pickHigherRankStatus(input.currentStatus, input.incomingStatus);
   }
 
-  if (input.maxScore > 0 && mergedScore >= input.maxScore) {
+  if (mergedScore <= 0) {
+    status = 'missed';
+  } else if (input.maxScore > 0 && mergedScore >= input.maxScore) {
     status = 'covered';
-  } else if (mergedScore > 0 && status === 'missed') {
+  } else if (status === 'missed') {
     status = 'partial';
   }
 
@@ -58,10 +60,10 @@ export function mergeCheckpointEvaluation(
     status,
     evidenceSummary: incomingWins
       ? input.incomingEvidenceSummary
-      : input.currentEvidenceSummary ?? input.incomingEvidenceSummary,
+      : (input.currentEvidenceSummary ?? input.incomingEvidenceSummary),
     rationale: incomingWins
       ? input.incomingRationale
-      : input.currentRationale ?? input.incomingRationale,
+      : (input.currentRationale ?? input.incomingRationale),
   };
 }
 

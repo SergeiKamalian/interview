@@ -3,6 +3,20 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import OpenAI, { APIError } from 'openai';
+import type {
+  ChatCompletion,
+  ChatCompletionChunk,
+  ChatCompletionCreateParamsNonStreaming,
+  ChatCompletionCreateParamsStreaming,
+  ChatCompletionMessageParam,
+} from 'openai/resources/chat/completions';
+import type {
+  Response,
+  ResponseCreateParamsNonStreaming,
+  ResponseCreateParamsStreaming,
+  ResponseInput,
+} from 'openai/resources/responses/responses';
 import type { AdaptiveAiDebugMeta } from '../../common/debug/adaptive-ai-debug.util';
 import {
   isAdaptiveAiDebugEnabled,
@@ -21,6 +35,7 @@ type ChatCompletionUsage = {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  cachedTokens?: number;
 };
 
 export type ChatCompletionResult = {
@@ -30,33 +45,47 @@ export type ChatCompletionResult = {
   latencyMs: number;
 };
 
-export type AiProviderDebugContext = AdaptiveAiDebugMeta;
-
-type OpenAiStreamChunk = {
-  model?: string;
-  choices?: Array<{ delta?: { content?: string } }>;
-  usage?: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    total_tokens?: number;
-  };
-  error?: { message?: string };
+export type ResponseCompletionResult = ChatCompletionResult & {
+  responseId: string;
 };
+
+export type AiProviderDebugContext = AdaptiveAiDebugMeta;
 
 export type StreamChatCompletionOptions = {
   model?: string;
   debug?: AiProviderDebugContext;
   onDelta: (delta: string, contentSoFar: string) => void;
 };
-type OpenAiChatResponse = {
+
+export type StreamResponseTextOptions = {
   model?: string;
-  choices?: Array<{ message?: { content?: string } }>;
-  usage?: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    total_tokens?: number;
-  };
-  error?: { message?: string };
+  input: string | ChatMessage[];
+  instructions?: string;
+  previousResponseId?: string;
+  conversationId?: string;
+  store?: boolean;
+  metadata?: Record<string, string | number | boolean | null>;
+  debug?: AiProviderDebugContext;
+  onTextDelta: (delta: string, contentSoFar: string) => void;
+  onDone?: (result: ResponseCompletionResult) => void;
+};
+
+export type CreateResponseTextOptions = {
+  model?: string;
+  messages: ChatMessage[];
+  previousResponseId?: string;
+  conversationId?: string;
+  store?: boolean;
+  debug?: AiProviderDebugContext;
+  metadata?: Record<string, string | number | boolean | null>;
+};
+
+type OpenAiChatUsage =
+  | ChatCompletion['usage']
+  | NonNullable<ChatCompletionChunk['usage']>;
+
+type ResponseOutputWithContent = {
+  content?: Array<{ text?: string | null }>;
 };
 
 @Injectable()
@@ -80,11 +109,10 @@ export class AiProviderService {
     const config = this.aiProviderConfig.getConfig();
     const client = this.aiProviderConfig.getClientConfig();
     const model = options?.model ?? config.modelEvaluation;
-    const url = `${client.baseUrl.replace(/\/$/, '')}/chat/completions`;
 
-    const body: Record<string, unknown> = {
+    const body: ChatCompletionCreateParamsNonStreaming = {
       model,
-      messages,
+      messages: this.toChatMessages(messages),
       temperature: client.temperature,
     };
 
@@ -109,25 +137,23 @@ export class AiProviderService {
     }
 
     const startedAt = Date.now();
-    const { response, retryCount } = await this.requestWithRetry(
-      url,
-      body,
-      config.apiKey,
-      client,
-      options?.debug,
+    const { result: payload, retryCount } = await this.runWithAiErrorHandling(
+      () =>
+        this.createSdkClient(config.apiKey, client).chat.completions.create(
+          body,
+          this.createRequestOptions(client),
+        ),
+      {
+        ...options?.debug,
+        provider: client.provider,
+        model,
+        operationType: options?.debug?.operationType ?? 'chat_completion',
+      },
+      `Chat completion failed provider=${client.provider} model=${model}`,
     );
     const latencyMs = Date.now() - startedAt;
 
-    const payload = (await response.json()) as OpenAiChatResponse;
-
-    if (!response.ok) {
-      this.logger.error(
-        `Chat completion failed provider=${client.provider} model=${model} status=${response.status}`,
-      );
-      throw new ServiceUnavailableException('AI provider request failed');
-    }
-
-    const content = payload.choices?.[0]?.message?.content?.trim();
+    const content = payload.choices[0]?.message?.content?.trim();
     if (!content) {
       throw new ServiceUnavailableException(
         'AI provider returned empty response',
@@ -137,11 +163,7 @@ export class AiProviderService {
     const result: ChatCompletionResult = {
       content,
       model: payload.model ?? model,
-      usage: {
-        promptTokens: payload.usage?.prompt_tokens ?? 0,
-        completionTokens: payload.usage?.completion_tokens ?? 0,
-        totalTokens: payload.usage?.total_tokens ?? 0,
-      },
+      usage: this.toChatCompletionUsage(payload.usage),
       latencyMs,
     };
 
@@ -155,6 +177,7 @@ export class AiProviderService {
         promptTokens: result.usage.promptTokens,
         completionTokens: result.usage.completionTokens,
         totalTokens: result.usage.totalTokens,
+        cachedTokens: result.usage.cachedTokens,
         responseChars: result.content.length,
         responsePreview:
           result.content.length > 600
@@ -180,6 +203,220 @@ export class AiProviderService {
     );
   }
 
+  async createResponseJson(
+    messages: ChatMessage[],
+    options?: {
+      previousResponseId?: string;
+      conversationId?: string;
+      model?: string;
+      debug?: AiProviderDebugContext;
+      store?: boolean;
+      metadata?: Record<string, string | number | boolean | null>;
+    },
+  ): Promise<ResponseCompletionResult> {
+    const config = this.aiProviderConfig.getConfig();
+    const client = this.aiProviderConfig.getClientConfig();
+    const model = options?.model ?? config.modelEvaluation;
+
+    const body: ResponseCreateParamsNonStreaming = {
+      model,
+      input: this.toResponseInput(messages),
+      temperature: client.temperature,
+      store: options?.store ?? true,
+      text: {
+        format: {
+          type: 'json_object',
+        },
+      },
+    };
+
+    this.applyResponseStateOptions(body, options);
+
+    if (isAdaptiveAiDebugEnabled()) {
+      logAdaptiveAiDebug(this.logger, 'ai.responses_request', {
+        ...options?.debug,
+        provider: client.provider,
+        baseUrl: client.baseUrl,
+        timeoutMs: client.timeoutMs,
+        maxRetries: client.maxRetries,
+        previousResponseId: options?.previousResponseId,
+        conversationId: options?.conversationId,
+        body: summarizeChatCompletionBody({
+          model,
+          messages,
+          jsonMode: true,
+          temperature: client.temperature,
+        }),
+      });
+    }
+
+    const startedAt = Date.now();
+    const { result: payload, retryCount } = await this.runWithAiErrorHandling(
+      () =>
+        this.createSdkClient(config.apiKey, client).responses.create(
+          body,
+          this.createRequestOptions(client),
+        ),
+      {
+        ...options?.debug,
+        provider: client.provider,
+        model,
+        operationType: options?.debug?.operationType ?? 'responses',
+      },
+      `Responses completion failed provider=${client.provider} model=${model}`,
+    );
+    const latencyMs = Date.now() - startedAt;
+
+    const responseId = payload.id.trim();
+    if (!responseId) {
+      throw new ServiceUnavailableException(
+        'AI provider returned response without id',
+      );
+    }
+
+    const content = this.extractResponseText(payload);
+    if (!content) {
+      throw new ServiceUnavailableException(
+        'AI provider returned empty response',
+      );
+    }
+
+    const result: ResponseCompletionResult = {
+      responseId,
+      content,
+      model: payload.model ?? model,
+      usage: this.toResponsesCompletionUsage(payload.usage),
+      latencyMs,
+    };
+
+    if (isAdaptiveAiDebugEnabled()) {
+      logAdaptiveAiDebug(this.logger, 'ai.responses_response', {
+        ...options?.debug,
+        provider: client.provider,
+        model: result.model,
+        responseId: result.responseId,
+        latencyMs: result.latencyMs,
+        retryCount,
+        promptTokens: result.usage.promptTokens,
+        completionTokens: result.usage.completionTokens,
+        totalTokens: result.usage.totalTokens,
+        cachedTokens: result.usage.cachedTokens,
+        responseChars: result.content.length,
+        responsePreview:
+          result.content.length > 600
+            ? `${result.content.slice(0, 600)}…`
+            : result.content,
+      });
+    }
+
+    return result;
+  }
+
+  async createResponseText(
+    options: CreateResponseTextOptions,
+  ): Promise<ResponseCompletionResult> {
+    const config = this.aiProviderConfig.getConfig();
+    const client = this.aiProviderConfig.getClientConfig();
+    const model = options.model ?? config.modelEvaluation;
+    const body: ResponseCreateParamsNonStreaming = {
+      model,
+      input: this.toResponseInput(options.messages),
+      temperature: client.temperature,
+      store: options.store ?? true,
+    };
+
+    this.applyResponseStateOptions(body, options);
+
+    if (isAdaptiveAiDebugEnabled()) {
+      logAdaptiveAiDebug(this.logger, 'ai.responses_text_request', {
+        ...options.debug,
+        provider: client.provider,
+        baseUrl: client.baseUrl,
+        timeoutMs: client.timeoutMs,
+        maxRetries: client.maxRetries,
+        previousResponseId: options.previousResponseId,
+        conversationId: options.conversationId,
+        body: summarizeChatCompletionBody({
+          model,
+          messages: options.messages,
+          temperature: client.temperature,
+        }),
+      });
+    }
+
+    const startedAt = Date.now();
+    const { result: payload, retryCount } = await this.runWithAiErrorHandling(
+      () =>
+        this.createSdkClient(config.apiKey, client).responses.create(
+          body,
+          this.createRequestOptions(client),
+        ),
+      {
+        ...options.debug,
+        provider: client.provider,
+        model,
+        operationType: options.debug?.operationType ?? 'responses_text',
+      },
+      `Responses text completion failed provider=${client.provider} model=${model}`,
+    );
+    const latencyMs = Date.now() - startedAt;
+
+    const responseId = payload.id.trim();
+    if (!responseId) {
+      throw new ServiceUnavailableException(
+        'AI provider returned response without id',
+      );
+    }
+
+    const content = this.extractResponseText(payload);
+    if (!content) {
+      throw new ServiceUnavailableException(
+        'AI provider returned empty response',
+      );
+    }
+
+    const result: ResponseCompletionResult = {
+      responseId,
+      content,
+      model: payload.model ?? model,
+      usage: this.toResponsesCompletionUsage(payload.usage),
+      latencyMs,
+    };
+
+    if (isAdaptiveAiDebugEnabled()) {
+      logAdaptiveAiDebug(this.logger, 'ai.responses_text_response', {
+        ...options.debug,
+        provider: client.provider,
+        model: result.model,
+        responseId: result.responseId,
+        latencyMs: result.latencyMs,
+        retryCount,
+        promptTokens: result.usage.promptTokens,
+        completionTokens: result.usage.completionTokens,
+        totalTokens: result.usage.totalTokens,
+        cachedTokens: result.usage.cachedTokens,
+        responseChars: result.content.length,
+      });
+    }
+
+    return result;
+  }
+
+  private extractResponseText(payload: Response): string {
+    if (payload.output_text?.trim()) {
+      return payload.output_text.trim();
+    }
+
+    const parts =
+      payload.output
+        ?.filter((item) => this.hasResponseOutputContent(item))
+        .flatMap((item) => item.content ?? [])
+        .map((content) => content.text?.trim() ?? '')
+        .filter((text) => text.length > 0) ?? [];
+
+    return parts.join('\n').trim();
+  }
+
   async streamChatCompletion(
     messages: ChatMessage[],
     options: StreamChatCompletionOptions,
@@ -187,11 +424,10 @@ export class AiProviderService {
     const config = this.aiProviderConfig.getConfig();
     const client = this.aiProviderConfig.getClientConfig();
     const model = options.model ?? config.modelEvaluation;
-    const url = `${client.baseUrl.replace(/\/$/, '')}/chat/completions`;
 
-    const body: Record<string, unknown> = {
+    const body: ChatCompletionCreateParamsStreaming = {
       model,
-      messages,
+      messages: this.toChatMessages(messages),
       temperature: client.temperature,
       stream: true,
       stream_options: { include_usage: true },
@@ -211,17 +447,20 @@ export class AiProviderService {
     }
 
     const startedAt = Date.now();
-    const { response, retryCount } = await this.requestWithRetry(
-      url,
-      body,
-      config.apiKey,
-      client,
-      options.debug,
+    const { result: stream, retryCount } = await this.runWithAiErrorHandling(
+      () =>
+        this.createSdkClient(config.apiKey, client).chat.completions.create(
+          body,
+          this.createRequestOptions(client),
+        ),
+      {
+        ...options.debug,
+        provider: client.provider,
+        model,
+        operationType: options.debug?.operationType ?? 'stream_message',
+      },
+      `Chat completion stream failed provider=${client.provider} model=${model}`,
     );
-
-    if (!response.ok || !response.body) {
-      throw new ServiceUnavailableException('AI provider stream request failed');
-    }
 
     let content = '';
     let resolvedModel = model;
@@ -231,18 +470,13 @@ export class AiProviderService {
       totalTokens: 0,
     };
 
-    for await (const chunk of this.readOpenAiSseStream(response.body)) {
+    for await (const chunk of stream) {
       if (chunk.model) {
         resolvedModel = chunk.model;
       }
 
       if (chunk.usage) {
-        usage = {
-          promptTokens: chunk.usage.prompt_tokens ?? usage.promptTokens,
-          completionTokens:
-            chunk.usage.completion_tokens ?? usage.completionTokens,
-          totalTokens: chunk.usage.total_tokens ?? usage.totalTokens,
-        };
+        usage = this.toChatCompletionUsage(chunk.usage, usage);
       }
 
       const delta = chunk.choices?.[0]?.delta?.content;
@@ -278,6 +512,7 @@ export class AiProviderService {
         promptTokens: result.usage.promptTokens,
         completionTokens: result.usage.completionTokens,
         totalTokens: result.usage.totalTokens,
+        cachedTokens: result.usage.cachedTokens,
         responseChars: result.content.length,
       });
     }
@@ -285,110 +520,292 @@ export class AiProviderService {
     return result;
   }
 
-  private async *readOpenAiSseStream(
-    body: ReadableStream<Uint8Array>,
-  ): AsyncGenerator<OpenAiStreamChunk> {
-    const reader = body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
+  async streamResponseText(
+    options: StreamResponseTextOptions,
+  ): Promise<ResponseCompletionResult> {
+    const config = this.aiProviderConfig.getConfig();
+    const client = this.aiProviderConfig.getClientConfig();
+    const model = options.model ?? config.modelEvaluation;
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        break;
+    const body: ResponseCreateParamsStreaming = {
+      model,
+      input:
+        typeof options.input === 'string'
+          ? options.input
+          : this.toResponseInput(options.input),
+      temperature: client.temperature,
+      stream: true,
+      store: options.store ?? true,
+    };
+
+    if (options.instructions) {
+      body.instructions = options.instructions;
+    }
+
+    this.applyResponseStateOptions(body, options);
+
+    if (isAdaptiveAiDebugEnabled()) {
+      const messages =
+        typeof options.input === 'string'
+          ? [{ role: 'user' as const, content: options.input }]
+          : options.input;
+
+      logAdaptiveAiDebug(this.logger, 'ai.responses_stream_request', {
+        ...options.debug,
+        provider: client.provider,
+        baseUrl: client.baseUrl,
+        timeoutMs: client.timeoutMs,
+        maxRetries: client.maxRetries,
+        previousResponseId: options.previousResponseId,
+        conversationId: options.conversationId,
+        body: summarizeChatCompletionBody({
+          model,
+          messages,
+          temperature: client.temperature,
+        }),
+      });
+    }
+
+    const startedAt = Date.now();
+    const { result: stream, retryCount } = await this.runWithAiErrorHandling(
+      () =>
+        this.createSdkClient(config.apiKey, client).responses.create(
+          body,
+          this.createRequestOptions(client),
+        ),
+      {
+        ...options.debug,
+        provider: client.provider,
+        model,
+        operationType: options.debug?.operationType ?? 'responses_stream',
+      },
+      `Responses stream failed provider=${client.provider} model=${model}`,
+    );
+
+    let content = '';
+    let finalResponse: Response | null = null;
+    let responseId = '';
+    let resolvedModel = model;
+
+    for await (const event of stream) {
+      if (event.type === 'response.completed') {
+        finalResponse = event.response;
+        responseId = event.response.id.trim();
+        resolvedModel = event.response.model ?? resolvedModel;
+      } else if (event.type === 'response.output_text.delta') {
+        content += event.delta;
+        options.onTextDelta(event.delta, content);
+      } else if (event.type === 'error') {
+        throw new ServiceUnavailableException(event.message);
+      } else if (
+        event.type === 'response.failed' ||
+        event.type === 'response.incomplete'
+      ) {
+        throw new ServiceUnavailableException(
+          `AI provider responses stream failed: ${event.type}`,
+        );
       }
+    }
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
+    const trimmed = content.trim();
+    if (!trimmed) {
+      throw new ServiceUnavailableException(
+        'AI provider returned empty responses stream',
+      );
+    }
 
-      for (const rawLine of lines) {
-        const line = rawLine.trim();
-        if (!line.startsWith('data:')) {
-          continue;
+    responseId = finalResponse?.id?.trim() ?? responseId;
+    if (!responseId) {
+      // Some compatible providers omit final response metadata in SSE.
+      // Keep this explicit so callers do not accidentally continue without state.
+      throw new ServiceUnavailableException(
+        'AI provider responses stream returned no response id',
+      );
+    }
+
+    const result: ResponseCompletionResult = {
+      responseId,
+      content: trimmed,
+      model: finalResponse?.model ?? resolvedModel,
+      usage: this.toResponsesCompletionUsage(finalResponse?.usage),
+      latencyMs: Date.now() - startedAt,
+    };
+
+    options.onDone?.(result);
+
+    if (isAdaptiveAiDebugEnabled()) {
+      logAdaptiveAiDebug(this.logger, 'ai.responses_stream_response', {
+        ...options.debug,
+        provider: client.provider,
+        model: result.model,
+        responseId: result.responseId,
+        latencyMs: result.latencyMs,
+        retryCount,
+        promptTokens: result.usage.promptTokens,
+        completionTokens: result.usage.completionTokens,
+        totalTokens: result.usage.totalTokens,
+        cachedTokens: result.usage.cachedTokens,
+        responseChars: result.content.length,
+      });
+    }
+
+    return result;
+  }
+
+  private toChatCompletionUsage(
+    usage: OpenAiChatUsage | undefined,
+    fallback?: ChatCompletionUsage,
+  ): ChatCompletionUsage {
+    return {
+      promptTokens: usage?.prompt_tokens ?? fallback?.promptTokens ?? 0,
+      completionTokens:
+        usage?.completion_tokens ?? fallback?.completionTokens ?? 0,
+      totalTokens: usage?.total_tokens ?? fallback?.totalTokens ?? 0,
+      cachedTokens:
+        usage?.prompt_tokens_details?.cached_tokens ?? fallback?.cachedTokens,
+    };
+  }
+
+  private hasResponseOutputContent(
+    item: Response['output'][number],
+  ): item is Response['output'][number] & ResponseOutputWithContent {
+    return 'content' in item && Array.isArray(item.content);
+  }
+
+  private toResponsesCompletionUsage(
+    usage: Response['usage'] | undefined,
+  ): ChatCompletionUsage {
+    return {
+      promptTokens: usage?.input_tokens ?? 0,
+      completionTokens: usage?.output_tokens ?? 0,
+      totalTokens: usage?.total_tokens ?? 0,
+      cachedTokens: usage?.input_tokens_details?.cached_tokens ?? undefined,
+    };
+  }
+
+  private createSdkClient(
+    apiKey: string,
+    client: AiProviderClientConfig,
+  ): OpenAI {
+    return new OpenAI({
+      apiKey,
+      baseURL: client.baseUrl,
+      timeout: client.timeoutMs,
+      maxRetries: client.maxRetries,
+    });
+  }
+
+  private createRequestOptions(
+    client: AiProviderClientConfig,
+  ): OpenAI.RequestOptions {
+    return {
+      timeout: client.timeoutMs,
+      maxRetries: client.maxRetries,
+      signal: AbortSignal.timeout(client.timeoutMs),
+    };
+  }
+
+  private toChatMessages(
+    messages: ChatMessage[],
+  ): ChatCompletionMessageParam[] {
+    return messages.map((message) => ({
+      role: message.role,
+      content: message.content,
+    }));
+  }
+
+  private toResponseInput(messages: ChatMessage[]): ResponseInput {
+    return messages.map((message) => ({
+      role: message.role,
+      content: message.content,
+    }));
+  }
+
+  private toSdkMetadata(
+    metadata: NonNullable<StreamResponseTextOptions['metadata']>,
+  ): Record<string, string> {
+    return Object.fromEntries(
+      Object.entries(metadata)
+        .filter(([, value]) => value !== null)
+        .map(([key, value]) => [key, String(value)]),
+    );
+  }
+
+  private applyResponseStateOptions(
+    body: ResponseCreateParamsNonStreaming | ResponseCreateParamsStreaming,
+    options:
+      | {
+          previousResponseId?: string;
+          conversationId?: string;
+          metadata?: Record<string, string | number | boolean | null>;
         }
+      | undefined,
+  ): void {
+    if (options?.previousResponseId) {
+      body.previous_response_id = options.previousResponseId;
+    }
 
-        const payload = line.slice(5).trim();
-        if (!payload || payload === '[DONE]') {
-          continue;
-        }
+    if (options?.conversationId) {
+      // Official Responses API supports `conversation`, but the currently
+      // installed SDK typings may lag behind the API schema.
+      (body as typeof body & { conversation?: string }).conversation =
+        options.conversationId;
+    }
 
-        yield JSON.parse(payload) as OpenAiStreamChunk;
-      }
+    if (options?.metadata) {
+      body.metadata = this.toSdkMetadata(options.metadata);
     }
   }
 
-  private async requestWithRetry(
-    url: string,
-    body: Record<string, unknown>,
-    apiKey: string,
-    client: AiProviderClientConfig,
-    debug?: AiProviderDebugContext,
-  ): Promise<{ response: Response; retryCount: number }> {
-    let lastError: unknown = null;
+  private async runWithAiErrorHandling<T>(
+    request: () => Promise<T>,
+    debug: AiProviderDebugContext & {
+      provider: string;
+      model: string;
+      operationType: string;
+    },
+    errorPrefix: string,
+  ): Promise<{ result: T; retryCount: number }> {
+    const startedAt = Date.now();
 
-    for (let attempt = 0; attempt <= client.maxRetries; attempt += 1) {
-      const attemptStartedAt = Date.now();
+    try {
+      const result = await request();
 
-      try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(client.timeoutMs),
+      if (isAdaptiveAiDebugEnabled()) {
+        logAdaptiveAiDebug(this.logger, 'ai.sdk_request_completed', {
+          ...debug,
+          durationMs: Date.now() - startedAt,
         });
-
-        if (isAdaptiveAiDebugEnabled()) {
-          logAdaptiveAiDebug(this.logger, 'ai.http_attempt', {
-            ...debug,
-            attempt: attempt + 1,
-            maxAttempts: client.maxRetries + 1,
-            durationMs: Date.now() - attemptStartedAt,
-            httpStatus: response.status,
-            ok: response.ok,
-          });
-        }
-
-        if (response.ok || (response.status < 500 && response.status !== 429)) {
-          return { response, retryCount: attempt };
-        }
-
-        lastError = new Error(`HTTP ${response.status}`);
-      } catch (error: unknown) {
-        lastError = error;
-        const message =
-          error instanceof Error ? error.message : 'Unknown fetch error';
-
-        if (isAdaptiveAiDebugEnabled()) {
-          logAdaptiveAiDebug(this.logger, 'ai.http_attempt_failed', {
-            ...debug,
-            attempt: attempt + 1,
-            maxAttempts: client.maxRetries + 1,
-            durationMs: Date.now() - attemptStartedAt,
-            error: message,
-          });
-        }
       }
 
-      if (attempt < client.maxRetries) {
-        const delayMs = 250 * 2 ** attempt;
-        if (isAdaptiveAiDebugEnabled()) {
-          logAdaptiveAiDebug(this.logger, 'ai.retry_scheduled', {
-            ...debug,
-            attempt: attempt + 1,
-            delayMs,
-          });
-        }
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      return { result, retryCount: 0 };
+    } catch (error: unknown) {
+      const status = this.getApiErrorStatus(error);
+      const message =
+        error instanceof Error ? error.message : 'Unknown OpenAI SDK error';
+
+      this.logger.error(
+        `${errorPrefix} status=${status ?? 'unknown'} message=${message}`,
+      );
+
+      if (isAdaptiveAiDebugEnabled()) {
+        logAdaptiveAiDebug(this.logger, 'ai.sdk_request_failed', {
+          ...debug,
+          durationMs: Date.now() - startedAt,
+          httpStatus: status,
+          error: message,
+        });
       }
+
+      throw new ServiceUnavailableException('AI provider request failed');
+    }
+  }
+
+  private getApiErrorStatus(error: unknown): number | undefined {
+    if (!(error instanceof APIError)) {
+      return undefined;
     }
 
-    this.logger.error(
-      `AI request failed after retries provider=${client.provider} baseUrl=${client.baseUrl} lastError=${lastError instanceof Error ? lastError.message : String(lastError)}`,
-    );
-    throw new ServiceUnavailableException('AI provider is unavailable');
+    return typeof error.status === 'number' ? error.status : undefined;
   }
 }

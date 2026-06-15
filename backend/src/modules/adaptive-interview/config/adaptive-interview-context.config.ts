@@ -1,6 +1,6 @@
 export const ADAPTIVE_INTERVIEW_CONTEXT_DEFAULTS = {
   localTurnLimit: 10,
-  maxFollowUpsPerQuestion: 10,
+  maxFollowUpsPerQuestion: 3,
   maxFollowUpsPerCheckpoint: 1,
   maxTextLength: 500,
   maxReferenceAnswerLength: 600,
@@ -27,7 +27,7 @@ export function isFollowUpLlmEnabled(): boolean {
   return readBooleanFlag(process.env.ADAPTIVE_FOLLOW_UP_USE_LLM, true);
 }
 
-/** Reuse Redis chat history per question — bootstrap context once, incremental turns after. */
+/** Legacy Chat Completions fallback: keeps Redis messages and sends full chat history. */
 export function isAdaptiveAiConversationSessionEnabled(): boolean {
   return readBooleanFlag(process.env.ADAPTIVE_AI_CONVERSATION_SESSION, true);
 }
@@ -40,6 +40,31 @@ export function isAdaptiveAiCombinedTurnEnabled(): boolean {
 export function getAdaptiveAiConversationSessionTtlSeconds(): number {
   return readPositiveInt(
     process.env.ADAPTIVE_AI_CONVERSATION_TTL_SECONDS,
+    86_400,
+  );
+}
+
+/** Recommended default: use OpenAI Responses API for adaptive evaluate_turn. */
+export function isAdaptiveAiOpenAiResponsesApiEnabled(): boolean {
+  return readBooleanFlag(process.env.ADAPTIVE_AI_OPENAI_RESPONSES_API, true);
+}
+
+/** Store previous_response_id in Redis and send only incremental turns to OpenAI. */
+export function isAdaptiveAiOpenAiServerStateEnabled(): boolean {
+  return readBooleanFlag(process.env.ADAPTIVE_AI_OPENAI_SERVER_STATE, true);
+}
+
+/** Retry once through the existing Chat Completions path if server-side state fails. */
+export function isAdaptiveAiOpenAiServerStateFallbackEnabled(): boolean {
+  return readBooleanFlag(
+    process.env.ADAPTIVE_AI_OPENAI_SERVER_STATE_FALLBACK,
+    true,
+  );
+}
+
+export function getAdaptiveAiOpenAiStateTtlSeconds(): number {
+  return readPositiveInt(
+    process.env.ADAPTIVE_AI_OPENAI_STATE_TTL_SECONDS,
     86_400,
   );
 }
@@ -108,10 +133,7 @@ function readPositiveFloat(
   return parsed;
 }
 
-function readPositiveInt(
-  value: string | undefined,
-  fallback: number,
-): number {
+function readPositiveInt(value: string | undefined, fallback: number): number {
   if (!value) {
     return fallback;
   }

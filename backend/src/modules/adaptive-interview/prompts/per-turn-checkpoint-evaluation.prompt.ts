@@ -2,7 +2,7 @@ import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview
 
 export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_KEY =
   'per_turn_checkpoint_evaluation';
-export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION = '2.2.0';
+export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION = '2.3.0';
 
 const RESPONSE_JSON_SCHEMA = `{
   "candidate_disposition": "engaged | declined | confused | off_topic",
@@ -30,7 +30,11 @@ export function buildPerTurnCheckpointEvaluationSystemPrompt(): string {
     '- Do NOT change max scores; score_awarded must be between 0 and the checkpoint max_score.',
     '- status must be one of: covered, partial, missed, unclear.',
     '- Base evidence only on the provided candidate answer and local turns.',
-    '- Award partial credit when the answer mentions relevant concepts even if wrong or incomplete.',
+    '- Evaluate semantic correctness, not keyword presence.',
+    '- Do NOT award credit just because the candidate mentions a relevant term.',
+    '- If a candidate mentions the term but explains it incorrectly, mark the checkpoint missed unless there is a separate clearly correct part.',
+    '- Award partial credit only when the answer is meaningfully true but incomplete or imprecise.',
+    '- Confident false statements should reduce credit for that checkpoint; do not treat false explanations as partial knowledge.',
     '- Do NOT give all zeros when earlier local turns already demonstrated partial knowledge.',
     '- If the latest answer declines only one sub-aspect, keep scores from earlier turns; use declined only for whole-question refusal.',
     '- Also set candidate_disposition from the latest answer:',
@@ -52,14 +56,13 @@ export function buildPerTurnCheckpointEvaluationUserPrompt(
   context: AdaptiveInterviewContextPacket,
 ): string {
   const checkpointBlock = context.checkpoints
-    .map(
-      (checkpoint, index) =>
-        [
-          `${index + 1}. key=${checkpoint.checkpointKey}`,
-          `   title=${checkpoint.title}`,
-          `   expected=${checkpoint.expected}`,
-          `   max_score=${checkpoint.score}`,
-        ].join('\n'),
+    .map((checkpoint, index) =>
+      [
+        `${index + 1}. key=${checkpoint.checkpointKey}`,
+        `   title=${checkpoint.title}`,
+        `   expected=${checkpoint.expected}`,
+        `   max_score=${checkpoint.score}`,
+      ].join('\n'),
     )
     .join('\n\n');
 
@@ -114,6 +117,7 @@ export function buildPerTurnCheckpointEvaluationUserPrompt(
     `Return exactly ${context.checkpoints.length} checkpoint_results entries.`,
     'Use checkpoint_key values exactly as listed above.',
     'For each checkpoint: score_awarded must be >= current score from checkpoint states (never decrease).',
-    'If local turns contain substantive on-topic content, award partial credit to matching checkpoints.',
+    'Preserve prior earned score only when checkpoint states already show it.',
+    'Do not add new score for a checkpoint unless the local turns contain semantically correct evidence for that checkpoint.',
   ].join('\n');
 }

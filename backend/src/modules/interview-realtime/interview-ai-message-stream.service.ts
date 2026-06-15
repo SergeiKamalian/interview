@@ -71,6 +71,9 @@ export class InterviewAiMessageStreamService {
     const streamId = randomUUID();
     this.emitStarted(input, streamId);
 
+    // TODO(openai-responses-stream): switch adaptive follow-up LLM streaming to
+    // AiProviderService.streamResponseText under a feature flag once planner
+    // state can safely pass previous_response_id without rebuilding prompt history.
     const completion = await this.aiProviderService.streamChatCompletion(
       [
         { role: 'system', content: input.systemPrompt },

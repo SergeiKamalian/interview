@@ -4,8 +4,7 @@ import {
   PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION,
 } from './per-turn-checkpoint-evaluation.prompt';
 
-export const ADAPTIVE_AI_CONVERSATION_EVALUATE_PROMPT_VERSION =
-  `conv-${PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION}-combined-v1`;
+export const ADAPTIVE_AI_CONVERSATION_EVALUATE_PROMPT_VERSION = `conv-${PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION}-combined-v1`;
 
 const COMBINED_FOLLOW_UP_SCHEMA = `Optional field when combined mode is on:
   "suggested_follow_up": {
@@ -27,6 +26,7 @@ export function buildEvaluateConversationSystemPrompt(
     '- The first user message establishes immutable interview context for this question.',
     '- Each later user message is only a new candidate turn — do NOT ask to repeat full context.',
     '- Use conversation history plus the latest turn; scores are cumulative and must never decrease.',
+    '- Cumulative does not mean lenient: do not increase scores for keyword mentions that are false or semantically wrong.',
     combinedTurn
       ? COMBINED_FOLLOW_UP_SCHEMA
       : '- Do not suggest follow-up questions in this response.',
@@ -37,14 +37,13 @@ export function buildEvaluateConversationBootstrapUserPrompt(
   context: AdaptiveInterviewContextPacket,
 ): string {
   const checkpointBlock = context.checkpoints
-    .map(
-      (checkpoint, index) =>
-        [
-          `${index + 1}. key=${checkpoint.checkpointKey}`,
-          `   title=${checkpoint.title}`,
-          `   expected=${checkpoint.expected}`,
-          `   max_score=${checkpoint.score}`,
-        ].join('\n'),
+    .map((checkpoint, index) =>
+      [
+        `${index + 1}. key=${checkpoint.checkpointKey}`,
+        `   title=${checkpoint.title}`,
+        `   expected=${checkpoint.expected}`,
+        `   max_score=${checkpoint.score}`,
+      ].join('\n'),
     )
     .join('\n\n');
 
@@ -97,6 +96,24 @@ export function buildEvaluateConversationTurnUserPrompt(
   }
 
   return lines.join('\n');
+}
+
+export function buildEvaluateConversationBootstrapPrewarmUserPrompt(
+  context: AdaptiveInterviewContextPacket,
+  combinedTurn: boolean,
+): string {
+  return [
+    buildEvaluateConversationBootstrapUserPrompt(context),
+    '',
+    'Prewarm only: no candidate answer has been submitted yet.',
+    'Return valid JSON now so this Responses API state can be continued later.',
+    'Set candidate_disposition to "engaged".',
+    'Return exactly one checkpoint_result per checkpoint from the established context.',
+    'For every checkpoint_result set status="missed", score_awarded=0, confidence=1, evidence_summary=null, rationale="No candidate answer yet."',
+    combinedTurn ? 'Set suggested_follow_up to null.' : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 export function buildEvaluateConversationBootstrapAssistantAck(): string {

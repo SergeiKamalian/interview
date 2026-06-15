@@ -14,6 +14,7 @@ import { PerTurnCheckpointEvaluatorService } from './per-turn-checkpoint-evaluat
 import { QuestionSummaryService } from './question-summary.service';
 import { AdaptiveInterviewContextService } from './adaptive-interview-context.service';
 import { AdaptiveAiConversationService } from './adaptive-ai-conversation.service';
+import { AdaptiveOpenAiResponseStateService } from './adaptive-openai-response-state.service';
 import { InterviewRealtimeService } from '../../interview-realtime/interview-realtime.service';
 import { InterviewAiMessageStreamService } from '../../interview-realtime/interview-ai-message-stream.service';
 
@@ -40,7 +41,9 @@ describe('AdaptiveInterviewSubmitService', () => {
   let perTurnEvaluator: jest.Mocked<
     Pick<PerTurnCheckpointEvaluatorService, 'evaluateTurnAndPersist'>
   >;
-  let followUpPlanner: jest.Mocked<Pick<FollowUpPlannerService, 'planFollowUp'>>;
+  let followUpPlanner: jest.Mocked<
+    Pick<FollowUpPlannerService, 'planFollowUp'>
+  >;
   let adaptiveInterviewContextService: jest.Mocked<
     Pick<AdaptiveInterviewContextService, 'buildContextPacket'>
   >;
@@ -249,6 +252,12 @@ describe('AdaptiveInterviewSubmitService', () => {
             clearQuestionSessions: jest.fn(),
           },
         },
+        {
+          provide: AdaptiveOpenAiResponseStateService,
+          useValue: {
+            clearEvaluateState: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -269,7 +278,11 @@ describe('AdaptiveInterviewSubmitService', () => {
     );
     expect(result.pendingMessageText).toContain('dependency array');
     expect(result.answeredMainQuestions).toBe(1);
-    expect(followUpRepository.markAsked).toHaveBeenCalledWith(99, 23, expect.any(Function));
+    expect(followUpRepository.markAsked).toHaveBeenCalledWith(
+      99,
+      23,
+      expect.any(Function),
+    );
     expect(perTurnEvaluator.evaluateTurnAndPersist).toHaveBeenCalled();
   });
 
@@ -318,12 +331,12 @@ describe('AdaptiveInterviewSubmitService', () => {
       trimmedAnswer: 'Я ничего не знаю по useEffect',
     });
 
-    expect(checkpointStateService.applyCandidateDeclinedKnowledge).toHaveBeenCalledWith(
-      {
-        attemptId: 5,
-        interviewQuestionId: 10,
-      },
-    );
+    expect(
+      checkpointStateService.applyCandidateDeclinedKnowledge,
+    ).toHaveBeenCalledWith({
+      attemptId: 5,
+      interviewQuestionId: 10,
+    });
     expect(perTurnEvaluator.evaluateTurnAndPersist).not.toHaveBeenCalled();
     expect(followUpPlanner.planFollowUp).not.toHaveBeenCalled();
     expect(result.isFollowUp).toBe(false);
@@ -385,9 +398,9 @@ describe('AdaptiveInterviewSubmitService', () => {
   it('rejects submit when all main questions are already answered', async () => {
     repository.countMainAnswerMessages.mockResolvedValue(2);
 
-    await expect(
-      service.assertCanSubmit(5, 2),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.assertCanSubmit(5, 2)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 });
 

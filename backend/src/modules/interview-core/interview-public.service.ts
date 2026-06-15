@@ -7,7 +7,10 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { isAdaptiveInterviewEnabled } from '../adaptive-interview/config/adaptive-interview-context.config';
-import { AdaptiveInterviewSubmitService, resolveSessionProgress } from '../adaptive-interview/services/adaptive-interview-submit.service';
+import {
+  AdaptiveInterviewSubmitService,
+  resolveSessionProgress,
+} from '../adaptive-interview/services/adaptive-interview-submit.service';
 import { AiEvaluationService } from '../ai-evaluation/services/ai-evaluation.service';
 import { CheckpointStateService } from '../adaptive-interview/services/checkpoint-state.service';
 import { InterviewRealtimeService } from '../interview-realtime/interview-realtime.service';
@@ -164,11 +167,21 @@ export class InterviewPublicService {
       const currentQuestion = questions[answered] ?? questions[0];
 
       return {
+        companyId: interview.companyId,
         attemptId: attempt.id,
+        currentQuestionId: currentQuestion.id,
         currentQuestionText: currentQuestion.questionText,
         totalQuestions: questions.length,
       };
     });
+
+    if (adaptiveEnabled) {
+      await this.adaptiveInterviewSubmitService.initializeQuestionAiState({
+        companyId: result.companyId,
+        attemptId: result.attemptId,
+        interviewQuestionId: result.currentQuestionId,
+      });
+    }
 
     return buildStartPayload(result);
   }
@@ -272,13 +285,12 @@ export class InterviewPublicService {
       questions.length,
     );
 
-    const adaptiveResult = await this.adaptiveInterviewSubmitService.submitAnswer(
-      {
+    const adaptiveResult =
+      await this.adaptiveInterviewSubmitService.submitAnswer({
         attempt,
         questions,
         trimmedAnswer,
-      },
-    );
+      });
 
     if (adaptiveResult.status === 'completed') {
       this.scheduleEvaluation(attempt.companyId, attemptId);
@@ -302,7 +314,9 @@ export class InterviewPublicService {
   private async submitLegacyAnswer(input: {
     attempt: { companyId: number; id: number };
     attemptId: number;
-    questions: Awaited<ReturnType<InterviewCoreRepository['listQuestionsForInterview']>>;
+    questions: Awaited<
+      ReturnType<InterviewCoreRepository['listQuestionsForInterview']>
+    >;
     trimmedAnswer: string;
   }): Promise<SubmitInterviewAnswerPayload> {
     const answeredBefore = await this.repository.countCandidateMessages(

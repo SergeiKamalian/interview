@@ -78,8 +78,14 @@ export function PublicInterviewStartPage() {
         loading={isStarting}
         disabled={!fullName.trim() || !email.trim()}
       >
-        Начать интервью
+        {isStarting ? 'Инициализируем AI-чат…' : 'Начать интервью'}
       </Button>
+      {isStarting && (
+        <p className="mt-3 text-sm text-slate-500">
+          Готовим первый вопрос и контекст оценки. Обычно это занимает несколько
+          секунд.
+        </p>
+      )}
     </Card>
   );
 }

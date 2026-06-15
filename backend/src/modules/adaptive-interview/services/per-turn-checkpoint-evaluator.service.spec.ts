@@ -5,6 +5,7 @@ import { AiUsageLogService } from '../../usage-logging/ai-usage-log.service';
 import { CheckpointStateRepository } from '../repositories/checkpoint-state.repository';
 import { AdaptiveInterviewContextService } from './adaptive-interview-context.service';
 import { CheckpointStateService } from './checkpoint-state.service';
+import { AdaptiveOpenAiResponseStateService } from './adaptive-openai-response-state.service';
 import { PerTurnCheckpointEvaluatorService } from './per-turn-checkpoint-evaluator.service';
 import { PerTurnEvaluationValidatorService } from './per-turn-evaluation-validator.service';
 import { AdaptiveAiConversationService } from './adaptive-ai-conversation.service';
@@ -23,7 +24,21 @@ describe('PerTurnCheckpointEvaluatorService', () => {
       'applyTurnEvaluationResults' | 'markNeedsManualReviewForQuestion'
     >
   >;
-  let aiProviderService: jest.Mocked<Pick<AiProviderService, 'evaluateJson'>>;
+  let aiProviderService: jest.Mocked<
+    Pick<
+      AiProviderService,
+      | 'evaluateJson'
+      | 'createResponseJson'
+      | 'createChatCompletion'
+      | 'getClientConfig'
+    >
+  >;
+  let adaptiveOpenAiResponseStateService: jest.Mocked<
+    Pick<
+      AdaptiveOpenAiResponseStateService,
+      'loadEvaluateState' | 'saveEvaluateState' | 'clearEvaluateState'
+    >
+  >;
   let aiUsageLogService: jest.Mocked<
     Pick<AiUsageLogService, 'createCorrelationId' | 'logCompletion'>
   >;
@@ -67,6 +82,8 @@ describe('PerTurnCheckpointEvaluatorService', () => {
   beforeEach(async () => {
     process.env.ADAPTIVE_AI_CONVERSATION_SESSION = 'false';
     process.env.ADAPTIVE_AI_COMBINED_TURN = 'false';
+    process.env.ADAPTIVE_AI_OPENAI_RESPONSES_API = 'false';
+    process.env.ADAPTIVE_AI_OPENAI_SERVER_STATE = 'false';
 
     adaptiveInterviewContextService = {
       buildContextPacket: jest.fn(),
@@ -80,6 +97,8 @@ describe('PerTurnCheckpointEvaluatorService', () => {
     };
     aiProviderService = {
       evaluateJson: jest.fn(),
+      createResponseJson: jest.fn(),
+      createChatCompletion: jest.fn(),
       getClientConfig: jest.fn().mockReturnValue({
         model: 'gpt-4o-mini',
         provider: 'openai',
@@ -92,6 +111,11 @@ describe('PerTurnCheckpointEvaluatorService', () => {
     aiUsageLogService = {
       createCorrelationId: jest.fn().mockReturnValue('corr-1'),
       logCompletion: jest.fn(),
+    };
+    adaptiveOpenAiResponseStateService = {
+      loadEvaluateState: jest.fn().mockResolvedValue(null),
+      saveEvaluateState: jest.fn(),
+      clearEvaluateState: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -128,6 +152,10 @@ describe('PerTurnCheckpointEvaluatorService', () => {
             buildCompletionMessages: jest.fn(),
             appendTurn: jest.fn(),
           },
+        },
+        {
+          provide: AdaptiveOpenAiResponseStateService,
+          useValue: adaptiveOpenAiResponseStateService,
         },
       ],
     }).compile();
@@ -213,6 +241,126 @@ describe('PerTurnCheckpointEvaluatorService', () => {
         }),
       ],
     });
+  });
+
+  it('uses OpenAI Responses previous_response_id after bootstrap', async () => {
+    process.env.ADAPTIVE_AI_OPENAI_RESPONSES_API = 'true';
+    process.env.ADAPTIVE_AI_OPENAI_SERVER_STATE = 'true';
+    process.env.ADAPTIVE_AI_COMBINED_TURN = 'true';
+
+    aiProviderService.createResponseJson
+      .mockResolvedValueOnce({
+        responseId: 'resp-bootstrap',
+        content: JSON.stringify({
+          candidate_disposition: 'engaged',
+          checkpoint_results: [
+            {
+              checkpoint_key: 'dependency_array',
+              status: 'partial',
+              score_awarded: 0.5,
+              confidence: 0.8,
+              evidence_summary: 'Mentioned rerun timing.',
+              rationale: 'Partial dependency understanding.',
+            },
+            {
+              checkpoint_key: 'cleanup',
+              status: 'missed',
+              score_awarded: 0,
+              confidence: 0.8,
+              evidence_summary: null,
+              rationale: 'No cleanup mention.',
+            },
+          ],
+          suggested_follow_up: {
+            checkpoint_key: 'cleanup',
+            follow_up_question: 'Как бы вы очистили эффект?',
+            reason: 'cleanup is missing',
+          },
+        }),
+        model: 'gpt-4o-mini',
+        usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+        latencyMs: 11,
+      })
+      .mockResolvedValueOnce({
+        responseId: 'resp-next',
+        content: JSON.stringify({
+          candidate_disposition: 'engaged',
+          checkpoint_results: [
+            {
+              checkpoint_key: 'dependency_array',
+              status: 'covered',
+              score_awarded: 1,
+              confidence: 0.9,
+              evidence_summary: 'Explained dependencies.',
+              rationale: 'Covered dependency array.',
+            },
+            {
+              checkpoint_key: 'cleanup',
+              status: 'partial',
+              score_awarded: 0.5,
+              confidence: 0.8,
+              evidence_summary: 'Mentioned cleanup.',
+              rationale: 'Partial cleanup coverage.',
+            },
+          ],
+          suggested_follow_up: null,
+        }),
+        model: 'gpt-4o-mini',
+        usage: { promptTokens: 5, completionTokens: 5, totalTokens: 10 },
+        latencyMs: 9,
+      });
+
+    checkpointStateRepository.applyTurnEvaluationResults.mockResolvedValue([]);
+
+    await service.evaluateTurnAndPersist({
+      companyId: 7,
+      attemptId: 5,
+      interviewQuestionId: 10,
+    });
+
+    adaptiveOpenAiResponseStateService.loadEvaluateState.mockResolvedValueOnce({
+      provider: 'openai',
+      api: 'responses',
+      model: 'gpt-4o-mini',
+      promptVersion: 'conv-2.2.0-combined-v1',
+      lastResponseId: 'resp-bootstrap',
+      attemptId: 5,
+      interviewQuestionId: 10,
+      turnCount: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    await service.evaluateTurnAndPersist({
+      companyId: 7,
+      attemptId: 5,
+      interviewQuestionId: 10,
+    });
+
+    expect(aiProviderService.createResponseJson).toHaveBeenNthCalledWith(
+      1,
+      expect.arrayContaining([
+        expect.objectContaining({ role: 'system' }),
+        expect.objectContaining({ role: 'user' }),
+      ]),
+      expect.objectContaining({
+        previousResponseId: undefined,
+      }),
+    );
+    expect(aiProviderService.createResponseJson).toHaveBeenNthCalledWith(
+      2,
+      [expect.objectContaining({ role: 'user' })],
+      expect.objectContaining({
+        previousResponseId: 'resp-bootstrap',
+      }),
+    );
+    expect(
+      adaptiveOpenAiResponseStateService.saveEvaluateState,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lastResponseId: 'resp-next',
+      }),
+    );
   });
 
   it('marks manual review when AI response stays invalid after repair', async () => {

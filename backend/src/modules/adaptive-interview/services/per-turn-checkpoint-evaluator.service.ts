@@ -1,16 +1,18 @@
-import {
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { AiProviderService } from '../../ai-provider/ai-provider.service';
+import type { ResponseCompletionResult } from '../../ai-provider/ai-provider.service';
 import { AiUsageLogService } from '../../usage-logging/ai-usage-log.service';
 import {
   isAdaptiveAiCombinedTurnEnabled,
   isAdaptiveAiConversationSessionEnabled,
+  isAdaptiveAiOpenAiResponsesApiEnabled,
+  isAdaptiveAiOpenAiServerStateEnabled,
+  isAdaptiveAiOpenAiServerStateFallbackEnabled,
 } from '../config/adaptive-interview-context.config';
 import {
   ADAPTIVE_AI_CONVERSATION_EVALUATE_PROMPT_VERSION,
   buildEvaluateConversationBootstrapAssistantAck,
+  buildEvaluateConversationBootstrapPrewarmUserPrompt,
   buildEvaluateConversationBootstrapUserPrompt,
   buildEvaluateConversationSystemPrompt,
   buildEvaluateConversationTurnUserPrompt,
@@ -34,6 +36,7 @@ import type {
 } from '../types/per-turn-evaluation.types';
 import { AdaptiveInterviewContextService } from './adaptive-interview-context.service';
 import { AdaptiveAiConversationService } from './adaptive-ai-conversation.service';
+import { AdaptiveOpenAiResponseStateService } from './adaptive-openai-response-state.service';
 import { CheckpointStateService } from './checkpoint-state.service';
 import { PerTurnEvaluationValidatorService } from './per-turn-evaluation-validator.service';
 import { applyCheckpointScoreFloors } from '../utils/apply-checkpoint-score-floors.util';
@@ -63,6 +66,24 @@ export type EvaluateTurnAndPersistResult =
       message: string;
     };
 
+export type InitializeOpenAiEvaluateStateResult =
+  | {
+      status: 'initialized';
+      responseId: string;
+    }
+  | {
+      status: 'skipped';
+      reason:
+        | 'disabled'
+        | 'existing_state'
+        | 'provider_not_openai'
+        | 'context_unavailable';
+    }
+  | {
+      status: 'provider_error';
+      message: string;
+    };
+
 @Injectable()
 export class PerTurnCheckpointEvaluatorService {
   private readonly logger = new Logger(PerTurnCheckpointEvaluatorService.name);
@@ -70,6 +91,7 @@ export class PerTurnCheckpointEvaluatorService {
   constructor(
     private readonly adaptiveInterviewContextService: AdaptiveInterviewContextService,
     private readonly adaptiveAiConversationService: AdaptiveAiConversationService,
+    private readonly adaptiveOpenAiResponseStateService: AdaptiveOpenAiResponseStateService,
     private readonly checkpointStateService: CheckpointStateService,
     private readonly checkpointStateRepository: CheckpointStateRepository,
     private readonly aiProviderService: AiProviderService,
@@ -83,7 +105,32 @@ export class PerTurnCheckpointEvaluatorService {
     context: AdaptiveInterviewContextPacket,
   ): Promise<PerTurnCheckpointEvaluatorRunResult> {
     const combinedTurn = isAdaptiveAiCombinedTurnEnabled();
+    const useOpenAiServerState =
+      isAdaptiveAiOpenAiResponsesApiEnabled() &&
+      isAdaptiveAiOpenAiServerStateEnabled();
     const useConversation = isAdaptiveAiConversationSessionEnabled();
+
+    if (useOpenAiServerState) {
+      const result = await this.evaluateTurnWithOpenAiServerState(
+        attemptId,
+        interviewQuestionId,
+        context,
+        combinedTurn,
+      );
+
+      if (
+        result.status === 'valid' ||
+        !isAdaptiveAiOpenAiServerStateFallbackEnabled()
+      ) {
+        return result;
+      }
+
+      logAdaptiveAiDebug(this.logger, 'evaluate_turn.openai_state_fallback', {
+        attemptId,
+        interviewQuestionId,
+        status: result.status,
+      });
+    }
 
     if (useConversation) {
       return this.evaluateTurnWithConversation(
@@ -99,6 +146,87 @@ export class PerTurnCheckpointEvaluatorService {
       interviewQuestionId,
       operationType: 'evaluate_turn',
     });
+  }
+
+  private async evaluateTurnWithOpenAiServerState(
+    attemptId: number,
+    interviewQuestionId: number,
+    context: AdaptiveInterviewContextPacket,
+    combinedTurn: boolean,
+  ): Promise<PerTurnCheckpointEvaluatorRunResult> {
+    const promptVersion = ADAPTIVE_AI_CONVERSATION_EVALUATE_PROMPT_VERSION;
+    const model = this.aiProviderService.getClientConfig().model;
+    const state =
+      await this.adaptiveOpenAiResponseStateService.loadEvaluateState({
+        attemptId,
+        interviewQuestionId,
+        promptVersion,
+        model,
+      });
+
+    const turnUserPrompt = buildEvaluateConversationTurnUserPrompt(
+      context,
+      combinedTurn,
+    );
+    const messages = state
+      ? ([{ role: 'user', content: turnUserPrompt }] as const)
+      : ([
+          {
+            role: 'system',
+            content: buildEvaluateConversationSystemPrompt(combinedTurn),
+          },
+          {
+            role: 'user',
+            content: buildEvaluateConversationBootstrapUserPrompt(context),
+          },
+          {
+            role: 'assistant',
+            content: buildEvaluateConversationBootstrapAssistantAck(),
+          },
+          { role: 'user', content: turnUserPrompt },
+        ] as const);
+
+    const correlationId = this.aiUsageLogService.createCorrelationId();
+    const debugMeta = {
+      attemptId,
+      interviewQuestionId,
+      operationType: 'evaluate_turn',
+      correlationId,
+      responsesApi: true,
+      serverState: true,
+      hadPreviousResponseId: Boolean(state?.lastResponseId),
+      sessionTurnCount: state?.turnCount ?? 0,
+    };
+
+    logAdaptiveAiDebug(this.logger, 'evaluate_turn.openai_server_state', {
+      ...debugMeta,
+      context: summarizeAdaptiveContextPacket(context),
+      messageCount: messages.length,
+      combinedTurn,
+    });
+
+    const result = await this.runEvaluationCompletion({
+      context,
+      combinedTurn,
+      debugMeta,
+      messages: [...messages],
+      attemptLabel: state ? 'responses_continue' : 'responses_bootstrap',
+      useResponsesApi: true,
+      previousResponseId: state?.lastResponseId,
+    });
+
+    if (result.runResult.status === 'valid' && result.responseId) {
+      await this.adaptiveOpenAiResponseStateService.saveEvaluateState({
+        attemptId,
+        interviewQuestionId,
+        promptVersion,
+        model,
+        lastResponseId: result.responseId,
+        previousState: state,
+      });
+    }
+
+    return result.runResult;
   }
 
   private async evaluateTurnWithConversation(
@@ -119,11 +247,10 @@ export class PerTurnCheckpointEvaluatorService {
       combinedTurn,
     );
 
-    let session =
-      await this.adaptiveAiConversationService.loadSession(
-        sessionKey,
-        promptVersion,
-      );
+    let session = await this.adaptiveAiConversationService.loadSession(
+      sessionKey,
+      promptVersion,
+    );
 
     if (!session) {
       session = this.adaptiveAiConversationService.createBootstrapSession({
@@ -218,13 +345,19 @@ export class PerTurnCheckpointEvaluatorService {
     context: AdaptiveInterviewContextPacket;
     combinedTurn: boolean;
     debugMeta: Record<string, unknown>;
-    messages?: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
+    messages?: Array<{
+      role: 'system' | 'user' | 'assistant';
+      content: string;
+    }>;
     systemPrompt?: string;
     userPrompt?: string;
     attemptLabel: string;
+    useResponsesApi?: boolean;
+    previousResponseId?: string;
   }): Promise<{
     runResult: PerTurnCheckpointEvaluatorRunResult;
     rawAssistantContent: string;
+    responseId?: string;
   }> {
     const { context, combinedTurn, debugMeta } = input;
     const expectedCheckpointKeys = context.checkpoints.map(
@@ -244,16 +377,7 @@ export class PerTurnCheckpointEvaluatorService {
     let repairAttempted = false;
 
     try {
-      let completion = input.messages
-        ? await this.aiProviderService.createChatCompletion(input.messages, {
-            jsonMode: true,
-            debug: { ...debugMeta, attemptLabel: input.attemptLabel },
-          })
-        : await this.aiProviderService.evaluateJson(
-            input.systemPrompt!,
-            input.userPrompt!,
-            { ...debugMeta, attemptLabel: input.attemptLabel },
-          );
+      let completion = await this.createInitialCompletion(input, debugMeta);
 
       let validation = this.validateCompletion(
         completion.content,
@@ -277,19 +401,35 @@ export class PerTurnCheckpointEvaluatorService {
             );
 
         completion = input.messages
-          ? await this.aiProviderService.createChatCompletion(
-              [
-                ...input.messages.slice(0, -1),
+          ? input.useResponsesApi
+            ? await this.aiProviderService.createResponseJson(
+                [
+                  {
+                    role: 'user',
+                    content: repairUserPrompt,
+                  },
+                ],
                 {
-                  role: 'user',
-                  content: repairUserPrompt,
+                  previousResponseId:
+                    (completion as ResponseCompletionResult).responseId ??
+                    input.previousResponseId,
+                  debug: { ...debugMeta, attemptLabel: 'repair' },
+                  store: true,
                 },
-              ],
-              {
-                jsonMode: true,
-                debug: { ...debugMeta, attemptLabel: 'repair' },
-              },
-            )
+              )
+            : await this.aiProviderService.createChatCompletion(
+                [
+                  ...input.messages.slice(0, -1),
+                  {
+                    role: 'user',
+                    content: repairUserPrompt,
+                  },
+                ],
+                {
+                  jsonMode: true,
+                  debug: { ...debugMeta, attemptLabel: 'repair' },
+                },
+              )
           : await this.aiProviderService.evaluateJson(
               `${input.systemPrompt!}\n\n${PER_TURN_CHECKPOINT_EVALUATION_REPAIR_INSTRUCTION}`,
               repairUserPrompt,
@@ -315,8 +455,7 @@ export class PerTurnCheckpointEvaluatorService {
         interviewAttemptId: context.attemptId,
         interviewMessageId: context.latestCandidateMessageId ?? undefined,
         operationType: 'evaluate_turn',
-        status:
-          validation.status === 'valid' ? 'success' : 'invalid_response',
+        status: validation.status === 'valid' ? 'success' : 'invalid_response',
         correlationId,
         model: completion.model,
         promptTokens: usage.promptTokens,
@@ -331,6 +470,7 @@ export class PerTurnCheckpointEvaluatorService {
         );
 
         return {
+          responseId: this.getResponseId(completion),
           rawAssistantContent: completion.content,
           runResult: {
             status: 'invalid_ai_response',
@@ -346,6 +486,7 @@ export class PerTurnCheckpointEvaluatorService {
       const floored = applyCheckpointScoreFloors(validation.data, context);
 
       return {
+        responseId: this.getResponseId(completion),
         rawAssistantContent: completion.content,
         runResult: {
           status: 'valid',
@@ -386,6 +527,188 @@ export class PerTurnCheckpointEvaluatorService {
         },
       };
     }
+  }
+
+  async initializeOpenAiEvaluateState(input: {
+    companyId: number;
+    attemptId: number;
+    interviewQuestionId: number;
+    context?: AdaptiveInterviewContextPacket;
+  }): Promise<InitializeOpenAiEvaluateStateResult> {
+    if (
+      !isAdaptiveAiOpenAiResponsesApiEnabled() ||
+      !isAdaptiveAiOpenAiServerStateEnabled()
+    ) {
+      return { status: 'skipped', reason: 'disabled' };
+    }
+
+    const client = this.aiProviderService.getClientConfig();
+    if (client.provider !== 'openai') {
+      return { status: 'skipped', reason: 'provider_not_openai' };
+    }
+
+    const combinedTurn = isAdaptiveAiCombinedTurnEnabled();
+    const promptVersion = ADAPTIVE_AI_CONVERSATION_EVALUATE_PROMPT_VERSION;
+    const model = client.model;
+    const existingState =
+      await this.adaptiveOpenAiResponseStateService.loadEvaluateState({
+        attemptId: input.attemptId,
+        interviewQuestionId: input.interviewQuestionId,
+        promptVersion,
+        model,
+      });
+
+    if (existingState) {
+      return { status: 'skipped', reason: 'existing_state' };
+    }
+
+    const context =
+      input.context ??
+      (await this.adaptiveInterviewContextService.buildContextPacket(
+        input.attemptId,
+        input.interviewQuestionId,
+      ));
+
+    if (context.checkpoints.length === 0) {
+      return { status: 'skipped', reason: 'context_unavailable' };
+    }
+
+    const correlationId = this.aiUsageLogService.createCorrelationId();
+    const debugMeta = {
+      attemptId: input.attemptId,
+      interviewQuestionId: input.interviewQuestionId,
+      operationType: 'evaluate_turn_prewarm',
+      correlationId,
+      responsesApi: true,
+      serverState: true,
+      prewarm: true,
+      combinedTurn,
+    };
+
+    try {
+      const completion = await this.aiProviderService.createResponseJson(
+        [
+          {
+            role: 'system',
+            content: buildEvaluateConversationSystemPrompt(combinedTurn),
+          },
+          {
+            role: 'user',
+            content: buildEvaluateConversationBootstrapPrewarmUserPrompt(
+              context,
+              combinedTurn,
+            ),
+          },
+        ],
+        {
+          debug: debugMeta,
+          store: true,
+          metadata: {
+            attemptId: input.attemptId,
+            interviewQuestionId: input.interviewQuestionId,
+            operationType: 'evaluate_turn_prewarm',
+          },
+        },
+      );
+
+      await this.adaptiveOpenAiResponseStateService.saveEvaluateState({
+        attemptId: input.attemptId,
+        interviewQuestionId: input.interviewQuestionId,
+        promptVersion,
+        model,
+        lastResponseId: completion.responseId,
+        previousState: null,
+      });
+
+      await this.aiUsageLogService.logCompletion({
+        companyId: input.companyId,
+        interviewAttemptId: input.attemptId,
+        operationType: 'evaluate_turn_prewarm',
+        status: 'success',
+        correlationId,
+        model: completion.model,
+        promptTokens: completion.usage.promptTokens,
+        completionTokens: completion.usage.completionTokens,
+        latencyMs: completion.latencyMs,
+      });
+
+      return {
+        status: 'initialized',
+        responseId: completion.responseId,
+      };
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'AI provider request failed';
+
+      this.logger.warn(
+        `OpenAI evaluate state prewarm failed attemptId=${input.attemptId} interviewQuestionId=${input.interviewQuestionId}: ${message}`,
+      );
+
+      await this.aiUsageLogService.logCompletion({
+        companyId: input.companyId,
+        interviewAttemptId: input.attemptId,
+        operationType: 'evaluate_turn_prewarm',
+        status: 'error',
+        correlationId,
+        model,
+        promptTokens: 0,
+        completionTokens: 0,
+        latencyMs: 0,
+      });
+
+      return {
+        status: 'provider_error',
+        message,
+      };
+    }
+  }
+
+  private async createInitialCompletion(
+    input: {
+      messages?: Array<{
+        role: 'system' | 'user' | 'assistant';
+        content: string;
+      }>;
+      systemPrompt?: string;
+      userPrompt?: string;
+      attemptLabel: string;
+      useResponsesApi?: boolean;
+      previousResponseId?: string;
+    },
+    debugMeta: Record<string, unknown>,
+  ) {
+    if (input.messages && input.useResponsesApi) {
+      return this.aiProviderService.createResponseJson(input.messages, {
+        previousResponseId: input.previousResponseId,
+        debug: { ...debugMeta, attemptLabel: input.attemptLabel },
+        store: true,
+      });
+    }
+
+    if (input.messages) {
+      return this.aiProviderService.createChatCompletion(input.messages, {
+        jsonMode: true,
+        debug: { ...debugMeta, attemptLabel: input.attemptLabel },
+      });
+    }
+
+    return this.aiProviderService.evaluateJson(
+      input.systemPrompt!,
+      input.userPrompt!,
+      { ...debugMeta, attemptLabel: input.attemptLabel },
+    );
+  }
+
+  private getResponseId(
+    completion: Awaited<ReturnType<typeof this.createInitialCompletion>>,
+  ): string | undefined {
+    if (!('responseId' in completion)) {
+      return undefined;
+    }
+
+    return typeof completion.responseId === 'string'
+      ? completion.responseId
+      : undefined;
   }
 
   private validateCompletion(
@@ -534,8 +857,8 @@ export class PerTurnCheckpointEvaluatorService {
       'evaluate_turn.persist_states',
       debugMeta,
     );
-    const states = await this.checkpointStateRepository.applyTurnEvaluationResults(
-      {
+    const states =
+      await this.checkpointStateRepository.applyTurnEvaluationResults({
         attemptId: input.attemptId,
         interviewQuestionId: input.interviewQuestionId,
         candidateMessageId: context.latestCandidateMessageId,
@@ -550,15 +873,20 @@ export class PerTurnCheckpointEvaluatorService {
           evidenceSummary: result.evidenceSummary,
           rationale: result.rationale,
         })),
-      },
-    );
+      });
     persistTimer.finish({ stateCount: states.length });
+
+    const validEvaluation = evaluation as {
+      repairAttempted: boolean;
+      candidateDisposition: CandidateAnswerDisposition;
+      suggestedFollowUp?: AdaptiveAiSuggestedFollowUp | null;
+    };
 
     return {
       status: 'valid',
-      repairAttempted: evaluation.repairAttempted,
-      candidateDisposition: evaluation.candidateDisposition,
-      suggestedFollowUp: evaluation.suggestedFollowUp ?? null,
+      repairAttempted: validEvaluation.repairAttempted,
+      candidateDisposition: validEvaluation.candidateDisposition,
+      suggestedFollowUp: validEvaluation.suggestedFollowUp ?? null,
       states,
     };
   }
