@@ -15,9 +15,14 @@ describe('FollowUpPlannerService', () => {
   let adaptiveInterviewContextService: jest.Mocked<
     Pick<AdaptiveInterviewContextService, 'buildContextPacket'>
   >;
-  let followUpPolicyService: jest.Mocked<Pick<FollowUpPolicyService, 'evaluate'>>;
+  let followUpPolicyService: jest.Mocked<
+    Pick<FollowUpPolicyService, 'evaluate'>
+  >;
   let checkpointStateRepository: jest.Mocked<
-    Pick<CheckpointStateRepository, 'findByAttemptAndQuestion' | 'incrementFollowUpCount'>
+    Pick<
+      CheckpointStateRepository,
+      'findByAttemptAndQuestion' | 'incrementFollowUpCount'
+    >
   >;
   let followUpRepository: jest.Mocked<
     Pick<
@@ -25,7 +30,9 @@ describe('FollowUpPlannerService', () => {
       'listByAttemptAndQuestion' | 'countUsedForQuestion' | 'create'
     >
   >;
-  let aiProviderService: jest.Mocked<Pick<AiProviderService, 'evaluateJson' | 'getClientConfig'>>;
+  let aiProviderService: jest.Mocked<
+    Pick<AiProviderService, 'evaluateJson' | 'getClientConfig'>
+  >;
   let aiMessageStreamService: jest.Mocked<
     Pick<
       InterviewAiMessageStreamService,
@@ -124,7 +131,7 @@ describe('FollowUpPlannerService', () => {
     };
     aiMessageStreamService = {
       isEnabled: jest.fn().mockReturnValue(false),
-      streamStaticText: jest.fn(async ({ text }) => text),
+      streamStaticText: jest.fn(({ text }) => Promise.resolve(text)),
       streamLlmText: jest.fn(),
     };
 
@@ -190,11 +197,9 @@ describe('FollowUpPlannerService', () => {
     }
     expect(aiProviderService.evaluateJson).not.toHaveBeenCalled();
     expect(followUpRepository.create).toHaveBeenCalled();
-    expect(checkpointStateRepository.incrementFollowUpCount).toHaveBeenCalledWith(
-      5,
-      10,
-      'dependency_array',
-    );
+    expect(
+      checkpointStateRepository.incrementFollowUpCount,
+    ).toHaveBeenCalledWith(5, 10, 'dependency_array');
 
     delete process.env.ADAPTIVE_FOLLOW_UP_USE_LLM;
   });
@@ -279,6 +284,45 @@ describe('FollowUpPlannerService', () => {
     expect(result.status).toBe('planned');
     expect(aiMessageStreamService.streamLlmText).toHaveBeenCalled();
     expect(aiProviderService.evaluateJson).not.toHaveBeenCalled();
+
+    delete process.env.ADAPTIVE_FOLLOW_UP_USE_LLM;
+    delete process.env.ADAPTIVE_INTERVIEW_ENABLED;
+    delete process.env.ADAPTIVE_AI_MESSAGE_STREAMING;
+  });
+
+  it('uses template fallback without a second LLM call when evaluator already handled the turn', async () => {
+    process.env.ADAPTIVE_FOLLOW_UP_USE_LLM = 'true';
+    process.env.ADAPTIVE_INTERVIEW_ENABLED = 'true';
+    process.env.ADAPTIVE_AI_MESSAGE_STREAMING = 'true';
+    aiMessageStreamService.isEnabled.mockReturnValue(true);
+    aiMessageStreamService.streamStaticText.mockResolvedValue(
+      'Понял, спасибо — можете подробнее раскрыть роль массива зависимостей?',
+    );
+
+    followUpPolicyService.evaluate.mockReturnValue({
+      shouldAskFollowUp: true,
+      targetCheckpointKey: 'dependency_array',
+      checkpointTitle: 'Dependency array',
+      checkpointExpected: 'Explains dependency array',
+      reason: 'checkpoint_missed',
+    });
+
+    const result = await service.planFollowUp(5, 10, {
+      context: contextPacket,
+      suggestedFollowUp: null,
+      candidateDispositionFromAi: 'engaged',
+      followUpsUsedForQuestion: 0,
+      avoidLlmFallback: true,
+    });
+
+    expect(result.status).toBe('planned');
+    if (result.status === 'planned') {
+      expect(result.usedTemplate).toBe(true);
+      expect(result.reason).toBe('combined_turn_template_fallback');
+    }
+    expect(aiProviderService.evaluateJson).not.toHaveBeenCalled();
+    expect(aiMessageStreamService.streamLlmText).not.toHaveBeenCalled();
+    expect(aiMessageStreamService.streamStaticText).toHaveBeenCalled();
 
     delete process.env.ADAPTIVE_FOLLOW_UP_USE_LLM;
     delete process.env.ADAPTIVE_INTERVIEW_ENABLED;

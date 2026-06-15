@@ -2,7 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InterviewAiMessageStreamService } from '../../interview-realtime/interview-ai-message-stream.service';
 import { AiProviderService } from '../../ai-provider/ai-provider.service';
 import { AiUsageLogService } from '../../usage-logging/ai-usage-log.service';
-import { getAdaptiveInterviewContextLimits, isFollowUpLlmEnabled, isAdaptiveAiCombinedTurnEnabled } from '../config/adaptive-interview-context.config';
+import {
+  getAdaptiveInterviewContextLimits,
+  isFollowUpLlmEnabled,
+  isAdaptiveAiCombinedTurnEnabled,
+} from '../config/adaptive-interview-context.config';
 import {
   buildFollowUpPlannerRepairUserPrompt,
   FOLLOW_UP_PLANNER_REPAIR_INSTRUCTION,
@@ -15,7 +19,10 @@ import {
 } from '../prompts/follow-up-planner.prompt';
 import { CheckpointStateRepository } from '../repositories/checkpoint-state.repository';
 import { FollowUpRepository } from '../repositories/follow-up.repository';
-import type { FollowUpPlannerRunResult, FollowUpPlannerOptions } from '../types/follow-up-planner.types';
+import type {
+  FollowUpPlannerRunResult,
+  FollowUpPlannerOptions,
+} from '../types/follow-up-planner.types';
 import { boundText } from '../utils/build-adaptive-interview-context.util';
 import { buildNaturalTemplateFollowUp } from '../utils/follow-up-policy.util';
 import { isSuggestedFollowUpUsable } from '../utils/parse-suggested-follow-up.util';
@@ -107,8 +114,9 @@ export class FollowUpPlannerService {
     policyTimer.finish({
       shouldAskFollowUp: policy.shouldAskFollowUp,
       reason: policy.shouldAskFollowUp ? undefined : policy.reason,
-      targetCheckpointKey:
-        policy.shouldAskFollowUp ? policy.targetCheckpointKey : undefined,
+      targetCheckpointKey: policy.shouldAskFollowUp
+        ? policy.targetCheckpointKey
+        : undefined,
     });
 
     if (!policy.shouldAskFollowUp) {
@@ -142,7 +150,8 @@ export class FollowUpPlannerService {
     const systemPrompt = buildFollowUpPlannerSystemPrompt();
     const userPrompt = buildFollowUpPlannerUserPrompt(promptInput);
     const streamingSystemPrompt = buildFollowUpPlannerStreamingSystemPrompt();
-    const streamingUserPrompt = buildFollowUpPlannerStreamingUserPrompt(promptInput);
+    const streamingUserPrompt =
+      buildFollowUpPlannerStreamingUserPrompt(promptInput);
 
     logAdaptiveAiDebug(this.logger, 'plan_follow_up.prompts', {
       ...aiDebugMeta,
@@ -153,6 +162,7 @@ export class FollowUpPlannerService {
     let usedTemplate = !isFollowUpLlmEnabled();
     let followUpQuestion = templateQuestion;
     let plannerReason = policy.reason;
+    const avoidLlmFallback = options.avoidLlmFallback === true;
 
     const combinedSuggested =
       isAdaptiveAiCombinedTurnEnabled() &&
@@ -185,13 +195,37 @@ export class FollowUpPlannerService {
       }
     }
 
+    if (!combinedSuggested && avoidLlmFallback) {
+      usedTemplate = true;
+      plannerReason = 'combined_turn_template_fallback';
+      logAdaptiveAiDebug(this.logger, 'plan_follow_up.combined_turn_template', {
+        ...aiDebugMeta,
+        checkpointKey: policy.targetCheckpointKey,
+        followUpQuestion: templateQuestion,
+      });
+
+      if (this.aiMessageStreamService.isEnabled()) {
+        followUpQuestion = await this.aiMessageStreamService.streamStaticText({
+          attemptId,
+          interviewQuestionId,
+          messageKind: 'follow_up_question',
+          text: templateQuestion,
+        });
+      }
+    }
+
     const streamInput = {
       attemptId,
       interviewQuestionId,
       messageKind: 'follow_up_question',
     };
 
-    if (!combinedSuggested && isFollowUpLlmEnabled() && this.aiMessageStreamService.isEnabled()) {
+    if (
+      !combinedSuggested &&
+      !avoidLlmFallback &&
+      isFollowUpLlmEnabled() &&
+      this.aiMessageStreamService.isEnabled()
+    ) {
       try {
         const streamed = await this.aiMessageStreamService.streamLlmText({
           ...streamInput,
@@ -215,7 +249,11 @@ export class FollowUpPlannerService {
         });
         plannerReason = 'provider_error_template_fallback';
       }
-    } else if (!combinedSuggested && isFollowUpLlmEnabled()) {
+    } else if (
+      !combinedSuggested &&
+      !avoidLlmFallback &&
+      isFollowUpLlmEnabled()
+    ) {
       try {
         const aiTimer = startAdaptiveAiPhaseTimer(
           this.logger,
@@ -228,10 +266,9 @@ export class FollowUpPlannerService {
           { ...aiDebugMeta, attemptLabel: 'initial' },
         );
 
-        let validation =
-          this.followUpPlannerValidatorService.validateResponse(
-            completion.content,
-          );
+        let validation = this.followUpPlannerValidatorService.validateResponse(
+          completion.content,
+        );
 
         if (validation.status === 'invalid_ai_response') {
           repairAttempted = true;
@@ -274,7 +311,10 @@ export class FollowUpPlannerService {
             validation.data.followUpQuestion,
             limits.maxTextLength,
           );
-          plannerReason = boundText(validation.data.reason, limits.maxTextLength);
+          plannerReason = boundText(
+            validation.data.reason,
+            limits.maxTextLength,
+          );
           usedTemplate = false;
         } else {
           this.followUpPlannerValidatorService.logInvalidResponse(
@@ -308,7 +348,11 @@ export class FollowUpPlannerService {
         followUpQuestion = templateQuestion;
         plannerReason = 'provider_error_template_fallback';
       }
-    } else if (!combinedSuggested && this.aiMessageStreamService.isEnabled()) {
+    } else if (
+      !combinedSuggested &&
+      !avoidLlmFallback &&
+      this.aiMessageStreamService.isEnabled()
+    ) {
       logAdaptiveAiDebug(this.logger, 'plan_follow_up.template_stream', {
         ...aiDebugMeta,
         followUpQuestion: templateQuestion,
@@ -317,7 +361,7 @@ export class FollowUpPlannerService {
         ...streamInput,
         text: templateQuestion,
       });
-    } else {
+    } else if (!combinedSuggested && !avoidLlmFallback) {
       logAdaptiveAiDebug(this.logger, 'plan_follow_up.template_only', {
         ...aiDebugMeta,
         followUpQuestion: templateQuestion,

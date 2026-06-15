@@ -69,6 +69,7 @@ export type FollowUpPlannerOptions = {
   suggestedFollowUp?: AdaptiveAiSuggestedFollowUp | null;
   candidateDispositionFromAi?: CandidateAnswerDisposition | null;
   followUpsUsedForQuestion?: number;
+  avoidLlmFallback?: boolean;
 };
 
 export type FollowUpPlannerRunResult =

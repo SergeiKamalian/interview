@@ -15,7 +15,7 @@ function scoreZone(score: number): string {
 
 export function OverallScoreCard({
   score,
-  maxScore = 100,
+  maxScore = 10,
   loading = false,
 }: OverallScoreCardProps) {
   if (loading) {
@@ -34,7 +34,7 @@ export function OverallScoreCard({
     );
   }
 
-  const normalized = (score / maxScore) * 100;
+  const normalized = Math.min(100, Math.max(0, (score / maxScore) * 100));
 
   return (
     <Card header="Overall score">
@@ -48,8 +48,8 @@ export function OverallScoreCard({
         <span className="text-sm">/ 100</span>
       </div>
       <p className="mt-3 text-xs text-slate-500">
-        Score рассчитан по structured checkpoints из question bank, не по
-        свободному тексту AI.
+        Score показан по 100-балльной шкале и рассчитан по structured
+        checkpoints из question bank, не по свободному тексту AI.
       </p>
     </Card>
   );

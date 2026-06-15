@@ -340,6 +340,7 @@ export class AdaptiveInterviewSubmitService {
             ? evaluation.candidateDisposition
             : undefined,
         followUpsUsedForQuestion: contextPacket.followUpLimits.usedForQuestion,
+        avoidLlmFallback: evaluation.status === 'valid',
       },
     );
     planTimer.finish({ status: planResult.status });

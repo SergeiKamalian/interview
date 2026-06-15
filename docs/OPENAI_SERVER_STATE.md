@@ -305,13 +305,25 @@ evaluate_turn returns:
   - suggested_follow_up
 ```
 
-Если `suggested_follow_up.checkpoint_key` совпадает с backend policy target, `FollowUpPlannerService` не делает отдельный `plan_follow_up` LLM call.
+Реализованное поведение:
+
+```txt
+valid evaluate_turn
+→ backend policy выбирает target checkpoint
+→ если suggested_follow_up подходит под policy target, используем его
+→ если suggested_follow_up пустой/не совпал, используем deterministic template
+→ отдельный plan_follow_up LLM call не вызывается
+```
+
+Отдельный `plan_follow_up` LLM fallback остаётся только для путей, где per-turn evaluator не дал валидный combined result.
 
 Ожидаемый выигрыш:
 
 ```txt
--1.5s ... -3s на turn с follow-up
+-1.5s ... -3s на каждый turn с follow-up, где раньше был второй последовательный LLM call
 ```
+
+Это соответствует OpenAI latency guidance: для быстрых интерактивных сценариев лучше уменьшать число последовательных LLM requests, использовать Responses API, держать статический prompt prefix в начале, а dynamic candidate answer — в конце.
 
 ### 2. Server-side state через Responses API
 
