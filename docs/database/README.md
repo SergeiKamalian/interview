@@ -26,6 +26,7 @@
 | [media-storage.md](schemas/media-storage.md) | media_assets, media_transcripts | 008 |
 | [analytics-cost.md](schemas/analytics-cost.md) | rollups, views | 009 |
 | [ats-integrations.md](schemas/ats-integrations.md) | integration_configs, deliveries, logs | 010 |
+| [adaptive-ai-interview.md](schemas/adaptive-ai-interview.md) | checkpoint states, follow-ups, question summaries | 013 |
 
 ---
 
@@ -51,6 +52,9 @@ backend/migrations/
   008_create_media_storage.sql
   009_create_analytics.sql
   010_create_ats_integrations.sql
+  011_create_auth_sessions.sql
+  012_create_candidate_shortlist.sql
+  013_create_adaptive_ai_interview.sql
 ```
 
 Apply: `cd backend && pnpm run migrate`
@@ -61,4 +65,4 @@ Apply: `cd backend && pnpm run migrate`
 
 Database design block `02-✅-database-design` — complete.
 
-Feature blocks 04–10 implement application code against this schema.
+Feature blocks 04–12 implement application code against this schema.

@@ -4,6 +4,7 @@ import type { InterviewAttemptEntity } from './entities/interview-attempt.entity
 import {
   AttemptStatusEnum,
   InterviewStatusEnum,
+  InterviewMessageKindEnum,
   type InterviewMessageType,
   type InterviewSessionType,
   type InterviewType,
@@ -54,6 +55,11 @@ export function mapMessageToGraphql(
     role: message.role as MessageRoleEnum,
     content: message.content,
     sequenceOrder: message.sequenceOrder,
+    messageKind: message.messageKind as InterviewMessageKindEnum | null,
+    interviewQuestionId: message.interviewQuestionId
+      ? String(message.interviewQuestionId)
+      : null,
+    targetCheckpointKey: message.targetCheckpointKey,
   };
 }
 
@@ -95,11 +101,32 @@ export function buildSubmitPayload(input: {
   nextQuestionText: string | null;
   answeredQuestions: number;
   totalQuestions: number;
+  pendingMessageText?: string | null;
+  messageKind?: InterviewMessageKindEnum | null;
+  currentInterviewQuestionId?: number | null;
+  isFollowUp?: boolean;
+  answeredMainQuestions?: number;
+  totalMainQuestions?: number;
+  currentQuestionFollowUpCount?: number;
 }): SubmitInterviewAnswerPayload {
+  const pendingMessageText = input.pendingMessageText ?? input.nextQuestionText;
+  const answeredMainQuestions =
+    input.answeredMainQuestions ?? input.answeredQuestions;
+  const totalMainQuestions = input.totalMainQuestions ?? input.totalQuestions;
+
   return {
     status: input.status as AttemptStatusEnum,
     nextQuestionText: input.nextQuestionText,
-    answeredQuestions: input.answeredQuestions,
-    totalQuestions: input.totalQuestions,
+    answeredQuestions: answeredMainQuestions,
+    totalQuestions: totalMainQuestions,
+    pendingMessageText,
+    messageKind: input.messageKind ?? null,
+    currentInterviewQuestionId: input.currentInterviewQuestionId
+      ? String(input.currentInterviewQuestionId)
+      : null,
+    isFollowUp: input.isFollowUp ?? false,
+    answeredMainQuestions,
+    totalMainQuestions,
+    currentQuestionFollowUpCount: input.currentQuestionFollowUpCount ?? 0,
   };
 }

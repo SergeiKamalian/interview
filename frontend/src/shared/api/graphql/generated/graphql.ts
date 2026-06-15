@@ -76,6 +76,13 @@ export type HireRecommendation =
   | 'strong_invite'
   | 'strong_reject';
 
+export type InterviewMessageKind =
+  | 'follow_up_answer'
+  | 'follow_up_question'
+  | 'main_answer'
+  | 'main_question'
+  | 'system_note';
+
 export type InterviewStatus =
   | 'active'
   | 'archived'
@@ -241,7 +248,7 @@ export type InterviewSessionQueryVariables = Exact<{
 }>;
 
 
-export type InterviewSessionQuery = { interviewSession: { attemptId: string, status: AttemptStatus, totalQuestions: number, answeredQuestions: number, currentQuestionText: string | null, currentQuestionId: string | null, messages: Array<{ id: string, role: MessageRole, content: string, sequenceOrder: number }> } };
+export type InterviewSessionQuery = { interviewSession: { attemptId: string, status: AttemptStatus, totalQuestions: number, answeredQuestions: number, currentQuestionText: string | null, currentQuestionId: string | null, messages: Array<{ id: string, role: MessageRole, content: string, sequenceOrder: number, messageKind: InterviewMessageKind | null, interviewQuestionId: string | null, targetCheckpointKey: string | null }> } };
 
 export type InterviewTranscriptQueryVariables = Exact<{
   attemptId: string | number;
@@ -327,7 +334,7 @@ export type SubmitInterviewAnswerMutationVariables = Exact<{
 }>;
 
 
-export type SubmitInterviewAnswerMutation = { submitInterviewAnswer: { status: AttemptStatus, nextQuestionText: string | null, answeredQuestions: number, totalQuestions: number } };
+export type SubmitInterviewAnswerMutation = { submitInterviewAnswer: { status: AttemptStatus, nextQuestionText: string | null, pendingMessageText: string | null, answeredQuestions: number, totalQuestions: number, answeredMainQuestions: number, totalMainQuestions: number, messageKind: InterviewMessageKind | null, currentInterviewQuestionId: string | null, isFollowUp: boolean, currentQuestionFollowUpCount: number } };
 
 export type TopicSkillQuestionAnalyticsQueryVariables = Exact<{
   filters?: TopicSkillQuestionFilterInput | null | undefined;
@@ -641,6 +648,9 @@ export const InterviewSessionDocument = new TypedDocumentString(`
       role
       content
       sequenceOrder
+      messageKind
+      interviewQuestionId
+      targetCheckpointKey
     }
   }
 }
@@ -850,8 +860,15 @@ export const SubmitInterviewAnswerDocument = new TypedDocumentString(`
   submitInterviewAnswer(input: $input) {
     status
     nextQuestionText
+    pendingMessageText
     answeredQuestions
     totalQuestions
+    answeredMainQuestions
+    totalMainQuestions
+    messageKind
+    currentInterviewQuestionId
+    isFollowUp
+    currentQuestionFollowUpCount
   }
 }
     `) as unknown as TypedDocumentString<SubmitInterviewAnswerMutation, SubmitInterviewAnswerMutationVariables>;

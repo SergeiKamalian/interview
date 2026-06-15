@@ -3,6 +3,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { isAdaptiveInterviewEnabled } from '../../adaptive-interview/config/adaptive-interview-context.config';
+import { AdaptiveEvidenceEvaluationService } from './adaptive-evidence-evaluation.service';
 import { InterviewCoreRepository } from '../../interview-core/interview-core.repository';
 import { AiUsageLogService } from '../../usage-logging/ai-usage-log.service';
 import {
@@ -37,6 +39,7 @@ export class AiEvaluationService {
     private readonly checkpointResultRepository: CheckpointResultRepository,
     private readonly hallucinationGuardService: HallucinationGuardService,
     private readonly finalEvaluationService: FinalEvaluationService,
+    private readonly adaptiveEvidenceEvaluationService: AdaptiveEvidenceEvaluationService,
     private readonly interviewRepository: InterviewCoreRepository,
     private readonly aiUsageLogService: AiUsageLogService,
   ) {}
@@ -149,8 +152,39 @@ export class AiEvaluationService {
       attempt.interviewId,
     );
 
-    for (const question of questions) {
-      await this.evaluateAndPersistQuestionAnswer(attemptId, question.id);
+    const useAdaptiveEvidence =
+      isAdaptiveInterviewEnabled() &&
+      (await this.adaptiveEvidenceEvaluationService.hasEvidenceForAttempt(
+        attemptId,
+      ));
+
+    if (useAdaptiveEvidence) {
+      const synced =
+        await this.adaptiveEvidenceEvaluationService.syncQuestionEvaluationsFromEvidence(
+          companyId,
+          attemptId,
+          attempt.interviewId,
+        );
+
+      if (synced < questions.length) {
+        const existing = await this.questionEvaluationRepository.findByAttemptId(
+          companyId,
+          attemptId,
+        );
+        const evaluatedQuestionIds = new Set(
+          existing.map((item) => item.interviewQuestionId),
+        );
+
+        for (const question of questions) {
+          if (!evaluatedQuestionIds.has(question.id)) {
+            await this.evaluateAndPersistQuestionAnswer(attemptId, question.id);
+          }
+        }
+      }
+    } else {
+      for (const question of questions) {
+        await this.evaluateAndPersistQuestionAnswer(attemptId, question.id);
+      }
     }
 
     const finalEvaluation =

@@ -6,7 +6,11 @@ import {
   NotFoundException,
   forwardRef,
 } from '@nestjs/common';
+import { isAdaptiveInterviewEnabled } from '../adaptive-interview/config/adaptive-interview-context.config';
+import { AdaptiveInterviewSubmitService, resolveSessionProgress } from '../adaptive-interview/services/adaptive-interview-submit.service';
 import { AiEvaluationService } from '../ai-evaluation/services/ai-evaluation.service';
+import { CheckpointStateService } from '../adaptive-interview/services/checkpoint-state.service';
+import { InterviewRealtimeService } from '../interview-realtime/interview-realtime.service';
 import { DatabaseService } from '../../common/database/database.service';
 import type { StartPublicInterviewInput } from './dto/start-public-interview.input';
 import {
@@ -32,13 +36,26 @@ export class InterviewPublicService {
     private readonly repository: InterviewCoreRepository,
     private readonly database: DatabaseService,
     private readonly publicTokenService: PublicTokenService,
+    private readonly checkpointStateService: CheckpointStateService,
+    private readonly adaptiveInterviewSubmitService: AdaptiveInterviewSubmitService,
+    private readonly interviewRealtimeService: InterviewRealtimeService,
     @Inject(forwardRef(() => AiEvaluationService))
     private readonly aiEvaluationService: AiEvaluationService,
   ) {}
 
+  private isAdaptiveEnabled(): boolean {
+    return isAdaptiveInterviewEnabled();
+  }
+
   private scheduleEvaluation(companyId: number, attemptId: number): void {
     void this.aiEvaluationService
       .evaluateAttempt(companyId, attemptId)
+      .then(() => {
+        this.interviewRealtimeService.emit({
+          attemptId,
+          eventType: 'evaluation.ready',
+        });
+      })
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : String(error);
         this.logger.warn(
@@ -86,6 +103,7 @@ export class InterviewPublicService {
     }
 
     const email = input.email.trim().toLowerCase();
+    const adaptiveEnabled = this.isAdaptiveEnabled();
 
     const result = await this.database.withTransaction(async (query) => {
       const candidate = await this.repository.findOrCreateCandidate(
@@ -125,12 +143,24 @@ export class InterviewPublicService {
             role: 'ai',
             content: firstQuestion.questionText,
             sequenceOrder: 1,
+            messageKind: adaptiveEnabled ? 'main_question' : null,
+          },
+          query,
+        );
+
+        await this.checkpointStateService.ensureCheckpointStatesForQuestion(
+          {
+            companyId: interview.companyId,
+            attemptId: attempt.id,
+            interviewQuestionId: firstQuestion.id,
           },
           query,
         );
       }
 
-      const answered = await this.repository.countCandidateMessages(attempt.id);
+      const answered = adaptiveEnabled
+        ? await this.repository.countMainAnswerMessages(attempt.id)
+        : await this.repository.countCandidateMessages(attempt.id);
       const currentQuestion = questions[answered] ?? questions[0];
 
       return {
@@ -157,24 +187,40 @@ export class InterviewPublicService {
       throw new NotFoundException('Interview attempt not found');
     }
 
-    const [questions, messages, answeredQuestions] = await Promise.all([
+    const adaptiveEnabled = this.isAdaptiveEnabled();
+    const [questions, messages, answeredMainQuestions] = await Promise.all([
       this.repository.listQuestionsForInterview(attempt.interviewId),
       this.repository.listMessages(attemptId),
-      this.repository.countCandidateMessages(attemptId),
+      adaptiveEnabled
+        ? this.repository.countMainAnswerMessages(attemptId)
+        : this.repository.countCandidateMessages(attemptId),
     ]);
 
-    const currentQuestion =
-      attempt.status === 'in_progress' && answeredQuestions < questions.length
-        ? questions[answeredQuestions]
-        : null;
+    const progress = resolveSessionProgress({
+      messages,
+      questions,
+      answeredMainQuestions,
+      adaptiveEnabled,
+    });
+
+    const sessionInProgress =
+      attempt.status === 'in_progress' &&
+      (answeredMainQuestions < questions.length ||
+        (adaptiveEnabled &&
+          messages.length > 0 &&
+          messages[messages.length - 1]?.role === 'ai'));
+
+    const currentQuestion = sessionInProgress
+      ? progress
+      : { currentQuestionText: null, currentQuestionId: null };
 
     return buildSessionPayload({
       attempt,
       messages,
       totalQuestions: questions.length,
-      answeredQuestions,
-      currentQuestionText: currentQuestion?.questionText ?? null,
-      currentQuestionId: currentQuestion?.id ?? null,
+      answeredQuestions: answeredMainQuestions,
+      currentQuestionText: currentQuestion.currentQuestionText,
+      currentQuestionId: currentQuestion.currentQuestionId,
     });
   }
 
@@ -212,31 +258,88 @@ export class InterviewPublicService {
       attempt.interviewId,
     );
 
-    const answeredBefore =
-      await this.repository.countCandidateMessages(attemptId);
+    if (!this.isAdaptiveEnabled()) {
+      return this.submitLegacyAnswer({
+        attempt,
+        attemptId,
+        questions,
+        trimmedAnswer,
+      });
+    }
 
-    if (answeredBefore >= questions.length) {
+    await this.adaptiveInterviewSubmitService.assertCanSubmit(
+      attemptId,
+      questions.length,
+    );
+
+    const adaptiveResult = await this.adaptiveInterviewSubmitService.submitAnswer(
+      {
+        attempt,
+        questions,
+        trimmedAnswer,
+      },
+    );
+
+    if (adaptiveResult.status === 'completed') {
+      this.scheduleEvaluation(attempt.companyId, attemptId);
+    }
+
+    return buildSubmitPayload({
+      status: adaptiveResult.status,
+      nextQuestionText: adaptiveResult.nextQuestionText,
+      pendingMessageText: adaptiveResult.pendingMessageText,
+      messageKind: adaptiveResult.messageKind,
+      currentInterviewQuestionId: adaptiveResult.currentInterviewQuestionId,
+      isFollowUp: adaptiveResult.isFollowUp,
+      answeredMainQuestions: adaptiveResult.answeredMainQuestions,
+      totalMainQuestions: adaptiveResult.totalMainQuestions,
+      currentQuestionFollowUpCount: adaptiveResult.currentQuestionFollowUpCount,
+      answeredQuestions: adaptiveResult.answeredMainQuestions,
+      totalQuestions: adaptiveResult.totalMainQuestions,
+    });
+  }
+
+  private async submitLegacyAnswer(input: {
+    attempt: { companyId: number; id: number };
+    attemptId: number;
+    questions: Awaited<ReturnType<InterviewCoreRepository['listQuestionsForInterview']>>;
+    trimmedAnswer: string;
+  }): Promise<SubmitInterviewAnswerPayload> {
+    const answeredBefore = await this.repository.countCandidateMessages(
+      input.attemptId,
+    );
+
+    if (answeredBefore >= input.questions.length) {
       throw new BadRequestException({
         message: 'All questions already answered',
         code: 'INTERVIEW_ALREADY_COMPLETE',
       });
     }
 
-    const currentQuestion = questions[answeredBefore];
+    const currentQuestion = input.questions[answeredBefore];
 
     const result = await this.database.withTransaction(async (query) => {
+      await this.checkpointStateService.ensureCheckpointStatesForQuestion(
+        {
+          companyId: input.attempt.companyId,
+          attemptId: input.attemptId,
+          interviewQuestionId: currentQuestion.id,
+        },
+        query,
+      );
+
       const sequenceOrder = await this.repository.getNextSequenceOrder(
-        attemptId,
+        input.attemptId,
         query,
       );
 
       await this.repository.appendMessage(
         {
-          companyId: attempt.companyId,
-          attemptId,
+          companyId: input.attempt.companyId,
+          attemptId: input.attemptId,
           interviewQuestionId: currentQuestion.id,
           role: 'candidate',
-          content: trimmedAnswer,
+          content: input.trimmedAnswer,
           sequenceOrder,
         },
         query,
@@ -244,14 +347,14 @@ export class InterviewPublicService {
 
       const answeredAfter = answeredBefore + 1;
 
-      if (answeredAfter < questions.length) {
-        const nextQuestion = questions[answeredAfter];
+      if (answeredAfter < input.questions.length) {
+        const nextQuestion = input.questions[answeredAfter];
         const nextSequence = sequenceOrder + 1;
 
         await this.repository.appendMessage(
           {
-            companyId: attempt.companyId,
-            attemptId,
+            companyId: input.attempt.companyId,
+            attemptId: input.attemptId,
             interviewQuestionId: nextQuestion.id,
             role: 'ai',
             content: nextQuestion.questionText,
@@ -264,25 +367,31 @@ export class InterviewPublicService {
           status: 'in_progress' as const,
           nextQuestionText: nextQuestion.questionText,
           answeredQuestions: answeredAfter,
-          totalQuestions: questions.length,
+          totalQuestions: input.questions.length,
         };
       }
 
-      await this.repository.completeAttempt(attemptId, query);
+      await this.repository.completeAttempt(input.attemptId, query);
 
       return {
         status: 'completed' as const,
         nextQuestionText: null,
         answeredQuestions: answeredAfter,
-        totalQuestions: questions.length,
+        totalQuestions: input.questions.length,
       };
     });
 
     if (result.status === 'completed') {
-      this.scheduleEvaluation(attempt.companyId, attemptId);
+      this.scheduleEvaluation(input.attempt.companyId, input.attemptId);
     }
 
-    return buildSubmitPayload(result);
+    return buildSubmitPayload({
+      ...result,
+      answeredMainQuestions: result.answeredQuestions,
+      totalMainQuestions: result.totalQuestions,
+      isFollowUp: false,
+      currentQuestionFollowUpCount: 0,
+    });
   }
 
   async completeAttempt(

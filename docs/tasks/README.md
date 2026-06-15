@@ -37,14 +37,15 @@ docs/tasks/
       TASKS.md
       subtasks/
 
-    04-⬜-auth-company/
-    05-⬜-question-bank/
-    06-⬜-interview-core/
-    07-⬜-ai-evaluation/
+    04-✅-auth-company/
+    05-✅-question-bank/
+    06-✅-interview-core/
+    07-✅-ai-evaluation/
     08-✅-dashboard-analytics/
-    09-⬜-voice-video/
-    10-⬜-ats-integrations/
-    11-⬜-deployment/
+    09-🟡-adaptive-ai-interview/
+    10-⬜-voice-video/
+    11-⬜-ats-integrations/
+    12-⬜-deployment/
 ```
 
 ---
@@ -61,9 +62,10 @@ docs/tasks/
 06 — interview-core
 07 — ai-evaluation           (checkpoint-based JSON)
 08 — dashboard-analytics
-09 — voice-video
-10 — ats-integrations
-11 — deployment
+09 — adaptive-ai-interview (live checkpoint follow-ups)
+10 — voice-video
+11 — ats-integrations
+12 — deployment
 ```
 
 Важно: design docs в `docs/database/` и SQL migrations — source of truth для feature-блоков 04+.
@@ -230,17 +232,17 @@ Cursor НЕ должен выполнять весь блок сразу.
 ## Текущий активный блок
 
 ```txt
-Setup завершён (00-✅-project-setup).
+09-🟡-adaptive-ai-interview (🟡 in progress)
 ```
 
-Следующий блок (не начат):
+Активный subtask:
 
 ```txt
-docs/tasks/list/01-🟡-backend-foundation/
+docs/tasks/list/09-🟡-adaptive-ai-interview/subtasks/007-⬜-add-follow-up-planner-policy.md
 ```
 
-Блок в работе. Следующая подзадача:
+Следующая рекомендуемая подзадача:
 
 ```txt
-docs/tasks/list/01-🟡-backend-foundation/subtasks/002-⬜-add-base-config-env-validation.md
+TASK-09.7 — Добавить follow-up planner и policy limits
 ```

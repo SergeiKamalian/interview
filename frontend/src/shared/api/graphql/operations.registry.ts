@@ -74,8 +74,8 @@ export const GraphqlOperations = {
   },
   InterviewSession: {
     operationName: 'InterviewSession',
-    document: "query InterviewSession($publicToken: String!, $attemptId: ID!) { interviewSession(publicToken: $publicToken, attemptId: $attemptId) { attemptId status totalQuestions answeredQuestions currentQuestionText currentQuestionId messages { id role content sequenceOrder } } }",
-    sha256Hash: 'bdb0c9d34565271b572aa6a5dac7f771cd70ff2197366ba31b7bb57e8fa32ca9',
+    document: "query InterviewSession($publicToken: String!, $attemptId: ID!) { interviewSession(publicToken: $publicToken, attemptId: $attemptId) { attemptId status totalQuestions answeredQuestions currentQuestionText currentQuestionId messages { id role content sequenceOrder messageKind interviewQuestionId targetCheckpointKey } } }",
+    sha256Hash: 'cea9d132a18b6bda6d1cf72c73f22bfc7882773ec4b35bf5899c783893868467',
   },
   InterviewTranscript: {
     operationName: 'InterviewTranscript',
@@ -134,8 +134,8 @@ export const GraphqlOperations = {
   },
   SubmitInterviewAnswer: {
     operationName: 'SubmitInterviewAnswer',
-    document: "mutation SubmitInterviewAnswer($input: SubmitInterviewAnswerInput!) { submitInterviewAnswer(input: $input) { status nextQuestionText answeredQuestions totalQuestions } }",
-    sha256Hash: 'eab868b52f5b35c0df5f8b37a7fa227303a87a523e71fbeae0fbc16cbe649c36',
+    document: "mutation SubmitInterviewAnswer($input: SubmitInterviewAnswerInput!) { submitInterviewAnswer(input: $input) { status nextQuestionText pendingMessageText answeredQuestions totalQuestions answeredMainQuestions totalMainQuestions messageKind currentInterviewQuestionId isFollowUp currentQuestionFollowUpCount } }",
+    sha256Hash: 'b936b668f3732ef1f268034d8e43866bbc1946f0fb16661a2262fabe0f2336ee',
   },
   TopicSkillQuestionAnalytics: {
     operationName: 'TopicSkillQuestionAnalytics',

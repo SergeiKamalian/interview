@@ -20,9 +20,18 @@ export enum MessageRoleEnum {
   candidate = 'candidate',
 }
 
+export enum InterviewMessageKindEnum {
+  main_question = 'main_question',
+  main_answer = 'main_answer',
+  follow_up_question = 'follow_up_question',
+  follow_up_answer = 'follow_up_answer',
+  system_note = 'system_note',
+}
+
 registerEnumType(InterviewStatusEnum, { name: 'InterviewStatus' });
 registerEnumType(AttemptStatusEnum, { name: 'AttemptStatus' });
 registerEnumType(MessageRoleEnum, { name: 'MessageRole' });
+registerEnumType(InterviewMessageKindEnum, { name: 'InterviewMessageKind' });
 
 @ObjectType()
 export class InterviewType {
@@ -73,6 +82,15 @@ export class InterviewMessageType {
 
   @Field(() => Int)
   sequenceOrder!: number;
+
+  @Field(() => InterviewMessageKindEnum, { nullable: true })
+  messageKind?: InterviewMessageKindEnum | null;
+
+  @Field(() => String, { nullable: true })
+  interviewQuestionId?: string | null;
+
+  @Field(() => String, { nullable: true })
+  targetCheckpointKey?: string | null;
 }
 
 @ObjectType()
@@ -139,6 +157,27 @@ export class SubmitInterviewAnswerPayload {
 
   @Field(() => Int)
   totalQuestions!: number;
+
+  @Field(() => String, { nullable: true })
+  pendingMessageText?: string | null;
+
+  @Field(() => InterviewMessageKindEnum, { nullable: true })
+  messageKind?: InterviewMessageKindEnum | null;
+
+  @Field(() => String, { nullable: true })
+  currentInterviewQuestionId?: string | null;
+
+  @Field()
+  isFollowUp!: boolean;
+
+  @Field(() => Int)
+  answeredMainQuestions!: number;
+
+  @Field(() => Int)
+  totalMainQuestions!: number;
+
+  @Field(() => Int)
+  currentQuestionFollowUpCount!: number;
 }
 
 export const GRAPHQL_INTERVIEW_STATUSES: InterviewStatus[] = [

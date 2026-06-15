@@ -4,14 +4,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InterviewCoreRepository } from '../../interview-core/interview-core.repository';
-import { QuestionBankRepository } from '../../question-bank/question-bank.repository';
 import type { CheckpointEvaluationContext } from '../types/checkpoint-evaluation.types';
 
 @Injectable()
 export class EvaluationContextService {
   constructor(
     private readonly interviewRepository: InterviewCoreRepository,
-    private readonly questionBankRepository: QuestionBankRepository,
   ) {}
 
   async buildCheckpointEvaluationContext(
@@ -53,16 +51,25 @@ export class EvaluationContextService {
       });
     }
 
-    const checkpoints = await this.loadCheckpointsFromQuestionBank(
-      interviewQuestion.sourceQuestionId,
-    );
+    const snapshotCheckpoints =
+      await this.interviewRepository.findCheckpointsByInterviewQuestionId(
+        interviewQuestionId,
+      );
 
-    if (checkpoints.length === 0) {
+    if (snapshotCheckpoints.length === 0) {
       throw new BadRequestException({
-        message: 'No checkpoints found in question bank for this question',
+        message: 'No checkpoints found in interview question snapshot',
         code: 'CHECKPOINTS_NOT_FOUND',
       });
     }
+
+    const checkpoints = snapshotCheckpoints.map((checkpoint) => ({
+      checkpointKey: checkpoint.checkpointKey,
+      title: checkpoint.title,
+      expected: checkpoint.expected,
+      score: checkpoint.score,
+      sortOrder: checkpoint.sortOrder,
+    }));
 
     return {
       interviewQuestionId: interviewQuestion.id,
@@ -81,26 +88,5 @@ export class EvaluationContextService {
         content: message.content,
       })),
     };
-  }
-
-  private async loadCheckpointsFromQuestionBank(
-    sourceQuestionId: number | null,
-  ) {
-    if (!sourceQuestionId) {
-      return [];
-    }
-
-    const rows =
-      await this.questionBankRepository.findCheckpointsByQuestionId(
-        sourceQuestionId,
-      );
-
-    return rows.map((checkpoint) => ({
-      checkpointKey: checkpoint.checkpointKey,
-      title: checkpoint.title,
-      expected: checkpoint.expected,
-      score: checkpoint.score,
-      sortOrder: checkpoint.sortOrder,
-    }));
   }
 }

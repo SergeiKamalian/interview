@@ -7,6 +7,7 @@ import { AiEvaluationService } from './ai-evaluation.service';
 import { CheckpointEvaluationService } from './checkpoint-evaluation.service';
 import { EvaluationContextService } from './evaluation-context.service';
 import { FinalEvaluationService } from './final-evaluation.service';
+import { AdaptiveEvidenceEvaluationService } from './adaptive-evidence-evaluation.service';
 import { HallucinationGuardService } from './hallucination-guard.service';
 
 describe('AiEvaluationService', () => {
@@ -68,6 +69,13 @@ describe('AiEvaluationService', () => {
         {
           provide: FinalEvaluationService,
           useValue: {},
+        },
+        {
+          provide: AdaptiveEvidenceEvaluationService,
+          useValue: {
+            hasEvidenceForAttempt: jest.fn(),
+            syncQuestionEvaluationsFromEvidence: jest.fn(),
+          },
         },
         {
           provide: InterviewCoreRepository,

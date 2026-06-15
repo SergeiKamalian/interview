@@ -1,0 +1,61 @@
+import { Injectable } from '@nestjs/common';
+import { getAdaptiveInterviewContextLimits } from '../config/adaptive-interview-context.config';
+import type { CandidateAnswerDisposition } from '../types/candidate-answer-disposition.type';
+import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview-context.types';
+import type {
+  FollowUpPolicyDecision,
+  FollowUpPolicyInput,
+} from '../types/follow-up-planner.types';
+import type { CheckpointStateStatus } from '../types/checkpoint-state-status.type';
+import { evaluateFollowUpPolicy } from '../utils/follow-up-policy.util';
+import type { InterviewCheckpointStateEntity } from '../entities/interview-checkpoint-state.entity';
+
+@Injectable()
+export class FollowUpPolicyService {
+  evaluate(
+    context: AdaptiveInterviewContextPacket,
+    checkpointStates: InterviewCheckpointStateEntity[],
+    followUpsUsedForQuestion: number,
+    candidateDispositionFromAi?: CandidateAnswerDisposition | null,
+  ): FollowUpPolicyDecision {
+    const limits = getAdaptiveInterviewContextLimits();
+
+    const input: FollowUpPolicyInput = {
+      questionMaxScore: context.maxScore,
+      checkpoints: context.checkpoints,
+      checkpointStates: checkpointStates.map((state) => ({
+        checkpointKey: state.checkpointKey,
+        status: state.status,
+        scoreAwarded: state.scoreAwarded,
+        maxScore: state.maxScore,
+        followUpCount: state.followUpCount,
+        needsManualReview: state.needsManualReview,
+      })),
+      followUpsUsedForQuestion,
+      maxFollowUpsPerQuestion: limits.maxFollowUpsPerQuestion,
+      maxFollowUpsPerCheckpoint: limits.maxFollowUpsPerCheckpoint,
+      questionScoreSufficientRatio: limits.questionScoreSufficientRatio,
+      lowWeightCheckpointRatio: limits.lowWeightCheckpointRatio,
+      latestCandidateAnswer: context.latestCandidateAnswer,
+      candidateDispositionFromAi: candidateDispositionFromAi ?? undefined,
+    };
+
+    return evaluateFollowUpPolicy(input);
+  }
+
+  isCheckpointEligible(
+    status: CheckpointStateStatus,
+    scoreAwarded: number,
+    maxScore: number,
+  ): boolean {
+    if (status === 'covered' || status === 'skipped' || status === 'unseen') {
+      return false;
+    }
+
+    if (status === 'partial' && scoreAwarded >= maxScore) {
+      return false;
+    }
+
+    return status === 'missed' || status === 'unclear' || status === 'partial';
+  }
+}

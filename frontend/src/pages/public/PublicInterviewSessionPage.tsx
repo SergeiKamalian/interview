@@ -1,9 +1,11 @@
+import { useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   useCompleteInterviewAttemptMutation,
   useInterviewSessionQuery,
   useSubmitInterviewAnswerMutation,
 } from '@features/public-interview/api/publicInterviewApi';
+import { useInterviewRealtime } from '@features/public-interview/model/useInterviewRealtime';
 import { TextInterviewChat } from '@features/public-interview/ui/TextInterviewChat';
 import { Alert, Card, Spinner } from '@shared/ui';
 
@@ -21,6 +23,28 @@ export function PublicInterviewSessionPage() {
   const [submitAnswer, { isLoading: isSubmitting }] =
     useSubmitInterviewAnswerMutation();
   const [completeAttempt] = useCompleteInterviewAttemptMutation();
+
+  const handleResync = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
+  const { statusLabel, streamingMessage, markAnswerSending, resetPhase } =
+    useInterviewRealtime({
+    publicToken: token,
+    attemptId,
+    enabled: Boolean(token && attemptId),
+    onResync: handleResync,
+  });
+
+  const streamingChatMessage = streamingMessage
+    ? {
+        id: `stream-${streamingMessage.streamId}`,
+        role: 'ai' as const,
+        content: streamingMessage.content,
+        messageKind: streamingMessage.messageKind,
+        isStreaming: true,
+      }
+    : null;
 
   if (!attemptId) {
     return (
@@ -48,17 +72,21 @@ export function PublicInterviewSessionPage() {
   }
 
   const isComplete = data.status === 'completed';
+  const answeredMainQuestions = data.answeredQuestions;
 
   return (
     <Card
-      header={`Интервью · ${data.answeredQuestions}/${data.totalQuestions}`}
+      header={`Интервью · ${answeredMainQuestions}/${data.totalQuestions}`}
     >
       <TextInterviewChat
         messages={data.messages}
+        streamingMessage={streamingChatMessage}
         currentQuestionText={data.currentQuestionText}
         isComplete={isComplete}
         isSubmitting={isSubmitting}
+        statusLabel={statusLabel}
         onSubmitAnswer={async (answer) => {
+          markAnswerSending();
           const result = await submitAnswer({
             publicToken: token,
             attemptId,
@@ -66,6 +94,7 @@ export function PublicInterviewSessionPage() {
           }).unwrap();
 
           await refetch();
+          resetPhase();
 
           if (result.status === 'completed') {
             navigate(`/i/${token}/complete?attemptId=${attemptId}`);

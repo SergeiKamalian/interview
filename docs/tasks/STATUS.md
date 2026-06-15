@@ -47,19 +47,19 @@
 Active block:
 
 ```txt
-Нет активного блока.
+10-⬜-voice-video
 ```
 
 Block status:
 
 ```txt
-—
+⬜ todo
 ```
 
 Block title:
 
 ```txt
-—
+Voice/video capture
 ```
 
 ---
@@ -69,37 +69,38 @@ Block title:
 Active subtask ID:
 
 ```txt
-Нет активного subtask.
+TASK-10.1 — Добавить microphone permission
 ```
 
 Last completed subtask:
 
 ```txt
-TASK-08.11 — Функция shortlist кандидатов
+TASK-09.13 — Покрыть adaptive flow тестами и smoke-check
 ```
 
 Next recommended subtask:
 
 ```txt
-TASK-09.1 (блок 09-voice-video)
+TASK-10.1 (блок 10-voice-video)
 ```
 
 Next subtask file:
 
 ```txt
-docs/tasks/list/09-⬜-voice-video/
+docs/tasks/list/10-⬜-voice-video/subtasks/001-⬜-add-microphone-permission.md
 ```
 
 Last updated:
 
 ```txt
-2026-06-12
+2026-06-15
 ```
 
 ---
 
 ## Done
 
+- [x] Block `09-✅-adaptive-ai-interview` completed (subtasks 09.1–09.13)
 - [x] Block `08-✅-dashboard-analytics` completed (subtasks 08.1–08.11)
 - [x] Block `07-✅-ai-evaluation` completed (subtasks 07.1–07.9)
 - [x] Block `06-✅-interview-core` completed
@@ -110,13 +111,13 @@ Last updated:
 
 ## In Progress
 
-Нет активных subtasks.
+No active in-progress subtasks.
 
 ---
 
 ## Next
 
-- [ ] Block `09-⬜-voice-video` — Voice/video capture
+- [ ] Block `10-⬜-voice-video` — Voice/video capture
 
 ---
 

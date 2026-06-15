@@ -2,7 +2,7 @@
 
 Binary files **не в MySQL** — только metadata + storage keys.
 
-**Migration:** `008_create_media_storage.sql` · **Feature block:** `09-⬜-voice-video`
+**Migration:** `008_create_media_storage.sql` · **Feature block:** `10-⬜-voice-video`
 
 ---
 
@@ -12,7 +12,7 @@ Binary files **не в MySQL** — только metadata + storage keys.
 |------|--------|
 | No BLOB | Audio/video in object storage / local filesystem |
 | Metadata in MySQL | `media_assets` + optional `media_transcripts` |
-| Download | REST `/files/:id` (block 09), not GraphQL |
+| Download | REST `/files/:id` (block 10), not GraphQL |
 | Retention | Design: 90 days default post-MVP; configurable per company |
 
 ---

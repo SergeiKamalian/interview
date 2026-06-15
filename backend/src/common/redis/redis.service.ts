@@ -55,6 +55,40 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async getJson<T>(key: string): Promise<T | null> {
+    const raw = await this.getClient().get(key);
+    if (!raw) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(raw) as T;
+    } catch (error: unknown) {
+      this.logger.warn(`Redis JSON parse failed key=${key}`, error);
+      return null;
+    }
+  }
+
+  async setJson(
+    key: string,
+    value: unknown,
+    ttlSeconds?: number,
+  ): Promise<void> {
+    const payload = JSON.stringify(value);
+    const client = this.getClient();
+
+    if (ttlSeconds !== undefined && ttlSeconds > 0) {
+      await client.set(key, payload, 'EX', ttlSeconds);
+      return;
+    }
+
+    await client.set(key, payload);
+  }
+
+  async del(key: string): Promise<void> {
+    await this.getClient().del(key);
+  }
+
   private getClient(): Redis {
     if (!this.client) {
       throw new Error('Redis client is not initialized');

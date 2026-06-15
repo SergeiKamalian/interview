@@ -14,6 +14,8 @@ import type {
   InterviewMessageEntity,
   MessageRole,
 } from './entities/interview-message.entity';
+import type { MessageKind } from './types/message-kind.type';
+import type { InterviewQuestionCheckpointEntity } from './entities/interview-question-checkpoint.entity';
 import type { InterviewQuestionEntity } from './entities/interview-question.entity';
 import type { InterviewStatus } from './types/interview-status.enum';
 import { INTERVIEW_PUBLISHED_STATUS } from './interview-core.schema';
@@ -83,8 +85,22 @@ interface MessageRow extends RowDataPacket {
   interview_attempt_id: number;
   interview_question_id: number | null;
   role: MessageRole;
+  message_kind: MessageKind | null;
+  parent_message_id: number | null;
+  target_checkpoint_key: string | null;
   content: string;
   sequence_order: number;
+  created_at: Date;
+}
+
+interface InterviewQuestionCheckpointRow extends RowDataPacket {
+  id: number;
+  interview_question_id: number;
+  checkpoint_key: string;
+  title: string;
+  expected: string;
+  score: string;
+  sort_order: number;
   created_at: Date;
 }
 
@@ -282,6 +298,20 @@ export class InterviewCoreRepository {
     return row ? this.mapInterviewQuestion(row) : null;
   }
 
+  async findCheckpointsByInterviewQuestionId(
+    interviewQuestionId: number,
+  ): Promise<InterviewQuestionCheckpointEntity[]> {
+    const rows = await this.database.query<InterviewQuestionCheckpointRow[]>(
+      `SELECT id, interview_question_id, checkpoint_key, title, expected, score, sort_order, created_at
+       FROM interview_question_checkpoints
+       WHERE interview_question_id = ?
+       ORDER BY sort_order ASC`,
+      [interviewQuestionId],
+    );
+
+    return rows.map((row) => this.mapInterviewQuestionCheckpoint(row));
+  }
+
   async findOrCreateCandidate(
     input: {
       companyId: number;
@@ -430,6 +460,19 @@ export class InterviewCoreRepository {
     return Number(rows[0]?.total ?? 0);
   }
 
+  async countMainAnswerMessages(attemptId: number): Promise<number> {
+    const rows = await this.database.query<CountRow[]>(
+      `SELECT COUNT(*) AS total
+       FROM interview_messages
+       WHERE interview_attempt_id = ?
+         AND role = 'candidate'
+         AND (message_kind IS NULL OR message_kind = 'main_answer')`,
+      [attemptId],
+    );
+
+    return Number(rows[0]?.total ?? 0);
+  }
+
   async getNextSequenceOrder(
     attemptId: number,
     query: QueryFn = (sql, params) => this.database.query(sql, params),
@@ -452,18 +495,26 @@ export class InterviewCoreRepository {
       role: MessageRole;
       content: string;
       sequenceOrder: number;
+      messageKind?: MessageKind | null;
+      parentMessageId?: number | null;
+      targetCheckpointKey?: string | null;
     },
     query: QueryFn = (sql, params) => this.database.query(sql, params),
   ): Promise<InterviewMessageEntity> {
     const result = await query<ResultSetHeader>(
       `INSERT INTO interview_messages (
-         company_id, interview_attempt_id, interview_question_id, role, content, sequence_order
-       ) VALUES (?, ?, ?, ?, ?, ?)`,
+         company_id, interview_attempt_id, interview_question_id, role,
+         message_kind, parent_message_id, target_checkpoint_key,
+         content, sequence_order
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         input.companyId,
         input.attemptId,
         input.interviewQuestionId,
         input.role,
+        input.messageKind ?? null,
+        input.parentMessageId ?? null,
+        input.targetCheckpointKey ?? null,
         input.content,
         input.sequenceOrder,
       ],
@@ -471,7 +522,8 @@ export class InterviewCoreRepository {
 
     const rows = await query<MessageRow[]>(
       `SELECT id, company_id, interview_attempt_id, interview_question_id,
-              role, content, sequence_order, created_at
+              role, message_kind, parent_message_id, target_checkpoint_key,
+              content, sequence_order, created_at
        FROM interview_messages WHERE id = ? LIMIT 1`,
       [Number(result.insertId)],
     );
@@ -487,7 +539,8 @@ export class InterviewCoreRepository {
   async listMessages(attemptId: number): Promise<InterviewMessageEntity[]> {
     const rows = await this.database.query<MessageRow[]>(
       `SELECT id, company_id, interview_attempt_id, interview_question_id,
-              role, content, sequence_order, created_at
+              role, message_kind, parent_message_id, target_checkpoint_key,
+              content, sequence_order, created_at
        FROM interview_messages
        WHERE interview_attempt_id = ?
        ORDER BY sequence_order ASC`,
@@ -557,6 +610,21 @@ export class InterviewCoreRepository {
     };
   }
 
+  private mapInterviewQuestionCheckpoint(
+    row: InterviewQuestionCheckpointRow,
+  ): InterviewQuestionCheckpointEntity {
+    return {
+      id: row.id,
+      interviewQuestionId: row.interview_question_id,
+      checkpointKey: row.checkpoint_key,
+      title: row.title,
+      expected: row.expected,
+      score: Number(row.score),
+      sortOrder: row.sort_order,
+      createdAt: row.created_at,
+    };
+  }
+
   private mapCandidate(row: CandidateRow): CandidateEntity {
     return {
       id: row.id,
@@ -594,6 +662,9 @@ export class InterviewCoreRepository {
       interviewAttemptId: row.interview_attempt_id,
       interviewQuestionId: row.interview_question_id,
       role: row.role,
+      messageKind: row.message_kind,
+      parentMessageId: row.parent_message_id,
+      targetCheckpointKey: row.target_checkpoint_key,
       content: row.content,
       sequenceOrder: row.sequence_order,
       createdAt: row.created_at,

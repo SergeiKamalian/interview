@@ -2,7 +2,6 @@ import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AiProviderService } from '../../ai-provider/ai-provider.service';
 import { InterviewCoreRepository } from '../../interview-core/interview-core.repository';
-import { QuestionBankRepository } from '../../question-bank/question-bank.repository';
 import {
   CHECKPOINT_EVALUATION_PROMPT_KEY,
   CHECKPOINT_EVALUATION_PROMPT_VERSION,
@@ -14,21 +13,33 @@ import { EvaluationContextService } from './evaluation-context.service';
 describe('CheckpointEvaluationService', () => {
   let service: CheckpointEvaluationService;
   let interviewRepository: jest.Mocked<
-    Pick<InterviewCoreRepository, 'findInterviewQuestionById' | 'listMessages'>
-  >;
-  let questionBankRepository: jest.Mocked<
-    Pick<QuestionBankRepository, 'findCheckpointsByQuestionId'>
+    Pick<
+      InterviewCoreRepository,
+      | 'findInterviewQuestionById'
+      | 'listMessages'
+      | 'findCheckpointsByInterviewQuestionId'
+    >
   >;
   let aiProviderService: jest.Mocked<Pick<AiProviderService, 'evaluateJson'>>;
+
+  const snapshotCheckpoints = [
+    {
+      id: 200,
+      interviewQuestionId: 10,
+      checkpointKey: 'react_definition',
+      title: 'Defines React correctly',
+      expected: 'Mentions component-based UI library',
+      score: 5,
+      sortOrder: 0,
+      createdAt: new Date(),
+    },
+  ];
 
   beforeEach(async () => {
     interviewRepository = {
       findInterviewQuestionById: jest.fn(),
       listMessages: jest.fn(),
-    };
-
-    questionBankRepository = {
-      findCheckpointsByQuestionId: jest.fn(),
+      findCheckpointsByInterviewQuestionId: jest.fn(),
     };
 
     aiProviderService = {
@@ -45,10 +56,6 @@ describe('CheckpointEvaluationService', () => {
           useValue: interviewRepository,
         },
         {
-          provide: QuestionBankRepository,
-          useValue: questionBankRepository,
-        },
-        {
           provide: AiProviderService,
           useValue: aiProviderService,
         },
@@ -58,7 +65,7 @@ describe('CheckpointEvaluationService', () => {
     service = module.get(CheckpointEvaluationService);
   });
 
-  it('builds a versioned prompt request from question bank checkpoints', async () => {
+  it('builds a versioned prompt request from interview snapshot checkpoints', async () => {
     interviewRepository.findInterviewQuestionById.mockResolvedValue({
       id: 10,
       interviewId: 1,
@@ -97,22 +104,15 @@ describe('CheckpointEvaluationService', () => {
       },
     ]);
 
-    questionBankRepository.findCheckpointsByQuestionId.mockResolvedValue([
-      {
-        id: 100,
-        questionId: 42,
-        checkpointKey: 'react_definition',
-        title: 'Defines React correctly',
-        expected: 'Mentions component-based UI library',
-        score: 5,
-        sortOrder: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ]);
+    interviewRepository.findCheckpointsByInterviewQuestionId.mockResolvedValue(
+      snapshotCheckpoints,
+    );
 
     const request = await service.buildEvaluationRequest(5, 10);
 
+    expect(
+      interviewRepository.findCheckpointsByInterviewQuestionId,
+    ).toHaveBeenCalledWith(10);
     expect(request.metadata).toEqual({
       promptKey: CHECKPOINT_EVALUATION_PROMPT_KEY,
       promptVersion: CHECKPOINT_EVALUATION_PROMPT_VERSION,
@@ -124,7 +124,7 @@ describe('CheckpointEvaluationService', () => {
     expect(request.systemPrompt).toContain('Do NOT invent new criteria');
   });
 
-  it('stops evaluation when checkpoints are missing in question bank', async () => {
+  it('stops evaluation when snapshot checkpoints are missing', async () => {
     interviewRepository.findInterviewQuestionById.mockResolvedValue({
       id: 10,
       interviewId: 1,
@@ -153,7 +153,9 @@ describe('CheckpointEvaluationService', () => {
       },
     ]);
 
-    questionBankRepository.findCheckpointsByQuestionId.mockResolvedValue([]);
+    interviewRepository.findCheckpointsByInterviewQuestionId.mockResolvedValue(
+      [],
+    );
 
     await expect(service.buildEvaluationRequest(5, 10)).rejects.toBeInstanceOf(
       BadRequestException,
@@ -189,19 +191,9 @@ describe('CheckpointEvaluationService', () => {
       },
     ]);
 
-    questionBankRepository.findCheckpointsByQuestionId.mockResolvedValue([
-      {
-        id: 100,
-        questionId: 42,
-        checkpointKey: 'react_definition',
-        title: 'Defines React correctly',
-        expected: 'Mentions component-based UI library',
-        score: 5,
-        sortOrder: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ]);
+    interviewRepository.findCheckpointsByInterviewQuestionId.mockResolvedValue(
+      snapshotCheckpoints,
+    );
 
     aiProviderService.evaluateJson
       .mockResolvedValueOnce({

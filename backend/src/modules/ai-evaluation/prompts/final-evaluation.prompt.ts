@@ -30,9 +30,13 @@ export function buildFinalEvaluationUserPrompt(input: {
   hireRecommendation: string;
   questionSummaries: string[];
   categoryBreakdown: string[];
+  evidenceSource?: 'adaptive_summaries' | 'question_evaluations';
 }): string {
   return [
     'Summarize this interview using only the structured data below.',
+    input.evidenceSource === 'adaptive_summaries'
+      ? 'Evidence source: adaptive checkpoint summaries (no full transcript).'
+      : 'Evidence source: per-question evaluations.',
     '',
     `Deterministic score (0-10): ${input.totalScoreOutOfTen}`,
     `Category: ${input.category}`,

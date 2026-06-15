@@ -12,6 +12,8 @@ import { CandidatesModule } from './modules/candidates/candidates.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ShortlistModule } from './modules/shortlist/shortlist.module';
 import { InterviewCoreModule } from './modules/interview-core/interview-core.module';
+import { InterviewRealtimeModule } from './modules/interview-realtime/interview-realtime.module';
+import { AdaptiveInterviewModule } from './modules/adaptive-interview/adaptive-interview.module';
 import { QuestionBankModule } from './modules/question-bank/question-bank.module';
 import { AppGraphQLModule } from './modules/graphql/graphql.module';
 import { HealthModule } from './modules/health/health.module';
@@ -28,6 +30,8 @@ import { AppService } from './app.service';
     HealthModule,
     AuthModule,
     QuestionBankModule,
+    AdaptiveInterviewModule,
+    InterviewRealtimeModule,
     InterviewCoreModule,
     AiEvaluationModule,
     UsageLoggingModule,

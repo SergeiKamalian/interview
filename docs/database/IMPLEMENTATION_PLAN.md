@@ -2,7 +2,7 @@
 
 Ordered roadmap для SQL migrations и mapping на feature-блоки.
 
-**Status:** migrations `001`–`010` **deployed** to dev DB (2026-06-12).
+**Status:** migrations `001`–`013` **deployed** to dev DB.
 
 ---
 
@@ -19,7 +19,10 @@ Ordered roadmap для SQL migrations и mapping на feature-блоки.
 | 007 | `create_ai_evaluation.sql` | AI eval | 07 ai-evaluation |
 | 008 | `create_media_storage.sql` | media | 09 voice-video |
 | 009 | `create_analytics.sql` | analytics | 08 dashboard-analytics |
-| 010 | `create_ats_integrations.sql` | ATS | 10 ats-integrations |
+| 010 | `create_ats_integrations.sql` | ATS | 11 ats-integrations |
+| 011 | `create_auth_sessions.sql` | auth | 04 auth-company |
+| 012 | `create_candidate_shortlist.sql` | analytics | 08 dashboard-analytics |
+| 013 | `create_adaptive_ai_interview.sql` | adaptive AI | 09 adaptive-ai-interview |
 
 ---
 
@@ -68,11 +71,15 @@ Schema 007 ✅ — implement AI service + structured JSON parsing.
 
 Schema 009 ✅ — views + rollups job + dashboard UI.
 
-### Block 09 — voice-video
+### Block 09 — adaptive-ai-interview
+
+Schema 013 ✅ applied — live checkpoint state + follow-up evidence + compact summaries (app logic in subtasks 09.4+).
+
+### Block 10 — voice-video
 
 Schema 008 ✅ — REST upload + STT integration.
 
-### Block 10 — ats-integrations
+### Block 11 — ats-integrations
 
 Schema 010 ✅ — webhook worker + retry logic.
 
