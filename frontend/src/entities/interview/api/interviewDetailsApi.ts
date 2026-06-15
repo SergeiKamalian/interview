@@ -1,0 +1,1 @@
+export { useInterviewDetailsQuery } from './interviewsApi';

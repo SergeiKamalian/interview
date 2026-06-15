@@ -6,7 +6,7 @@ import { graphqlBaseQuery } from './graphqlBaseQuery';
 export const baseApi = createApi({
   reducerPath: 'api',
   baseQuery: graphqlBaseQuery,
-  tagTypes: ['Health'],
+  tagTypes: ['Health', 'QuestionBank', 'Interview', 'Candidate', 'Analytics'],
   endpoints: (builder) => ({
     getHello: builder.query<{ hello: string }, void>({
       query: () => GraphqlOperations.Hello,

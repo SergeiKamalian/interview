@@ -41,7 +41,7 @@ docs/tasks/
     05-⬜-question-bank/
     06-⬜-interview-core/
     07-⬜-ai-evaluation/
-    08-⬜-dashboard-analytics/
+    08-✅-dashboard-analytics/
     09-⬜-voice-video/
     10-⬜-ats-integrations/
     11-⬜-deployment/

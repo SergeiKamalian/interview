@@ -10,7 +10,8 @@ React + Vite + TypeScript + Tailwind + Redux Toolkit + RTK Query + GraphQL.
 
 ```bash
 pnpm install
-pnpm run dev      # http://localhost:5173
+pnpm run dev      # http://localhost:5174
+pnpm --dir ../backend run dev:local  # full local stack from backend, frontend on http://localhost:5174
 pnpm run build
 pnpm run lint
 ```
@@ -41,4 +42,4 @@ src/
 
 ## Dev proxy
 
-Vite proxies `/graphql` and `/health` → `http://127.0.0.1:3000`. Start backend before testing GraphQL on home page.
+Vite proxies `/graphql` and `/health` → `http://127.0.0.1:3000`. Start backend before testing GraphQL on home page. Full local stack uses `FRONTEND_PORT=5174` by default to avoid conflicts with `captcha-panel`.

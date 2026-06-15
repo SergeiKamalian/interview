@@ -7,10 +7,80 @@ export type GraphqlOperationDef = {
 };
 
 export const GraphqlOperations = {
+  AddCandidateToShortlist: {
+    operationName: 'AddCandidateToShortlist',
+    document: "mutation AddCandidateToShortlist($candidateId: ID!, $reason: String) { addCandidateToShortlist(candidateId: $candidateId, reason: $reason) { candidateId status reason } }",
+    sha256Hash: '945eb92bf90b01f4c657538dc82aa7ec3fc5fc348deffe76e008f5273a0456f2',
+  },
+  AiCostAnalytics: {
+    operationName: 'AiCostAnalytics',
+    document: "query AiCostAnalytics($filters: AiCostFilterInput) { aiCostAnalytics(filters: $filters) { kpi { totalCostUsd costPerInterview costPerCandidate totalRequests } byModel { model promptTokens completionTokens totalCostUsd } topExpensiveInterviews { interviewAttemptId interviewTitle totalCostUsd latencyMs } } }",
+    sha256Hash: '8b33137e77cc5fea6d6fc6f5d10982188676da5dbf9ede3a13755c4c73b68e7c',
+  },
+  CandidateReport: {
+    operationName: 'CandidateReport',
+    document: "query CandidateReport($candidateId: ID!) { candidateReport(candidateId: $candidateId) { candidateId fullName email phone linkedinUrl githubUrl shortlistStatus shortlistReason latestFinalEvaluation { id totalScore category hireRecommendation summary detailedSummary strengths weaknesses risks needsManualReview categoryBreakdown { categoryKey categoryLabel scoreNormalized weight contribution } } interviewHistory { attemptId interviewId interviewTitle jobRole status completedAt totalScore } } }",
+    sha256Hash: '2e49229966b6099a0385fb032860d4dc81693258b6799fc9e48262b1ba653994',
+  },
+  CheckpointResultsByAttempt: {
+    operationName: 'CheckpointResultsByAttempt',
+    document: "query CheckpointResultsByAttempt($attemptId: ID!) { checkpointResultsByAttempt(attemptId: $attemptId) { attemptId questionGroups { interviewQuestionId questionText needsManualReview checkpoints { id checkpointKey checkpointTitle status scoreAwarded maxScore evidenceQuote reasoningShort } } } }",
+    sha256Hash: '00b197d53add2a43719d52da38185c665ad2f49a7166454146d7cc372a38d7b1',
+  },
+  CompanyCandidates: {
+    operationName: 'CompanyCandidates',
+    document: "query CompanyCandidates($filters: CompanyCandidatesFilterInput) { companyCandidates(filters: $filters) { items { candidateId fullName email interviewsCount avgScore lastInterviewDate shortlistStatus } total page pageSize } }",
+    sha256Hash: '94458040d97fcc4f4b704a9b5f22dc8645c637d34db726ccd1c8e79beeb659eb',
+  },
+  CompanyInterviews: {
+    operationName: 'CompanyInterviews',
+    document: "query CompanyInterviews($filters: CompanyInterviewsFilterInput) { companyInterviews(filters: $filters) { items { attemptId interviewId interviewTitle jobRole candidateName candidateEmail status startedAt completedAt overallScore } total page pageSize } }",
+    sha256Hash: 'acd78f7d9f08e5defd9b44b023f12874b001086d70b32ec324cd292d48b48e12',
+  },
+  CompleteInterviewAttempt: {
+    operationName: 'CompleteInterviewAttempt',
+    document: "mutation CompleteInterviewAttempt($publicToken: String!, $attemptId: ID!) { completeInterviewAttempt(publicToken: $publicToken, attemptId: $attemptId) { attemptId status totalQuestions answeredQuestions messages { id role content } } }",
+    sha256Hash: '1776b590581c7d0575427d84d1aaaa5c135f6bc892972591b5a1e7acfed00b74',
+  },
+  CreateInterview: {
+    operationName: 'CreateInterview',
+    document: "mutation CreateInterview($input: CreateInterviewInput!) { createInterview(input: $input) { id title jobRole level status publicToken publicUrl questionCount } }",
+    sha256Hash: '48ac554096bc635ba80dd1df69291352d3d8bd8bb37a0da6a8771bfcb9c7e075',
+  },
+  EvaluateInterviewAttempt: {
+    operationName: 'EvaluateInterviewAttempt',
+    document: "mutation EvaluateInterviewAttempt($attemptId: ID!) { evaluateInterviewAttempt(attemptId: $attemptId) { questionCount finalEvaluation { id totalScore category hireRecommendation summary needsManualReview categoryBreakdown { categoryKey categoryLabel scoreNormalized weight contribution } } } }",
+    sha256Hash: '2acd8d61f7ff4cf8ea99df9a08adcf77936d10de4378995b4874cf968b740963',
+  },
+  FinalEvaluationByAttempt: {
+    operationName: 'FinalEvaluationByAttempt',
+    document: "query FinalEvaluationByAttempt($attemptId: ID!) { finalEvaluationByAttempt(attemptId: $attemptId) { id interviewAttemptId totalScore category hireRecommendation summary detailedSummary strengths weaknesses risks needsManualReview categoryBreakdown { categoryKey categoryLabel scoreNormalized weight contribution } } }",
+    sha256Hash: 'cd4cb86339b655f673884211206dd9dd2824a792047eb6a374f02a5e83a4ae8f',
+  },
   Hello: {
     operationName: 'Hello',
     document: "query Hello { hello }",
     sha256Hash: '3f710a83decac3d21ddeae7bd265d8c5a48749226d23327b5dfd7031f406a987',
+  },
+  Interview: {
+    operationName: 'Interview',
+    document: "query Interview($id: ID!) { interview(id: $id) { id title jobRole status publicUrl questionCount } }",
+    sha256Hash: '40e85211a8dfb1a2688f1e64a7f9fdf54ad0e8be581214bd46bf56af170e3c5e',
+  },
+  InterviewDetails: {
+    operationName: 'InterviewDetails',
+    document: "query InterviewDetails($interviewId: ID!) { interviewDetails(interviewId: $interviewId) { id title jobRole status questionCount publicUrl createdAt evaluationStatus primaryFinalEvaluation { id totalScore category hireRecommendation summary strengths weaknesses risks needsManualReview categoryBreakdown { categoryKey categoryLabel scoreNormalized weight contribution } } attempts { attemptId candidateId candidateName candidateEmail status startedAt completedAt overallScore hireRecommendation evaluationStatus } } }",
+    sha256Hash: 'ed66729a9ed16a39e43bb047972fe16c6d1920d1bee4abc725dbd7312f092ea8',
+  },
+  InterviewSession: {
+    operationName: 'InterviewSession',
+    document: "query InterviewSession($publicToken: String!, $attemptId: ID!) { interviewSession(publicToken: $publicToken, attemptId: $attemptId) { attemptId status totalQuestions answeredQuestions currentQuestionText currentQuestionId messages { id role content sequenceOrder } } }",
+    sha256Hash: 'bdb0c9d34565271b572aa6a5dac7f771cd70ff2197366ba31b7bb57e8fa32ca9',
+  },
+  InterviewTranscript: {
+    operationName: 'InterviewTranscript',
+    document: "query InterviewTranscript($attemptId: ID!) { interviewTranscript(attemptId: $attemptId) { attemptId segments { messageId role content sequenceOrder timestamp questionText interviewQuestionId } } }",
+    sha256Hash: 'c8fbaa5a49e16d13e2de04f98a250b2e517a9cdc5458df598494facaa3d94faa',
   },
   Login: {
     operationName: 'Login',
@@ -27,6 +97,21 @@ export const GraphqlOperations = {
     document: "query Me { me { user { id email fullName isActive } company { id name slug isActive } } }",
     sha256Hash: '5f9c2503b6ca4fe21e1c16798409bceb2edfa861d45775b9cc7ada9c8275661f',
   },
+  PublicInterview: {
+    operationName: 'PublicInterview',
+    document: "query PublicInterview($publicToken: String!) { publicInterview(publicToken: $publicToken) { title jobRole questionCount interviewLanguage } }",
+    sha256Hash: 'feb1012eb7c31cb2c33da06f91cc874abfa6626a62c1409ab3345d3e381b6ba6',
+  },
+  PublishInterview: {
+    operationName: 'PublishInterview',
+    document: "mutation PublishInterview($id: ID!) { publishInterview(id: $id) { id status publicUrl publicToken } }",
+    sha256Hash: 'e86d2b2b5c4a402e904bb5d8c4e4b64320284fc1873a34ed389c1fed34853277',
+  },
+  QuestionBank: {
+    operationName: 'QuestionBank',
+    document: "query QuestionBank($filters: QuestionBankFilterInput) { questionBank(filters: $filters) { total items { id questionText level difficulty maxScore isActive topic { id code name } profession { id code name } skills { id code name } checkpoints { id checkpointKey title expected score sortOrder } answerExamples { id exampleType exampleText sortOrder } } } } query Question($id: ID!) { question(id: $id) { id questionText level difficulty maxScore isActive shortAnswer idealAnswer topic { name } profession { name } checkpoints { title score sortOrder } answerExamples { exampleType exampleText } } }",
+    sha256Hash: 'de38f6122a27af38a3b9589f16d0755060013011ad58e0979019026b63059218',
+  },
   RefreshTokens: {
     operationName: 'RefreshTokens',
     document: "mutation RefreshTokens { refreshTokens { accessToken tokenType } }",
@@ -36,6 +121,26 @@ export const GraphqlOperations = {
     operationName: 'Register',
     document: "mutation Register($input: RegisterInput!) { register(input: $input) { accessToken tokenType user { id email fullName isActive } company { id name slug isActive } } }",
     sha256Hash: 'eacb35598acea114d9b5e3476c08021f098294de483f7f6b957ab12019a5d762',
+  },
+  RemoveCandidateFromShortlist: {
+    operationName: 'RemoveCandidateFromShortlist',
+    document: "mutation RemoveCandidateFromShortlist($candidateId: ID!, $reason: String) { removeCandidateFromShortlist(candidateId: $candidateId, reason: $reason) { candidateId status reason } }",
+    sha256Hash: 'eea0840468dc86c5c2b7077fce042f4746bd0187d09973782c889c57d871aa03',
+  },
+  StartPublicInterview: {
+    operationName: 'StartPublicInterview',
+    document: "mutation StartPublicInterview($input: StartPublicInterviewInput!) { startPublicInterview(input: $input) { attemptId currentQuestionText totalQuestions } }",
+    sha256Hash: '032a7de3478909ccacd75f2493a53e8cd385ff297a67a9277bea7569b2c799ea',
+  },
+  SubmitInterviewAnswer: {
+    operationName: 'SubmitInterviewAnswer',
+    document: "mutation SubmitInterviewAnswer($input: SubmitInterviewAnswerInput!) { submitInterviewAnswer(input: $input) { status nextQuestionText answeredQuestions totalQuestions } }",
+    sha256Hash: 'eab868b52f5b35c0df5f8b37a7fa227303a87a523e71fbeae0fbc16cbe649c36',
+  },
+  TopicSkillQuestionAnalytics: {
+    operationName: 'TopicSkillQuestionAnalytics',
+    document: "query TopicSkillQuestionAnalytics($filters: TopicSkillQuestionFilterInput) { topicSkillQuestionAnalytics(filters: $filters) { totalCompletedAttempts lowSampleWarning topics { topicName avgScore passRate sampleCount } skills { skillName avgScore passRate sampleCount } questions { questionId questionText avgScore passRate sampleCount } } }",
+    sha256Hash: 'd8d55accebfe184107870db37acbac5f49a6e2f398eb354ae6d694ed370c2df6',
   }
 } as const satisfies Record<string, GraphqlOperationDef>;
 
