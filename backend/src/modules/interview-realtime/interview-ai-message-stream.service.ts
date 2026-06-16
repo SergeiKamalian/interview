@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { AiProviderService } from '../ai-provider/ai-provider.service';
+import { InterviewAiAudioStreamService } from './interview-ai-audio-stream.service';
 import { isAiMessageStreamingEnabled } from './config/interview-stream.config';
 import type { StreamAiMessageInput } from './types/interview-message-stream.types';
 import { InterviewRealtimeService } from './interview-realtime.service';
@@ -13,6 +14,7 @@ export class InterviewAiMessageStreamService {
   constructor(
     private readonly interviewRealtimeService: InterviewRealtimeService,
     private readonly aiProviderService: AiProviderService,
+    private readonly aiAudioStreamService: InterviewAiAudioStreamService,
   ) {}
 
   isEnabled(): boolean {
@@ -29,6 +31,7 @@ export class InterviewAiMessageStreamService {
 
     const streamId = randomUUID();
     this.emitStarted(input, streamId);
+    this.startAudioStream(input, streamId, text);
 
     let contentSoFar = '';
     for (const chunk of chunkTextForStream(text)) {
@@ -93,6 +96,7 @@ export class InterviewAiMessageStreamService {
     );
 
     this.emitCompleted(input, streamId, completion.content);
+    this.startAudioStream(input, streamId, completion.content);
     return completion.content;
   }
 
@@ -140,6 +144,20 @@ export class InterviewAiMessageStreamService {
         content,
         contentSoFar: content,
       },
+    });
+  }
+
+  private startAudioStream(
+    input: StreamAiMessageInput,
+    streamId: string,
+    text: string,
+  ): void {
+    this.aiAudioStreamService.streamAudioForText({
+      attemptId: input.attemptId,
+      interviewQuestionId: input.interviewQuestionId,
+      messageKind: input.messageKind,
+      streamId,
+      text,
     });
   }
 

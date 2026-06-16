@@ -271,7 +271,7 @@ Cursor НЕ должен:
 04+ feature blocks      → реальные SQL migrations по design docs
 ```
 
-Feature-блоки (`04-auth-company`, `05-question-bank`, `06-interview-core`, `07-ai-evaluation`, `09-adaptive-ai-interview` для live evidence/follow-ups, `10-voice-video` для media metadata, `11-ats-integrations` для integration logs) **зависят** от соответствующих design docs в `docs/database/schemas/`.
+Feature-блоки (`04-auth-company`, `05-question-bank`, `06-interview-core`, `07-ai-evaluation`, `09-adaptive-ai-interview` для live evidence/follow-ups, `10-voice` и `11-video` для media metadata, `12-ats-integrations` для integration logs) **зависят** от соответствующих design docs в `docs/database/schemas/`.
 
 Перед созданием SQL migration в feature-блоке Cursor должен проверить, что design doc из блока 02 существует и согласован с `CONVENTIONS.md`.
 

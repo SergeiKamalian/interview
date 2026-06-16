@@ -42,10 +42,11 @@ docs/tasks/
     06-✅-interview-core/
     07-✅-ai-evaluation/
     08-✅-dashboard-analytics/
-    09-🟡-adaptive-ai-interview/
-    10-⬜-voice-video/
-    11-⬜-ats-integrations/
-    12-⬜-deployment/
+    09-✅-adaptive-ai-interview/
+    10-🟡-voice/
+    11-⬜-video/
+    12-⬜-ats-integrations/
+    13-⬜-deployment/
 ```
 
 ---
@@ -63,9 +64,10 @@ docs/tasks/
 07 — ai-evaluation           (checkpoint-based JSON)
 08 — dashboard-analytics
 09 — adaptive-ai-interview (live checkpoint follow-ups)
-10 — voice-video
-11 — ats-integrations
-12 — deployment
+10 — voice
+11 — video
+12 — ats-integrations
+13 — deployment
 ```
 
 Важно: design docs в `docs/database/` и SQL migrations — source of truth для feature-блоков 04+.
@@ -232,17 +234,17 @@ Cursor НЕ должен выполнять весь блок сразу.
 ## Текущий активный блок
 
 ```txt
-09-🟡-adaptive-ai-interview (🟡 in progress)
+10-🟡-voice (🟡 in progress)
 ```
 
 Активный subtask:
 
 ```txt
-docs/tasks/list/09-🟡-adaptive-ai-interview/subtasks/007-⬜-add-follow-up-planner-policy.md
+docs/tasks/list/10-🟡-voice/subtasks/001-🟡-add-microphone-permission.md
 ```
 
 Следующая рекомендуемая подзадача:
 
 ```txt
-TASK-09.7 — Добавить follow-up planner и policy limits
+TASK-10.1 — Добавить microphone permission
 ```

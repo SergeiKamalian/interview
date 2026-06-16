@@ -1,5 +1,5 @@
 import { Field, InputType } from '@nestjs/graphql';
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 @InputType()
 export class SubmitInterviewAnswerInput {
@@ -15,7 +15,11 @@ export class SubmitInterviewAnswerInput {
 
   @Field()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(5000)
   answer!: string;
+
+  @Field(() => String, { nullable: true })
+  @IsOptional()
+  @IsString()
+  mediaAssetId?: string | null;
 }

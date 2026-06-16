@@ -2,7 +2,7 @@
 
 Binary files **не в MySQL** — только metadata + storage keys.
 
-**Migration:** `008_create_media_storage.sql` · **Feature block:** `10-⬜-voice-video`
+**Migration:** `008_create_media_storage.sql` · **Feature blocks:** `10-🟡-voice`, `11-⬜-video`
 
 ---
 

@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AiProviderService } from '../ai-provider/ai-provider.service';
+import { InterviewAiAudioStreamService } from './interview-ai-audio-stream.service';
 import { InterviewAiMessageStreamService } from './interview-ai-message-stream.service';
 import { InterviewRealtimeService } from './interview-realtime.service';
 
@@ -32,6 +33,12 @@ describe('InterviewAiMessageStreamService', () => {
           useValue: {
             createChatCompletion: jest.fn(),
             streamChatCompletion: jest.fn(),
+          },
+        },
+        {
+          provide: InterviewAiAudioStreamService,
+          useValue: {
+            streamAudioForText: jest.fn(),
           },
         },
       ],

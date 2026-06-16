@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { uploadInterviewAudio } from '@features/voice-interview/api/audioUploadApi';
 import {
   useCompleteInterviewAttemptMutation,
   useInterviewSessionQuery,
@@ -28,7 +29,7 @@ export function PublicInterviewSessionPage() {
     await refetch();
   }, [refetch]);
 
-  const { statusLabel, streamingMessage, markAnswerSending, resetPhase } =
+  const { statusLabel, streamingMessage, audioState, replayAiAudio, isConnected, markAnswerSending, resetPhase } =
     useInterviewRealtime({
     publicToken: token,
     attemptId,
@@ -85,6 +86,33 @@ export function PublicInterviewSessionPage() {
         isComplete={isComplete}
         isSubmitting={isSubmitting}
         statusLabel={statusLabel}
+        aiAudioState={audioState}
+        showQuestionAudioControls={isConnected && Boolean(data.currentQuestionText)}
+        onReplayAiAudio={replayAiAudio}
+        onSubmitVoiceAnswer={async ({ blob, mimeType, durationSec }) => {
+          markAnswerSending();
+          const upload = await uploadInterviewAudio({
+            publicToken: token,
+            attemptId,
+            blob,
+            mimeType,
+            durationSec,
+          });
+
+          const result = await submitAnswer({
+            publicToken: token,
+            attemptId,
+            answer: '',
+            mediaAssetId: upload.mediaAssetId,
+          }).unwrap();
+
+          await refetch();
+          resetPhase();
+
+          if (result.status === 'completed') {
+            navigate(`/i/${token}/complete?attemptId=${attemptId}`);
+          }
+        }}
         onSubmitAnswer={async (answer) => {
           markAnswerSending();
           const result = await submitAnswer({

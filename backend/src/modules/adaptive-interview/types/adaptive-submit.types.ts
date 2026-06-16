@@ -18,4 +18,5 @@ export type AdaptiveSubmitInput = {
   attempt: InterviewAttemptEntity;
   questions: InterviewQuestionEntity[];
   trimmedAnswer: string;
+  mediaAssetId?: number | null;
 };

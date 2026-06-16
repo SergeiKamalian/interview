@@ -8,6 +8,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
+import { InterviewCurrentQuestionSpeechService } from './interview-current-question-speech.service';
 import { InterviewRealtimeService } from './interview-realtime.service';
 import type { JoinInterviewRoomPayload } from './types/interview-realtime-event.types';
 
@@ -33,7 +34,10 @@ export class InterviewRealtimeGateway implements OnGatewayInit {
   @WebSocketServer()
   server!: Server;
 
-  constructor(private readonly interviewRealtimeService: InterviewRealtimeService) {}
+  constructor(
+    private readonly interviewRealtimeService: InterviewRealtimeService,
+    private readonly currentQuestionSpeechService: InterviewCurrentQuestionSpeechService,
+  ) {}
 
   afterInit(): void {
     this.interviewRealtimeService.setServer(this.server);
@@ -62,6 +66,42 @@ export class InterviewRealtimeGateway implements OnGatewayInit {
       attemptId: payload.attemptId,
       room,
       lastEventId: payload.lastEventId ?? null,
+    });
+
+    const attemptId = Number(payload.attemptId);
+    if (Number.isInteger(attemptId) && attemptId > 0) {
+      void this.currentQuestionSpeechService
+        .speakCurrentQuestion({
+          attemptId,
+          publicToken: payload.publicToken,
+        })
+        .catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : String(error);
+          this.logger.warn(
+            `Failed to speak current question attempt=${payload.attemptId}: ${message}`,
+          );
+        });
+    }
+  }
+
+  @SubscribeMessage('speak_current_question')
+  async handleSpeakCurrentQuestion(
+    @MessageBody() payload: JoinInterviewRoomPayload,
+  ): Promise<void> {
+    const attemptId = Number(payload.attemptId);
+    if (!Number.isInteger(attemptId) || attemptId < 1) {
+      return;
+    }
+
+    const isValid = await this.interviewRealtimeService.validateJoin(payload);
+    if (!isValid) {
+      return;
+    }
+
+    await this.currentQuestionSpeechService.speakCurrentQuestion({
+      attemptId,
+      publicToken: payload.publicToken,
+      force: true,
     });
   }
 }

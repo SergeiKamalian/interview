@@ -8,6 +8,7 @@ import type {
   JoinInterviewRoomPayload,
 } from './types/interview-realtime-event.types';
 
+import type { InterviewAudioStreamPayload } from './types/interview-audio-stream.types';
 import type { InterviewMessageStreamPayload } from './types/interview-message-stream.types';
 
 export type EmitInterviewRealtimeEventInput = {
@@ -19,6 +20,7 @@ export type EmitInterviewRealtimeEventInput = {
   sequenceOrder?: number | null;
   messageKind?: string | null;
   stream?: InterviewMessageStreamPayload | null;
+  audio?: InterviewAudioStreamPayload | null;
 };
 
 @Injectable()
@@ -89,6 +91,7 @@ export class InterviewRealtimeService {
       sequenceOrder: input.sequenceOrder ?? null,
       messageKind: input.messageKind ?? null,
       stream: input.stream ?? null,
+      audio: input.audio ?? null,
       createdAt: new Date().toISOString(),
     };
   }

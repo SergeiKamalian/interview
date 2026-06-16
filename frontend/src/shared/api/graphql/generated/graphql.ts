@@ -141,6 +141,7 @@ export type StartPublicInterviewInput = {
 export type SubmitInterviewAnswerInput = {
   answer: string;
   attemptId: string;
+  mediaAssetId?: string | null | undefined;
   publicToken: string;
 };
 

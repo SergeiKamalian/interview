@@ -28,6 +28,7 @@ import {
   shouldSkipFollowUps,
 } from '../utils/candidate-decline.util';
 import { buildNextMainQuestionMessage } from '../utils/interviewer-dialogue.util';
+import { MediaAssetService } from '../../media/media-asset.service';
 
 @Injectable()
 export class AdaptiveInterviewSubmitService {
@@ -46,6 +47,7 @@ export class AdaptiveInterviewSubmitService {
     private readonly adaptiveInterviewContextService: AdaptiveInterviewContextService,
     private readonly adaptiveAiConversationService: AdaptiveAiConversationService,
     private readonly adaptiveOpenAiResponseStateService: AdaptiveOpenAiResponseStateService,
+    private readonly mediaAssetService: MediaAssetService,
   ) {}
 
   async assertCanSubmit(
@@ -199,6 +201,14 @@ export class AdaptiveInterviewSubmitService {
       messageId: saveResult.candidateMessage.id,
       isFollowUpAnswer,
     });
+
+    if (input.mediaAssetId) {
+      await this.mediaAssetService.linkPendingAssetToMessage({
+        mediaAssetId: input.mediaAssetId,
+        attemptId,
+        messageId: saveResult.candidateMessage.id,
+      });
+    }
 
     this.interviewRealtimeService.emit({
       attemptId,

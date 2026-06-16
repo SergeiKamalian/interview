@@ -3,6 +3,7 @@ import { AuthModule } from '../auth/auth.module';
 import { AiEvaluationModule } from '../ai-evaluation/ai-evaluation.module';
 import { AdaptiveInterviewModule } from '../adaptive-interview/adaptive-interview.module';
 import { InterviewRealtimeModule } from '../interview-realtime/interview-realtime.module';
+import { MediaModule } from '../media/media.module';
 import { QuestionBankModule } from '../question-bank/question-bank.module';
 import { InterviewCoreRepository } from './interview-core.repository';
 import { InterviewCoreResolver } from './interview-core.resolver';
@@ -18,6 +19,7 @@ import { PublicTokenService } from './public-token.service';
     forwardRef(() => AiEvaluationModule),
     forwardRef(() => AdaptiveInterviewModule),
     forwardRef(() => InterviewRealtimeModule),
+    MediaModule,
   ],
   providers: [
     InterviewCoreRepository,

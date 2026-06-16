@@ -1,4 +1,11 @@
 import { useState } from 'react';
+import { AudioRecorderWidget } from '@features/media-recording/audio/AudioRecorderWidget';
+import {
+  MicrophonePermissionCard,
+} from '@features/media-permissions/microphone/MicrophonePermissionCard';
+import { useMicrophonePermission } from '@features/media-permissions/microphone/useMicrophonePermission';
+import { InterviewAiAudioControls } from '@features/voice-interview/tts/InterviewAiAudioControls';
+import type { InterviewAiAudioState } from '@features/voice-interview/tts/useInterviewAiAudio';
 import { Button, Input, Spinner } from '@shared/ui';
 
 type Message = {
@@ -16,6 +23,14 @@ type TextInterviewChatProps = {
   isComplete: boolean;
   isSubmitting: boolean;
   statusLabel?: string | null;
+  aiAudioState?: InterviewAiAudioState | null;
+  showQuestionAudioControls?: boolean;
+  onReplayAiAudio?: () => void;
+  onSubmitVoiceAnswer?: (input: {
+    blob: Blob;
+    mimeType: string;
+    durationSec: number;
+  }) => Promise<void>;
   onSubmitAnswer: (answer: string) => Promise<void>;
   onComplete: () => Promise<void>;
 };
@@ -41,10 +56,15 @@ export function TextInterviewChat({
   isComplete,
   isSubmitting,
   statusLabel,
+  aiAudioState,
+  showQuestionAudioControls = false,
+  onReplayAiAudio,
+  onSubmitVoiceAnswer,
   onSubmitAnswer,
   onComplete,
 }: TextInterviewChatProps) {
   const [answer, setAnswer] = useState('');
+  const microphone = useMicrophonePermission();
   const showCurrentQuestion =
     Boolean(currentQuestionText) &&
     !streamingMessage &&
@@ -107,12 +127,39 @@ export function TextInterviewChat({
               Текущий вопрос: {currentQuestionText}
             </p>
           ) : null}
-          {statusLabel && (
+          {statusLabel ? (
             <div className="flex items-center gap-2 text-sm text-slate-500">
               <Spinner size="sm" label={statusLabel} />
               <span>{statusLabel}</span>
             </div>
-          )}
+          ) : null}
+          <InterviewAiAudioControls
+            audioState={
+              aiAudioState ??
+              (showQuestionAudioControls
+                ? {
+                    streamId: 'pending',
+                    mimeType: 'audio/mpeg',
+                    status: 'buffering',
+                    objectUrl: null,
+                  }
+                : null)
+            }
+            onReplay={() => onReplayAiAudio?.()}
+          />
+          <MicrophonePermissionCard
+            status={microphone.status}
+            isRequesting={microphone.isRequesting}
+            errorMessage={microphone.errorMessage}
+            requestPermission={microphone.requestPermission}
+          />
+          {microphone.status === 'granted' && onSubmitVoiceAnswer ? (
+            <AudioRecorderWidget
+              enabled={microphone.status === 'granted'}
+              isSubmitting={isSubmitting}
+              onSubmitRecording={onSubmitVoiceAnswer}
+            />
+          ) : null}
           <Input
             value={answer}
             onChange={(e) => setAnswer(e.target.value)}

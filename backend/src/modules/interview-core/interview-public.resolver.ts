@@ -45,6 +45,7 @@ export class InterviewPublicResolver {
       input.publicToken,
       input.attemptId,
       input.answer,
+      input.mediaAssetId ?? null,
     );
   }
 

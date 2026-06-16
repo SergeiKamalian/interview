@@ -5,6 +5,9 @@ export const INTERVIEW_REALTIME_EVENT_TYPES = [
   'ai.message.stream_started',
   'ai.message.stream_delta',
   'ai.message.stream_completed',
+  'ai.audio.stream_started',
+  'ai.audio.stream_chunk',
+  'ai.audio.stream_completed',
   'message.appended',
   'question.completed',
   'attempt.completed',
@@ -22,6 +25,14 @@ export type InterviewMessageStreamPayload = {
   content?: string;
 };
 
+export type InterviewAudioStreamPayload = {
+  streamId: string;
+  mimeType: string;
+  chunkIndex?: number;
+  audioBase64?: string;
+  audioBase64Final?: string;
+};
+
 export type InterviewRealtimeEvent = {
   eventId: string;
   eventType: InterviewRealtimeEventType;
@@ -32,6 +43,7 @@ export type InterviewRealtimeEvent = {
   sequenceOrder?: number | null;
   messageKind?: string | null;
   stream?: InterviewMessageStreamPayload | null;
+  audio?: InterviewAudioStreamPayload | null;
   createdAt: string;
 };
 

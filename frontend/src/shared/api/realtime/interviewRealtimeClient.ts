@@ -65,3 +65,13 @@ export function subscribeInterviewEvents(
     socket.off('interview.event', handler);
   };
 }
+
+export function requestSpeakCurrentQuestion(
+  socket: Socket,
+  input: {
+    publicToken: string;
+    attemptId: string;
+  },
+): void {
+  socket.emit('speak_current_question', input);
+}

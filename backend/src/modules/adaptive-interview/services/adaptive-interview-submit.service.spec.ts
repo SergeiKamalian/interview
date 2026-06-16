@@ -17,6 +17,7 @@ import { AdaptiveAiConversationService } from './adaptive-ai-conversation.servic
 import { AdaptiveOpenAiResponseStateService } from './adaptive-openai-response-state.service';
 import { InterviewRealtimeService } from '../../interview-realtime/interview-realtime.service';
 import { InterviewAiMessageStreamService } from '../../interview-realtime/interview-ai-message-stream.service';
+import { MediaAssetService } from '../../media/media-asset.service';
 
 describe('AdaptiveInterviewSubmitService', () => {
   let service: AdaptiveInterviewSubmitService;
@@ -256,6 +257,12 @@ describe('AdaptiveInterviewSubmitService', () => {
           provide: AdaptiveOpenAiResponseStateService,
           useValue: {
             clearEvaluateState: jest.fn(),
+          },
+        },
+        {
+          provide: MediaAssetService,
+          useValue: {
+            linkPendingAssetToMessage: jest.fn(),
           },
         },
       ],

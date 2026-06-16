@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { RedisModule } from '../../common/redis/redis.module';
 import { InterviewCoreModule } from '../interview-core/interview-core.module';
 import { InterviewRealtimeModule } from '../interview-realtime/interview-realtime.module';
+import { MediaModule } from '../media/media.module';
 import { UsageLoggingModule } from '../usage-logging/usage-logging.module';
 import { FollowUpRepository } from './repositories/follow-up.repository';
 import { CheckpointStateRepository } from './repositories/checkpoint-state.repository';
@@ -23,6 +24,7 @@ import { QuestionSummaryService } from './services/question-summary.service';
     RedisModule,
     forwardRef(() => InterviewCoreModule),
     forwardRef(() => InterviewRealtimeModule),
+    MediaModule,
     UsageLoggingModule,
   ],
   providers: [

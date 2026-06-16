@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useInterviewAiAudio } from '@features/voice-interview/tts/useInterviewAiAudio';
+import { useInterviewThinkingSound } from '@features/voice-interview/tts/useInterviewThinkingSound';
 import {
   createInterviewRealtimeClient,
   joinInterviewAttemptRoom,
+  requestSpeakCurrentQuestion,
   subscribeInterviewEvents,
 } from '@shared/api/realtime/interviewRealtimeClient';
 import type {
@@ -114,16 +117,35 @@ export function useInterviewRealtime(input: UseInterviewRealtimeInput) {
   const socketRef = useRef(
     enabled ? createInterviewRealtimeClient() : null,
   );
+  const {
+    audioState,
+    handleAudioEvent,
+    replayAiAudio,
+    resetAiAudio,
+  } = useInterviewAiAudio();
+  const handleAudioEventRef = useRef(handleAudioEvent);
+  handleAudioEventRef.current = handleAudioEvent;
+  const { stopThinking, preloadThinkingSound } = useInterviewThinkingSound(phase);
+  const stopThinkingRef = useRef(stopThinking);
+  stopThinkingRef.current = stopThinking;
+
+  useEffect(() => {
+    if (enabled && publicToken && attemptId) {
+      void preloadThinkingSound();
+    }
+  }, [attemptId, enabled, preloadThinkingSound, publicToken]);
 
   const markAnswerSending = useCallback(() => {
     setPhase('answer_sending');
     setStreamingMessage(null);
-  }, []);
+    resetAiAudio();
+  }, [resetAiAudio]);
 
   const resetPhase = useCallback(() => {
     setPhase('idle');
     setStreamingMessage(null);
-  }, []);
+    resetAiAudio();
+  }, [resetAiAudio]);
 
   useEffect(() => {
     if (!enabled || !publicToken || !attemptId) {
@@ -164,7 +186,10 @@ export function useInterviewRealtime(input: UseInterviewRealtimeInput) {
 
         seenEventIdsRef.current.add(event.eventId);
         setLastEvent(event);
-        setPhase(mapEventToPhase(event.eventType));
+
+        if (!event.eventType.startsWith('ai.audio.')) {
+          setPhase(mapEventToPhase(event.eventType));
+        }
 
         if (
           event.eventType === 'ai.message.stream_started' ||
@@ -174,8 +199,31 @@ export function useInterviewRealtime(input: UseInterviewRealtimeInput) {
           setStreamingMessage((current) => applyStreamEvent(current, event));
         }
 
+        if (
+          event.eventType === 'ai.audio.stream_started' ||
+          event.eventType === 'ai.audio.stream_chunk' ||
+          event.eventType === 'ai.audio.stream_completed'
+        ) {
+          if (event.eventType === 'ai.audio.stream_started') {
+            stopThinkingRef.current();
+          }
+          handleAudioEventRef.current(event);
+        }
+
+        if (
+          event.eventType === 'ai.message.stream_started' ||
+          event.eventType === 'message.appended'
+        ) {
+          stopThinkingRef.current();
+        }
+
         if (event.eventType === 'message.appended') {
           setStreamingMessage(null);
+          setPhase('idle');
+        }
+
+        if (event.eventType === 'ai.message.stream_completed') {
+          setPhase('idle');
         }
       });
 
@@ -225,11 +273,25 @@ export function useInterviewRealtime(input: UseInterviewRealtimeInput) {
     }
   }, [phase]);
 
+  const handleReplayAiAudio = useCallback(() => {
+    if (audioState?.objectUrl) {
+      replayAiAudio();
+      return;
+    }
+
+    const socket = socketRef.current;
+    if (socket?.connected && publicToken && attemptId) {
+      requestSpeakCurrentQuestion(socket, { publicToken, attemptId });
+    }
+  }, [attemptId, audioState?.objectUrl, publicToken, replayAiAudio]);
+
   return {
     phase,
     statusLabel,
     lastEvent,
     streamingMessage,
+    audioState,
+    replayAiAudio: handleReplayAiAudio,
     isConnected,
     markAnswerSending,
     resetPhase,

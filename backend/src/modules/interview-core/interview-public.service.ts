@@ -14,6 +14,10 @@ import {
 import { AiEvaluationService } from '../ai-evaluation/services/ai-evaluation.service';
 import { CheckpointStateService } from '../adaptive-interview/services/checkpoint-state.service';
 import { InterviewRealtimeService } from '../interview-realtime/interview-realtime.service';
+import {
+  MediaAssetService,
+  VOICE_ANSWER_PLACEHOLDER,
+} from '../media/media-asset.service';
 import { DatabaseService } from '../../common/database/database.service';
 import type { StartPublicInterviewInput } from './dto/start-public-interview.input';
 import {
@@ -42,6 +46,7 @@ export class InterviewPublicService {
     private readonly checkpointStateService: CheckpointStateService,
     private readonly adaptiveInterviewSubmitService: AdaptiveInterviewSubmitService,
     private readonly interviewRealtimeService: InterviewRealtimeService,
+    private readonly mediaAssetService: MediaAssetService,
     @Inject(forwardRef(() => AiEvaluationService))
     private readonly aiEvaluationService: AiEvaluationService,
   ) {}
@@ -241,6 +246,7 @@ export class InterviewPublicService {
     publicToken: string,
     attemptIdRaw: string,
     answer: string,
+    mediaAssetIdRaw?: string | null,
   ): Promise<SubmitInterviewAnswerPayload> {
     const attemptId = Number(attemptIdRaw);
     const attempt = await this.repository.findAttemptById(
@@ -259,13 +265,16 @@ export class InterviewPublicService {
       });
     }
 
+    const mediaAssetId = this.parseMediaAssetId(mediaAssetIdRaw);
     const trimmedAnswer = answer.trim();
-    if (!trimmedAnswer) {
+    if (!trimmedAnswer && !mediaAssetId) {
       throw new BadRequestException({
         message: 'Answer cannot be empty',
         code: 'EMPTY_ANSWER',
       });
     }
+
+    const effectiveAnswer = trimmedAnswer || VOICE_ANSWER_PLACEHOLDER;
 
     const questions = await this.repository.listQuestionsForInterview(
       attempt.interviewId,
@@ -276,7 +285,8 @@ export class InterviewPublicService {
         attempt,
         attemptId,
         questions,
-        trimmedAnswer,
+        trimmedAnswer: effectiveAnswer,
+        mediaAssetId,
       });
     }
 
@@ -289,7 +299,8 @@ export class InterviewPublicService {
       await this.adaptiveInterviewSubmitService.submitAnswer({
         attempt,
         questions,
-        trimmedAnswer,
+        trimmedAnswer: effectiveAnswer,
+        mediaAssetId,
       });
 
     if (adaptiveResult.status === 'completed') {
@@ -318,6 +329,7 @@ export class InterviewPublicService {
       ReturnType<InterviewCoreRepository['listQuestionsForInterview']>
     >;
     trimmedAnswer: string;
+    mediaAssetId: number | null;
   }): Promise<SubmitInterviewAnswerPayload> {
     const answeredBefore = await this.repository.countCandidateMessages(
       input.attemptId,
@@ -347,7 +359,7 @@ export class InterviewPublicService {
         query,
       );
 
-      await this.repository.appendMessage(
+      const candidateMessage = await this.repository.appendMessage(
         {
           companyId: input.attempt.companyId,
           attemptId: input.attemptId,
@@ -358,6 +370,14 @@ export class InterviewPublicService {
         },
         query,
       );
+
+      if (input.mediaAssetId) {
+        await this.mediaAssetService.linkPendingAssetToMessage({
+          mediaAssetId: input.mediaAssetId,
+          attemptId: input.attemptId,
+          messageId: candidateMessage.id,
+        });
+      }
 
       const answeredAfter = answeredBefore + 1;
 
@@ -406,6 +426,22 @@ export class InterviewPublicService {
       isFollowUp: false,
       currentQuestionFollowUpCount: 0,
     });
+  }
+
+  private parseMediaAssetId(mediaAssetIdRaw?: string | null): number | null {
+    if (!mediaAssetIdRaw?.trim()) {
+      return null;
+    }
+
+    const mediaAssetId = Number(mediaAssetIdRaw);
+    if (!Number.isInteger(mediaAssetId) || mediaAssetId < 1) {
+      throw new BadRequestException({
+        message: 'Invalid media asset id',
+        code: 'INVALID_MEDIA_ASSET',
+      });
+    }
+
+    return mediaAssetId;
   }
 
   async completeAttempt(
