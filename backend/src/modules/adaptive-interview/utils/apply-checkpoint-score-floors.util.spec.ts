@@ -455,4 +455,429 @@ describe('applyCheckpointScoreFloors', () => {
       }),
     );
   });
+
+  it('does not false-flag scheduling when latest answer correctly denies requestIdleCallback', () => {
+    const wrongCommit =
+      'В commit phase React использует requestIdleCallback и может прерываться.';
+    const correctScheduling =
+      'Планирование через scheduler и MessageChannel, не requestIdleCallback.';
+
+    const context = buildGenericsContext(correctScheduling, [
+      { role: 'candidate', sequenceOrder: 1, content: wrongCommit },
+    ]);
+
+    const { evaluation } = applyCheckpointScoreFloors(
+      {
+        candidateDisposition: 'engaged',
+        checkpointResults: [
+          {
+            checkpointKey: 'scheduling',
+            status: 'covered',
+            scoreAwarded: 1,
+            confidence: 0.9,
+            evidenceSummary: 'Correct scheduling',
+            rationale:
+              'depth=knows, coverage=high, accuracy=full: scheduler, shouldYield, MessageChannel.',
+          },
+        ],
+      },
+      context,
+    );
+
+    const scheduling = evaluation.checkpointResults.find(
+      (item) => item.checkpointKey === 'scheduling',
+    );
+
+    expect(scheduling?.scoreAwarded).toBe(1);
+    expect(scheduling?.rationale).not.toContain('false_claim');
+  });
+
+  it('caps lanes_priority to zero on explicit refusal in latest answer', () => {
+    const context: AdaptiveInterviewContextPacket = {
+      ...buildGenericsContext('placeholder', []),
+      latestCandidateAnswer:
+        'Честно, с lanes и приоритетами не разбирался — startTransition только названия слышал. Давайте дальше.',
+      localTurns: [
+        {
+          role: 'candidate',
+          sequenceOrder: 1,
+          content:
+            'Fiber планирует через scheduler и lanes, startTransition для transition.',
+        },
+      ],
+      checkpoints: [
+        {
+          checkpointKey: 'lanes_priority',
+          title: 'Понимает приоритеты и concurrent API',
+          expected: 'lanes, bitmasks, startTransition',
+          score: 1,
+          sortOrder: 0,
+        },
+      ],
+      checkpointStates: [
+        {
+          checkpointKey: 'lanes_priority',
+          status: 'partial',
+          scoreAwarded: 0.25,
+          maxScore: 1,
+          followUpCount: 1,
+          needsManualReview: false,
+        },
+      ],
+    };
+
+    const { evaluation } = applyCheckpointScoreFloors(
+      {
+        candidateDisposition: 'declined',
+        checkpointResults: [
+          {
+            checkpointKey: 'lanes_priority',
+            status: 'partial',
+            scoreAwarded: 0.25,
+            confidence: 0.7,
+            evidenceSummary: 'Mentioned lanes earlier',
+            rationale:
+              'depth=partial_knowledge, coverage=medium, accuracy=partial: lanes упомянуты ранее.',
+          },
+        ],
+      },
+      context,
+      { evidenceSource: 'follow_up_answer' },
+    );
+
+    expect(
+      evaluation.checkpointResults.find(
+        (item) => item.checkpointKey === 'lanes_priority',
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        scoreAwarded: 0,
+        status: 'missed',
+      }),
+    );
+  });
+
+  it('does not cap stack_vs_fiber when answer is correct but shares render/commit vocabulary', () => {
+    const stackAnswer =
+      'Раньше reconciler шёл рекурсивно через call stack — синхронный обход дерева. Fiber заменил это на связный список fiber-узлов: работа идёт порциями, React может уступить поток.';
+
+    const context: AdaptiveInterviewContextPacket = {
+      ...buildGenericsContext(stackAnswer, []),
+      questionText: 'Как работает React Fiber?',
+      maxScore: 8,
+      badAnswerExamples: [
+        'Render phase и commit phase — одно и то же. React сразу пишет в DOM во время reconcileChildFibers.',
+      ],
+      checkpoints: [
+        {
+          checkpointKey: 'stack_vs_fiber',
+          title: 'Отличает stack reconciler от Fiber',
+          expected: 'stack vs fiber',
+          score: 1,
+          sortOrder: 0,
+        },
+      ],
+    };
+
+    const { evaluation } = applyCheckpointScoreFloors(
+      {
+        candidateDisposition: 'engaged',
+        checkpointResults: [
+          {
+            checkpointKey: 'stack_vs_fiber',
+            status: 'partial',
+            scoreAwarded: 0.25,
+            confidence: 0.9,
+            evidenceSummary: 'stack vs fiber',
+            rationale:
+              'depth=understands, coverage=high, accuracy=partial: верно объяснил stack vs Fiber',
+          },
+        ],
+      },
+      context,
+    );
+
+    const stack = evaluation.checkpointResults.find(
+      (item) => item.checkpointKey === 'stack_vs_fiber',
+    );
+
+    expect(stack?.scoreAwarded).toBeGreaterThanOrEqual(0.75);
+    expect(stack?.rationale).not.toContain('overlaps bad answer example');
+  });
+
+  it('raises scheduling score when latest answer has MessageChannel and shouldYield', () => {
+    const schedulingAnswer =
+      'Fiber планирует работу через scheduler. В work loop React проверяет shouldYield и тайм-слайсы ~5ms. Используется MessageChannel, не requestIdleCallback.';
+
+    const context: AdaptiveInterviewContextPacket = {
+      ...buildGenericsContext(schedulingAnswer, []),
+      questionText: 'Как работает React Fiber?',
+      targetCheckpointKey: 'scheduling',
+      latestAnswerMessageKind: 'follow_up_answer',
+      checkpoints: [
+        {
+          checkpointKey: 'scheduling',
+          title: 'Понимает планирование Fiber',
+          expected: 'scheduler, shouldYield, MessageChannel',
+          score: 1,
+          sortOrder: 0,
+        },
+      ],
+    };
+
+    const { evaluation } = applyCheckpointScoreFloors(
+      {
+        candidateDisposition: 'engaged',
+        checkpointResults: [
+          {
+            checkpointKey: 'scheduling',
+            status: 'missed',
+            scoreAwarded: 0,
+            confidence: 0.9,
+            evidenceSummary: null,
+            rationale:
+              'depth=heard_of, coverage=none, accuracy=none: не упомянул scheduler',
+          },
+        ],
+      },
+      context,
+      { evidenceSource: 'follow_up_answer' },
+    );
+
+    const scheduling = evaluation.checkpointResults.find(
+      (item) => item.checkpointKey === 'scheduling',
+    );
+
+    expect(scheduling?.scoreAwarded).toBeGreaterThanOrEqual(0.7);
+    expect(scheduling?.status).toBe('partial');
+  });
+
+  it('aligns fiber_pointers to covered when AI rationale says accuracy=full depth=knows', () => {
+    const pointersAnswer =
+      'Fiber-узел с child, sibling, return. Обход: вглубь через child, потом sibling, при тупике return.';
+
+    const context: AdaptiveInterviewContextPacket = {
+      ...buildGenericsContext(pointersAnswer, []),
+      questionText: 'Как работает React Fiber?',
+      targetCheckpointKey: 'fiber_pointers',
+      latestAnswerMessageKind: 'follow_up_answer',
+      checkpoints: [
+        {
+          checkpointKey: 'fiber_pointers',
+          title: 'Знает структуру fiber-узла',
+          expected: 'child, sibling, return',
+          score: 1,
+          sortOrder: 0,
+        },
+      ],
+    };
+
+    const { evaluation } = applyCheckpointScoreFloors(
+      {
+        candidateDisposition: 'engaged',
+        checkpointResults: [
+          {
+            checkpointKey: 'fiber_pointers',
+            status: 'partial',
+            scoreAwarded: 0.25,
+            confidence: 0.95,
+            evidenceSummary: 'child sibling return',
+            rationale:
+              'depth=knows, coverage=high, accuracy=full: корректно перечислены child/sibling/return и описан порядок обхода.',
+          },
+        ],
+      },
+      context,
+      { evidenceSource: 'follow_up_answer' },
+    );
+
+    const pointers = evaluation.checkpointResults.find(
+      (item) => item.checkpointKey === 'fiber_pointers',
+    );
+
+    expect(pointers?.scoreAwarded).toBe(1);
+    expect(pointers?.status).toBe('covered');
+  });
+
+  it('raises strong composite Fiber main answer toward 7.5+/10 band', () => {
+    const opener =
+      'Да, на практике с React 18: createRoot, startTransition, useDeferredValue. Fiber — reconciliation engine: fiber-узел в связном дереве, render phase прерывается через lanes и shouldYield, commit phase атомарно применяет изменения в DOM.';
+    const main =
+      'При setState/createRoot React создаёт update с lane-приоритетом. В render phase Fiber строит work-in-progress дерево: у каждого fiber есть child/sibling/return, current и alternate. Scheduler через lanes (SyncLane, TransitionLane) и MessageChannel с shouldYield прерывает длинный render, не блокируя main thread. Когда дерево готово — commit phase атомарно: before mutation, mutation (DOM), layout (useLayoutEffect), passive (useEffect). Виртуализация списков выигрывает от прерываемого render.';
+
+    const fiberCheckpoints = [
+      'fiber_definition',
+      'stack_vs_fiber',
+      'fiber_pointers',
+      'render_phase',
+      'commit_phase',
+      'scheduling',
+      'lanes_priority',
+      'commit_limitation',
+    ] as const;
+
+    const context: AdaptiveInterviewContextPacket = {
+      ...buildGenericsContext(main, [
+        { role: 'candidate', sequenceOrder: 1, content: opener },
+      ]),
+      questionText: 'Как работает React Fiber?',
+      maxScore: 8,
+      checkpoints: fiberCheckpoints.map((checkpointKey, index) => ({
+        checkpointKey,
+        title: checkpointKey,
+        expected: checkpointKey,
+        score: 1,
+        sortOrder: index,
+      })),
+      checkpointStates: fiberCheckpoints.map((checkpointKey) => ({
+        checkpointKey,
+        status: 'partial' as const,
+        scoreAwarded: 0.5,
+        maxScore: 1,
+        followUpCount: 0,
+        needsManualReview: false,
+      })),
+    };
+
+    const aiUnderscore = (
+      checkpointKey: string,
+    ): (typeof fiberCheckpoints)[number] extends never
+      ? never
+      : {
+          checkpointKey: string;
+          status: 'partial';
+          scoreAwarded: number;
+          confidence: number;
+          evidenceSummary: string;
+          rationale: string;
+        } => ({
+      checkpointKey,
+      status: 'partial' as const,
+      scoreAwarded: 0.5,
+      confidence: 0.7,
+      evidenceSummary: 'underscored',
+      rationale:
+        'depth=partial_knowledge, coverage=medium, accuracy=partial: корректная идея, но не все детали раскрыты.',
+    });
+
+    const { evaluation } = applyCheckpointScoreFloors(
+      {
+        candidateDisposition: 'engaged',
+        checkpointResults: fiberCheckpoints.map((checkpointKey) =>
+          aiUnderscore(checkpointKey),
+        ),
+      },
+      context,
+    );
+
+    const total = evaluation.checkpointResults.reduce(
+      (sum, item) => sum + item.scoreAwarded,
+      0,
+    );
+
+    expect(total).toBeGreaterThanOrEqual(6.5);
+
+    const pointers = evaluation.checkpointResults.find(
+      (item) => item.checkpointKey === 'fiber_pointers',
+    );
+    const scheduling = evaluation.checkpointResults.find(
+      (item) => item.checkpointKey === 'scheduling',
+    );
+    const lanes = evaluation.checkpointResults.find(
+      (item) => item.checkpointKey === 'lanes_priority',
+    );
+
+    expect(pointers?.scoreAwarded).toBeGreaterThanOrEqual(0.85);
+    expect(scheduling?.scoreAwarded).toBeGreaterThanOrEqual(0.75);
+    expect(lanes?.scoreAwarded).toBeGreaterThanOrEqual(0.75);
+    expect(scheduling?.rationale).not.toContain('false_claim');
+    expect(pointers?.rationale).toMatch(/depth=(knows|understands)/i);
+  });
+
+  it('preserves covered stack_vs_fiber when render follow-up omits stack comparison', () => {
+    const mainAnswer =
+      'До React 16 reconciler шёл рекурсивно через call stack. Fiber — связный список child/sibling/return.';
+    const renderFollowUp =
+      'Render phase чистая: строится WIP alternate, DOM не мутируется, commit после готовности WIP.';
+
+    const context: AdaptiveInterviewContextPacket = {
+      ...buildGenericsContext(renderFollowUp, [
+        { role: 'candidate', sequenceOrder: 1, content: mainAnswer },
+      ]),
+      questionText: 'Как работает React Fiber?',
+      maxScore: 8,
+      latestAnswerMessageKind: 'follow_up_answer',
+      targetCheckpointKey: 'render_phase',
+      checkpoints: [
+        {
+          checkpointKey: 'stack_vs_fiber',
+          title: 'Отличает stack reconciler от Fiber',
+          expected: 'stack vs fiber',
+          score: 1,
+          sortOrder: 0,
+        },
+        {
+          checkpointKey: 'render_phase',
+          title: 'Объясняет render phase',
+          expected: 'WIP render',
+          score: 1,
+          sortOrder: 1,
+        },
+      ],
+      checkpointStates: [
+        {
+          checkpointKey: 'stack_vs_fiber',
+          status: 'covered',
+          scoreAwarded: 1,
+          maxScore: 1,
+          followUpCount: 0,
+          needsManualReview: false,
+        },
+        {
+          checkpointKey: 'render_phase',
+          status: 'partial',
+          scoreAwarded: 0.85,
+          maxScore: 1,
+          followUpCount: 0,
+          needsManualReview: false,
+        },
+      ],
+    };
+
+    const { evaluation } = applyCheckpointScoreFloors(
+      {
+        candidateDisposition: 'engaged',
+        checkpointResults: [
+          {
+            checkpointKey: 'stack_vs_fiber',
+            status: 'partial',
+            scoreAwarded: 0.5,
+            confidence: 0.8,
+            evidenceSummary: 'not repeated',
+            rationale:
+              'В текущем ответе нет явного сравнения с stack reconciler, но ранее было покрыто; текущий ответ не противоречит. depth=mention_only, coverage=high, accuracy=wrong.',
+          },
+          {
+            checkpointKey: 'render_phase',
+            status: 'covered',
+            scoreAwarded: 1,
+            confidence: 0.95,
+            evidenceSummary: 'WIP render',
+            rationale:
+              'depth=knows, coverage=high, accuracy=full: WIP alternate, DOM не мутируется.',
+          },
+        ],
+      },
+      context,
+      { evidenceSource: 'follow_up_answer' },
+    );
+
+    const stack = evaluation.checkpointResults.find(
+      (item) => item.checkpointKey === 'stack_vs_fiber',
+    );
+
+    expect(stack?.scoreAwarded).toBe(1);
+    expect(stack?.status).toBe('covered');
+    expect(stack?.rationale).not.toContain('false_claim');
+  });
 });

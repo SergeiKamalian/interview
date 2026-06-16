@@ -2,7 +2,7 @@ import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview
 
 export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_KEY =
   'per_turn_checkpoint_evaluation';
-export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION = '2.5.0';
+export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION = '2.5.3';
 
 export function getPerTurnCheckpointEvaluationPromptVersion(): string {
   const override = process.env.PER_TURN_EVAL_PROMPT_VERSION?.trim();
@@ -30,7 +30,8 @@ export function buildPerTurnCheckpointEvaluationSystemPrompt(): string {
   return [
     'You are a strict technical interview evaluator for a live adaptive interview.',
     'Assess the latest candidate answer together with earlier local turns for the current question.',
-    'Evidence is cumulative across the conversation — scores must reflect everything the candidate already said in local turns.',
+    'For EACH checkpoint, the LATEST answer has highest weight: a confident false claim in the latest answer must reduce that checkpoint even if an earlier turn was correct.',
+    'Evidence is cumulative for context, but scoring must reflect contradictions and explicit refusals in the latest answer.',
     '',
     'Rules:',
     '- Use ONLY the checkpoints provided in the user message.',
@@ -59,10 +60,17 @@ export function buildPerTurnCheckpointEvaluationSystemPrompt(): string {
     'Depth taxonomy:',
     '- depth=mention_only — buzzwords only, no explanation',
     '- depth=heard_of — «слышал, не помню»',
-    '- depth=partial_knowledge — correct idea, incomplete',
-    '- depth=understands — coherent explanation with minor gaps',
-    '- depth=knows — precise details',
+    '- depth=partial_knowledge — correct idea with notable gaps only',
+    '- depth=understands — coherent multi-sentence explanation with correct core mechanics',
+    '- depth=knows — precise details and terminology',
     '- depth=false_claim — confident wrong statement',
+    '',
+    'Depth calibration (IMPORTANT):',
+    '- If the candidate gives a coherent explanation with correct core mechanics, prefer depth=understands (NOT partial_knowledge).',
+    '- Missing optional details alone (e.g. ~5ms chunks, explicit requestIdleCallback denial, createRoot vs render) must NOT force partial_knowledge when the core is correct.',
+    '- Use depth=partial_knowledge only when the explanation is fragmentary or misses the main mechanism.',
+    '- coverage=high when the candidate names 3+ correct aspects for that checkpoint.',
+    '- accuracy=full when the explained core is correct and there are NO material false claims for that checkpoint.',
     '',
     'Status + score rubric (MANDATORY):',
     '- covered: accuracy=full, NO material false claims → score_awarded = max_score.',
@@ -76,8 +84,11 @@ export function buildPerTurnCheckpointEvaluationSystemPrompt(): string {
     '- NEVER set status=covered with score=max when your rationale mentions incorrect, contradictory, or imprecise parts.',
     '',
     '- Confident false statements MUST cap the checkpoint at partial or missed; do not treat false explanations as full knowledge.',
-    '- Do NOT give all zeros when earlier local turns already demonstrated partial knowledge.',
+    '- If the latest answer explicitly refuses a sub-topic («не знаю», «давайте дальше», «не скажу»), that checkpoint → missed with depth=heard_of even if mentioned earlier.',
+    '- Use exactly ONE depth= label in rationale; never combine depth=knows and depth=false_claim.',
+    '- Do NOT give all zeros when earlier local turns already demonstrated partial knowledge unless the latest answer contradicts or refuses that checkpoint.',
     '- If the latest answer declines only one sub-aspect, keep scores from earlier turns.',
+    '- On follow-up answers, score the targeted checkpoint primarily from the latest answer; do not zero unrelated checkpoints unless the latest answer contradicts them.',
   '- Also set candidate_disposition from the latest answer:',
     '  - engaged: candidate tries to answer substantively, even if incorrect;',
     '  - declined: candidate refuses or clearly says they do not know / cannot answer;',
@@ -135,9 +146,22 @@ export function buildPerTurnCheckpointEvaluationUserPrompt(
           .map((example, index) => `${index + 1}. ${example}`)
           .join('\n');
 
+  const targetBlock =
+    context.latestAnswerMessageKind === 'follow_up_answer' &&
+    context.targetCheckpointKey
+      ? [
+          'Follow-up target checkpoint:',
+          context.targetCheckpointKey,
+          'The latest answer is a follow-up for this checkpoint. Prioritize evidence for it in the latest answer.',
+          'For other checkpoints: keep current scores unless the latest answer adds new correct evidence or contradicts them.',
+          '',
+        ].join('\n')
+      : '';
+
   return [
     'Evaluate the latest candidate answer for the current question only.',
     '',
+    targetBlock,
     'Question:',
     context.questionText,
     '',

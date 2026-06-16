@@ -22,6 +22,10 @@ export type MergeCheckpointEvaluationInput = {
   incomingRationale: string | null;
   maxScore: number;
   evidenceSource?: EvaluationEvidenceSource;
+  /** Dedicated follow-up for this checkpoint — allow stronger score uplift. */
+  relaxFollowUpWeight?: boolean;
+  /** When true, a worse incoming turn may reduce the merged score (false claim / refusal). */
+  incomingAllowsScoreDecrease?: boolean;
 };
 
 export type MergeCheckpointEvaluationResult = {
@@ -39,18 +43,24 @@ export function mergeCheckpointEvaluation(
     input.incomingScoreAwarded,
     input.maxScore,
     input.evidenceSource,
+    input.relaxFollowUpWeight,
   );
 
-  const mergedScore = Math.min(
-    input.maxScore,
-    Math.max(input.currentScoreAwarded, weightedIncoming),
-  );
+  const allowsDecrease = incomingAllowsScoreDecrease(input);
+
+  const mergedScore =
+    allowsDecrease && weightedIncoming < input.currentScoreAwarded
+      ? Math.min(input.maxScore, weightedIncoming)
+      : Math.min(
+          input.maxScore,
+          Math.max(input.currentScoreAwarded, weightedIncoming),
+        );
 
   let status: CheckpointStateStatus;
   if (mergedScore > input.currentScoreAwarded) {
     status = input.incomingStatus;
   } else if (mergedScore < input.currentScoreAwarded) {
-    status = input.currentStatus;
+    status = input.incomingStatus;
   } else {
     status = pickHigherRankStatus(input.currentStatus, input.incomingStatus);
   }
@@ -63,7 +73,9 @@ export function mergeCheckpointEvaluation(
     status = 'partial';
   }
 
-  const incomingWins = mergedScore > input.currentScoreAwarded;
+  const incomingWins =
+    mergedScore > input.currentScoreAwarded ||
+    (allowsDecrease && mergedScore < input.currentScoreAwarded);
 
   return {
     scoreAwarded: mergedScore,
@@ -77,11 +89,31 @@ export function mergeCheckpointEvaluation(
   };
 }
 
+export function incomingAllowsScoreDecrease(
+  input: Pick<
+    MergeCheckpointEvaluationInput,
+    'incomingRationale' | 'incomingAllowsScoreDecrease'
+  >,
+): boolean {
+  if (input.incomingAllowsScoreDecrease) {
+    return true;
+  }
+
+  const rationale = input.incomingRationale ?? '';
+  return (
+    /depth\s*=\s*false_claim/i.test(rationale) ||
+    /semantic guard capped/i.test(rationale) ||
+    /score capped:.*false_claim/i.test(rationale) ||
+    /explicit refusal in latest answer/i.test(rationale)
+  );
+}
+
 export function applyFollowUpEvidenceWeight(
   currentScore: number,
   incomingScore: number,
   maxScore: number,
   evidenceSource?: EvaluationEvidenceSource,
+  relaxFollowUpWeight = false,
 ): number {
   if (evidenceSource !== 'follow_up_answer' || incomingScore <= currentScore) {
     return incomingScore;
@@ -89,6 +121,15 @@ export function applyFollowUpEvidenceWeight(
 
   const { scoreDeltaCap, maxRelativeBoost } = getFollowUpEvidenceWeightConfig();
   const delta = incomingScore - currentScore;
+
+  if (relaxFollowUpWeight) {
+    if (currentScore <= 0) {
+      return Math.min(maxScore, incomingScore);
+    }
+
+    const relaxedCap = Math.min(delta, maxScore * 0.75);
+    return Math.min(maxScore, currentScore + relaxedCap);
+  }
 
   if (currentScore <= 0) {
     const cappedDelta = Math.min(delta, scoreDeltaCap * maxScore);

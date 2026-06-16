@@ -80,6 +80,13 @@ export function buildAdaptiveInterviewContextPacket(
       ? boundText(latestCandidateMessage.content, input.limits.maxTextLength)
       : '',
     latestCandidateMessageId: latestCandidateMessage?.id ?? null,
+    latestAnswerMessageKind:
+      latestCandidateMessage?.messageKind === 'follow_up_answer'
+        ? 'follow_up_answer'
+        : latestCandidateMessage?.messageKind === 'main_answer'
+          ? 'main_answer'
+          : null,
+    targetCheckpointKey: latestCandidateMessage?.targetCheckpointKey ?? null,
     checkpointStates,
     evidenceSnippets,
     localTurns,

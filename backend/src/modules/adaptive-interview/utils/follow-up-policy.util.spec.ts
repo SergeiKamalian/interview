@@ -50,6 +50,18 @@ const baseInput: FollowUpPolicyInput = {
 };
 
 describe('buildNaturalTemplateFollowUp', () => {
+  it('rephrases rubric checkpoint title into second-person follow-up', () => {
+    const question = buildNaturalTemplateFollowUp({
+      questionText: 'Fiber?',
+      checkpointTitle: 'Объясняет render phase и WIP tree',
+      latestCandidateAnswer: 'answer',
+      seed: 3,
+    });
+
+    expect(question.toLowerCase()).toContain('как вы объясняете');
+    expect(question).not.toContain('объясняет render');
+  });
+
   it('does not quote the candidate answer and avoids default Понял, спасибо', () => {
     const question = buildNaturalTemplateFollowUp({
       questionText: 'Что такое useEffect?',

@@ -1,7 +1,7 @@
 import { mergeCheckpointEvaluation } from './merge-checkpoint-evaluation.util';
 
 describe('mergeCheckpointEvaluation', () => {
-  it('keeps the higher score when a later turn scores lower', () => {
+  it('keeps the higher score when a later turn scores lower without decrease flag', () => {
     const merged = mergeCheckpointEvaluation({
       currentScoreAwarded: 0.5,
       currentStatus: 'partial',
@@ -20,6 +20,25 @@ describe('mergeCheckpointEvaluation', () => {
       evidenceSummary: 'Mentioned T[]',
       rationale: 'Partial reuse example',
     });
+  });
+
+  it('reduces score when latest turn signals false_claim', () => {
+    const merged = mergeCheckpointEvaluation({
+      currentScoreAwarded: 0.5,
+      currentStatus: 'partial',
+      currentEvidenceSummary: 'Earlier correct commit',
+      currentRationale: 'Main answer partial',
+      incomingScoreAwarded: 0.25,
+      incomingStatus: 'partial',
+      incomingEvidenceSummary: 'Wrong interruptible commit',
+      incomingRationale:
+        'depth=false_claim. Semantic guard capped score because candidate evidence contains a direct contradiction.',
+      maxScore: 1,
+      incomingAllowsScoreDecrease: true,
+    });
+
+    expect(merged.scoreAwarded).toBe(0.25);
+    expect(merged.rationale).toContain('false_claim');
   });
 
   it('upgrades score and status when a later turn adds evidence', () => {

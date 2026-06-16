@@ -2,6 +2,7 @@ import {
   parseDepthFromRationale,
   type CheckpointDepthLevel,
 } from './checkpoint-depth.util';
+import { extractFalseClaimQuote } from './false-claim-quote.util';
 
 export type CheckpointRedFlagSeverity = 'low' | 'medium' | 'high';
 
@@ -34,11 +35,15 @@ function buildRedFlag(checkpoint: RedFlagInput): CheckpointRedFlag | null {
   const rationale = checkpoint.rationale ?? '';
 
   if (depth === 'false_claim' || hasFalseClaimSignal(rationale)) {
+    const quote =
+      extractFalseClaimQuote(checkpoint.evidenceSummary, checkpoint.checkpointKey) ??
+      (depth === 'false_claim' ? checkpoint.evidenceSummary : null);
+
     return {
       checkpointKey: checkpoint.checkpointKey,
       checkpointTitle: checkpoint.checkpointTitle,
       summary: extractFalseClaimSummary(rationale, checkpoint.checkpointTitle),
-      candidateQuote: checkpoint.evidenceSummary,
+      candidateQuote: quote,
       severity: resolveSeverity(depth, rationale),
     };
   }
@@ -51,11 +56,29 @@ function hasFalseClaimSignal(rationale: string): boolean {
     /depth\s*=\s*false_claim/i,
     /material false claim/i,
     /уверенн.{0,20}(?:ошиб|неверн)/i,
-    /requestidlecallback/i,
-    /virtual\s+dom.{0,40}(?:fiber|хран)/i,
-    /score capped/i,
+    /overlaps bad answer example/i,
     /semantic guard capped/i,
-  ].some((pattern) => pattern.test(rationale));
+    /Score capped:.*(?:contradict|overlap|material)/i,
+    hasPositiveRequestIdleCallbackInRationale(rationale),
+    /virtual\s+dom.{0,40}(?:fiber|хран)/i,
+  ].some((pattern) =>
+    typeof pattern === 'boolean' ? pattern : pattern.test(rationale),
+  );
+}
+
+function hasPositiveRequestIdleCallbackInRationale(rationale: string): boolean {
+  const text = rationale.toLowerCase();
+  if (
+    /(?:не|not|instead|без|отсутств).{0,40}request\s*idle\s*callback/i.test(
+      text,
+    )
+  ) {
+    return false;
+  }
+
+  return /(?:использует|через|drives?|на\s+основе).{0,30}request\s*idle\s*callback/i.test(
+    text,
+  );
 }
 
 function extractFalseClaimSummary(

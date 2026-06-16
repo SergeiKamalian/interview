@@ -79,6 +79,8 @@ export class AdaptiveInterviewContextService {
         content: message.content,
         sequenceOrder: message.sequenceOrder,
         interviewQuestionId: message.interviewQuestionId,
+        messageKind: message.messageKind,
+        targetCheckpointKey: message.targetCheckpointKey,
       })),
       checkpointStates: checkpointStates.map((state) => ({
         checkpointKey: state.checkpointKey,

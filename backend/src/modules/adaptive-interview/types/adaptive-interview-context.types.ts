@@ -43,6 +43,8 @@ export type AdaptiveInterviewContextPacket = {
   badAnswerExamples: string[];
   latestCandidateAnswer: string;
   latestCandidateMessageId: number | null;
+  latestAnswerMessageKind?: 'main_answer' | 'follow_up_answer' | null;
+  targetCheckpointKey?: string | null;
   checkpointStates: AdaptiveCheckpointStateSnapshot[];
   evidenceSnippets: AdaptiveEvidenceSnippet[];
   localTurns: AdaptiveLocalTurn[];
@@ -65,6 +67,8 @@ export type BuildAdaptiveInterviewContextInput = {
     content: string;
     sequenceOrder: number;
     interviewQuestionId: number | null;
+    messageKind?: string | null;
+    targetCheckpointKey?: string | null;
   }>;
   checkpointStates: Array<{
     checkpointKey: string;

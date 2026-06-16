@@ -2,6 +2,7 @@ import {
   isCandidateDecliningKnowledge,
   isFullQuestionDecline,
   isScopedTopicDecline,
+  isTargetedTopicRefusal,
   shouldSkipFollowUps,
 } from './candidate-decline.util';
 
@@ -87,6 +88,24 @@ describe('isCandidateDecliningKnowledge', () => {
     expect(
       isCandidateDecliningKnowledge(
         'useEffect запускается после рендера и нужен для side effects',
+      ),
+    ).toBe(false);
+  });
+});
+
+describe('isTargetedTopicRefusal', () => {
+  it('detects honest lanes refusal', () => {
+    expect(
+      isTargetedTopicRefusal(
+        'Честно, с lanes и приоритетами не разбирался — startTransition только названия слышал.',
+      ),
+    ).toBe(true);
+  });
+
+  it('does not treat scheduling answer with lanes vocabulary as refusal', () => {
+    expect(
+      isTargetedTopicRefusal(
+        'Fiber планирует через scheduler и lanes. Используется MessageChannel, не requestIdleCallback, не блокируя ввод и paint.',
       ),
     ).toBe(false);
   });

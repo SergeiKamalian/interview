@@ -22,6 +22,17 @@ const DECLINE_PATTERNS: RegExp[] = [
   /\bnot\s+sure\s+i\s+understand\b/i,
 ];
 
+const TARGETED_TOPIC_REFUSAL_PATTERNS: RegExp[] = [
+  /давайте\s+дальше/i,
+  /лучше\s+не\s+трогать/i,
+  /эту\s+часть\s+лучше/i,
+  /не\s+скажу/i,
+  /честно.{0,60}(?:lanes|приоритет|concurrent)/i,
+  /(?:не\s+разбирался|не\s+знаю|не\s+понимаю).{0,40}(?:lanes|приоритет|concurrent|transition|deferred)/i,
+  /только\s+названия\s+слышал/i,
+  /не\s+разбирался/i,
+];
+
 /** Declines only one sub-aspect, not the whole question (e.g. "на это не смогу ответить"). */
 const SCOPED_DECLINE_PATTERNS: RegExp[] = [
   /на\s+эт[оаеу]/i,
@@ -49,6 +60,16 @@ export function isScopedTopicDecline(answer: string): boolean {
   }
 
   return SCOPED_DECLINE_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+/** Latest answer refuses the specific follow-up topic (not whole interview). */
+export function isTargetedTopicRefusal(answer: string): boolean {
+  const normalized = answer.trim();
+  if (!normalized) {
+    return false;
+  }
+
+  return TARGETED_TOPIC_REFUSAL_PATTERNS.some((pattern) => pattern.test(normalized));
 }
 
 /** Whole-question refusal — not a scoped "can't answer this part". */

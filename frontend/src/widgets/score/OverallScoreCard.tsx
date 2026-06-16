@@ -4,6 +4,7 @@ type OverallScoreCardProps = {
   score?: number | null;
   maxScore?: number;
   loading?: boolean;
+  interim?: boolean;
 };
 
 function scoreZone(score: number): string {
@@ -17,6 +18,7 @@ export function OverallScoreCard({
   score,
   maxScore = 10,
   loading = false,
+  interim = false,
 }: OverallScoreCardProps) {
   if (loading) {
     return (
@@ -37,7 +39,7 @@ export function OverallScoreCard({
   const normalized = Math.min(100, Math.max(0, (score / maxScore) * 100));
 
   return (
-    <Card header="Overall score">
+    <Card header={interim ? 'Overall score (промежуточно)' : 'Overall score'}>
       <div
         className={[
           'inline-flex items-baseline gap-2 rounded-lg border px-4 py-3',
@@ -46,10 +48,12 @@ export function OverallScoreCard({
       >
         <span className="text-3xl font-semibold">{normalized.toFixed(0)}</span>
         <span className="text-sm">/ 100</span>
+        <span className="text-sm text-slate-500">({score.toFixed(1)} / 10)</span>
       </div>
       <p className="mt-3 text-xs text-slate-500">
-        Score показан по 100-балльной шкале и рассчитан по structured
-        checkpoints из question bank, не по свободному тексту AI.
+        {interim
+          ? 'Промежуточный score по уже оценённым checkpoints. Финальная оценка появится после завершения интервью.'
+          : 'Score показан по 100-балльной шкале и рассчитан по structured checkpoints из question bank, не по свободному тексту AI.'}
       </p>
     </Card>
   );

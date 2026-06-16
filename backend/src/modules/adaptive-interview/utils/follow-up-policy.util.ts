@@ -6,6 +6,7 @@ import type { CheckpointStateStatus } from '../types/checkpoint-state-status.typ
 import { parseDepthFromRationale } from './checkpoint-depth.util';
 import {
   normalizeFollowUpQuestionForCandidate,
+  rephraseCheckpointTitleForFollowUp,
 } from './checkpoint-expected-speech.util';
 import {
   resolveSkipFollowUpReason,
@@ -209,7 +210,9 @@ export function buildNaturalTemplateFollowUp(input: {
     input.previousFollowUpQuestions ?? [],
   );
   const stem = pickFollowUpQuestionStem(seed + 1);
-  const topicHint = (input.checkpointTitle ?? '').trim().toLowerCase();
+  const topicHint = rephraseCheckpointTitleForFollowUp(
+    input.checkpointTitle ?? '',
+  );
 
   const question = topicHint
     ? `${acknowledgment} ${stem} ${topicHint}?`

@@ -23,12 +23,22 @@ export function parseDepthFromRationale(
     return 'none';
   }
 
-  const match = rationale.match(DEPTH_PATTERN);
-  if (!match?.[1]) {
-    return inferDepthFromRationale(rationale);
+  const matches = [
+    ...rationale.matchAll(
+      /depth\s*=\s*(mention_only|heard_of|partial_knowledge|understands|knows|false_claim)/gi,
+    ),
+  ];
+
+  if (matches.length > 0) {
+    const levels = matches.map((match) => match[1]!.toLowerCase());
+    if (levels.includes('false_claim')) {
+      return 'false_claim';
+    }
+
+    return levels[levels.length - 1] as CheckpointDepthLevel;
   }
 
-  return match[1].toLowerCase() as CheckpointDepthLevel;
+  return inferDepthFromRationale(rationale);
 }
 
 export function parseCoverageFromRationale(
@@ -78,7 +88,10 @@ export function depthLabelRu(depth: CheckpointDepthLevel): string {
 function inferDepthFromRationale(rationale: string): CheckpointDepthLevel {
   const text = rationale.toLowerCase();
 
-  if (/false_claim|ложн|неверн|ошиб|противореч|requestidlecallback/i.test(text)) {
+  if (
+    /false_claim|ложн|неверн|ошиб|противореч/i.test(text) ||
+    hasPositiveRequestIdleCallbackClaim(text)
+  ) {
     return 'false_claim';
   }
 
@@ -158,4 +171,16 @@ export function accuracyPercent(level: AccuracyLevel): number {
   };
 
   return map[level];
+}
+
+function hasPositiveRequestIdleCallbackClaim(text: string): boolean {
+  if (
+    /(?:не|not|instead\s+of|а\s+не|без)\s+.{0,30}request\s*idle\s*callback/i.test(
+      text,
+    )
+  ) {
+    return false;
+  }
+
+  return /request\s*idle\s*callback|requestidlecallback/i.test(text);
 }

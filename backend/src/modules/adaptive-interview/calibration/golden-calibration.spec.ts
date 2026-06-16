@@ -32,7 +32,11 @@ function loadGoldenCases(): GoldenCalibrationCase[] {
 function buildFiberContext(
   caseData: GoldenCalibrationCase,
 ): AdaptiveInterviewContextPacket {
-  const candidateText = caseData.turns.map((turn) => turn.content).join(' ');
+  const candidateTurns = caseData.turns.filter((turn) => turn.role === 'candidate');
+  const useLatestTurnOnly = caseData.id === 'react-fiber-attempt42-paraphrase';
+  const candidateText = useLatestTurnOnly
+    ? (candidateTurns[candidateTurns.length - 1]?.content ?? '')
+    : candidateTurns.map((turn) => turn.content).join(' ');
 
   return {
     companyId: 1,
@@ -48,6 +52,8 @@ function buildFiberContext(
     ],
     latestCandidateAnswer: candidateText,
     latestCandidateMessageId: 99,
+    latestAnswerMessageKind: useLatestTurnOnly ? 'follow_up_answer' : null,
+    targetCheckpointKey: useLatestTurnOnly ? 'scheduling' : null,
     checkpoints: FIBER_CHECKPOINTS.map((key, index) => ({
       checkpointKey: key,
       title: key,

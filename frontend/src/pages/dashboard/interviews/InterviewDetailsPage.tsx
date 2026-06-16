@@ -15,6 +15,48 @@ import { RecommendationCard } from '@widgets/score/RecommendationCard';
 import { formatScore, formatUnixDate } from '@shared/lib/format';
 import { Alert, Button, Card, Spinner } from '@shared/ui';
 
+type FinalEvaluationDisplay = {
+  totalScore: number;
+  hireRecommendation?: string | null;
+  summary?: string | null;
+  needsManualReview?: boolean;
+  categoryBreakdown?: Array<{
+    categoryKey: string;
+    categoryLabel: string;
+    scoreNormalized: number;
+    weight: number;
+    contribution: number;
+  }>;
+};
+
+function computeCheckpointInterimScore(review: {
+  questionGroups: Array<{
+    checkpoints: Array<{ scoreAwarded: number; maxScore: number }>;
+  }>;
+} | null | undefined): { score: number; maxScore: number } | null {
+  if (!review?.questionGroups.length) {
+    return null;
+  }
+
+  let earned = 0;
+  let rawMax = 0;
+
+  for (const group of review.questionGroups) {
+    for (const checkpoint of group.checkpoints) {
+      earned += checkpoint.scoreAwarded;
+      rawMax += checkpoint.maxScore;
+    }
+  }
+
+  if (rawMax <= 0) {
+    return null;
+  }
+
+  const scoreOutOfTen = Math.round((earned / rawMax) * 100) / 10;
+
+  return { score: scoreOutOfTen, maxScore: 10 };
+}
+
 export function InterviewDetailsPage() {
   const { interviewId = '' } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -113,7 +155,34 @@ export function InterviewDetailsPage() {
     );
   }
 
-  const displayEvaluation = evaluation ?? data.primaryFinalEvaluation;
+  const displayEvaluation: FinalEvaluationDisplay | null = evaluationReady
+    ? (evaluation ?? null)
+    : null;
+
+  const checkpointInterimScore = computeCheckpointInterimScore(adaptiveReview);
+
+  const displayScore =
+    displayEvaluation?.totalScore ??
+    selectedAttempt?.overallScore ??
+    checkpointInterimScore?.score ??
+    null;
+
+  const displayScoreMax = 10;
+
+  const showInterimCheckpointScore =
+    displayEvaluation == null &&
+    selectedAttempt?.overallScore == null &&
+    checkpointInterimScore != null;
+
+  const displayHireRecommendation =
+    displayEvaluation?.hireRecommendation ?? selectedAttempt?.hireRecommendation ?? null;
+
+  const displaySummary = displayEvaluation?.summary ?? null;
+
+  const displayNeedsManualReview =
+    displayEvaluation?.needsManualReview ?? adaptiveReview?.needsManualReview ?? false;
+
+  const displayCategoryBreakdown = displayEvaluation?.categoryBreakdown ?? [];
 
   return (
     <div className="space-y-4">
@@ -183,7 +252,13 @@ export function InterviewDetailsPage() {
               </div>
               <div className="text-right text-slate-600">
                 <p>Status: {selectedAttempt.status}</p>
-                <p>Score: {formatScore(displayEvaluation?.totalScore ?? selectedAttempt.overallScore)}</p>
+                <p>Score: {formatScore(displayScore)}</p>
+                {showInterimCheckpointScore && (
+                  <p className="text-xs text-slate-500">
+                    Промежуточно по checkpoints ({formatScore(displayScore)}/
+                    {formatScore(displayScoreMax)})
+                  </p>
+                )}
               </div>
               <Link
                 to={`/dashboard/candidates/${selectedAttempt.candidateId}/report`}
@@ -247,18 +322,18 @@ export function InterviewDetailsPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <OverallScoreCard
-          score={displayEvaluation?.totalScore ?? selectedAttempt?.overallScore}
+          score={displayScore}
+          maxScore={displayScoreMax}
           loading={isEvaluating}
+          interim={showInterimCheckpointScore}
         />
         <RecommendationCard
-          hireRecommendation={
-            displayEvaluation?.hireRecommendation ?? selectedAttempt?.hireRecommendation
-          }
-          summary={displayEvaluation?.summary}
-          needsManualReview={displayEvaluation?.needsManualReview}
+          hireRecommendation={displayHireRecommendation}
+          summary={displaySummary}
+          needsManualReview={displayNeedsManualReview}
           loading={isEvaluating}
         />
-        <CategoryBreakdownChart items={displayEvaluation?.categoryBreakdown ?? []} />
+        <CategoryBreakdownChart items={displayCategoryBreakdown} />
       </div>
 
       {selectedAttemptId && adaptiveReview && (
