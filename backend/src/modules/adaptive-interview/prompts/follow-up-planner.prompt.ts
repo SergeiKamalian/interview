@@ -1,14 +1,15 @@
 import { sanitizeCheckpointExpectedForCandidateSpeech } from '../utils/checkpoint-expected-speech.util';
 import {
+  INTERVIEWER_ACKNOWLEDGMENT_VARIETY_RULES,
   INTERVIEWER_FIRST_PERSON_VOICE_RULES,
   INTERVIEWER_FOLLOW_UP_REMINDER,
 } from './interviewer-voice.prompt';
 
 export const FOLLOW_UP_PLANNER_PROMPT_KEY = 'follow_up_planner';
-export const FOLLOW_UP_PLANNER_PROMPT_VERSION = '2.4.0';
+export const FOLLOW_UP_PLANNER_PROMPT_VERSION = '2.5.0';
 
 const RESPONSE_JSON_SCHEMA = `{
-  "follow_up_question": "interviewer «я» → candidate «вы»: short generic acknowledgment, then ONE direct follow-up question in Russian — never quote the candidate's words",
+  "follow_up_question": "interviewer «я» → candidate «вы»: varied short opener (not «Понял, спасибо» every time) or none, then ONE direct follow-up question in Russian — never quote the candidate's words",
   "reason": "why this follow-up helps clarify the missing point"
 }`;
 
@@ -28,10 +29,10 @@ const INTERVIEWER_PERSONA = [
   INTERVIEWER_FIRST_PERSON_VOICE_RULES,
   '',
   'Dialogue style:',
-  '- Start with a SHORT generic acknowledgment only («Понял, спасибо.», «Хорошо.», «Ок, давайте уточним.»).',
+  INTERVIEWER_ACKNOWLEDGMENT_VARIETY_RULES,
   '- Do NOT repeat, quote, or paraphrase what the candidate just said — no «про … услышал», no «…» with their answer.',
   '- They already know what they said; move straight to your clarifying question.',
-  '- Keep the full message to 1–2 short sentences (acknowledgment + one question).',
+  '- Keep the full message to 1–2 short sentences (optional acknowledgment + one question).',
   '',
   'Critical rules:',
   '- Ask exactly ONE follow-up question in Russian (unless the main question is clearly in English).',
@@ -63,7 +64,7 @@ function buildSharedUserContext(input: FollowUpPlannerPromptInput): string {
     'Candidate latest answer:',
     input.latestCandidateAnswer || '(empty)',
     '',
-    'Follow-ups already asked for this main question (do not repeat):',
+    'Follow-ups already asked for this main question (do not repeat topic OR opener phrasing):',
     buildPreviousFollowUpsBlock(input.previousFollowUpQuestions),
   ].join('\n');
 }
@@ -87,7 +88,7 @@ export function buildFollowUpPlannerUserPrompt(
   input: FollowUpPlannerPromptInput,
 ): string {
   return [
-    'Write one natural interviewer reply: first person «я», candidate «вы» — short generic acknowledgment, then one follow-up question. Do not quote their answer.',
+    'Write one natural interviewer reply: varied short opener (or none), then one follow-up question. Do not quote their answer. Do not reuse «Понял, спасибо» if it already appears above.',
     '',
     buildSharedUserContext(input),
     '',
@@ -109,7 +110,7 @@ export function buildFollowUpPlannerStreamingUserPrompt(
   input: FollowUpPlannerPromptInput,
 ): string {
   return [
-    'Write one natural interviewer reply: first person «я», candidate «вы» — short generic acknowledgment, then one follow-up question. Do not quote their answer.',
+    'Write one natural interviewer reply: varied short opener (or none), then one follow-up question. Do not quote their answer. Do not reuse «Понял, спасибо» if it already appears above.',
     '',
     buildSharedUserContext(input),
     '',

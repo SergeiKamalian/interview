@@ -18,6 +18,7 @@ import { AdaptiveOpenAiResponseStateService } from './adaptive-openai-response-s
 import { InterviewRealtimeService } from '../../interview-realtime/interview-realtime.service';
 import { InterviewAiMessageStreamService } from '../../interview-realtime/interview-ai-message-stream.service';
 import { MediaAssetService } from '../../media/media-asset.service';
+import { MainQuestionOpenerService } from './main-question-opener.service';
 
 describe('AdaptiveInterviewSubmitService', () => {
   let service: AdaptiveInterviewSubmitService;
@@ -25,6 +26,7 @@ describe('AdaptiveInterviewSubmitService', () => {
     Pick<
       InterviewCoreRepository,
       | 'countMainAnswerMessages'
+      | 'findAwaitingTopicOpener'
       | 'getNextSequenceOrder'
       | 'appendMessage'
       | 'completeAttempt'
@@ -102,6 +104,7 @@ describe('AdaptiveInterviewSubmitService', () => {
   beforeEach(async () => {
     repository = {
       countMainAnswerMessages: jest.fn().mockResolvedValue(0),
+      findAwaitingTopicOpener: jest.fn().mockResolvedValue(null),
       getNextSequenceOrder: jest
         .fn()
         .mockResolvedValueOnce(2)
@@ -265,6 +268,19 @@ describe('AdaptiveInterviewSubmitService', () => {
             linkPendingAssetToMessage: jest.fn(),
           },
         },
+        {
+          provide: MainQuestionOpenerService,
+          useValue: {
+            generateTopicOpener: jest
+              .fn()
+              .mockResolvedValue('Давайте поговорим про useMemo. Вам знакома тема?'),
+            generateQuestionInvite: jest
+              .fn()
+              .mockResolvedValue(
+                'Ок, давайте попробуем. С чего бы вы начали объяснение?',
+              ),
+          },
+        },
       ],
     }).compile();
 
@@ -347,8 +363,8 @@ describe('AdaptiveInterviewSubmitService', () => {
     expect(perTurnEvaluator.evaluateTurnAndPersist).not.toHaveBeenCalled();
     expect(followUpPlanner.planFollowUp).not.toHaveBeenCalled();
     expect(result.isFollowUp).toBe(false);
-    expect(result.messageKind).toBe(InterviewMessageKindEnum.main_question);
-    expect(result.pendingMessageText).toContain('What is useMemo?');
+    expect(result.messageKind).toBe(InterviewMessageKindEnum.topic_opener);
+    expect(result.pendingMessageText).toContain('useMemo');
   });
 
   it('moves to next main question when planner returns no follow-up', async () => {
@@ -397,9 +413,68 @@ describe('AdaptiveInterviewSubmitService', () => {
     });
 
     expect(result.isFollowUp).toBe(false);
-    expect(result.messageKind).toBe(InterviewMessageKindEnum.main_question);
-    expect(result.pendingMessageText).toContain('What is useMemo?');
+    expect(result.messageKind).toBe(InterviewMessageKindEnum.topic_opener);
+    expect(result.pendingMessageText).toContain('useMemo');
     expect(result.currentInterviewQuestionId).toBe(11);
+  });
+
+  it('reveals main question after topic opener answer', async () => {
+    repository.findAwaitingTopicOpener.mockResolvedValue({
+      interviewQuestionId: 10,
+      topicOpenerMessageId: 20,
+      topicOpenerText: 'Давайте поговорим про useEffect. Вы сталкивались?',
+    });
+    repository.getNextSequenceOrder = jest
+      .fn()
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(4);
+    repository.appendMessage = jest
+      .fn()
+      .mockResolvedValueOnce({
+        id: 21,
+        companyId: 7,
+        interviewAttemptId: 5,
+        interviewQuestionId: 10,
+        role: 'candidate',
+        messageKind: 'topic_opener_answer',
+        parentMessageId: 20,
+        targetCheckpointKey: null,
+        content: 'Да, немного знаком',
+        sequenceOrder: 3,
+        createdAt: new Date(),
+      })
+      .mockResolvedValueOnce({
+        id: 22,
+        companyId: 7,
+        interviewAttemptId: 5,
+        interviewQuestionId: 10,
+        role: 'ai',
+        messageKind: 'main_question',
+        parentMessageId: null,
+        targetCheckpointKey: null,
+        content: 'Ок, давайте попробуем. С чего бы вы начали объяснение?',
+        sequenceOrder: 4,
+        createdAt: new Date(),
+      });
+
+    const initializeSpy = jest
+      .spyOn(service, 'initializeQuestionAiState')
+      .mockResolvedValue();
+
+    const result = await service.submitAnswer({
+      attempt,
+      questions,
+      trimmedAnswer: 'Да, немного знаком',
+    });
+
+    expect(perTurnEvaluator.evaluateTurnAndPersist).not.toHaveBeenCalled();
+    expect(initializeSpy).toHaveBeenCalledWith({
+      companyId: 7,
+      attemptId: 5,
+      interviewQuestionId: 10,
+    });
+    expect(result.messageKind).toBe(InterviewMessageKindEnum.main_question);
+    expect(result.pendingMessageText).toContain('С чего бы вы начали');
   });
 
   it('rejects submit when all main questions are already answered', async () => {

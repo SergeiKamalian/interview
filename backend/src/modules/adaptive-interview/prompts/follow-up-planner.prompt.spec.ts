@@ -24,6 +24,7 @@ describe('follow-up-planner.prompt v2', () => {
     expect(systemPrompt).toContain('MANDATORY');
     expect(systemPrompt).toContain('first person «я»');
     expect(systemPrompt).toContain('NEVER use third person');
+    expect(systemPrompt).toContain('NEVER start every follow-up with «Понял, спасибо»');
     expect(systemPrompt).toContain('NEVER use robotic templates');
   });
 

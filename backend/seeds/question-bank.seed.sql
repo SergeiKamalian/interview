@@ -47,6 +47,11 @@ SELECT s.id, 'react_forms', 'React Forms'
 FROM skills s WHERE s.code = 'react'
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
+INSERT INTO topics (skill_id, code, name)
+SELECT s.id, 'react_fiber', 'React Fiber & Reconciliation'
+FROM skills s WHERE s.code = 'react'
+ON DUPLICATE KEY UPDATE name = VALUES(name);
+
 -- useEffect question
 INSERT INTO questions (
   company_id, profession_id, topic_id, level, difficulty,
@@ -274,6 +279,104 @@ WHERE p.code = 'frontend_developer'
       AND q.profession_id = p.id
   );
 
+-- React Fiber and Virtual DOM update process
+INSERT INTO questions (
+  company_id, profession_id, topic_id, level, difficulty,
+  question_text, short_answer, ideal_answer, max_score
+)
+SELECT NULL, p.id, t.id, 'senior', 'advanced',
+  'Как работает React Fiber и процесс обновления Virtual DOM?',
+  'React Fiber — это новая архитектура reconciliation в виде связного списка fiber-узлов, которая позволяет прерывать render phase, приоритизировать обновления и затем атомарно применять изменения к DOM в commit phase.',
+  'До React 16 reconciler обходил дерево через call stack синхронно: большое дерево могло блокировать main thread на сотни миллисекунд. Fiber заменил стек на связный список узлов с указателями child, sibling и return — работу можно прерывать через shouldYield() и продолжать с того же узла. При setState/useState обновление попадает в очередь fiber, React строит work-in-progress дерево (current.alternate), вызывает render-функции и diff-ит props/state. В render phase DOM не меняется — фаза чистая и прерываемая. После завершения WIP начинается commit phase: она синхронная и атомарная — getSnapshotBeforeUpdate, commitMutationEffects (реальные DOM-изменения), commitLayoutEffects (useLayoutEffect, lifecycle), затем после paint — useEffect. Fiber планирует работу через пакет scheduler (MessageChannel postMessage, чанки ~5ms), а не через requestIdleCallback. Приоритеты кодируются lane bitmasks: SyncLane для ввода пользователя, TransitionLane для startTransition — более высокий приоритет прерывает низкий. createRoot в React 18 включает concurrent features; ReactDOM.render остаётся на legacy sync path. Для тяжёлых списков (500+ элементов) или фильтрации при вводе используют startTransition или useDeferredValue, но commit большого числа DOM-узлов всё равно блокирует браузер — Fiber не разбивает запись в DOM, поэтому virtualization остаётся нужной. Типичные ошибки: оборачивать в startTransition обновление value инпута, думать что concurrent mode убирает весь jank, и злоупотреблять flushSync.',
+  8.00
+FROM professions p
+JOIN topics t ON t.code = 'react_fiber'
+WHERE p.code = 'frontend_developer'
+  AND NOT EXISTS (
+    SELECT 1 FROM questions q
+    WHERE q.question_text = 'Как работает React Fiber и процесс обновления Virtual DOM?'
+      AND q.profession_id = p.id
+  );
+
+INSERT INTO question_skills (question_id, skill_id)
+SELECT q.id, s.id
+FROM questions q
+JOIN professions p ON p.id = q.profession_id
+JOIN skills s ON s.code IN ('react', 'javascript')
+WHERE q.question_text = 'Как работает React Fiber и процесс обновления Virtual DOM?'
+  AND NOT EXISTS (
+    SELECT 1 FROM question_skills qs
+    WHERE qs.question_id = q.id AND qs.skill_id = s.id
+  );
+
+INSERT INTO question_checkpoints (question_id, checkpoint_key, title, expected, score, sort_order)
+SELECT q.id, cp.checkpoint_key, cp.title, cp.expected, cp.score, cp.sort_order
+FROM questions q
+JOIN (
+  SELECT 'fiber_definition' AS checkpoint_key,
+         'Понимает, что такое Fiber' AS title,
+         'Кандидат объясняет Fiber как переосмысление reconciliation engine: связный список fiber-узлов для инкрементального, прерываемого и приоритетного рендера Virtual DOM.' AS expected,
+         1.00 AS score, 0 AS sort_order
+  UNION ALL SELECT 'stack_vs_fiber', 'Отличает stack reconciler от Fiber',
+         'Кандидат говорит, что до React 16 дерево обходилось синхронно через call stack без пауз; Fiber позволяет прерывать работу и возобновлять с того же узла, чтобы UI оставался отзывчивым.',
+         1.00, 1
+  UNION ALL SELECT 'fiber_pointers', 'Знает структуру fiber-узла',
+         'Кандидат называет три указателя: child (первый потомок), sibling (следующий на том же уровне), return (родитель).',
+         1.00, 2
+  UNION ALL SELECT 'render_phase', 'Объясняет render phase и WIP tree',
+         'Кандидат описывает построение work-in-progress дерева (current.alternate), diff props/state, роль key для списков; подчёркивает, что render phase чистая, прерываемая и не мутирует DOM.',
+         1.00, 3
+  UNION ALL SELECT 'commit_phase', 'Объясняет commit phase',
+         'Кандидат говорит, что commit phase синхронная и атомарная: DOM-мутации, layout effects (useLayoutEffect), затем после paint — useEffect. Понимает, что именно commit нельзя прервать.',
+         1.00, 4
+  UNION ALL SELECT 'scheduling', 'Понимает планирование Fiber',
+         'Кандидат упоминает scheduler, чанки работы (~5ms), shouldYield(), MessageChannel/postMessage; может отметить, что requestIdleCallback не используется напрямую из-за грубых дедлайнов.',
+         1.00, 5
+  UNION ALL SELECT 'lanes_priority', 'Понимает приоритеты и concurrent API',
+         'Кандидат объясняет lane bitmasks (SyncLane vs TransitionLane), startTransition/useDeferredValue, createRoot vs ReactDOM.render.',
+         1.00, 6
+  UNION ALL SELECT 'commit_limitation', 'Знает ограничения concurrent mode',
+         'Кандидат понимает, что Fiber разбивает построение WIP, но не разбивает запись в DOM: массовый commit тысяч узлов всё равно блокирует браузер; virtualization/react-window по-прежнему нужна.',
+         1.00, 7
+) cp
+WHERE q.question_text = 'Как работает React Fiber и процесс обновления Virtual DOM?'
+  AND NOT EXISTS (
+    SELECT 1 FROM question_checkpoints qc
+    WHERE qc.question_id = q.id AND qc.checkpoint_key = cp.checkpoint_key
+  );
+
+INSERT INTO answer_examples (question_id, example_type, example_text, sort_order)
+SELECT q.id, ex.example_type, ex.example_text, ex.sort_order
+FROM questions q
+JOIN (
+  SELECT 'good' AS example_type,
+         'Fiber заменил stack-based reconciler на связный список узлов, поэтому React может обрабатывать дерево кусками и уступать main thread при вводе пользователя. Сначала идёт render phase: строится WIP-дерево, diff-ятся fiber-узлы, DOM не трогается. Потом commit phase — синхронно применяются мутации DOM и layout effects. Для тяжёлой фильтрации большого списка я оставляю setInput синхронным, а filterLargeList оборачиваю в startTransition — так инпут не лагает, а список догоняет в фоне. Concurrent mode не отменяет jank от commit 20 000 DOM-узлов, поэтому для длинных списков всё равно нужна виртуализация.' AS example_text,
+         0 AS sort_order
+  UNION ALL SELECT 'good',
+         'У каждого fiber есть child, sibling и return — обход идёт вглубь через child, потом через sibling, при тупике поднимаемся return. Приоритеты кодируются lanes: ввод пользователя (SyncLane) важнее transition-обновлений. useDeferredValue отстаёт от query на один или несколько рендеров, поэтому input остаётся мгновенным, а тяжёлый список фильтруется с низким приоритетом. createRoot в React 18 включает эти возможности, а legacy ReactDOM.render остаётся на синхронном пути.',
+         1
+  UNION ALL SELECT 'good',
+         'Render phase можно прервать: React строит alternate-дерево и собирает список эффектов, не трогая реальный DOM. Commit phase — три подфазы: snapshot до мутаций, DOM updates, layout effects. useEffect выполняется уже после paint. Scheduler режет работу на ~5ms через MessageChannel, а не через requestIdleCallback. Типичная ошибка — обернуть setInputValue в startTransition: тогда лагает сам инпут; transition нужен только для вторичного тяжёлого обновления.',
+         2
+  UNION ALL SELECT 'bad',
+         'Fiber — это просто Virtual DOM. React сравнивает деревья и обновляет страницу быстрее.',
+         0
+  UNION ALL SELECT 'bad',
+         'Concurrent mode полностью убирает лаги. Можно рендерить 20 000 div без virtualization — Fiber всё разобьёт на кадры.',
+         1
+  UNION ALL SELECT 'bad',
+         'Чтобы приложение стало concurrent, достаточно обернуть все setState в startTransition, включая value инпута. flushSync можно использовать везде, где нужен быстрый UI.',
+         2
+  UNION ALL SELECT 'bad',
+         'Render phase и commit phase — одно и то же. React сразу пишет в DOM во время reconcileChildFibers.',
+         3
+) ex
+WHERE q.question_text = 'Как работает React Fiber и процесс обновления Virtual DOM?'
+  AND NOT EXISTS (
+    SELECT 1 FROM answer_examples ae
+    WHERE ae.question_id = q.id AND ae.example_type = ex.example_type AND ae.sort_order = ex.sort_order
+  );
+
 -- Skill links for seeded questions
 INSERT INTO question_skills (question_id, skill_id)
 SELECT q.id, s.id
@@ -289,6 +392,8 @@ JOIN (
   UNION ALL SELECT 'Как работает event loop в JavaScript?', 'javascript'
   UNION ALL SELECT 'Что такое controlled component в React?', 'react'
   UNION ALL SELECT 'Что такое controlled component в React?', 'javascript'
+  UNION ALL SELECT 'Как работает React Fiber и процесс обновления Virtual DOM?', 'react'
+  UNION ALL SELECT 'Как работает React Fiber и процесс обновления Virtual DOM?', 'javascript'
 ) map ON map.question_text = q.question_text
 JOIN skills s ON s.code = map.skill_code
 WHERE q.company_id IS NULL

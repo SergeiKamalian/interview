@@ -137,6 +137,10 @@ export class FollowUpPlannerService {
       questionText: context.questionText,
       checkpointExpected: policy.checkpointExpected,
       latestCandidateAnswer: context.latestCandidateAnswer,
+      previousFollowUpQuestions: existingFollowUps.map(
+        (followUp) => followUp.questionText,
+      ),
+      seed: attemptId + interviewQuestionId + followUpsUsedForQuestion,
     });
     const correlationId = this.aiUsageLogService.createCorrelationId();
     const aiDebugMeta = { ...debugMeta, correlationId };

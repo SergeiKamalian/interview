@@ -1,4 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { AiProviderModule } from '../ai-provider/ai-provider.module';
 import { RedisModule } from '../../common/redis/redis.module';
 import { InterviewCoreModule } from '../interview-core/interview-core.module';
 import { InterviewRealtimeModule } from '../interview-realtime/interview-realtime.module';
@@ -13,6 +14,7 @@ import { AdaptiveOpenAiResponseStateService } from './services/adaptive-openai-r
 import { AdaptiveInterviewSubmitService } from './services/adaptive-interview-submit.service';
 import { CheckpointStateService } from './services/checkpoint-state.service';
 import { FollowUpPlannerService } from './services/follow-up-planner.service';
+import { MainQuestionOpenerService } from './services/main-question-opener.service';
 import { FollowUpPlannerValidatorService } from './services/follow-up-planner-validator.service';
 import { FollowUpPolicyService } from './services/follow-up-policy.service';
 import { PerTurnCheckpointEvaluatorService } from './services/per-turn-checkpoint-evaluator.service';
@@ -22,6 +24,7 @@ import { QuestionSummaryService } from './services/question-summary.service';
 @Module({
   imports: [
     RedisModule,
+    AiProviderModule,
     forwardRef(() => InterviewCoreModule),
     forwardRef(() => InterviewRealtimeModule),
     MediaModule,
@@ -40,6 +43,7 @@ import { QuestionSummaryService } from './services/question-summary.service';
     FollowUpPolicyService,
     FollowUpPlannerValidatorService,
     FollowUpPlannerService,
+    MainQuestionOpenerService,
     AdaptiveInterviewSubmitService,
     QuestionSummaryService,
   ],
@@ -56,6 +60,7 @@ import { QuestionSummaryService } from './services/question-summary.service';
     FollowUpPolicyService,
     FollowUpPlannerService,
     FollowUpPlannerValidatorService,
+    MainQuestionOpenerService,
     AdaptiveInterviewSubmitService,
     QuestionSummaryService,
   ],

@@ -11,6 +11,10 @@ import {
   resolveSkipFollowUpReason,
   shouldSkipFollowUps,
 } from './candidate-decline.util';
+import {
+  pickFollowUpAcknowledgment,
+  pickFollowUpQuestionStem,
+} from './follow-up-acknowledgment.util';
 
 const ELIGIBLE_STATUSES = new Set<CheckpointStateStatus>([
   'missed',
@@ -165,14 +169,24 @@ export function buildNaturalTemplateFollowUp(input: {
   questionText: string;
   checkpointExpected: string;
   latestCandidateAnswer: string;
+  previousFollowUpQuestions?: string[];
+  seed?: number;
 }): string {
+  const seed =
+    input.seed ??
+    input.checkpointExpected.length + input.questionText.length;
+  const acknowledgment = pickFollowUpAcknowledgment(
+    seed,
+    input.previousFollowUpQuestions ?? [],
+  );
+  const stem = pickFollowUpQuestionStem(seed + 1);
   const topicHint = sanitizeCheckpointExpectedForCandidateSpeech(
     input.checkpointExpected,
   );
 
   const question = topicHint
-    ? `Понял, спасибо. Можете подробнее рассказать — ${topicHint}?`
-    : 'Понял, спасибо. Можете подробнее рассказать?';
+    ? `${acknowledgment} ${stem} ${topicHint}?`
+    : `${acknowledgment} ${stem.replace(/—$/, '')}?`;
 
   return normalizeFollowUpQuestionForCandidate(question);
 }

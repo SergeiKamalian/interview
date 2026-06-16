@@ -8,12 +8,12 @@ import {
   PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION,
 } from './per-turn-checkpoint-evaluation.prompt';
 
-export const ADAPTIVE_AI_CONVERSATION_EVALUATE_PROMPT_VERSION = `conv-${PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION}-combined-v2`;
+export const ADAPTIVE_AI_CONVERSATION_EVALUATE_PROMPT_VERSION = `conv-${PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION}-combined-v3`;
 
 const COMBINED_FOLLOW_UP_SCHEMA = `Optional field when combined mode is on:
   "suggested_follow_up": {
     "checkpoint_key": "key of the highest-priority checkpoint that still needs clarification",
-    "follow_up_question": "MANDATORY: interviewer «я» speaking to candidate «вы» — short generic acknowledgment + ONE direct question in Russian; never third person, never rubric/checkpoint labels, never quote the candidate's words",
+    "follow_up_question": "MANDATORY: interviewer «я» speaking to candidate «вы» — varied short opener (not «Понял, спасибо» every time) or none, then ONE direct question in Russian; never third person, never rubric/checkpoint labels, never quote the candidate's words",
     "reason": "why this follow-up helps"
   } | null
   — set null if all checkpoints are covered, candidate declined/confused whole question, or no follow-up needed.`;

@@ -236,40 +236,45 @@ export class InterviewPublicService {
     const adaptiveEnabled = this.isAdaptiveEnabled();
     const firstQuestion = questions[0];
 
-    await this.database.withTransaction(async (query) => {
+    const began = await this.database.withTransaction(async (query) => {
       const started = await this.repository.beginAttempt(attemptId, query);
-      if (!started) {
-        return;
-      }
-
-      await this.repository.appendMessage(
-        {
-          companyId: interview.companyId,
-          attemptId,
-          interviewQuestionId: firstQuestion.id,
-          role: 'ai',
-          content: firstQuestion.questionText,
-          sequenceOrder: 2,
-          messageKind: adaptiveEnabled ? 'main_question' : null,
-        },
-        query,
-      );
-
-      await this.checkpointStateService.ensureCheckpointStatesForQuestion(
-        {
-          companyId: interview.companyId,
-          attemptId,
-          interviewQuestionId: firstQuestion.id,
-        },
-        query,
-      );
+      return started;
     });
 
+    if (!began) {
+      return this.getSession(input.publicToken, input.attemptId);
+    }
+
     if (adaptiveEnabled) {
-      await this.adaptiveInterviewSubmitService.initializeQuestionAiState({
+      await this.adaptiveInterviewSubmitService.postTopicOpenerForQuestion({
         companyId: interview.companyId,
         attemptId,
-        interviewQuestionId: firstQuestion.id,
+        question: firstQuestion,
+        answeredMainQuestions: 0,
+      });
+    } else {
+      await this.database.withTransaction(async (query) => {
+        await this.repository.appendMessage(
+          {
+            companyId: interview.companyId,
+            attemptId,
+            interviewQuestionId: firstQuestion.id,
+            role: 'ai',
+            content: firstQuestion.questionText,
+            sequenceOrder: 2,
+            messageKind: null,
+          },
+          query,
+        );
+
+        await this.checkpointStateService.ensureCheckpointStatesForQuestion(
+          {
+            companyId: interview.companyId,
+            attemptId,
+            interviewQuestionId: firstQuestion.id,
+          },
+          query,
+        );
       });
     }
 

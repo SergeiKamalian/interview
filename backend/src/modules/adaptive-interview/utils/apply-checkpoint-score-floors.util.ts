@@ -24,9 +24,11 @@ export function applyCheckpointScoreFloors(
       return result;
     }
 
-    const guardedResult = applySemanticContradictionCap(
-      result,
-      candidateText,
+    const guardedResult = enforceStatusScoreAlignment(
+      applyRationaleContradictionCap(
+        applySemanticContradictionCap(result, candidateText, checkpoint.score),
+        checkpoint.score,
+      ),
       checkpoint.score,
     );
 
@@ -66,6 +68,69 @@ function collectCandidateText(context: AdaptiveInterviewContextPacket): string {
   ]
     .join(' ')
     .toLowerCase();
+}
+
+function applyRationaleContradictionCap(
+  result: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
+  maxScore: number,
+): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
+  if (result.scoreAwarded < maxScore || result.status !== 'covered') {
+    return result;
+  }
+
+  const rationale = (result.rationale ?? '').toLowerCase();
+  const admitsError = [
+    /не\s+соответствует/,
+    /неверн/,
+    /ошиб/,
+    /противореч/,
+    /неправильн/,
+    /перепутал/,
+    /не\s+точн/,
+    /слишком\s+категорич/,
+    /ложн/,
+    /не\s+упомянул/,
+    /не\s+раскрыт/,
+    /добавлени[ея].{0,40}ошиб/,
+  ].some((pattern) => pattern.test(rationale));
+
+  if (!admitsError) {
+    return result;
+  }
+
+  const cap = partialScoreForMax(maxScore);
+  return {
+    ...result,
+    scoreAwarded: cap,
+    status: cap > 0 ? 'partial' : 'missed',
+    rationale: `${result.rationale} Score capped: rationale notes material errors.`,
+  };
+}
+
+function enforceStatusScoreAlignment(
+  result: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
+  maxScore: number,
+): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
+  if (result.scoreAwarded <= 0) {
+    return {
+      ...result,
+      scoreAwarded: 0,
+      status: 'missed',
+    };
+  }
+
+  if (result.scoreAwarded < maxScore && result.status === 'covered') {
+    return {
+      ...result,
+      status: 'partial',
+    };
+  }
+
+  return result;
+}
+
+function partialScoreForMax(maxScore: number): number {
+  return Number((maxScore * 0.5).toFixed(2));
 }
 
 function applySemanticContradictionCap(
@@ -159,6 +224,84 @@ function getContradictionScoreCap(
     has([/вместо\s+usestate/i, /нужен.{0,80}перерис/i])
   ) {
     return 0.5;
+  }
+
+  if (
+    checkpointKey === 'scheduling' &&
+    has([/requestidlecallback/i, /request_idle_callback/i])
+  ) {
+    return partialScoreForMax(1);
+  }
+
+  if (
+    checkpointKey === 'stack_vs_fiber' &&
+    has([
+      /через\s+promises?/i,
+      /полностью\s+асинхронн/i,
+      /клики\s+всегда\s+проходят/i,
+      /redux/i,
+    ])
+  ) {
+    return partialScoreForMax(1);
+  }
+
+  if (
+    checkpointKey === 'fiber_pointers' &&
+    has([
+      /\bparent\b.*\bnext\b/i,
+      /лежат\s+в\s+redux/i,
+      /virtual\s+dom.{0,40}(?:fiber|узл)/i,
+      /хранит.{0,40}virtual\s+dom/i,
+    ])
+  ) {
+    return partialScoreForMax(1);
+  }
+
+  if (
+    checkpointKey === 'commit_phase' &&
+    has([
+      /useeffect.{0,40}commit/i,
+      /useeffect.{0,40}до\s+paint/i,
+      /тоже\s+в\s+commit.{0,40}до\s+paint/i,
+      /fiber.{0,40}разбивает.{0,40}commit/i,
+      /commit.{0,40}куск/i,
+      /commit.{0,40}5\s*ms/i,
+    ])
+  ) {
+    return partialScoreForMax(1);
+  }
+
+  if (
+    checkpointKey === 'lanes_priority' &&
+    has([
+      /lanes?.{0,40}redux/i,
+      /redux.{0,40}lanes?/i,
+      /requestidlecallback/i,
+    ])
+  ) {
+    return partialScoreForMax(1);
+  }
+
+  if (
+    checkpointKey === 'commit_limitation' &&
+    has([
+      /concurrent.{0,40}не\s+лаг/i,
+      /вообще\s+не\s+лаг/i,
+      /не\s+лагает.{0,40}тысяч/i,
+      /10000|10\s*000/,
+    ])
+  ) {
+    return 0;
+  }
+
+  if (
+    checkpointKey === 'render_phase' &&
+    has([
+      /requestidlecallback/i,
+      /concurrent.{0,40}не\s+лаг/i,
+    ])
+  ) {
+    return partialScoreForMax(1);
   }
 
   return null;

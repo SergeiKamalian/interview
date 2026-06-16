@@ -50,19 +50,38 @@ const baseInput: FollowUpPolicyInput = {
 };
 
 describe('buildNaturalTemplateFollowUp', () => {
-  it('does not quote the candidate answer in the opener', () => {
+  it('does not quote the candidate answer and avoids default Понял, спасибо', () => {
     const question = buildNaturalTemplateFollowUp({
       questionText: 'Что такое useEffect?',
       checkpointExpected: 'Кандидат объясняет роль массива зависимостей.',
       latestCandidateAnswer:
         'Юзефект это хук в реакте для выполнения таких функционалов как запрос к апи, изм…',
+      seed: 3,
     });
 
-    expect(question).toBe(
-      'Понял, спасибо. Можете подробнее рассказать — роль массива зависимостей?',
-    );
+    expect(question).toContain('роль массива зависимостей');
+    expect(question).not.toContain('Понял, спасибо');
     expect(question).not.toContain('Юзефект');
     expect(question).not.toContain('про «');
+  });
+
+  it('picks a different opener when previous follow-ups used one', () => {
+    const first = buildNaturalTemplateFollowUp({
+      questionText: 'Fiber?',
+      checkpointExpected: 'Кандидат говорит про stack.',
+      latestCandidateAnswer: 'answer',
+      seed: 1,
+      previousFollowUpQuestions: [],
+    });
+    const second = buildNaturalTemplateFollowUp({
+      questionText: 'Fiber?',
+      checkpointExpected: 'Кандидат называет child/sibling/return.',
+      latestCandidateAnswer: 'answer',
+      seed: 2,
+      previousFollowUpQuestions: [first],
+    });
+
+    expect(first.split(/[.!?]/)[0]).not.toBe(second.split(/[.!?]/)[0]);
   });
 });
 

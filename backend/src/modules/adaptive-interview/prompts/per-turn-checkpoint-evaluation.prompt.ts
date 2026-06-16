@@ -2,7 +2,7 @@ import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview
 
 export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_KEY =
   'per_turn_checkpoint_evaluation';
-export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION = '2.3.0';
+export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION = '2.4.0';
 
 const RESPONSE_JSON_SCHEMA = `{
   "candidate_disposition": "engaged | declined | confused | off_topic",
@@ -32,9 +32,22 @@ export function buildPerTurnCheckpointEvaluationSystemPrompt(): string {
     '- Base evidence only on the provided candidate answer and local turns.',
     '- Evaluate semantic correctness, not keyword presence.',
     '- Do NOT award credit just because the candidate mentions a relevant term.',
-    '- If a candidate mentions the term but explains it incorrectly, mark the checkpoint missed unless there is a separate clearly correct part.',
-    '- Award partial credit only when the answer is meaningfully true but incomplete or imprecise.',
-    '- Confident false statements should reduce credit for that checkpoint; do not treat false explanations as partial knowledge.',
+    '',
+    'Status + score rubric (MANDATORY):',
+    '- covered: the checkpoint is substantially correct with NO material false claims → score_awarded = max_score.',
+    '- partial: correct core idea BUT incomplete, imprecise, OR mixed with wrong details for this checkpoint → score_awarded ≈ 40–60% of max_score (for max_score=1 use 0.5).',
+    '- missed: fundamentally wrong, only keywords, or confident false explanation → score_awarded = 0.',
+    '- unclear: candidate did not address this checkpoint at all → score_awarded = 0.',
+    '',
+    'Half-right / half-wrong answers:',
+    '- If an answer is ~50% correct and ~50% false for a checkpoint, status MUST be partial (NOT covered) and score MUST be below max_score.',
+    '- Example: names Fiber + reconciliation correctly but says requestIdleCallback drives scheduling → scheduling = partial 0.5, not covered 1.',
+    '- Example: explains child/sibling/return but adds wrong parent/next or «stored in Virtual DOM» → fiber_pointers = partial 0.5.',
+    '- NEVER set status=covered with score=max when your rationale mentions incorrect, contradictory, or imprecise parts.',
+    '',
+    '- If a candidate mentions the term but explains it incorrectly, mark missed or partial — not covered.',
+    '- Award partial credit when the answer is meaningfully true but incomplete or imprecise.',
+    '- Confident false statements MUST cap the checkpoint at partial or missed; do not treat false explanations as full knowledge.',
     '- Do NOT give all zeros when earlier local turns already demonstrated partial knowledge.',
     '- If the latest answer declines only one sub-aspect, keep scores from earlier turns; use declined only for whole-question refusal.',
     '- Also set candidate_disposition from the latest answer:',

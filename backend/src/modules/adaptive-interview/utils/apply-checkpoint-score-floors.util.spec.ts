@@ -360,4 +360,97 @@ describe('applyCheckpointScoreFloors', () => {
     expect(typeParameter?.status).toBe('partial');
     expect(reusability?.scoreAwarded).toBe(0.5);
   });
+
+  it('caps over-awarded Fiber answers to partial when evidence is half-right half-wrong', () => {
+    const candidateAnswers = [
+      'React Fiber — новый механизм reconciliation в React 16+, прерывать рендер. Virtual DOM, requestIdleCallback. concurrent mode не лагает на тысячах элементов.',
+      'До Fiber call stack синхронно. Fiber сделал рендер полностью асинхронным через Promises, клики всегда проходят. Узлы Fiber лежат в Redux.',
+      'child, sibling, return. Обход через child и sibling. Ещё parent и next, React хранит в Virtual DOM.',
+      'На commit DOM мутации, useLayoutEffect. useEffect тоже в commit до paint. Fiber разбивает commit на куски по 5ms.',
+      'SyncLane, TransitionLane, startTransition, useDeferredValue, createRoot. Lanes в Redux, requestIdleCallback решает приоритеты.',
+    ].join(' ');
+
+    const fiberCheckpoints = [
+      'fiber_definition',
+      'stack_vs_fiber',
+      'fiber_pointers',
+      'render_phase',
+      'commit_phase',
+      'scheduling',
+      'lanes_priority',
+      'commit_limitation',
+    ] as const;
+
+    const context: AdaptiveInterviewContextPacket = {
+      companyId: 1,
+      interviewId: 4,
+      attemptId: 34,
+      interviewQuestionId: 7,
+      questionText: 'Как работает React Fiber и процесс обновления Virtual DOM?',
+      referenceAnswer: 'Fiber reconciliation engine',
+      latestCandidateAnswer: candidateAnswers,
+      latestCandidateMessageId: 99,
+      maxScore: 8,
+      checkpoints: fiberCheckpoints.map((key, index) => ({
+        checkpointKey: key,
+        title: key,
+        expected: 'test',
+        score: 1,
+        sortOrder: index,
+      })),
+      checkpointStates: [],
+      evidenceSnippets: [],
+      localTurns: candidateAnswers
+        .split('. ')
+        .map((content, index) => ({
+          role: 'candidate' as const,
+          sequenceOrder: index + 1,
+          content,
+        })),
+      followUpLimits: {
+        maxPerQuestion: 5,
+        maxPerCheckpoint: 1,
+        usedForQuestion: 4,
+      },
+    };
+
+    const evaluation = applyCheckpointScoreFloors(
+      {
+        candidateDisposition: 'engaged',
+        checkpointResults: fiberCheckpoints.map((checkpointKey) => ({
+          checkpointKey,
+          status: 'covered' as const,
+          scoreAwarded: 1,
+          confidence: 0.9,
+          evidenceSummary: 'AI over-awarded',
+          rationale:
+            'Суть верна, но утверждение про requestIdleCallback не соответствует ожидаемому описанию.',
+        })),
+      },
+      context,
+    );
+
+    const total = evaluation.checkpointResults.reduce(
+      (sum, item) => sum + item.scoreAwarded,
+      0,
+    );
+
+    expect(total).toBeLessThanOrEqual(5);
+    expect(total).toBeGreaterThanOrEqual(3);
+
+    expect(
+      evaluation.checkpointResults.filter((item) => item.status === 'covered'),
+    ).toHaveLength(0);
+
+    expect(
+      evaluation.checkpointResults.find(
+        (item) => item.checkpointKey === 'commit_limitation',
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        scoreAwarded: 0,
+        status: 'missed',
+      }),
+    );
+  });
 });

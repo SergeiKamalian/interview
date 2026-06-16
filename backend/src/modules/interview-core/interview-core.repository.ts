@@ -559,6 +559,45 @@ export class InterviewCoreRepository {
     return Number(rows[0]?.total ?? 0);
   }
 
+  async findAwaitingTopicOpener(attemptId: number): Promise<{
+    interviewQuestionId: number;
+    topicOpenerMessageId: number;
+    topicOpenerText: string;
+  } | null> {
+    const rows = await this.database.query<
+      (RowDataPacket & {
+        id: number;
+        interview_question_id: number | null;
+        role: string;
+        message_kind: MessageKind | null;
+        content: string;
+      })[]
+    >(
+      `SELECT id, interview_question_id, role, message_kind, content
+       FROM interview_messages
+       WHERE interview_attempt_id = ?
+       ORDER BY sequence_order DESC
+       LIMIT 1`,
+      [attemptId],
+    );
+
+    const last = rows[0];
+    if (
+      !last ||
+      last.role !== 'ai' ||
+      last.message_kind !== 'topic_opener' ||
+      last.interview_question_id == null
+    ) {
+      return null;
+    }
+
+    return {
+      interviewQuestionId: Number(last.interview_question_id),
+      topicOpenerMessageId: Number(last.id),
+      topicOpenerText: last.content,
+    };
+  }
+
   async getNextSequenceOrder(
     attemptId: number,
     query: QueryFn = (sql, params) => this.database.query(sql, params),

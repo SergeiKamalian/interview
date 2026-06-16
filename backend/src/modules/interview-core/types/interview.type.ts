@@ -22,6 +22,8 @@ export enum MessageRoleEnum {
 
 export enum InterviewMessageKindEnum {
   welcome = 'welcome',
+  topic_opener = 'topic_opener',
+  topic_opener_answer = 'topic_opener_answer',
   main_question = 'main_question',
   main_answer = 'main_answer',
   follow_up_question = 'follow_up_question',

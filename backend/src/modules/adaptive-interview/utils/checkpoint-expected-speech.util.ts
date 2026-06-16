@@ -52,7 +52,7 @@ export function stripCandidateAnswerEchoFromFollowUp(question: string): string {
 
   text = text.replace(
     /^(?:хорошо|ок|интересно),?\s*про\s+.+?\s*(?:услышал|понял)\.?\s*/i,
-    'Понял, спасибо. ',
+    'Хорошо. ',
   );
 
   text = text.replace(

@@ -27,8 +27,8 @@ import {
   isFullQuestionDecline,
   shouldSkipFollowUps,
 } from '../utils/candidate-decline.util';
-import { buildNextMainQuestionMessage } from '../utils/interviewer-dialogue.util';
 import { MediaAssetService } from '../../media/media-asset.service';
+import { MainQuestionOpenerService } from './main-question-opener.service';
 
 @Injectable()
 export class AdaptiveInterviewSubmitService {
@@ -48,18 +48,25 @@ export class AdaptiveInterviewSubmitService {
     private readonly adaptiveAiConversationService: AdaptiveAiConversationService,
     private readonly adaptiveOpenAiResponseStateService: AdaptiveOpenAiResponseStateService,
     private readonly mediaAssetService: MediaAssetService,
+    private readonly mainQuestionOpenerService: MainQuestionOpenerService,
   ) {}
 
   async assertCanSubmit(
     attemptId: number,
     totalMainQuestions: number,
   ): Promise<void> {
-    const [answeredMain, awaitingFollowUp] = await Promise.all([
+    const [answeredMain, awaitingFollowUp, awaitingTopicOpener] =
+      await Promise.all([
       this.repository.countMainAnswerMessages(attemptId),
       this.followUpRepository.findAwaitingAnswer(attemptId),
+      this.repository.findAwaitingTopicOpener(attemptId),
     ]);
 
-    if (!awaitingFollowUp && answeredMain >= totalMainQuestions) {
+    if (
+      !awaitingFollowUp &&
+      !awaitingTopicOpener &&
+      answeredMain >= totalMainQuestions
+    ) {
       throw new BadRequestException({
         message: 'All questions already answered',
         code: 'INTERVIEW_ALREADY_COMPLETE',
@@ -102,6 +109,74 @@ export class AdaptiveInterviewSubmitService {
     }
   }
 
+  async postTopicOpenerForQuestion(input: {
+    companyId: number;
+    attemptId: number;
+    question: InterviewQuestionEntity;
+    answeredMainQuestions: number;
+  }): Promise<string> {
+    const openerText = await this.mainQuestionOpenerService.generateTopicOpener({
+      attemptId: input.attemptId,
+      interviewQuestionId: input.question.id,
+      questionText: input.question.questionText,
+      referenceAnswer: input.question.shortAnswer,
+      isFirstQuestion: input.answeredMainQuestions === 0,
+      previousQuestionCount: input.answeredMainQuestions,
+      seed: input.attemptId + input.question.id,
+    });
+
+    const streamedText = this.aiMessageStreamService.isEnabled()
+      ? await this.aiMessageStreamService.streamStaticText({
+          attemptId: input.attemptId,
+          interviewQuestionId: input.question.id,
+          messageKind: 'topic_opener',
+          text: openerText,
+        })
+      : openerText;
+
+    const aiMessage = await this.database.withTransaction(async (query) => {
+      const sequenceOrder = await this.repository.getNextSequenceOrder(
+        input.attemptId,
+        query,
+      );
+
+      const message = await this.repository.appendMessage(
+        {
+          companyId: input.companyId,
+          attemptId: input.attemptId,
+          interviewQuestionId: input.question.id,
+          role: 'ai',
+          content: streamedText,
+          sequenceOrder,
+          messageKind: 'topic_opener',
+        },
+        query,
+      );
+
+      await this.checkpointStateService.ensureCheckpointStatesForQuestion(
+        {
+          companyId: input.companyId,
+          attemptId: input.attemptId,
+          interviewQuestionId: input.question.id,
+        },
+        query,
+      );
+
+      return message;
+    });
+
+    this.interviewRealtimeService.emit({
+      attemptId: input.attemptId,
+      eventType: 'message.appended',
+      interviewQuestionId: input.question.id,
+      messageId: aiMessage.id,
+      sequenceOrder: aiMessage.sequenceOrder,
+      messageKind: 'topic_opener',
+    });
+
+    return streamedText;
+  }
+
   async submitAnswer(
     input: AdaptiveSubmitInput,
   ): Promise<AdaptiveSubmitResult> {
@@ -123,13 +198,37 @@ export class AdaptiveInterviewSubmitService {
           : trimmedAnswer,
     });
 
-    const [answeredMainBefore, awaitingFollowUp] = await Promise.all([
+    const [answeredMainBefore, awaitingFollowUp, awaitingTopicOpener] =
+      await Promise.all([
       this.repository.countMainAnswerMessages(attemptId),
       this.followUpRepository.findAwaitingAnswer(attemptId),
+      this.repository.findAwaitingTopicOpener(attemptId),
     ]);
 
-    if (!awaitingFollowUp && answeredMainBefore >= totalMainQuestions) {
+    if (!awaitingFollowUp && !awaitingTopicOpener && answeredMainBefore >= totalMainQuestions) {
       throw new Error('All main questions already answered');
+    }
+
+    if (awaitingTopicOpener) {
+      const topicQuestion = questions.find(
+        (question) => question.id === awaitingTopicOpener.interviewQuestionId,
+      );
+
+      if (!topicQuestion) {
+        throw new Error('Topic opener question not found');
+      }
+
+      return this.handleTopicOpenerAnswer({
+        attempt,
+        questions,
+        currentQuestion: topicQuestion,
+        trimmedAnswer,
+        topicOpenerMessageId: awaitingTopicOpener.topicOpenerMessageId,
+        topicOpenerText: awaitingTopicOpener.topicOpenerText,
+        answeredMainQuestions: answeredMainBefore,
+        totalMainQuestions,
+        mediaAssetId: input.mediaAssetId,
+      });
     }
 
     const isFollowUpAnswer = awaitingFollowUp !== null;
@@ -459,6 +558,134 @@ export class AdaptiveInterviewSubmitService {
     };
   }
 
+  private async handleTopicOpenerAnswer(input: {
+    attempt: AdaptiveSubmitInput['attempt'];
+    questions: InterviewQuestionEntity[];
+    currentQuestion: InterviewQuestionEntity;
+    trimmedAnswer: string;
+    topicOpenerMessageId: number;
+    topicOpenerText: string;
+    answeredMainQuestions: number;
+    totalMainQuestions: number;
+    mediaAssetId?: number | null;
+  }): Promise<AdaptiveSubmitResult> {
+    const attemptId = input.attempt.id;
+    const submitTimer = startAdaptiveAiPhaseTimer(
+      this.logger,
+      'submit_answer.topic_opener',
+      { attemptId, interviewQuestionId: input.currentQuestion.id },
+    );
+
+    const saveResult = await this.database.withTransaction(async (query) => {
+      const sequenceOrder = await this.repository.getNextSequenceOrder(
+        attemptId,
+        query,
+      );
+
+      const candidateMessage = await this.repository.appendMessage(
+        {
+          companyId: input.attempt.companyId,
+          attemptId,
+          interviewQuestionId: input.currentQuestion.id,
+          role: 'candidate',
+          content: input.trimmedAnswer,
+          sequenceOrder,
+          messageKind: 'topic_opener_answer',
+          parentMessageId: input.topicOpenerMessageId,
+        },
+        query,
+      );
+
+      return { candidateMessage };
+    });
+
+    if (input.mediaAssetId) {
+      await this.mediaAssetService.linkPendingAssetToMessage({
+        mediaAssetId: input.mediaAssetId,
+        attemptId,
+        messageId: saveResult.candidateMessage.id,
+      });
+    }
+
+    this.interviewRealtimeService.emit({
+      attemptId,
+      eventType: 'answer.received',
+      interviewQuestionId: input.currentQuestion.id,
+      messageId: saveResult.candidateMessage.id,
+      sequenceOrder: saveResult.candidateMessage.sequenceOrder,
+      messageKind: 'topic_opener_answer',
+    });
+
+    const mainQuestionText =
+      await this.mainQuestionOpenerService.generateQuestionInvite({
+        attemptId,
+        interviewQuestionId: input.currentQuestion.id,
+        topicOpenerText: input.topicOpenerText,
+        candidateOpenerAnswer: input.trimmedAnswer,
+        questionText: input.currentQuestion.questionText,
+        referenceAnswer: input.currentQuestion.shortAnswer,
+        seed: attemptId + input.currentQuestion.id,
+      });
+
+    const streamedMainQuestion = this.aiMessageStreamService.isEnabled()
+      ? await this.aiMessageStreamService.streamStaticText({
+          attemptId,
+          interviewQuestionId: input.currentQuestion.id,
+          messageKind: 'main_question',
+          text: mainQuestionText,
+        })
+      : mainQuestionText;
+
+    const aiMessage = await this.database.withTransaction(async (query) => {
+      const sequenceOrder = await this.repository.getNextSequenceOrder(
+        attemptId,
+        query,
+      );
+
+      return this.repository.appendMessage(
+        {
+          companyId: input.attempt.companyId,
+          attemptId,
+          interviewQuestionId: input.currentQuestion.id,
+          role: 'ai',
+          content: streamedMainQuestion,
+          sequenceOrder,
+          messageKind: 'main_question',
+        },
+        query,
+      );
+    });
+
+    this.interviewRealtimeService.emit({
+      attemptId,
+      eventType: 'message.appended',
+      interviewQuestionId: input.currentQuestion.id,
+      messageId: aiMessage.id,
+      sequenceOrder: aiMessage.sequenceOrder,
+      messageKind: 'main_question',
+    });
+
+    await this.initializeQuestionAiState({
+      companyId: input.attempt.companyId,
+      attemptId,
+      interviewQuestionId: input.currentQuestion.id,
+    });
+
+    submitTimer.finish({ outcome: 'main_question_revealed' });
+
+    return {
+      status: 'in_progress',
+      nextQuestionText: streamedMainQuestion,
+      pendingMessageText: streamedMainQuestion,
+      messageKind: InterviewMessageKindEnum.main_question,
+      currentInterviewQuestionId: input.currentQuestion.id,
+      isFollowUp: false,
+      answeredMainQuestions: input.answeredMainQuestions,
+      totalMainQuestions: input.totalMainQuestions,
+      currentQuestionFollowUpCount: 0,
+    };
+  }
+
   private async completeCurrentQuestion(input: {
     attempt: AdaptiveSubmitInput['attempt'];
     questions: InterviewQuestionEntity[];
@@ -496,64 +723,18 @@ export class AdaptiveInterviewSubmitService {
 
     if (input.answeredMainQuestions < input.totalMainQuestions) {
       const nextQuestion = input.questions[input.answeredMainQuestions];
-      const nextQuestionWithTransition = buildNextMainQuestionMessage(
-        nextQuestion.questionText,
-        attemptId + input.answeredMainQuestions,
-      );
-      const nextQuestionText = this.aiMessageStreamService.isEnabled()
-        ? await this.aiMessageStreamService.streamStaticText({
-            attemptId,
-            interviewQuestionId: nextQuestion.id,
-            messageKind: 'main_question',
-            text: nextQuestionWithTransition,
-          })
-        : nextQuestionWithTransition;
-
-      const aiMessage = await this.database.withTransaction(async (query) => {
-        const sequenceOrder = await this.repository.getNextSequenceOrder(
-          attemptId,
-          query,
-        );
-
-        const message = await this.repository.appendMessage(
-          {
-            companyId: input.attempt.companyId,
-            attemptId,
-            interviewQuestionId: nextQuestion.id,
-            role: 'ai',
-            content: nextQuestionText,
-            sequenceOrder,
-            messageKind: 'main_question',
-          },
-          query,
-        );
-
-        await this.checkpointStateService.ensureCheckpointStatesForQuestion(
-          {
-            companyId: input.attempt.companyId,
-            attemptId,
-            interviewQuestionId: nextQuestion.id,
-          },
-          query,
-        );
-
-        return message;
-      });
-
-      this.interviewRealtimeService.emit({
+      const nextOpenerText = await this.postTopicOpenerForQuestion({
+        companyId: input.attempt.companyId,
         attemptId,
-        eventType: 'message.appended',
-        interviewQuestionId: nextQuestion.id,
-        messageId: aiMessage.id,
-        sequenceOrder: aiMessage.sequenceOrder,
-        messageKind: 'main_question',
+        question: nextQuestion,
+        answeredMainQuestions: input.answeredMainQuestions,
       });
 
       return {
         status: 'in_progress',
-        nextQuestionText,
-        pendingMessageText: nextQuestionText,
-        messageKind: InterviewMessageKindEnum.main_question,
+        nextQuestionText: nextOpenerText,
+        pendingMessageText: nextOpenerText,
+        messageKind: InterviewMessageKindEnum.topic_opener,
         currentInterviewQuestionId: nextQuestion.id,
         isFollowUp: false,
         answeredMainQuestions: input.answeredMainQuestions,
