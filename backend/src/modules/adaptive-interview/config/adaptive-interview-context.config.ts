@@ -4,8 +4,8 @@ export const ADAPTIVE_INTERVIEW_CONTEXT_DEFAULTS = {
   maxFollowUpsPerCheckpoint: 1,
   maxTextLength: 500,
   maxReferenceAnswerLength: 600,
-  /** 1.0 = probe all checkpoints unless already covered; no early stop at partial total score */
-  questionScoreSufficientRatio: 1,
+  /** 0.85 = stop follow-ups when question score is sufficient */
+  questionScoreSufficientRatio: 0.85,
   lowWeightCheckpointRatio: 0.2,
 } as const;
 

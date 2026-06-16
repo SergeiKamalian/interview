@@ -1,6 +1,12 @@
 # TASK-14.1 — Coverage vs accuracy taxonomy (понимает / знает / слышал / упомянул)
 
-Status: [ ] todo
+Status: [x] done
+
+## Completion Notes
+
+- Prompt v2.5.0 с checklist coverage/accuracy/depth + bad examples в context packet
+- `pnpm --dir backend run test -- --testPathPattern=per-turn-checkpoint-evaluation` — green
+- Live attempt 36: partial scores вместо covered на 50/50 Fiber ответе
 
 ## Goal
 

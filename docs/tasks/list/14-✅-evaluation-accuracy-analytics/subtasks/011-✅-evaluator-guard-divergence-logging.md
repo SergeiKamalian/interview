@@ -1,6 +1,12 @@
 # TASK-14.11 — Evaluator vs guard divergence logging
 
-Status: [ ] todo
+Status: [x] done
+
+## Completion Notes
+
+- Structured `logger.log` event `checkpoint_guard_adjustment` с `promptVersion`, before/after scores
+- Тип `CheckpointGuardAdjustment` в `checkpoint-guard-adjustment.types.ts`
+- Вызывается из `apply-checkpoint-score-floors.util.ts`
 
 ## Goal
 

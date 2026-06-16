@@ -325,6 +325,23 @@ export class InterviewCoreRepository {
     return rows.map((row) => this.mapInterviewQuestionCheckpoint(row));
   }
 
+  async findBadAnswerExamplesBySourceQuestionId(
+    sourceQuestionId: number,
+    limit = 3,
+  ): Promise<string[]> {
+    const safeLimit = Math.max(1, Math.min(10, Math.trunc(limit)));
+    const rows = await this.database.query<RowDataPacket[]>(
+      `SELECT example_text
+       FROM answer_examples
+       WHERE question_id = ? AND example_type = 'bad'
+       ORDER BY sort_order ASC
+       LIMIT ${safeLimit}`,
+      [sourceQuestionId],
+    );
+
+    return rows.map((row) => String(row.example_text));
+  }
+
   async findOrCreateCandidate(
     input: {
       companyId: number;

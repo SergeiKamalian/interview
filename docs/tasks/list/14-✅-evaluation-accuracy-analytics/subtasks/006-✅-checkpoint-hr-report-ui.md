@@ -1,6 +1,13 @@
 # TASK-14.6 — Per-checkpoint HR report (dashboard)
 
-Status: [ ] todo
+Status: [x] done
+
+## Completion Notes
+
+- GraphQL `adaptiveCheckpointReviewByAttempt` + `AdaptiveCheckpointReviewService`
+- `AdaptiveCheckpointReviewPanel` на `InterviewDetailsPage`
+- `pnpm --dir frontend run build` — green
+- GraphQL smoke: attempt 36 — checkpoint cards с rationale
 
 ## Goal
 

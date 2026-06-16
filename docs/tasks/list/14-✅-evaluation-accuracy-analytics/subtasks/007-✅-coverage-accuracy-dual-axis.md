@@ -1,6 +1,12 @@
 # TASK-14.7 — Coverage vs accuracy dual axis UI
 
-Status: [ ] todo
+Status: [x] done
+
+## Completion Notes
+
+- Поля `coveragePercent` / `accuracyPercent` в GraphQL review type
+- Dual progress bars в `AdaptiveCheckpointReviewPanel`
+- Depth labels из `checkpoint-depth.util.ts`
 
 ## Goal
 

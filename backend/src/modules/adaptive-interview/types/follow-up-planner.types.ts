@@ -41,12 +41,15 @@ export type FollowUpPolicyInput = {
     maxScore: number;
     followUpCount: number;
     needsManualReview: boolean;
+    rationale?: string | null;
   }>;
   followUpsUsedForQuestion: number;
   maxFollowUpsPerQuestion: number;
   maxFollowUpsPerCheckpoint: number;
   questionScoreSufficientRatio: number;
   lowWeightCheckpointRatio: number;
+  stagnationLimit?: number;
+  recentScoreDeltas?: number[];
   latestCandidateAnswer?: string | null;
   candidateDispositionFromAi?: CandidateAnswerDisposition | null;
 };
@@ -70,6 +73,7 @@ export type FollowUpPlannerOptions = {
   candidateDispositionFromAi?: CandidateAnswerDisposition | null;
   followUpsUsedForQuestion?: number;
   avoidLlmFallback?: boolean;
+  recentScoreDeltas?: number[];
 };
 
 export type FollowUpPlannerRunResult =

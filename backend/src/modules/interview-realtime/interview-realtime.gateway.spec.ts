@@ -3,6 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { io as ioClient, type Socket } from 'socket.io-client';
 import { InterviewCoreRepository } from '../interview-core/interview-core.repository';
+import { InterviewCurrentQuestionSpeechService } from '../interview-realtime/interview-current-question-speech.service';
 import { InterviewRealtimeGateway } from '../interview-realtime/interview-realtime.gateway';
 import { InterviewRealtimeService } from '../interview-realtime/interview-realtime.service';
 
@@ -22,6 +23,12 @@ describe('Interview realtime gateway', () => {
           provide: InterviewCoreRepository,
           useValue: {
             findAttemptById: jest.fn().mockResolvedValue(null),
+          },
+        },
+        {
+          provide: InterviewCurrentQuestionSpeechService,
+          useValue: {
+            speakOnJoin: jest.fn().mockResolvedValue(undefined),
           },
         },
       ],

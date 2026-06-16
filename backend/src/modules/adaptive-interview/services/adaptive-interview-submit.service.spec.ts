@@ -418,7 +418,7 @@ describe('AdaptiveInterviewSubmitService', () => {
     expect(result.currentInterviewQuestionId).toBe(11);
   });
 
-  it('reveals main question after topic opener answer', async () => {
+  it('does not call evaluator on topic_opener_answer (not scored)', async () => {
     repository.findAwaitingTopicOpener.mockResolvedValue({
       interviewQuestionId: 10,
       topicOpenerMessageId: 20,

@@ -2,18 +2,26 @@ import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview
 
 export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_KEY =
   'per_turn_checkpoint_evaluation';
-export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION = '2.4.0';
+export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION = '2.5.0';
+
+export function getPerTurnCheckpointEvaluationPromptVersion(): string {
+  const override = process.env.PER_TURN_EVAL_PROMPT_VERSION?.trim();
+  return override || PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION;
+}
 
 const RESPONSE_JSON_SCHEMA = `{
   "candidate_disposition": "engaged | declined | confused | off_topic",
   "checkpoint_results": [
     {
       "checkpoint_key": "string — must match one of the provided checkpoint keys exactly",
+      "coverage": "none | low | medium | high",
+      "accuracy": "none | wrong | partial | full",
+      "depth": "mention_only | heard_of | partial_knowledge | understands | knows | false_claim",
       "status": "covered | partial | missed | unclear",
       "score_awarded": 0,
       "confidence": 0.0,
       "evidence_summary": "short evidence summary or null",
-      "rationale": "short explanation in 1-2 sentences"
+      "rationale": "short explanation in 1-2 sentences; MUST include depth=... and coverage=/accuracy= labels"
     }
   ]
 }`;
@@ -33,31 +41,48 @@ export function buildPerTurnCheckpointEvaluationSystemPrompt(): string {
     '- Evaluate semantic correctness, not keyword presence.',
     '- Do NOT award credit just because the candidate mentions a relevant term.',
     '',
+    'Per-checkpoint mental checklist (MANDATORY before scoring each checkpoint):',
+    '1. MENTION: Did the candidate name this topic? (yes/no)',
+    '2. EXPLAIN: Did they explain HOW/WHY correctly? (yes/no/partial)',
+    '3. FALSE: Any confident false claim about this topic? (yes/no)',
+    '4. DEPTH: mention_only | heard_of | partial_knowledge | understands | knows | false_claim',
+    '',
+    'Coverage vs accuracy (MANDATORY in JSON + rationale):',
+    '- coverage: none | low | medium | high — did they touch the topic?',
+    '- accuracy: none | wrong | partial | full — was the explanation correct?',
+    '- depth in rationale as depth=<level> (e.g. depth=partial_knowledge)',
+    '- mention_only / heard_of without correct explanation → missed or partial ≤ 25% of max_score',
+    '- partial correct explanation → partial 40–60% of max_score',
+    '- correct without material false claims → covered',
+    '- false claims → partial or missed, never covered; depth=false_claim',
+    '',
+    'Depth taxonomy:',
+    '- depth=mention_only — buzzwords only, no explanation',
+    '- depth=heard_of — «слышал, не помню»',
+    '- depth=partial_knowledge — correct idea, incomplete',
+    '- depth=understands — coherent explanation with minor gaps',
+    '- depth=knows — precise details',
+    '- depth=false_claim — confident wrong statement',
+    '',
     'Status + score rubric (MANDATORY):',
-    '- covered: the checkpoint is substantially correct with NO material false claims → score_awarded = max_score.',
-    '- partial: correct core idea BUT incomplete, imprecise, OR mixed with wrong details for this checkpoint → score_awarded ≈ 40–60% of max_score (for max_score=1 use 0.5).',
+    '- covered: accuracy=full, NO material false claims → score_awarded = max_score.',
+    '- partial: correct core idea BUT incomplete, imprecise, OR mixed with wrong details → score_awarded ≈ 40–60% of max_score.',
     '- missed: fundamentally wrong, only keywords, or confident false explanation → score_awarded = 0.',
     '- unclear: candidate did not address this checkpoint at all → score_awarded = 0.',
     '',
     'Half-right / half-wrong answers:',
     '- If an answer is ~50% correct and ~50% false for a checkpoint, status MUST be partial (NOT covered) and score MUST be below max_score.',
-    '- Example: names Fiber + reconciliation correctly but says requestIdleCallback drives scheduling → scheduling = partial 0.5, not covered 1.',
-    '- Example: explains child/sibling/return but adds wrong parent/next or «stored in Virtual DOM» → fiber_pointers = partial 0.5.',
+    '- Example: names Fiber + reconciliation correctly but says requestIdleCallback drives scheduling → scheduling = partial 0.5, depth=false_claim, not covered 1.',
     '- NEVER set status=covered with score=max when your rationale mentions incorrect, contradictory, or imprecise parts.',
     '',
-    '- If a candidate mentions the term but explains it incorrectly, mark missed or partial — not covered.',
-    '- Award partial credit when the answer is meaningfully true but incomplete or imprecise.',
     '- Confident false statements MUST cap the checkpoint at partial or missed; do not treat false explanations as full knowledge.',
     '- Do NOT give all zeros when earlier local turns already demonstrated partial knowledge.',
-    '- If the latest answer declines only one sub-aspect, keep scores from earlier turns; use declined only for whole-question refusal.',
-    '- Also set candidate_disposition from the latest answer:',
+    '- If the latest answer declines only one sub-aspect, keep scores from earlier turns.',
+  '- Also set candidate_disposition from the latest answer:',
     '  - engaged: candidate tries to answer substantively, even if incorrect;',
     '  - declined: candidate refuses or clearly says they do not know / cannot answer;',
-    '  - confused: candidate explicitly says they do not understand the question or topic (not just a wrong answer);',
-    '  - off_topic: unrelated nonsense, jokes, random objects, spam, insults — answer does not engage with the question at all.',
-    '- Examples: "А вот я в моей тарелке" → off_topic; "рендер и API" about useEffect → engaged + partial;',
-    '  "не понимаю что такое useEffect" → confused; "не знаю" → declined.',
-    '- off_topic and engaged wrong answers are NOT confused.',
+    '  - confused: candidate explicitly says they do not understand the question or topic;',
+    '  - off_topic: unrelated nonsense — answer does not engage with the question.',
     '- Return valid JSON only, with no markdown fences or extra commentary.',
     '',
     'Required JSON shape:',
@@ -103,6 +128,13 @@ export function buildPerTurnCheckpointEvaluationUserPrompt(
           .map((turn) => `[${turn.role}] ${turn.content}`)
           .join('\n');
 
+  const badExamplesBlock =
+    (context.badAnswerExamples ?? []).length === 0
+      ? '(none)'
+      : (context.badAnswerExamples ?? [])
+          .map((example, index) => `${index + 1}. ${example}`)
+          .join('\n');
+
   return [
     'Evaluate the latest candidate answer for the current question only.',
     '',
@@ -111,6 +143,9 @@ export function buildPerTurnCheckpointEvaluationUserPrompt(
     '',
     'Reference answer (short, not a strict match requirement):',
     context.referenceAnswer,
+    '',
+    'Bad answer examples (do NOT award covered if candidate repeats these patterns):',
+    badExamplesBlock,
     '',
     'Checkpoints (source of truth from interview snapshot):',
     checkpointBlock,
@@ -130,7 +165,7 @@ export function buildPerTurnCheckpointEvaluationUserPrompt(
     `Return exactly ${context.checkpoints.length} checkpoint_results entries.`,
     'Use checkpoint_key values exactly as listed above.',
     'For each checkpoint: score_awarded must be >= current score from checkpoint states (never decrease).',
-    'Preserve prior earned score only when checkpoint states already show it.',
+    'Each rationale MUST include depth=..., coverage=..., accuracy=... labels.',
     'Do not add new score for a checkpoint unless the local turns contain semantically correct evidence for that checkpoint.',
   ].join('\n');
 }

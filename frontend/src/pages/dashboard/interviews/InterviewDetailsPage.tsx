@@ -3,9 +3,11 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useInterviewDetailsQuery } from '@entities/interview/api/interviewDetailsApi';
 import { useInterviewTranscriptQuery } from '@entities/interview/api/interviewTranscriptApi';
 import { useCheckpointResultsByAttemptQuery } from '@entities/evaluation/api/checkpointResultsApi';
+import { useAdaptiveCheckpointReviewByAttemptQuery } from '@entities/evaluation/api/adaptiveCheckpointReviewApi';
 import { useEvaluateInterviewAttemptMutation } from '@entities/evaluation/api/evaluationApi';
 import { useFinalEvaluationByAttemptQuery } from '@entities/evaluation/api/finalEvaluationApi';
 import { CheckpointResultsPanel } from '@widgets/checkpoints/CheckpointResultsPanel';
+import { AdaptiveCheckpointReviewPanel } from '@widgets/checkpoints/AdaptiveCheckpointReviewPanel';
 import { TranscriptPanel } from '@widgets/transcript/TranscriptPanel';
 import { OverallScoreCard } from '@widgets/score/OverallScoreCard';
 import { CategoryBreakdownChart } from '@widgets/score/CategoryBreakdownChart';
@@ -26,6 +28,7 @@ export function InterviewDetailsPage() {
   const selectedAttemptId =
     searchParams.get('attemptId') ?? data?.attempts[0]?.attemptId ?? '';
 
+  const [manualReviewOnly, setManualReviewOnly] = useState(false);
   const [transcriptSearch, setTranscriptSearch] = useState<string | null>(null);
 
   const { data: transcript, refetch: refetchTranscript } = useInterviewTranscriptQuery(
@@ -34,6 +37,10 @@ export function InterviewDetailsPage() {
   );
   const { data: checkpointData, refetch: refetchCheckpoints } =
     useCheckpointResultsByAttemptQuery(selectedAttemptId, { skip: !selectedAttemptId });
+  const { data: adaptiveReview, refetch: refetchAdaptiveReview } =
+    useAdaptiveCheckpointReviewByAttemptQuery(selectedAttemptId, {
+      skip: !selectedAttemptId,
+    });
 
   const selectedAttempt = useMemo(
     () => data?.attempts.find((attempt) => attempt.attemptId === selectedAttemptId),
@@ -62,7 +69,12 @@ export function InterviewDetailsPage() {
 
     try {
       await evaluateAttempt(selectedAttemptId).unwrap();
-      await Promise.all([refetch(), refetchTranscript(), refetchCheckpoints()]);
+      await Promise.all([
+        refetch(),
+        refetchTranscript(),
+        refetchCheckpoints(),
+        refetchAdaptiveReview(),
+      ]);
     } catch (mutationError) {
       const message =
         mutationError instanceof Error
@@ -187,8 +199,30 @@ export function InterviewDetailsPage() {
       </div>
 
       <Card header="Attempts timeline">
+        <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={manualReviewOnly}
+              onChange={(event) => setManualReviewOnly(event.target.checked)}
+            />
+            Только с ручной проверкой
+          </label>
+        </div>
         <div className="flex flex-wrap gap-2">
-          {data.attempts.map((attempt) => (
+          {data.attempts
+            .filter((attempt) => {
+              if (!manualReviewOnly) {
+                return true;
+              }
+
+              if (attempt.attemptId === selectedAttemptId) {
+                return adaptiveReview?.needsManualReview ?? false;
+              }
+
+              return false;
+            })
+            .map((attempt) => (
             <button
               key={attempt.attemptId}
               type="button"
@@ -226,6 +260,10 @@ export function InterviewDetailsPage() {
         />
         <CategoryBreakdownChart items={displayEvaluation?.categoryBreakdown ?? []} />
       </div>
+
+      {selectedAttemptId && adaptiveReview && (
+        <AdaptiveCheckpointReviewPanel review={adaptiveReview} />
+      )}
 
       {selectedAttemptId && (
         <div className="grid gap-4 xl:grid-cols-2">

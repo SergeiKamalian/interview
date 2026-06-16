@@ -1,4 +1,6 @@
 import type { CheckpointStateStatus } from '../types/checkpoint-state-status.type';
+import type { EvaluationEvidenceSource } from '../types/evaluation-evidence-source.type';
+import { getFollowUpEvidenceWeightConfig } from '../config/follow-up-evidence-weight.config';
 
 const STATUS_RANK: Record<CheckpointStateStatus, number> = {
   covered: 5,
@@ -19,6 +21,7 @@ export type MergeCheckpointEvaluationInput = {
   incomingEvidenceSummary: string | null;
   incomingRationale: string | null;
   maxScore: number;
+  evidenceSource?: EvaluationEvidenceSource;
 };
 
 export type MergeCheckpointEvaluationResult = {
@@ -31,9 +34,16 @@ export type MergeCheckpointEvaluationResult = {
 export function mergeCheckpointEvaluation(
   input: MergeCheckpointEvaluationInput,
 ): MergeCheckpointEvaluationResult {
+  const weightedIncoming = applyFollowUpEvidenceWeight(
+    input.currentScoreAwarded,
+    input.incomingScoreAwarded,
+    input.maxScore,
+    input.evidenceSource,
+  );
+
   const mergedScore = Math.min(
     input.maxScore,
-    Math.max(input.currentScoreAwarded, input.incomingScoreAwarded),
+    Math.max(input.currentScoreAwarded, weightedIncoming),
   );
 
   let status: CheckpointStateStatus;
@@ -49,7 +59,7 @@ export function mergeCheckpointEvaluation(
     status = 'missed';
   } else if (input.maxScore > 0 && mergedScore >= input.maxScore) {
     status = 'covered';
-  } else if (status === 'missed') {
+  } else if (status === 'covered' || status === 'missed') {
     status = 'partial';
   }
 
@@ -65,6 +75,28 @@ export function mergeCheckpointEvaluation(
       ? input.incomingRationale
       : (input.currentRationale ?? input.incomingRationale),
   };
+}
+
+export function applyFollowUpEvidenceWeight(
+  currentScore: number,
+  incomingScore: number,
+  maxScore: number,
+  evidenceSource?: EvaluationEvidenceSource,
+): number {
+  if (evidenceSource !== 'follow_up_answer' || incomingScore <= currentScore) {
+    return incomingScore;
+  }
+
+  const { scoreDeltaCap, maxRelativeBoost } = getFollowUpEvidenceWeightConfig();
+  const delta = incomingScore - currentScore;
+
+  if (currentScore <= 0) {
+    const cappedDelta = Math.min(delta, scoreDeltaCap * maxScore);
+    return currentScore + cappedDelta;
+  }
+
+  const cappedDelta = Math.min(delta, currentScore * maxRelativeBoost);
+  return Math.min(maxScore, currentScore + cappedDelta);
 }
 
 function pickHigherRankStatus(

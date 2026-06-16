@@ -1,6 +1,13 @@
 # TASK-14.12 — A/B prompt versioning
 
-Status: [ ] todo
+Status: [x] done
+
+## Completion Notes
+
+- `getPerTurnCheckpointEvaluationPromptVersion()` + env `PER_TURN_EVAL_PROMPT_VERSION`
+- Version в AI usage logs и guard adjustment events
+- Документировано в `backend/.env.example`
+- Analytics breakdown by version в UI — отложено (достаточно SQL по `prompt_version` в логах)
 
 ## Goal
 

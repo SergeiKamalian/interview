@@ -1,16 +1,28 @@
 import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview-context.types';
+import type { CheckpointGuardAdjustment } from '../types/checkpoint-guard-adjustment.types';
 import type { CheckpointStateStatus } from '../types/checkpoint-state-status.type';
+import type { EvaluationEvidenceSource } from '../types/evaluation-evidence-source.type';
 import type {
   PerTurnCheckpointEvaluationAiResponse,
   PerTurnCheckpointEvaluationStatus,
 } from '../types/per-turn-evaluation.types';
+import { getPerTurnCheckpointEvaluationPromptVersion } from '../prompts/per-turn-checkpoint-evaluation.prompt';
 import { mergeCheckpointEvaluation } from './merge-checkpoint-evaluation.util';
+
+export type ApplyCheckpointScoreFloorsResult = {
+  evaluation: PerTurnCheckpointEvaluationAiResponse;
+  adjustments: CheckpointGuardAdjustment[];
+};
 
 export function applyCheckpointScoreFloors(
   evaluation: PerTurnCheckpointEvaluationAiResponse,
   context: AdaptiveInterviewContextPacket,
-): PerTurnCheckpointEvaluationAiResponse {
+  options: { evidenceSource?: EvaluationEvidenceSource } = {},
+): ApplyCheckpointScoreFloorsResult {
   const candidateText = collectCandidateText(context);
+  const badExamples = context.badAnswerExamples ?? [];
+  const promptVersion = getPerTurnCheckpointEvaluationPromptVersion();
+  const adjustments: CheckpointGuardAdjustment[] = [];
 
   const checkpointResults = evaluation.checkpointResults.map((result) => {
     const checkpoint = context.checkpoints.find(
@@ -24,13 +36,38 @@ export function applyCheckpointScoreFloors(
       return result;
     }
 
+    const aiSnapshot = {
+      status: result.status,
+      scoreAwarded: result.scoreAwarded,
+    };
+
     const guardedResult = enforceStatusScoreAlignment(
-      applyRationaleContradictionCap(
-        applySemanticContradictionCap(result, candidateText, checkpoint.score),
+      applyBadExampleOverlapCap(
+        applyRationaleContradictionCap(
+          applySemanticContradictionCap(result, candidateText, checkpoint.score),
+          checkpoint.score,
+        ),
+        candidateText,
+        badExamples,
         checkpoint.score,
       ),
       checkpoint.score,
     );
+
+    if (
+      guardedResult.status !== aiSnapshot.status ||
+      guardedResult.scoreAwarded !== aiSnapshot.scoreAwarded
+    ) {
+      adjustments.push({
+        checkpointKey: result.checkpointKey,
+        aiStatus: aiSnapshot.status,
+        aiScore: aiSnapshot.scoreAwarded,
+        guardedStatus: guardedResult.status,
+        guardedScore: guardedResult.scoreAwarded,
+        reason: resolveAdjustmentReason(result, guardedResult, candidateText),
+        promptVersion,
+      });
+    }
 
     const merged = mergeCheckpointEvaluation({
       currentScoreAwarded: priorState?.scoreAwarded ?? 0,
@@ -42,6 +79,7 @@ export function applyCheckpointScoreFloors(
       incomingEvidenceSummary: guardedResult.evidenceSummary,
       incomingRationale: guardedResult.rationale,
       maxScore: checkpoint.score,
+      evidenceSource: options.evidenceSource,
     });
 
     return {
@@ -54,9 +92,38 @@ export function applyCheckpointScoreFloors(
   });
 
   return {
-    ...evaluation,
-    checkpointResults,
+    evaluation: {
+      ...evaluation,
+      checkpointResults,
+    },
+    adjustments,
   };
+}
+
+function resolveAdjustmentReason(
+  original: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
+  guarded: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
+  candidateText: string,
+): CheckpointGuardAdjustment['reason'] {
+  if (
+    original.status === 'covered' &&
+    guarded.status !== 'covered' &&
+    /incorrect|wrong|contradict|неверн|ошиб|противореч/i.test(
+      original.rationale ?? '',
+    )
+  ) {
+    return 'rationale_contradiction_cap';
+  }
+
+  if (getContradictionScoreCap(original.checkpointKey, candidateText) !== null) {
+    return 'semantic_contradiction_cap';
+  }
+
+  if (original.status === 'covered' && guarded.status !== 'covered') {
+    return 'status_score_alignment';
+  }
+
+  return 'bad_example_overlap_cap';
 }
 
 function collectCandidateText(context: AdaptiveInterviewContextPacket): string {
@@ -80,11 +147,15 @@ function applyRationaleContradictionCap(
 
   const rationale = (result.rationale ?? '').toLowerCase();
   const admitsError = [
+    /incorrect/,
+    /wrong/,
+    /contradict/,
     /не\s+соответствует/,
     /неверн/,
     /ошиб/,
     /противореч/,
     /неправильн/,
+    /не\s+так/,
     /перепутал/,
     /не\s+точн/,
     /слишком\s+категорич/,
@@ -103,8 +174,60 @@ function applyRationaleContradictionCap(
     ...result,
     scoreAwarded: cap,
     status: cap > 0 ? 'partial' : 'missed',
-    rationale: `${result.rationale} Score capped: rationale notes material errors.`,
+    rationale: `${result.rationale} depth=false_claim. Score capped: rationale notes material errors.`,
   };
+}
+
+function applyBadExampleOverlapCap(
+  result: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
+  candidateText: string,
+  badExamples: string[],
+  maxScore: number,
+): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
+  if (result.scoreAwarded <= 0 || badExamples.length === 0) {
+    return result;
+  }
+
+  const overlaps = badExamples.some((example) =>
+    hasSignificantOverlap(candidateText, example.toLowerCase()),
+  );
+
+  if (!overlaps || result.scoreAwarded < maxScore) {
+    return overlaps && result.status === 'covered'
+      ? {
+          ...result,
+          scoreAwarded: partialScoreForMax(maxScore),
+          status: 'partial',
+          rationale: `${result.rationale} depth=false_claim. Score capped: overlaps bad answer example.`,
+        }
+      : result;
+  }
+
+  const cap = partialScoreForMax(maxScore);
+  return {
+    ...result,
+    scoreAwarded: Math.min(result.scoreAwarded, cap),
+    status: 'partial',
+    rationale: `${result.rationale} depth=false_claim. Score capped: overlaps bad answer example.`,
+  };
+}
+
+function hasSignificantOverlap(left: string, right: string): boolean {
+  if (/(?:не|not)\s+.{0,20}requestidlecallback/i.test(left)) {
+    return false;
+  }
+
+  const tokens = right
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 5);
+
+  if (tokens.length === 0) {
+    return false;
+  }
+
+  const matched = tokens.filter((token) => left.includes(token));
+  return matched.length >= Math.min(2, tokens.length);
 }
 
 function enforceStatusScoreAlignment(
@@ -148,7 +271,7 @@ function applySemanticContradictionCap(
     ...result,
     scoreAwarded,
     status: scoreAwarded > 0 ? 'partial' : 'missed',
-    rationale: `${result.rationale} Semantic guard capped score because candidate evidence contains a direct contradiction.`,
+    rationale: `${result.rationale} depth=false_claim. Semantic guard capped score because candidate evidence contains a direct contradiction.`,
   };
 }
 
@@ -306,3 +429,5 @@ function getContradictionScoreCap(
 
   return null;
 }
+
+export { getContradictionScoreCap };

@@ -73,6 +73,9 @@ export function buildAdaptiveInterviewContextPacket(
       title: boundText(checkpoint.title, input.limits.maxTextLength),
       expected: boundText(checkpoint.expected, input.limits.maxTextLength),
     })),
+    badAnswerExamples: (input.badAnswerExamples ?? [])
+      .slice(0, 3)
+      .map((example) => boundText(example, input.limits.maxTextLength)),
     latestCandidateAnswer: latestCandidateMessage
       ? boundText(latestCandidateMessage.content, input.limits.maxTextLength)
       : '',

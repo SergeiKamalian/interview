@@ -115,6 +115,7 @@ export class FollowUpPlannerService {
       checkpointStates,
       followUpsUsedForQuestion,
       options.candidateDispositionFromAi,
+      options.recentScoreDeltas,
     );
     policyTimer.finish({
       shouldAskFollowUp: policy.shouldAskFollowUp,
@@ -135,7 +136,7 @@ export class FollowUpPlannerService {
     const limits = getAdaptiveInterviewContextLimits();
     const templateQuestion = buildNaturalTemplateFollowUp({
       questionText: context.questionText,
-      checkpointExpected: policy.checkpointExpected,
+      checkpointTitle: policy.checkpointTitle,
       latestCandidateAnswer: context.latestCandidateAnswer,
       previousFollowUpQuestions: existingFollowUps.map(
         (followUp) => followUp.questionText,

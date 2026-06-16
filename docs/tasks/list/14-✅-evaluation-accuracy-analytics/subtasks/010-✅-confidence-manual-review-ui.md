@@ -1,6 +1,12 @@
 # TASK-14.10 — Confidence + manual review в UI
 
-Status: [ ] todo
+Status: [x] done
+
+## Completion Notes
+
+- `confidence` + `manualReviewRequired` в review GraphQL и panel
+- Фильтр «Только с ручной проверкой» на `InterviewDetailsPage`
+- Badge для checkpoints с низкой confidence
 
 ## Goal
 

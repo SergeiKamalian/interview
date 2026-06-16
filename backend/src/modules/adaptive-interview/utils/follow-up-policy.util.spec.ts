@@ -53,29 +53,30 @@ describe('buildNaturalTemplateFollowUp', () => {
   it('does not quote the candidate answer and avoids default Понял, спасибо', () => {
     const question = buildNaturalTemplateFollowUp({
       questionText: 'Что такое useEffect?',
-      checkpointExpected: 'Кандидат объясняет роль массива зависимостей.',
+      checkpointTitle: 'Массив зависимостей',
       latestCandidateAnswer:
         'Юзефект это хук в реакте для выполнения таких функционалов как запрос к апи, изм…',
       seed: 3,
     });
 
-    expect(question).toContain('роль массива зависимостей');
+    expect(question).toContain('массив зависимостей');
     expect(question).not.toContain('Понял, спасибо');
     expect(question).not.toContain('Юзефект');
-    expect(question).not.toContain('про «');
+    expect(question).not.toContain('expected=');
+    expect(question).not.toContain('Кандидат объясняет');
   });
 
   it('picks a different opener when previous follow-ups used one', () => {
     const first = buildNaturalTemplateFollowUp({
       questionText: 'Fiber?',
-      checkpointExpected: 'Кандидат говорит про stack.',
+      checkpointTitle: 'Stack vs Fiber',
       latestCandidateAnswer: 'answer',
       seed: 1,
       previousFollowUpQuestions: [],
     });
     const second = buildNaturalTemplateFollowUp({
       questionText: 'Fiber?',
-      checkpointExpected: 'Кандидат называет child/sibling/return.',
+      checkpointTitle: 'Fiber pointers',
       latestCandidateAnswer: 'answer',
       seed: 2,
       previousFollowUpQuestions: [first],

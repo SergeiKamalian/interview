@@ -1,6 +1,11 @@
 # TASK-14.14 — Follow-up answer weight < main answer
 
-Status: [ ] todo
+Status: [x] done
+
+## Completion Notes
+
+- `merge-checkpoint-evaluation.util.ts`: `evidenceSource` main vs follow_up, caps `FOLLOW_UP_SCORE_DELTA_CAP` / `FOLLOW_UP_MAX_RELATIVE_BOOST`
+- `merge-checkpoint-evaluation.util.spec.ts` — green
 
 ## Goal
 

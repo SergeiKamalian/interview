@@ -8,6 +8,7 @@ import '@entities/candidate/api/candidatesApi';
 import '@entities/candidate/api/candidateReportApi';
 import '@entities/candidate/api/shortlistApi';
 import '@entities/evaluation/api/checkpointResultsApi';
+import '@entities/evaluation/api/adaptiveCheckpointReviewApi';
 import '@entities/evaluation/api/finalEvaluationApi';
 import '@entities/evaluation/api/evaluationApi';
 import '@entities/analytics/api/topicSkillQuestionApi';

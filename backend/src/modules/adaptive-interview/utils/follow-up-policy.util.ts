@@ -3,9 +3,9 @@ import type {
   FollowUpPolicyInput,
 } from '../types/follow-up-planner.types';
 import type { CheckpointStateStatus } from '../types/checkpoint-state-status.type';
+import { parseDepthFromRationale } from './checkpoint-depth.util';
 import {
   normalizeFollowUpQuestionForCandidate,
-  sanitizeCheckpointExpectedForCandidateSpeech,
 } from './checkpoint-expected-speech.util';
 import {
   resolveSkipFollowUpReason,
@@ -61,6 +61,18 @@ export function evaluateFollowUpPolicy(
     };
   }
 
+  const stagnationLimit = input.stagnationLimit ?? 2;
+  const recentDeltas = input.recentScoreDeltas ?? [];
+  if (
+    recentDeltas.length >= stagnationLimit &&
+    recentDeltas.slice(-stagnationLimit).every((delta) => delta <= 0)
+  ) {
+    return {
+      shouldAskFollowUp: false,
+      reason: 'follow_up_stagnation',
+    };
+  }
+
   const questionScore = input.checkpointStates.reduce(
     (total, state) => total + state.scoreAwarded,
     0,
@@ -68,6 +80,21 @@ export function evaluateFollowUpPolicy(
   const questionScoreSufficient =
     input.questionMaxScore > 0 &&
     questionScore >= input.questionMaxScore * input.questionScoreSufficientRatio;
+  const hasMentionOnlyMissed = input.checkpointStates.some((state) => {
+    if (state.status !== 'missed') {
+      return false;
+    }
+
+    const depth = parseDepthFromRationale(state.rationale ?? null);
+    return depth === 'mention_only' || depth === 'heard_of';
+  });
+
+  if (questionScoreSufficient && !hasMentionOnlyMissed) {
+    return {
+      shouldAskFollowUp: false,
+      reason: 'sufficient_question_score',
+    };
+  }
 
   const checkpointByKey = new Map(
     input.checkpoints.map((checkpoint) => [checkpoint.checkpointKey, checkpoint]),
@@ -75,6 +102,7 @@ export function evaluateFollowUpPolicy(
 
   const eligible = input.checkpointStates
     .filter((state) => isEligibleCheckpointState(state))
+    .filter((state) => !isExhaustedPartialCheckpoint(state))
     .filter((state) => state.followUpCount < input.maxFollowUpsPerCheckpoint)
     .filter((state) => {
       const checkpoint = checkpointByKey.get(state.checkpointKey);
@@ -167,22 +195,21 @@ function compareCandidates(
 
 export function buildNaturalTemplateFollowUp(input: {
   questionText: string;
-  checkpointExpected: string;
+  checkpointTitle?: string;
+  checkpointExpected?: string;
   latestCandidateAnswer: string;
   previousFollowUpQuestions?: string[];
   seed?: number;
 }): string {
   const seed =
     input.seed ??
-    input.checkpointExpected.length + input.questionText.length;
+    (input.checkpointTitle ?? input.checkpointExpected ?? input.questionText).length;
   const acknowledgment = pickFollowUpAcknowledgment(
     seed,
     input.previousFollowUpQuestions ?? [],
   );
   const stem = pickFollowUpQuestionStem(seed + 1);
-  const topicHint = sanitizeCheckpointExpectedForCandidateSpeech(
-    input.checkpointExpected,
-  );
+  const topicHint = (input.checkpointTitle ?? '').trim().toLowerCase();
 
   const question = topicHint
     ? `${acknowledgment} ${stem} ${topicHint}?`
@@ -195,7 +222,25 @@ export function buildNaturalTemplateFollowUp(input: {
 export function buildTemplateFollowUpQuestion(checkpointTitle: string): string {
   return buildNaturalTemplateFollowUp({
     questionText: checkpointTitle,
-    checkpointExpected: '',
+    checkpointTitle,
     latestCandidateAnswer: '',
   });
+}
+
+function isExhaustedPartialCheckpoint(state: {
+  status: CheckpointStateStatus;
+  scoreAwarded: number;
+  maxScore: number;
+  rationale?: string | null;
+}): boolean {
+  if (state.status !== 'partial' || state.maxScore <= 0) {
+    return false;
+  }
+
+  const depth = parseDepthFromRationale(state.rationale ?? null);
+  const partialThreshold = state.maxScore * 0.5;
+  return (
+    state.scoreAwarded >= partialThreshold &&
+    (depth === 'partial_knowledge' || depth === 'heard_of')
+  );
 }

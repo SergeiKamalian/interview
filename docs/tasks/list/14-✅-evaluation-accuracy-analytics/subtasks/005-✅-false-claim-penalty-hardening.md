@@ -1,6 +1,12 @@
 # TASK-14.5 — False claim penalty hardening
 
-Status: [ ] todo
+Status: [x] done
+
+## Completion Notes
+
+- `apply-checkpoint-score-floors.util.ts`: EN+RU false-claim patterns, bad-example overlap, semantic guards
+- Возвращает `{ evaluation, adjustments }` для divergence logging
+- `apply-checkpoint-score-floors.util.spec.ts` + Fiber 50/50 scenario — green
 
 ## Goal
 

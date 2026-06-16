@@ -1,6 +1,12 @@
 # TASK-14.4 — Follow-up early stop policy
 
-Status: [ ] todo
+Status: [x] done
+
+## Completion Notes
+
+- `questionScoreSufficientRatio` default **0.85** в `adaptive-interview-context.config.ts`
+- Stagnation limit + exhausted partial checkpoints в `follow-up-policy.util.ts`
+- `follow-up-policy.util.spec.ts` — green
 
 ## Goal
 

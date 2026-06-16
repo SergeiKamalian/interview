@@ -39,6 +39,7 @@ import { AdaptiveAiConversationService } from './adaptive-ai-conversation.servic
 import { AdaptiveOpenAiResponseStateService } from './adaptive-openai-response-state.service';
 import { CheckpointStateService } from './checkpoint-state.service';
 import { PerTurnEvaluationValidatorService } from './per-turn-evaluation-validator.service';
+import type { EvaluationEvidenceSource } from '../types/evaluation-evidence-source.type';
 import { applyCheckpointScoreFloors } from '../utils/apply-checkpoint-score-floors.util';
 import { parseSuggestedFollowUpFromJson } from '../utils/parse-suggested-follow-up.util';
 import {
@@ -103,6 +104,7 @@ export class PerTurnCheckpointEvaluatorService {
     attemptId: number,
     interviewQuestionId: number,
     context: AdaptiveInterviewContextPacket,
+    options: { evidenceSource?: EvaluationEvidenceSource } = {},
   ): Promise<PerTurnCheckpointEvaluatorRunResult> {
     const combinedTurn = isAdaptiveAiCombinedTurnEnabled();
     const useOpenAiServerState =
@@ -116,6 +118,7 @@ export class PerTurnCheckpointEvaluatorService {
         interviewQuestionId,
         context,
         combinedTurn,
+        options.evidenceSource,
       );
 
       if (
@@ -138,6 +141,7 @@ export class PerTurnCheckpointEvaluatorService {
         interviewQuestionId,
         context,
         combinedTurn,
+        options.evidenceSource,
       );
     }
 
@@ -145,6 +149,7 @@ export class PerTurnCheckpointEvaluatorService {
       attemptId,
       interviewQuestionId,
       operationType: 'evaluate_turn',
+      evidenceSource: options.evidenceSource,
     });
   }
 
@@ -153,6 +158,7 @@ export class PerTurnCheckpointEvaluatorService {
     interviewQuestionId: number,
     context: AdaptiveInterviewContextPacket,
     combinedTurn: boolean,
+    evidenceSource?: EvaluationEvidenceSource,
   ): Promise<PerTurnCheckpointEvaluatorRunResult> {
     const promptVersion = ADAPTIVE_AI_CONVERSATION_EVALUATE_PROMPT_VERSION;
     const model = this.aiProviderService.getClientConfig().model;
@@ -213,6 +219,7 @@ export class PerTurnCheckpointEvaluatorService {
       attemptLabel: state ? 'responses_continue' : 'responses_bootstrap',
       useResponsesApi: true,
       previousResponseId: state?.lastResponseId,
+      evidenceSource,
     });
 
     if (result.runResult.status === 'valid' && result.responseId) {
@@ -234,6 +241,7 @@ export class PerTurnCheckpointEvaluatorService {
     interviewQuestionId: number,
     context: AdaptiveInterviewContextPacket,
     combinedTurn: boolean,
+    evidenceSource?: EvaluationEvidenceSource,
   ): Promise<PerTurnCheckpointEvaluatorRunResult> {
     const sessionKey = this.adaptiveAiConversationService.buildSessionKey(
       'evaluate',
@@ -290,6 +298,7 @@ export class PerTurnCheckpointEvaluatorService {
       debugMeta,
       messages,
       attemptLabel: 'conversation',
+      evidenceSource,
     });
 
     if (result.runResult.status === 'valid') {
@@ -314,6 +323,7 @@ export class PerTurnCheckpointEvaluatorService {
       attemptId: number;
       interviewQuestionId: number;
       operationType: string;
+      evidenceSource?: EvaluationEvidenceSource;
     },
   ): Promise<PerTurnCheckpointEvaluatorRunResult> {
     const systemPrompt = buildPerTurnCheckpointEvaluationSystemPrompt();
@@ -336,6 +346,7 @@ export class PerTurnCheckpointEvaluatorService {
       systemPrompt,
       userPrompt,
       attemptLabel: 'initial',
+      evidenceSource: debugMeta.evidenceSource,
     });
 
     return result.runResult;
@@ -345,6 +356,7 @@ export class PerTurnCheckpointEvaluatorService {
     context: AdaptiveInterviewContextPacket;
     combinedTurn: boolean;
     debugMeta: Record<string, unknown>;
+    evidenceSource?: EvaluationEvidenceSource;
     messages?: Array<{
       role: 'system' | 'user' | 'assistant';
       content: string;
@@ -483,7 +495,21 @@ export class PerTurnCheckpointEvaluatorService {
         };
       }
 
-      const floored = applyCheckpointScoreFloors(validation.data, context);
+      const { evaluation: flooredEvaluation, adjustments } =
+        applyCheckpointScoreFloors(validation.data, context, {
+          evidenceSource: input.evidenceSource,
+        });
+
+      if (adjustments.length > 0) {
+        this.logger.log(
+          JSON.stringify({
+            event: 'checkpoint_guard_adjustment',
+            attemptId: context.attemptId,
+            interviewQuestionId: context.interviewQuestionId,
+            adjustments,
+          }),
+        );
+      }
 
       return {
         responseId: this.getResponseId(completion),
@@ -491,7 +517,7 @@ export class PerTurnCheckpointEvaluatorService {
         runResult: {
           status: 'valid',
           repairAttempted,
-          ...floored,
+          ...flooredEvaluation,
           suggestedFollowUp: validation.suggestedFollowUp,
           model: completion.model,
           latencyMs: completion.latencyMs,
@@ -762,6 +788,7 @@ export class PerTurnCheckpointEvaluatorService {
     interviewQuestionId: number;
     context?: AdaptiveInterviewContextPacket;
     skipEnsureStates?: boolean;
+    evidenceSource?: EvaluationEvidenceSource;
   }): Promise<EvaluateTurnAndPersistResult> {
     const debugMeta = {
       attemptId: input.attemptId,
@@ -820,6 +847,7 @@ export class PerTurnCheckpointEvaluatorService {
       input.attemptId,
       input.interviewQuestionId,
       context,
+      { evidenceSource: input.evidenceSource },
     );
     aiTimer.finish({ status: evaluation.status });
 
@@ -862,6 +890,7 @@ export class PerTurnCheckpointEvaluatorService {
         attemptId: input.attemptId,
         interviewQuestionId: input.interviewQuestionId,
         candidateMessageId: context.latestCandidateMessageId,
+        evidenceSource: input.evidenceSource,
         results: evaluation.checkpointResults.map((result) => ({
           checkpointKey: result.checkpointKey,
           status: result.status,

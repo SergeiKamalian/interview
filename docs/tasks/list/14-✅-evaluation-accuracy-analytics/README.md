@@ -1,4 +1,4 @@
-# 14-⬜-evaluation-accuracy-analytics — Точность оценки и HR-аналитика
+# 14-✅-evaluation-accuracy-analytics — Точность оценки и HR-аналитика
 
 ## Цель блока
 

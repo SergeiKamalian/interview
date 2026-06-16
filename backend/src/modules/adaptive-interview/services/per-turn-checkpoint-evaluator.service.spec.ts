@@ -69,6 +69,7 @@ describe('PerTurnCheckpointEvaluatorService', () => {
     ],
     latestCandidateAnswer: 'useEffect runs after render.',
     latestCandidateMessageId: 22,
+    badAnswerExamples: [],
     checkpointStates: [],
     evidenceSnippets: [],
     localTurns: [],

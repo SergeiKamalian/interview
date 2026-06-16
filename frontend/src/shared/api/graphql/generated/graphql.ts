@@ -89,6 +89,8 @@ export type InterviewMessageKind =
   | 'main_answer'
   | 'main_question'
   | 'system_note'
+  | 'topic_opener'
+  | 'topic_opener_answer'
   | 'welcome';
 
 export type InterviewStatus =
@@ -159,6 +161,13 @@ export type TopicSkillQuestionFilterInput = {
   jobRole?: string | null | undefined;
   level?: QuestionLevel | null | undefined;
 };
+
+export type AdaptiveCheckpointReviewByAttemptQueryVariables = Exact<{
+  attemptId: string | number;
+}>;
+
+
+export type AdaptiveCheckpointReviewByAttemptQuery = { adaptiveCheckpointReviewByAttempt: { attemptId: string, needsManualReview: boolean, redFlags: Array<{ checkpointKey: string, checkpointTitle: string, summary: string, candidateQuote: string | null, severity: string }>, questionGroups: Array<{ interviewQuestionId: string, questionText: string, idealAnswer: string | null, needsManualReview: boolean, checkpoints: Array<{ checkpointKey: string, checkpointTitle: string, status: string, scoreAwarded: number, maxScore: number, rationale: string | null, evidenceSummary: string | null, confidence: number | null, needsManualReview: boolean, depthLabel: string, coveragePercent: number, accuracyPercent: number }> }> } };
 
 export type AddCandidateToShortlistMutationVariables = Exact<{
   candidateId: string | number;
@@ -378,6 +387,41 @@ export class TypedDocumentString<TResult, TVariables>
   }
 }
 
+export const AdaptiveCheckpointReviewByAttemptDocument = new TypedDocumentString(`
+    query AdaptiveCheckpointReviewByAttempt($attemptId: ID!) {
+  adaptiveCheckpointReviewByAttempt(attemptId: $attemptId) {
+    attemptId
+    needsManualReview
+    redFlags {
+      checkpointKey
+      checkpointTitle
+      summary
+      candidateQuote
+      severity
+    }
+    questionGroups {
+      interviewQuestionId
+      questionText
+      idealAnswer
+      needsManualReview
+      checkpoints {
+        checkpointKey
+        checkpointTitle
+        status
+        scoreAwarded
+        maxScore
+        rationale
+        evidenceSummary
+        confidence
+        needsManualReview
+        depthLabel
+        coveragePercent
+        accuracyPercent
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<AdaptiveCheckpointReviewByAttemptQuery, AdaptiveCheckpointReviewByAttemptQueryVariables>;
 export const AddCandidateToShortlistDocument = new TypedDocumentString(`
     mutation AddCandidateToShortlist($candidateId: ID!, $reason: String) {
   addCandidateToShortlist(candidateId: $candidateId, reason: $reason) {

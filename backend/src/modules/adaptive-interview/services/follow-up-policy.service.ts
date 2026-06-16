@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { getAdaptiveInterviewContextLimits } from '../config/adaptive-interview-context.config';
+import { getFollowUpEvidenceWeightConfig } from '../config/follow-up-evidence-weight.config';
 import type { CandidateAnswerDisposition } from '../types/candidate-answer-disposition.type';
 import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview-context.types';
 import type {
@@ -17,8 +18,11 @@ export class FollowUpPolicyService {
     checkpointStates: InterviewCheckpointStateEntity[],
     followUpsUsedForQuestion: number,
     candidateDispositionFromAi?: CandidateAnswerDisposition | null,
+    recentScoreDeltas?: number[],
   ): FollowUpPolicyDecision {
     const limits = getAdaptiveInterviewContextLimits();
+
+    const weightConfig = getFollowUpEvidenceWeightConfig();
 
     const input: FollowUpPolicyInput = {
       questionMaxScore: context.maxScore,
@@ -30,12 +34,15 @@ export class FollowUpPolicyService {
         maxScore: state.maxScore,
         followUpCount: state.followUpCount,
         needsManualReview: state.needsManualReview,
+        rationale: state.rationale,
       })),
       followUpsUsedForQuestion,
       maxFollowUpsPerQuestion: limits.maxFollowUpsPerQuestion,
       maxFollowUpsPerCheckpoint: limits.maxFollowUpsPerCheckpoint,
       questionScoreSufficientRatio: limits.questionScoreSufficientRatio,
       lowWeightCheckpointRatio: limits.lowWeightCheckpointRatio,
+      stagnationLimit: weightConfig.stagnationLimit,
+      recentScoreDeltas,
       latestCandidateAnswer: context.latestCandidateAnswer,
       candidateDispositionFromAi: candidateDispositionFromAi ?? undefined,
     };

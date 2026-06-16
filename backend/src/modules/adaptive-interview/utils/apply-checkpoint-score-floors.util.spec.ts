@@ -16,6 +16,7 @@ function buildGenericsContext(
     latestCandidateAnswer: latestAnswer,
     latestCandidateMessageId: 10,
     maxScore: 4,
+    badAnswerExamples: [],
     checkpoints: [
       {
         checkpointKey: 'type_parameter',
@@ -119,7 +120,7 @@ describe('applyCheckpointScoreFloors', () => {
       ],
     );
 
-    const evaluation = applyCheckpointScoreFloors(
+    const { evaluation } = applyCheckpointScoreFloors(
       {
         candidateDisposition: 'declined',
         checkpointResults: context.checkpoints.map((checkpoint) => ({
@@ -171,7 +172,7 @@ describe('applyCheckpointScoreFloors', () => {
       ],
     );
 
-    const evaluation = applyCheckpointScoreFloors(
+    const { evaluation } = applyCheckpointScoreFloors(
       {
         candidateDisposition: 'engaged',
         checkpointResults: context.checkpoints.map((checkpoint) => ({
@@ -223,7 +224,7 @@ describe('applyCheckpointScoreFloors', () => {
       ],
     );
 
-    const evaluation = applyCheckpointScoreFloors(
+    const { evaluation } = applyCheckpointScoreFloors(
       {
         candidateDisposition: 'engaged',
         checkpointResults: [
@@ -308,7 +309,7 @@ describe('applyCheckpointScoreFloors', () => {
 
     const context = buildGenericsContext('Ой на это не отвечу', localTurns);
 
-    const evaluation = applyCheckpointScoreFloors(
+    const { evaluation } = applyCheckpointScoreFloors(
       {
         candidateDisposition: 'declined',
         checkpointResults: [
@@ -391,6 +392,7 @@ describe('applyCheckpointScoreFloors', () => {
       latestCandidateAnswer: candidateAnswers,
       latestCandidateMessageId: 99,
       maxScore: 8,
+      badAnswerExamples: [],
       checkpoints: fiberCheckpoints.map((key, index) => ({
         checkpointKey: key,
         title: key,
@@ -414,7 +416,7 @@ describe('applyCheckpointScoreFloors', () => {
       },
     };
 
-    const evaluation = applyCheckpointScoreFloors(
+    const { evaluation } = applyCheckpointScoreFloors(
       {
         candidateDisposition: 'engaged',
         checkpointResults: fiberCheckpoints.map((checkpointKey) => ({

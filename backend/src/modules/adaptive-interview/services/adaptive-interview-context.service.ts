@@ -29,7 +29,8 @@ export class AdaptiveInterviewContextService {
       throw new NotFoundException('Interview question not found');
     }
 
-    const [messages, snapshotCheckpoints, checkpointStates] = await Promise.all([
+    const [messages, snapshotCheckpoints, checkpointStates, badAnswerExamples] =
+      await Promise.all([
       this.interviewRepository.listMessages(attemptId),
       this.interviewRepository.findCheckpointsByInterviewQuestionId(
         interviewQuestionId,
@@ -38,6 +39,11 @@ export class AdaptiveInterviewContextService {
         attemptId,
         interviewQuestionId,
       ),
+      interviewQuestion.sourceQuestionId
+        ? this.interviewRepository.findBadAnswerExamplesBySourceQuestionId(
+            interviewQuestion.sourceQuestionId,
+          )
+        : Promise.resolve([]),
     ]);
 
     if (snapshotCheckpoints.length === 0) {
@@ -82,6 +88,7 @@ export class AdaptiveInterviewContextService {
         followUpCount: state.followUpCount,
         evidenceSummary: state.evidenceSummary,
       })),
+      badAnswerExamples,
       limits: getAdaptiveInterviewContextLimits(),
     });
   }

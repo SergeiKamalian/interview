@@ -6,6 +6,7 @@ import { ScoringModule } from '../scoring/scoring.module';
 import { UsageLoggingModule } from '../usage-logging/usage-logging.module';
 import { AiEvaluationResolver } from './ai-evaluation.resolver';
 import { CheckpointResultsResolver } from './graphql/checkpoint-results.resolver';
+import { AdaptiveCheckpointReviewResolver } from './graphql/adaptive-checkpoint-review.resolver';
 import { CheckpointResultRepository } from './repositories/checkpoint-result.repository';
 import { FinalEvaluationRepository } from './repositories/final-evaluation.repository';
 import { QuestionEvaluationRepository } from './repositories/question-evaluation.repository';
@@ -17,6 +18,7 @@ import { EvaluationContextService } from './services/evaluation-context.service'
 import { FinalEvaluationService } from './services/final-evaluation.service';
 import { HallucinationGuardService } from './services/hallucination-guard.service';
 import { CheckpointResultsService } from './services/checkpoint-results.service';
+import { AdaptiveCheckpointReviewService } from './services/adaptive-checkpoint-review.service';
 
 @Module({
   imports: [
@@ -38,8 +40,10 @@ import { CheckpointResultsService } from './services/checkpoint-results.service'
     AdaptiveEvidenceEvaluationService,
     AiEvaluationService,
     CheckpointResultsService,
+    AdaptiveCheckpointReviewService,
     AiEvaluationResolver,
     CheckpointResultsResolver,
+    AdaptiveCheckpointReviewResolver,
   ],
   exports: [
     CheckpointEvaluationService,

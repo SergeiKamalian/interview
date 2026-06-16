@@ -1,6 +1,11 @@
 # TASK-14.13 — Verify topic_opener not scored
 
-Status: [ ] todo
+Status: [x] done
+
+## Completion Notes
+
+- `adaptive-interview-submit.service.spec.ts`: `evaluateTurnAndPersist` не вызывается на `topic_opener_answer`
+- Live flow attempt 36: оценка только после main answer
 
 ## Goal
 

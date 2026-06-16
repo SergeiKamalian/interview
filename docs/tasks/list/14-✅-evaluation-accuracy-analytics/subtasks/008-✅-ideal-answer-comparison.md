@@ -1,6 +1,11 @@
 # TASK-14.8 — Ideal answer comparison в отчёте
 
-Status: [ ] todo
+Status: [x] done
+
+## Completion Notes
+
+- Collapsible «Эталонный ответ» per checkpoint в `AdaptiveCheckpointReviewPanel`
+- `idealAnswer` из question bank snapshot в review service
 
 ## Goal
 

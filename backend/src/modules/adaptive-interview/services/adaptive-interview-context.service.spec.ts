@@ -11,6 +11,7 @@ describe('AdaptiveInterviewContextService', () => {
       | 'findInterviewQuestionById'
       | 'listMessages'
       | 'findCheckpointsByInterviewQuestionId'
+      | 'findBadAnswerExamplesBySourceQuestionId'
     >
   >;
   let checkpointStateRepository: jest.Mocked<
@@ -22,6 +23,7 @@ describe('AdaptiveInterviewContextService', () => {
       findInterviewQuestionById: jest.fn(),
       listMessages: jest.fn(),
       findCheckpointsByInterviewQuestionId: jest.fn(),
+      findBadAnswerExamplesBySourceQuestionId: jest.fn().mockResolvedValue([]),
     };
 
     checkpointStateRepository = {

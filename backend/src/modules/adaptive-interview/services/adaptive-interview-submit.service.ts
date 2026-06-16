@@ -366,6 +366,11 @@ export class AdaptiveInterviewSubmitService {
       context: summarizeAdaptiveContextPacket(contextPacket),
     });
 
+    const scoreBefore = contextPacket.checkpointStates.reduce(
+      (total, state) => total + state.scoreAwarded,
+      0,
+    );
+
     const evaluateTimer = startAdaptiveAiPhaseTimer(
       this.logger,
       'submit_answer.evaluate_turn',
@@ -378,8 +383,15 @@ export class AdaptiveInterviewSubmitService {
         interviewQuestionId: currentQuestion.id,
         context: contextPacket,
         skipEnsureStates: true,
+        evidenceSource: isFollowUpAnswer ? 'follow_up_answer' : 'main_answer',
       });
     evaluateTimer.finish({ status: evaluation.status });
+
+    const scoreAfter =
+      evaluation.status === 'valid'
+        ? evaluation.states.reduce((total, state) => total + state.scoreAwarded, 0)
+        : scoreBefore;
+    const scoreDelta = scoreAfter - scoreBefore;
 
     if (
       evaluation.status === 'provider_error' ||
@@ -450,6 +462,7 @@ export class AdaptiveInterviewSubmitService {
             : undefined,
         followUpsUsedForQuestion: contextPacket.followUpLimits.usedForQuestion,
         avoidLlmFallback: evaluation.status === 'valid',
+        recentScoreDeltas: isFollowUpAnswer ? [scoreDelta] : undefined,
       },
     );
     planTimer.finish({ status: planResult.status });

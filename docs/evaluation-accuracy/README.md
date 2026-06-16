@@ -396,4 +396,22 @@ Dashboard shows per-checkpoint rationale
 
 ---
 
-*Last updated: 2026-06-16 — after commit f93b32b*
+### Golden calibration (CI)
+
+```bash
+pnpm --dir backend run test -- --testPathPattern=golden-calibration
+```
+
+Live AI mode (optional, expensive): `CALIBRATION_LIVE_AI=1 pnpm --dir backend run test -- --testPathPattern=golden-calibration`
+
+### GraphQL HR review
+
+```graphql
+query { adaptiveCheckpointReviewByAttempt(attemptId: "36") { redFlags { checkpointKey summary } questionGroups { idealAnswer checkpoints { checkpointKey depthLabel coveragePercent accuracyPercent } } } }
+```
+
+Prompt version override: `PER_TURN_EVAL_PROMPT_VERSION=2.5.0` (see `.env.example`).
+
+---
+
+*Last updated: 2026-06-16 — block 14 complete*

@@ -1,6 +1,13 @@
 # TASK-14.2 — Golden calibration dataset + CI
 
-Status: [ ] todo
+Status: [x] done
+
+## Completion Notes
+
+- 4 кейса в `calibration/golden-cases/` (включая `react-fiber-50-50`)
+- `golden-calibration.spec.ts`: mocked AI path в CI, live mode skip без `CALIBRATION_LIVE_AI=1`
+- `npx jest golden-calibration.spec.ts` — green
+- Секция calibration в `docs/evaluation-accuracy/README.md`
 
 ## Goal
 

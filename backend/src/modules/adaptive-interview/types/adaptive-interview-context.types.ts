@@ -40,6 +40,7 @@ export type AdaptiveInterviewContextPacket = {
   referenceAnswer: string;
   maxScore: number;
   checkpoints: AdaptiveCheckpointDefinition[];
+  badAnswerExamples: string[];
   latestCandidateAnswer: string;
   latestCandidateMessageId: number | null;
   checkpointStates: AdaptiveCheckpointStateSnapshot[];
@@ -73,6 +74,7 @@ export type BuildAdaptiveInterviewContextInput = {
     followUpCount: number;
     evidenceSummary: string | null;
   }>;
+  badAnswerExamples?: string[];
   limits: {
     localTurnLimit: number;
     maxFollowUpsPerQuestion: number;

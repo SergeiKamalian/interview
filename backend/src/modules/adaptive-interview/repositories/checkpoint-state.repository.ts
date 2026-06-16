@@ -5,6 +5,7 @@ import type { DbQueryParam } from '../../../common/database/database.types';
 import { ADAPTIVE_INTERVIEW_TABLES } from '../adaptive-interview.schema';
 import type { InterviewCheckpointStateEntity } from '../entities/interview-checkpoint-state.entity';
 import type { CheckpointStateStatus } from '../types/checkpoint-state-status.type';
+import type { EvaluationEvidenceSource } from '../types/evaluation-evidence-source.type';
 import { mergeCheckpointEvaluation } from '../utils/merge-checkpoint-evaluation.util';
 
 interface CheckpointStateRow extends RowDataPacket {
@@ -125,6 +126,7 @@ export class CheckpointStateRepository {
       attemptId: number;
       interviewQuestionId: number;
       candidateMessageId: number;
+      evidenceSource?: EvaluationEvidenceSource;
       results: ApplyTurnEvaluationResultItem[];
     },
     query: QueryFn = (sql, params) => this.database.query(sql, params),
@@ -151,6 +153,7 @@ export class CheckpointStateRepository {
         incomingEvidenceSummary: result.evidenceSummary,
         incomingRationale: result.rationale,
         maxScore,
+        evidenceSource: input.evidenceSource,
       });
       const evidenceMessageIds = this.mergeEvidenceMessageIds(
         current?.evidenceMessageIds ?? null,

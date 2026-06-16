@@ -7,6 +7,11 @@ export type GraphqlOperationDef = {
 };
 
 export const GraphqlOperations = {
+  AdaptiveCheckpointReviewByAttempt: {
+    operationName: 'AdaptiveCheckpointReviewByAttempt',
+    document: "query AdaptiveCheckpointReviewByAttempt($attemptId: ID!) { adaptiveCheckpointReviewByAttempt(attemptId: $attemptId) { attemptId needsManualReview redFlags { checkpointKey checkpointTitle summary candidateQuote severity } questionGroups { interviewQuestionId questionText idealAnswer needsManualReview checkpoints { checkpointKey checkpointTitle status scoreAwarded maxScore rationale evidenceSummary confidence needsManualReview depthLabel coveragePercent accuracyPercent } } } }",
+    sha256Hash: 'fd13a87f04265b8353665f8bd29400d78d06bc2146b3f88c6830c38a336b899e',
+  },
   AddCandidateToShortlist: {
     operationName: 'AddCandidateToShortlist',
     document: "mutation AddCandidateToShortlist($candidateId: ID!, $reason: String) { addCandidateToShortlist(candidateId: $candidateId, reason: $reason) { candidateId status reason } }",

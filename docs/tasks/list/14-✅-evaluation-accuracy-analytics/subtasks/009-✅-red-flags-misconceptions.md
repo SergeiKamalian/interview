@@ -1,6 +1,12 @@
 # TASK-14.9 — Red flags / misconceptions block
 
-Status: [ ] todo
+Status: [x] done
+
+## Completion Notes
+
+- `checkpoint-red-flags.util.ts` — извлечение red flags из rationale/guards
+- Блок misconceptions в `AdaptiveCheckpointReviewPanel`
+- GraphQL attempt 36: red flags на scheduling / fiber_pointers
 
 ## Goal
 

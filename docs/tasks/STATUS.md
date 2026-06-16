@@ -20,19 +20,19 @@
 Active block:
 
 ```txt
-10-🟡-voice
+14-✅-evaluation-accuracy-analytics
 ```
 
 Block status:
 
 ```txt
-🟡 in progress
+✅ done
 ```
 
 Block title:
 
 ```txt
-Voice interview mode
+Evaluation accuracy & HR analytics
 ```
 
 ---
@@ -42,36 +42,49 @@ Voice interview mode
 Active subtask ID:
 
 ```txt
-TASK-10.4 — Speech-to-text (deferred)
+(none — block 14 complete)
 ```
 
 Last completed subtask:
 
 ```txt
-TASK-10.6 — Хранение аудио-артефактов
+TASK-14.14 — Follow-up answer weight < main answer
 ```
 
 Next recommended subtask:
 
 ```txt
-TASK-10.4 — STT (когда будет нужен transcript pipeline)
-```
-
-Next subtask file:
-
-```txt
-docs/tasks/list/10-🟡-voice/subtasks/004-⬜-add-speech-to-text.md
+Block 11-⬜-video or user choice
 ```
 
 Last updated:
 
 ```txt
-2026-06-16
+2026-06-16 (block 14 tails closed)
 ```
 
 ---
 
-## Done (block 10)
+## Done (block 14)
+
+- [x] TASK-14.1 — Coverage vs accuracy taxonomy
+- [x] TASK-14.2 — Golden calibration dataset + CI
+- [x] TASK-14.3 — LLM follow-ups, no rubric fallback
+- [x] TASK-14.4 — Follow-up early stop policy
+- [x] TASK-14.5 — False claim penalty hardening
+- [x] TASK-14.6 — Per-checkpoint HR report (dashboard)
+- [x] TASK-14.7 — Coverage vs accuracy dual axis UI
+- [x] TASK-14.8 — Ideal answer comparison
+- [x] TASK-14.9 — Red flags / misconceptions block
+- [x] TASK-14.10 — Confidence + manual review UI
+- [x] TASK-14.11 — Evaluator vs guard divergence logging
+- [x] TASK-14.12 — A/B prompt versioning
+- [x] TASK-14.13 — Verify topic_opener not scored
+- [x] TASK-14.14 — Follow-up answer weight < main answer
+
+---
+
+## Previous block (10)
 
 - [x] TASK-10.1 — Microphone permission
 - [x] TASK-10.2 — Audio recording
@@ -89,7 +102,6 @@ Last updated:
 
 ## Next blocks
 
-- [ ] Block `14-⬜-evaluation-accuracy-analytics` — Scoring accuracy, coverage vs accuracy, HR report (see `docs/evaluation-accuracy/README.md`)
 - [ ] Block `11-⬜-video` — Video interview recording
 - [ ] Block `12-⬜-ats-integrations` — ATS integrations
 - [ ] Block `13-⬜-deployment` — Deployment

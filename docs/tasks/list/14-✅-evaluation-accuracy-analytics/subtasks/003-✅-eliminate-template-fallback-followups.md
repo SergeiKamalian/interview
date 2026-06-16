@@ -1,6 +1,12 @@
 # TASK-14.3 — LLM follow-ups, убрать rubric template fallback
 
-Status: [ ] todo
+Status: [x] done
+
+## Completion Notes
+
+- `buildNaturalTemplateFollowUp` использует только `checkpointTitle`, без rubric `expected`
+- `follow-up-policy.util.spec.ts` — green
+- Template fallback остаётся last resort после LLM/repair chain
 
 ## Goal
 
