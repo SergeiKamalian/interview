@@ -13,6 +13,8 @@ export type CreateInterviewInput = {
   level: 'junior' | 'middle' | 'senior' | 'lead';
   interviewLanguage?: string;
   jobDescription?: string;
+  interviewerName?: string;
+  welcomeMessageTemplate?: string;
   questionIds: string[];
 };
 

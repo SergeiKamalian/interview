@@ -2,11 +2,13 @@ import { useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { uploadInterviewAudio } from '@features/voice-interview/api/audioUploadApi';
 import {
+  useBeginInterviewAttemptMutation,
   useCompleteInterviewAttemptMutation,
   useInterviewSessionQuery,
   useSubmitInterviewAnswerMutation,
 } from '@features/public-interview/api/publicInterviewApi';
 import { useInterviewRealtime } from '@features/public-interview/model/useInterviewRealtime';
+import { InterviewWelcomeCard } from '@features/public-interview/ui/InterviewWelcomeCard';
 import { TextInterviewChat } from '@features/public-interview/ui/TextInterviewChat';
 import { Alert, Card, Spinner } from '@shared/ui';
 
@@ -21,6 +23,8 @@ export function PublicInterviewSessionPage() {
     { skip: !token || !attemptId, pollingInterval: 0 },
   );
 
+  const [beginInterviewAttempt, { isLoading: isBeginning }] =
+    useBeginInterviewAttemptMutation();
   const [submitAnswer, { isLoading: isSubmitting }] =
     useSubmitInterviewAnswerMutation();
   const [completeAttempt] = useCompleteInterviewAttemptMutation();
@@ -29,8 +33,17 @@ export function PublicInterviewSessionPage() {
     await refetch();
   }, [refetch]);
 
-  const { statusLabel, streamingMessage, audioState, replayAiAudio, isConnected, markAnswerSending, resetPhase } =
-    useInterviewRealtime({
+  const {
+    statusLabel,
+    streamingMessage,
+    audioState,
+    replayAiAudio,
+    requestWelcomeSpeech,
+    requestCurrentQuestionSpeech,
+    isConnected,
+    markAnswerSending,
+    resetPhase,
+  } = useInterviewRealtime({
     publicToken: token,
     attemptId,
     enabled: Boolean(token && attemptId),
@@ -46,6 +59,21 @@ export function PublicInterviewSessionPage() {
         isStreaming: true,
       }
     : null;
+
+  const handleBeginInterview = useCallback(async () => {
+    await beginInterviewAttempt({
+      publicToken: token,
+      attemptId,
+    }).unwrap();
+    await refetch();
+    requestCurrentQuestionSpeech();
+  }, [
+    attemptId,
+    beginInterviewAttempt,
+    refetch,
+    requestCurrentQuestionSpeech,
+    token,
+  ]);
 
   if (!attemptId) {
     return (
@@ -74,6 +102,24 @@ export function PublicInterviewSessionPage() {
 
   const isComplete = data.status === 'completed';
   const answeredMainQuestions = data.answeredQuestions;
+  const welcomeMessage =
+    data.welcomeMessage ??
+    data.messages.find((message) => message.messageKind === 'welcome')?.content ??
+    '';
+
+  if (data.isWelcomePending && welcomeMessage) {
+    return (
+      <Card header="Добро пожаловать">
+        <InterviewWelcomeCard
+          welcomeMessage={welcomeMessage}
+          isBeginning={isBeginning}
+          aiAudioState={audioState}
+          onReplayWelcome={requestWelcomeSpeech}
+          onBegin={handleBeginInterview}
+        />
+      </Card>
+    );
+  }
 
   return (
     <Card

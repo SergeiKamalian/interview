@@ -1,6 +1,8 @@
 import { baseApi } from '@shared/api/baseApi';
 import { GraphqlOperations } from '@shared/api/graphql/operations.registry';
 import type {
+  BeginInterviewAttemptMutation,
+  BeginInterviewAttemptMutationVariables,
   CompleteInterviewAttemptMutation,
   CompleteInterviewAttemptMutationVariables,
   InterviewSessionQuery,
@@ -48,6 +50,17 @@ export const publicInterviewApi = baseApi.injectEndpoints({
       transformResponse: (response: InterviewSessionQuery) =>
         response.interviewSession,
     }),
+    beginInterviewAttempt: builder.mutation<
+      BeginInterviewAttemptMutation['beginInterviewAttempt'],
+      BeginInterviewAttemptMutationVariables['input']
+    >({
+      query: (input) => ({
+        ...GraphqlOperations.BeginInterviewAttempt,
+        variables: { input },
+      }),
+      transformResponse: (response: BeginInterviewAttemptMutation) =>
+        response.beginInterviewAttempt,
+    }),
     submitInterviewAnswer: builder.mutation<
       SubmitInterviewAnswerMutation['submitInterviewAnswer'],
       SubmitInterviewAnswerMutationVariables['input']
@@ -77,6 +90,7 @@ export const {
   usePublicInterviewQuery,
   useStartPublicInterviewMutation,
   useInterviewSessionQuery,
+  useBeginInterviewAttemptMutation,
   useSubmitInterviewAnswerMutation,
   useCompleteInterviewAttemptMutation,
 } = publicInterviewApi;

@@ -40,6 +40,8 @@ erDiagram
 | `status` | draft \| active \| archived |
 | `level`, `question_count`, `interview_language` | Config |
 | `is_video_enabled` | Video flag |
+| `interviewer_name` | Optional AI interviewer display name for welcome TTS |
+| `welcome_message_template` | Optional welcome text with `{{candidateName}}`, `{{interviewerName}}`, `{{jobRole}}`, `{{title}}`, `{{questionCount}}` |
 
 **Public token policy:** crypto-random UUID v4, generated in application, never sequential IDs in URLs.
 

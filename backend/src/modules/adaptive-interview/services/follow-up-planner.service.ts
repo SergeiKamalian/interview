@@ -24,6 +24,7 @@ import type {
   FollowUpPlannerOptions,
 } from '../types/follow-up-planner.types';
 import { boundText } from '../utils/build-adaptive-interview-context.util';
+import { normalizeFollowUpQuestionForCandidate } from '../utils/checkpoint-expected-speech.util';
 import { buildNaturalTemplateFollowUp } from '../utils/follow-up-policy.util';
 import { isSuggestedFollowUpUsable } from '../utils/parse-suggested-follow-up.util';
 import { AdaptiveInterviewContextService } from './adaptive-interview-context.service';
@@ -35,6 +36,10 @@ import {
   summarizeAdaptiveContextPacket,
   summarizeAiPrompts,
 } from '../utils/adaptive-ai-debug.util';
+
+function prepareFollowUpQuestion(text: string, maxLength: number): string {
+  return boundText(normalizeFollowUpQuestionForCandidate(text), maxLength);
+}
 
 @Injectable()
 export class FollowUpPlannerService {
@@ -174,7 +179,7 @@ export class FollowUpPlannerService {
         : null;
 
     if (combinedSuggested) {
-      followUpQuestion = boundText(
+      followUpQuestion = prepareFollowUpQuestion(
         combinedSuggested.followUpQuestion,
         limits.maxTextLength,
       );
@@ -234,7 +239,7 @@ export class FollowUpPlannerService {
           operationType: 'plan_follow_up',
           correlationId,
         });
-        followUpQuestion = boundText(streamed, limits.maxTextLength);
+        followUpQuestion = prepareFollowUpQuestion(streamed, limits.maxTextLength);
         usedTemplate = false;
       } catch (error: unknown) {
         const message =
@@ -307,7 +312,7 @@ export class FollowUpPlannerService {
         });
 
         if (validation.status === 'valid') {
-          followUpQuestion = boundText(
+          followUpQuestion = prepareFollowUpQuestion(
             validation.data.followUpQuestion,
             limits.maxTextLength,
           );
@@ -367,6 +372,11 @@ export class FollowUpPlannerService {
         followUpQuestion: templateQuestion,
       });
     }
+
+    followUpQuestion = prepareFollowUpQuestion(
+      followUpQuestion,
+      limits.maxTextLength,
+    );
 
     const followUp = await this.followUpRepository.create({
       companyId: context.companyId,

@@ -46,6 +46,39 @@ export class ExpensiveInterviewType {
 }
 
 @ObjectType()
+export class ElevenLabsCostKpiType {
+  @Field(() => Float)
+  totalCostUsd!: number;
+
+  @Field(() => Int)
+  totalCharacters!: number;
+
+  @Field(() => Int)
+  totalRequests!: number;
+}
+
+@ObjectType()
+export class ElevenLabsCostByOperationType {
+  @Field()
+  operationType!: string;
+
+  @Field(() => Int)
+  characterCount!: number;
+
+  @Field(() => Float)
+  totalCostUsd!: number;
+}
+
+@ObjectType()
+export class ElevenLabsCostAnalyticsType {
+  @Field(() => ElevenLabsCostKpiType)
+  kpi!: ElevenLabsCostKpiType;
+
+  @Field(() => [ElevenLabsCostByOperationType])
+  byOperation!: ElevenLabsCostByOperationType[];
+}
+
+@ObjectType()
 export class AiCostAnalyticsType {
   @Field(() => AiCostKpiType)
   kpi!: AiCostKpiType;
@@ -55,4 +88,7 @@ export class AiCostAnalyticsType {
 
   @Field(() => [ExpensiveInterviewType])
   topExpensiveInterviews!: ExpensiveInterviewType[];
+
+  @Field(() => ElevenLabsCostAnalyticsType)
+  elevenLabs!: ElevenLabsCostAnalyticsType;
 }

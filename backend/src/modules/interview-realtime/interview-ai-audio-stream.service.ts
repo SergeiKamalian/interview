@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ElevenLabsTtsService } from '../elevenlabs/elevenlabs-tts.service';
+import { InterviewCoreRepository } from '../interview-core/interview-core.repository';
 import { InterviewRealtimeService } from './interview-realtime.service';
 import type { StreamAiAudioInput } from './types/interview-audio-stream.types';
 
@@ -10,6 +11,7 @@ export class InterviewAiAudioStreamService {
   constructor(
     private readonly elevenLabsTtsService: ElevenLabsTtsService,
     private readonly interviewRealtimeService: InterviewRealtimeService,
+    private readonly interviewRepository: InterviewCoreRepository,
   ) {}
 
   isEnabled(): boolean {
@@ -46,7 +48,19 @@ export class InterviewAiAudioStreamService {
       },
     });
 
-    const generator = this.elevenLabsTtsService.streamText(text);
+    const companyId = await this.interviewRepository.findAttemptCompanyId(
+      input.attemptId,
+    );
+    const usage =
+      companyId != null
+        ? {
+            companyId,
+            interviewAttemptId: input.attemptId,
+            operationType: `tts_${input.messageKind}`,
+          }
+        : undefined;
+
+    const generator = this.elevenLabsTtsService.streamText(text, usage);
     let chunkIndex = 0;
     let result = await generator.next();
 

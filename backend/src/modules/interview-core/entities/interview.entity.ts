@@ -16,6 +16,8 @@ export type InterviewEntity = {
   publicToken: string;
   status: InterviewStatus;
   isVideoEnabled: boolean;
+  interviewerName: string | null;
+  welcomeMessageTemplate: string | null;
   createdAt: Date;
   updatedAt: Date;
 };

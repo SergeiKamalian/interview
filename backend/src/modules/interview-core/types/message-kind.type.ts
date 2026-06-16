@@ -1,4 +1,5 @@
 export const MESSAGE_KINDS = [
+  'welcome',
   'main_question',
   'main_answer',
   'follow_up_question',

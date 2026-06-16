@@ -56,6 +56,18 @@ export class CreateInterviewInput {
   @IsBoolean()
   isVideoEnabled?: boolean;
 
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  interviewerName?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  welcomeMessageTemplate?: string;
+
   @Field(() => [String])
   @IsArray()
   @ArrayMinSize(1)

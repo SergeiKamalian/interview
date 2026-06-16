@@ -1,8 +1,14 @@
+import { sanitizeCheckpointExpectedForCandidateSpeech } from '../utils/checkpoint-expected-speech.util';
+import {
+  INTERVIEWER_FIRST_PERSON_VOICE_RULES,
+  INTERVIEWER_FOLLOW_UP_REMINDER,
+} from './interviewer-voice.prompt';
+
 export const FOLLOW_UP_PLANNER_PROMPT_KEY = 'follow_up_planner';
-export const FOLLOW_UP_PLANNER_PROMPT_VERSION = '2.1.0';
+export const FOLLOW_UP_PLANNER_PROMPT_VERSION = '2.4.0';
 
 const RESPONSE_JSON_SCHEMA = `{
-  "follow_up_question": "brief acknowledgment of the candidate's answer, then one natural follow-up question",
+  "follow_up_question": "interviewer «я» → candidate «вы»: short generic acknowledgment, then ONE direct follow-up question in Russian — never quote the candidate's words",
   "reason": "why this follow-up helps clarify the missing point"
 }`;
 
@@ -19,16 +25,18 @@ const INTERVIEWER_PERSONA = [
   'You are an experienced, friendly human technical interviewer in a live 1:1 conversation.',
   'Sound natural and respectful — like a real interviewer, not a quiz bot or grading rubric.',
   '',
+  INTERVIEWER_FIRST_PERSON_VOICE_RULES,
+  '',
   'Dialogue style:',
-  '- Always reply like a human: first a SHORT reaction to what the candidate just said, then your question.',
-  '- Good openers: "Понял, спасибо.", "Хорошо, про таблицу услышал.", "Ок, давайте уточним:", "Интересно, спасибо."',
-  '- The acknowledgment must relate to their latest answer — never generic filler every time.',
-  '- Keep the full message to 2–3 short sentences total (reaction + one question).',
+  '- Start with a SHORT generic acknowledgment only («Понял, спасибо.», «Хорошо.», «Ок, давайте уточним.»).',
+  '- Do NOT repeat, quote, or paraphrase what the candidate just said — no «про … услышал», no «…» with their answer.',
+  '- They already know what they said; move straight to your clarifying question.',
+  '- Keep the full message to 1–2 short sentences (acknowledgment + one question).',
   '',
   'Critical rules:',
   '- Ask exactly ONE follow-up question in Russian (unless the main question is clearly in English).',
-  "- Base the question on the candidate's latest answer: react to their words, acknowledge gaps or confusion gently.",
-  '- The backend selected an internal topic to clarify — use it as guidance only.',
+  '- Use the candidate answer only to decide WHAT to ask next — never to recap it aloud.',
+  '- The backend selected an internal topic to clarify — use it as guidance only; rephrase in «я»→«вы» form.',
   '- NEVER quote internal rubric labels (e.g. "Понимает параметр типа", checkpoint keys, scores, or evaluation criteria).',
   '- NEVER use robotic templates like "Можете подробнее рассказать про «…»" with a rubric title.',
   '- Do NOT repeat a follow-up that was already asked in this question.',
@@ -61,10 +69,7 @@ function buildSharedUserContext(input: FollowUpPlannerPromptInput): string {
 }
 
 function sanitizeTopicHint(checkpointExpected: string): string {
-  return checkpointExpected
-    .replace(/^кандидат\s+(объясняет|говорит),?\s*что\s+/i, '')
-    .replace(/\.$/, '')
-    .trim();
+  return sanitizeCheckpointExpectedForCandidateSpeech(checkpointExpected);
 }
 
 export function buildFollowUpPlannerSystemPrompt(): string {
@@ -82,9 +87,11 @@ export function buildFollowUpPlannerUserPrompt(
   input: FollowUpPlannerPromptInput,
 ): string {
   return [
-    'Write one natural interviewer reply: a brief acknowledgment of the candidate answer, then one follow-up question.',
+    'Write one natural interviewer reply: first person «я», candidate «вы» — short generic acknowledgment, then one follow-up question. Do not quote their answer.',
     '',
     buildSharedUserContext(input),
+    '',
+    INTERVIEWER_FOLLOW_UP_REMINDER,
     '',
     'Return JSON with follow_up_question and reason.',
   ].join('\n');
@@ -94,7 +101,7 @@ export function buildFollowUpPlannerStreamingSystemPrompt(): string {
   return [
     INTERVIEWER_PERSONA,
     '',
-    'Return plain text only: brief acknowledgment + one follow-up question in the same message. No JSON, no markdown, no commentary.',
+    'Return plain text only: short generic acknowledgment + one follow-up question in the same message. Never quote the candidate. No JSON, no markdown, no commentary.',
   ].join('\n');
 }
 
@@ -102,8 +109,10 @@ export function buildFollowUpPlannerStreamingUserPrompt(
   input: FollowUpPlannerPromptInput,
 ): string {
   return [
-    'Write one natural interviewer reply: first react briefly to what the candidate said, then ask one follow-up question.',
+    'Write one natural interviewer reply: first person «я», candidate «вы» — short generic acknowledgment, then one follow-up question. Do not quote their answer.',
     '',
     buildSharedUserContext(input),
+    '',
+    INTERVIEWER_FOLLOW_UP_REMINDER,
   ].join('\n');
 }

@@ -21,8 +21,9 @@ describe('follow-up-planner.prompt v2', () => {
     const systemPrompt = buildFollowUpPlannerSystemPrompt();
 
     expect(systemPrompt).toContain('human technical interviewer');
-    expect(systemPrompt).toContain('Dialogue style');
-    expect(systemPrompt).toContain('NEVER quote internal rubric labels');
+    expect(systemPrompt).toContain('MANDATORY');
+    expect(systemPrompt).toContain('first person «я»');
+    expect(systemPrompt).toContain('NEVER use third person');
     expect(systemPrompt).toContain('NEVER use robotic templates');
   });
 

@@ -8,7 +8,7 @@ export type InterviewAudioStreamPayload = {
 
 export type StreamAiAudioInput = {
   attemptId: number;
-  interviewQuestionId: number;
+  interviewQuestionId: number | null;
   messageKind: string;
   streamId: string;
   text: string;

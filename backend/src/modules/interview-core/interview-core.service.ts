@@ -81,6 +81,8 @@ export class InterviewCoreService {
           professionId: input.professionId ? Number(input.professionId) : null,
           publicToken,
           isVideoEnabled: input.isVideoEnabled ?? false,
+          interviewerName: input.interviewerName?.trim() ?? null,
+          welcomeMessageTemplate: input.welcomeMessageTemplate?.trim() ?? null,
           questions: loadedQuestions,
           topicNames,
         },

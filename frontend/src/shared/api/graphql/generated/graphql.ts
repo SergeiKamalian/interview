@@ -21,6 +21,11 @@ export type AttemptStatus =
   | 'in_progress'
   | 'pending';
 
+export type BeginInterviewAttemptInput = {
+  attemptId: string;
+  publicToken: string;
+};
+
 export type CheckpointMatchStatus =
   | 'met'
   | 'not_met'
@@ -52,6 +57,7 @@ export type CompanyInterviewsFilterInput = {
 
 export type CreateInterviewInput = {
   interviewLanguage?: string | null | undefined;
+  interviewerName?: string | null | undefined;
   isVideoEnabled?: boolean | null | undefined;
   jobDescription?: string | null | undefined;
   jobRole: string;
@@ -60,6 +66,7 @@ export type CreateInterviewInput = {
   questionCount?: number | null | undefined;
   questionIds: Array<string>;
   title: string;
+  welcomeMessageTemplate?: string | null | undefined;
 };
 
 export type FinalEvaluationCategory =
@@ -81,7 +88,8 @@ export type InterviewMessageKind =
   | 'follow_up_question'
   | 'main_answer'
   | 'main_question'
-  | 'system_note';
+  | 'system_note'
+  | 'welcome';
 
 export type InterviewStatus =
   | 'active'
@@ -165,7 +173,14 @@ export type AiCostAnalyticsQueryVariables = Exact<{
 }>;
 
 
-export type AiCostAnalyticsQuery = { aiCostAnalytics: { kpi: { totalCostUsd: number, costPerInterview: number, costPerCandidate: number, totalRequests: number }, byModel: Array<{ model: string, promptTokens: number, completionTokens: number, totalCostUsd: number }>, topExpensiveInterviews: Array<{ interviewAttemptId: string, interviewTitle: string | null, totalCostUsd: number, latencyMs: number | null }> } };
+export type AiCostAnalyticsQuery = { aiCostAnalytics: { kpi: { totalCostUsd: number, costPerInterview: number, costPerCandidate: number, totalRequests: number }, byModel: Array<{ model: string, promptTokens: number, completionTokens: number, totalCostUsd: number }>, topExpensiveInterviews: Array<{ interviewAttemptId: string, interviewTitle: string | null, totalCostUsd: number, latencyMs: number | null }>, elevenLabs: { kpi: { totalCostUsd: number, totalCharacters: number, totalRequests: number }, byOperation: Array<{ operationType: string, characterCount: number, totalCostUsd: number }> } } };
+
+export type BeginInterviewAttemptMutationVariables = Exact<{
+  input: BeginInterviewAttemptInput;
+}>;
+
+
+export type BeginInterviewAttemptMutation = { beginInterviewAttempt: { attemptId: string, status: AttemptStatus, isWelcomePending: boolean, welcomeMessage: string | null, totalQuestions: number, answeredQuestions: number, currentQuestionText: string | null, currentQuestionId: string | null, messages: Array<{ id: string, role: MessageRole, content: string, sequenceOrder: number, messageKind: InterviewMessageKind | null }> } };
 
 export type CandidateReportQueryVariables = Exact<{
   candidateId: string | number;
@@ -208,7 +223,7 @@ export type CreateInterviewMutationVariables = Exact<{
 }>;
 
 
-export type CreateInterviewMutation = { createInterview: { id: string, title: string, jobRole: string, level: QuestionLevel, status: InterviewStatus, publicToken: string, publicUrl: string, questionCount: number } };
+export type CreateInterviewMutation = { createInterview: { id: string, title: string, jobRole: string, level: QuestionLevel, status: InterviewStatus, publicToken: string, publicUrl: string, questionCount: number, interviewerName: string | null, welcomeMessageTemplate: string | null } };
 
 export type EvaluateInterviewAttemptMutationVariables = Exact<{
   attemptId: string | number;
@@ -249,7 +264,7 @@ export type InterviewSessionQueryVariables = Exact<{
 }>;
 
 
-export type InterviewSessionQuery = { interviewSession: { attemptId: string, status: AttemptStatus, totalQuestions: number, answeredQuestions: number, currentQuestionText: string | null, currentQuestionId: string | null, messages: Array<{ id: string, role: MessageRole, content: string, sequenceOrder: number, messageKind: InterviewMessageKind | null, interviewQuestionId: string | null, targetCheckpointKey: string | null }> } };
+export type InterviewSessionQuery = { interviewSession: { attemptId: string, status: AttemptStatus, totalQuestions: number, answeredQuestions: number, currentQuestionText: string | null, currentQuestionId: string | null, welcomeMessage: string | null, isWelcomePending: boolean, messages: Array<{ id: string, role: MessageRole, content: string, sequenceOrder: number, messageKind: InterviewMessageKind | null, interviewQuestionId: string | null, targetCheckpointKey: string | null }> } };
 
 export type InterviewTranscriptQueryVariables = Exact<{
   attemptId: string | number;
@@ -328,7 +343,7 @@ export type StartPublicInterviewMutationVariables = Exact<{
 }>;
 
 
-export type StartPublicInterviewMutation = { startPublicInterview: { attemptId: string, currentQuestionText: string, totalQuestions: number } };
+export type StartPublicInterviewMutation = { startPublicInterview: { attemptId: string, currentQuestionText: string | null, totalQuestions: number } };
 
 export type SubmitInterviewAnswerMutationVariables = Exact<{
   input: SubmitInterviewAnswerInput;
@@ -393,9 +408,42 @@ export const AiCostAnalyticsDocument = new TypedDocumentString(`
       totalCostUsd
       latencyMs
     }
+    elevenLabs {
+      kpi {
+        totalCostUsd
+        totalCharacters
+        totalRequests
+      }
+      byOperation {
+        operationType
+        characterCount
+        totalCostUsd
+      }
+    }
   }
 }
     `) as unknown as TypedDocumentString<AiCostAnalyticsQuery, AiCostAnalyticsQueryVariables>;
+export const BeginInterviewAttemptDocument = new TypedDocumentString(`
+    mutation BeginInterviewAttempt($input: BeginInterviewAttemptInput!) {
+  beginInterviewAttempt(input: $input) {
+    attemptId
+    status
+    isWelcomePending
+    welcomeMessage
+    totalQuestions
+    answeredQuestions
+    currentQuestionText
+    currentQuestionId
+    messages {
+      id
+      role
+      content
+      sequenceOrder
+      messageKind
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<BeginInterviewAttemptMutation, BeginInterviewAttemptMutationVariables>;
 export const CandidateReportDocument = new TypedDocumentString(`
     query CandidateReport($candidateId: ID!) {
   candidateReport(candidateId: $candidateId) {
@@ -525,6 +573,8 @@ export const CreateInterviewDocument = new TypedDocumentString(`
     publicToken
     publicUrl
     questionCount
+    interviewerName
+    welcomeMessageTemplate
   }
 }
     `) as unknown as TypedDocumentString<CreateInterviewMutation, CreateInterviewMutationVariables>;
@@ -644,6 +694,8 @@ export const InterviewSessionDocument = new TypedDocumentString(`
     answeredQuestions
     currentQuestionText
     currentQuestionId
+    welcomeMessage
+    isWelcomePending
     messages {
       id
       role

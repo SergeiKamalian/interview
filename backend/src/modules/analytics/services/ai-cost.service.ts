@@ -16,6 +16,10 @@ export class AiCostService {
     const distinctAttempts = Number(data.kpi?.distinct_attempts ?? 0);
     const distinctCandidates = Number(data.kpi?.distinct_candidates ?? 0);
 
+    const elevenLabsTotalCostUsd = Number(
+      data.elevenLabs.kpi?.total_cost_usd ?? 0,
+    );
+
     return {
       kpi: {
         totalCostUsd,
@@ -37,6 +41,20 @@ export class AiCostService {
         totalCostUsd: Number(row.total_cost_usd),
         latencyMs: row.max_latency_ms,
       })),
+      elevenLabs: {
+        kpi: {
+          totalCostUsd: elevenLabsTotalCostUsd,
+          totalCharacters: Number(
+            data.elevenLabs.kpi?.total_characters ?? 0,
+          ),
+          totalRequests: Number(data.elevenLabs.kpi?.total_requests ?? 0),
+        },
+        byOperation: data.elevenLabs.byOperation.map((row) => ({
+          operationType: row.operation_type,
+          characterCount: Number(row.character_count),
+          totalCostUsd: Number(row.total_cost_usd),
+        })),
+      },
     };
   }
 }

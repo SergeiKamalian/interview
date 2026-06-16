@@ -32,6 +32,9 @@ export const elevenlabsEnvValidationSchema: ObjectSchema = Joi.object({
     .min(1)
     .max(500)
     .default('Хмм... хорошо...'),
+  ELEVENLABS_PRICE_PER_1K_CHARS: Joi.alternatives()
+    .try(Joi.number().min(0), Joi.string().pattern(/^\d+(\.\d+)?$/))
+    .default(0.06),
 });
 
 export type ElevenLabsConfig = {
@@ -43,6 +46,7 @@ export type ElevenLabsConfig = {
   optimizeStreamingLatency: number;
   maxTextLength: number;
   thinkingPhrase: string;
+  pricePer1kChars: number;
 };
 
 const DEFAULT_ELEVENLABS_BASE_URL = 'https://api.elevenlabs.io/v1';
@@ -64,6 +68,9 @@ export const elevenlabsConfig = registerAs('elevenlabs', (): ElevenLabsConfig =>
     maxTextLength: Number(process.env.ELEVENLABS_TTS_MAX_TEXT_LENGTH ?? 2000),
     thinkingPhrase:
       process.env.ELEVENLABS_THINKING_PHRASE?.trim() || 'Хмм... хорошо...',
+    pricePer1kChars: Number(
+      process.env.ELEVENLABS_PRICE_PER_1K_CHARS ?? 0.06,
+    ),
   };
 });
 

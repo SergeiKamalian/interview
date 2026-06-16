@@ -1,4 +1,7 @@
-import { evaluateFollowUpPolicy } from './follow-up-policy.util';
+import {
+  buildNaturalTemplateFollowUp,
+  evaluateFollowUpPolicy,
+} from './follow-up-policy.util';
 import type { FollowUpPolicyInput } from '../types/follow-up-planner.types';
 
 const baseCheckpoints = [
@@ -45,6 +48,23 @@ const baseInput: FollowUpPolicyInput = {
   questionScoreSufficientRatio: 0.6,
   lowWeightCheckpointRatio: 0.2,
 };
+
+describe('buildNaturalTemplateFollowUp', () => {
+  it('does not quote the candidate answer in the opener', () => {
+    const question = buildNaturalTemplateFollowUp({
+      questionText: 'Что такое useEffect?',
+      checkpointExpected: 'Кандидат объясняет роль массива зависимостей.',
+      latestCandidateAnswer:
+        'Юзефект это хук в реакте для выполнения таких функционалов как запрос к апи, изм…',
+    });
+
+    expect(question).toBe(
+      'Понял, спасибо. Можете подробнее рассказать — роль массива зависимостей?',
+    );
+    expect(question).not.toContain('Юзефект');
+    expect(question).not.toContain('про «');
+  });
+});
 
 describe('evaluateFollowUpPolicy', () => {
   it('does not select already covered checkpoints', () => {

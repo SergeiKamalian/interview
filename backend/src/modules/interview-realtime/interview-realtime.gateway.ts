@@ -71,14 +71,14 @@ export class InterviewRealtimeGateway implements OnGatewayInit {
     const attemptId = Number(payload.attemptId);
     if (Number.isInteger(attemptId) && attemptId > 0) {
       void this.currentQuestionSpeechService
-        .speakCurrentQuestion({
+        .speakOnJoin({
           attemptId,
           publicToken: payload.publicToken,
         })
         .catch((error: unknown) => {
           const message = error instanceof Error ? error.message : String(error);
           this.logger.warn(
-            `Failed to speak current question attempt=${payload.attemptId}: ${message}`,
+            `Failed to speak on join attempt=${payload.attemptId}: ${message}`,
           );
         });
     }
@@ -99,6 +99,27 @@ export class InterviewRealtimeGateway implements OnGatewayInit {
     }
 
     await this.currentQuestionSpeechService.speakCurrentQuestion({
+      attemptId,
+      publicToken: payload.publicToken,
+      force: true,
+    });
+  }
+
+  @SubscribeMessage('speak_welcome')
+  async handleSpeakWelcome(
+    @MessageBody() payload: JoinInterviewRoomPayload,
+  ): Promise<void> {
+    const attemptId = Number(payload.attemptId);
+    if (!Number.isInteger(attemptId) || attemptId < 1) {
+      return;
+    }
+
+    const isValid = await this.interviewRealtimeService.validateJoin(payload);
+    if (!isValid) {
+      return;
+    }
+
+    await this.currentQuestionSpeechService.speakWelcomeIfPending({
       attemptId,
       publicToken: payload.publicToken,
       force: true,

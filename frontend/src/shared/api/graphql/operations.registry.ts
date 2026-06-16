@@ -14,8 +14,13 @@ export const GraphqlOperations = {
   },
   AiCostAnalytics: {
     operationName: 'AiCostAnalytics',
-    document: "query AiCostAnalytics($filters: AiCostFilterInput) { aiCostAnalytics(filters: $filters) { kpi { totalCostUsd costPerInterview costPerCandidate totalRequests } byModel { model promptTokens completionTokens totalCostUsd } topExpensiveInterviews { interviewAttemptId interviewTitle totalCostUsd latencyMs } } }",
-    sha256Hash: '8b33137e77cc5fea6d6fc6f5d10982188676da5dbf9ede3a13755c4c73b68e7c',
+    document: "query AiCostAnalytics($filters: AiCostFilterInput) { aiCostAnalytics(filters: $filters) { kpi { totalCostUsd costPerInterview costPerCandidate totalRequests } byModel { model promptTokens completionTokens totalCostUsd } topExpensiveInterviews { interviewAttemptId interviewTitle totalCostUsd latencyMs } elevenLabs { kpi { totalCostUsd totalCharacters totalRequests } byOperation { operationType characterCount totalCostUsd } } } }",
+    sha256Hash: '974d996d3ab9c10f6b6eeac46c5a6a84114d35df066f715d37375c03b0f1a0de',
+  },
+  BeginInterviewAttempt: {
+    operationName: 'BeginInterviewAttempt',
+    document: "mutation BeginInterviewAttempt($input: BeginInterviewAttemptInput!) { beginInterviewAttempt(input: $input) { attemptId status isWelcomePending welcomeMessage totalQuestions answeredQuestions currentQuestionText currentQuestionId messages { id role content sequenceOrder messageKind } } }",
+    sha256Hash: '5a6ba59ffe973bcfec75dc962fcdddf3aabab9d65093f8125e6ce207ba72e7e9',
   },
   CandidateReport: {
     operationName: 'CandidateReport',
@@ -44,8 +49,8 @@ export const GraphqlOperations = {
   },
   CreateInterview: {
     operationName: 'CreateInterview',
-    document: "mutation CreateInterview($input: CreateInterviewInput!) { createInterview(input: $input) { id title jobRole level status publicToken publicUrl questionCount } }",
-    sha256Hash: '48ac554096bc635ba80dd1df69291352d3d8bd8bb37a0da6a8771bfcb9c7e075',
+    document: "mutation CreateInterview($input: CreateInterviewInput!) { createInterview(input: $input) { id title jobRole level status publicToken publicUrl questionCount interviewerName welcomeMessageTemplate } }",
+    sha256Hash: 'b6b1596454218a45eabacfe27ada9cb66ad2df7b15459e9483f14d45da2c29d0',
   },
   EvaluateInterviewAttempt: {
     operationName: 'EvaluateInterviewAttempt',
@@ -74,8 +79,8 @@ export const GraphqlOperations = {
   },
   InterviewSession: {
     operationName: 'InterviewSession',
-    document: "query InterviewSession($publicToken: String!, $attemptId: ID!) { interviewSession(publicToken: $publicToken, attemptId: $attemptId) { attemptId status totalQuestions answeredQuestions currentQuestionText currentQuestionId messages { id role content sequenceOrder messageKind interviewQuestionId targetCheckpointKey } } }",
-    sha256Hash: 'cea9d132a18b6bda6d1cf72c73f22bfc7882773ec4b35bf5899c783893868467',
+    document: "query InterviewSession($publicToken: String!, $attemptId: ID!) { interviewSession(publicToken: $publicToken, attemptId: $attemptId) { attemptId status totalQuestions answeredQuestions currentQuestionText currentQuestionId welcomeMessage isWelcomePending messages { id role content sequenceOrder messageKind interviewQuestionId targetCheckpointKey } } }",
+    sha256Hash: 'a2ec889f92d97cd79687f49d3628adb8e0bbedaf8fc5be80cf1993faa15271f7',
   },
   InterviewTranscript: {
     operationName: 'InterviewTranscript',

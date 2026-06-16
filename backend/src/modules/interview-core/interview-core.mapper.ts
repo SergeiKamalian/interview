@@ -33,6 +33,8 @@ export function mapInterviewToGraphql(
     publicUrl: `${publicBasePath}/${interview.publicToken}`,
     status: interview.status as InterviewStatusEnum,
     isVideoEnabled: interview.isVideoEnabled,
+    interviewerName: interview.interviewerName,
+    welcomeMessageTemplate: interview.welcomeMessageTemplate,
   };
 }
 
@@ -70,6 +72,8 @@ export function buildSessionPayload(input: {
   answeredQuestions: number;
   currentQuestionText: string | null;
   currentQuestionId: number | null;
+  welcomeMessage?: string | null;
+  isWelcomePending?: boolean;
 }): InterviewSessionType {
   return {
     attemptId: String(input.attempt.id),
@@ -81,12 +85,14 @@ export function buildSessionPayload(input: {
       ? String(input.currentQuestionId)
       : null,
     messages: input.messages.map(mapMessageToGraphql),
+    welcomeMessage: input.welcomeMessage ?? null,
+    isWelcomePending: input.isWelcomePending ?? false,
   };
 }
 
 export function buildStartPayload(input: {
   attemptId: number;
-  currentQuestionText: string;
+  currentQuestionText: string | null;
   totalQuestions: number;
 }): StartPublicInterviewPayload {
   return {

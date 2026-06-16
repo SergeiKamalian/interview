@@ -26,6 +26,18 @@ interface ExpensiveRow extends RowDataPacket {
   max_latency_ms: number | null;
 }
 
+interface ElevenLabsKpiRow extends RowDataPacket {
+  total_cost_usd: string;
+  total_characters: number;
+  total_requests: number;
+}
+
+interface ElevenLabsOperationRow extends RowDataPacket {
+  operation_type: string;
+  character_count: number;
+  total_cost_usd: string;
+}
+
 @Injectable()
 export class AiCostRepository {
   constructor(private readonly database: DatabaseService) {}
@@ -77,11 +89,33 @@ export class AiCostRepository {
               COALESCE(SUM(l.completion_tokens), 0) AS completion_tokens,
               COALESCE(SUM(l.cost_usd), 0) AS total_cost_usd
        FROM ${AI_EVALUATION_TABLES.aiUsageLogs} l
-       WHERE ${whereClause}
+       WHERE ${whereClause} AND l.provider <> 'elevenlabs'
        GROUP BY l.model
        ORDER BY total_cost_usd DESC`,
       params,
     );
+
+    const elevenLabsWhereClause = `${whereClause} AND l.provider = 'elevenlabs'`;
+    const elevenLabsKpiRows = await this.database.query<ElevenLabsKpiRow[]>(
+      `SELECT COALESCE(SUM(l.cost_usd), 0) AS total_cost_usd,
+              COALESCE(SUM(l.prompt_tokens), 0) AS total_characters,
+              COUNT(*) AS total_requests
+       FROM ${AI_EVALUATION_TABLES.aiUsageLogs} l
+       WHERE ${elevenLabsWhereClause}`,
+      params,
+    );
+
+    const elevenLabsOperationRows =
+      await this.database.query<ElevenLabsOperationRow[]>(
+        `SELECT l.operation_type,
+                COALESCE(SUM(l.prompt_tokens), 0) AS character_count,
+                COALESCE(SUM(l.cost_usd), 0) AS total_cost_usd
+         FROM ${AI_EVALUATION_TABLES.aiUsageLogs} l
+         WHERE ${elevenLabsWhereClause}
+         GROUP BY l.operation_type
+         ORDER BY total_cost_usd DESC`,
+        params,
+      );
 
     const expensiveRows = await this.database.query<ExpensiveRow[]>(
       `SELECT l.interview_attempt_id,
@@ -98,6 +132,14 @@ export class AiCostRepository {
       params,
     );
 
-    return { kpi: kpiRows[0], byModel: modelRows, expensive: expensiveRows };
+    return {
+      kpi: kpiRows[0],
+      byModel: modelRows,
+      expensive: expensiveRows,
+      elevenLabs: {
+        kpi: elevenLabsKpiRows[0],
+        byOperation: elevenLabsOperationRows,
+      },
+    };
   }
 }

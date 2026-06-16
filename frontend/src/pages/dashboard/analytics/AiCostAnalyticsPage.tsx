@@ -24,7 +24,14 @@ export function AiCostAnalyticsPage() {
     );
   }
 
-  if (!data || data.kpi.totalRequests === 0) {
+  if (!data) {
+    return null;
+  }
+
+  const hasAnyUsage =
+    data.kpi.totalRequests > 0 || data.elevenLabs.kpi.totalRequests > 0;
+
+  if (!hasAnyUsage) {
     return (
       <Alert variant="info" title="AI usage пока пуст">
         После первых AI-оценок здесь появятся расходы по моделям и интервью.
@@ -54,6 +61,50 @@ export function AiCostAnalyticsPage() {
           <p className="text-2xl font-semibold text-slate-900">{data.kpi.totalRequests}</p>
         </Card>
       </div>
+
+      {data.elevenLabs.kpi.totalRequests > 0 ? (
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+            ElevenLabs TTS
+          </h3>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card header="ElevenLabs cost (USD)">
+              <p className="text-2xl font-semibold text-slate-900">
+                ${formatUsd(data.elevenLabs.kpi.totalCostUsd)}
+              </p>
+            </Card>
+            <Card header="Characters synthesized">
+              <p className="text-2xl font-semibold text-slate-900">
+                {data.elevenLabs.kpi.totalCharacters.toLocaleString('ru-RU')}
+              </p>
+            </Card>
+            <Card header="TTS requests">
+              <p className="text-2xl font-semibold text-slate-900">
+                {data.elevenLabs.kpi.totalRequests}
+              </p>
+            </Card>
+          </div>
+
+          {data.elevenLabs.byOperation.length > 0 ? (
+            <Card header="ElevenLabs by operation">
+              <div className="space-y-2 text-sm">
+                {data.elevenLabs.byOperation.map((row) => (
+                  <div
+                    key={row.operationType}
+                    className="flex justify-between gap-2"
+                  >
+                    <span className="font-medium">{row.operationType}</span>
+                    <span className="text-slate-600">
+                      ${formatUsd(row.totalCostUsd)} ·{' '}
+                      {row.characterCount.toLocaleString('ru-RU')} chars
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card header="Tokens by model">

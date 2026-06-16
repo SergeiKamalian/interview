@@ -5,6 +5,7 @@ import {
   createInterviewRealtimeClient,
   joinInterviewAttemptRoom,
   requestSpeakCurrentQuestion,
+  requestSpeakWelcome,
   subscribeInterviewEvents,
 } from '@shared/api/realtime/interviewRealtimeClient';
 import type {
@@ -285,6 +286,22 @@ export function useInterviewRealtime(input: UseInterviewRealtimeInput) {
     }
   }, [attemptId, audioState?.objectUrl, publicToken, replayAiAudio]);
 
+  const requestWelcomeSpeech = useCallback(() => {
+    const socket = socketRef.current;
+    if (socket?.connected && publicToken && attemptId) {
+      resetAiAudio();
+      requestSpeakWelcome(socket, { publicToken, attemptId });
+    }
+  }, [attemptId, publicToken, resetAiAudio]);
+
+  const requestCurrentQuestionSpeech = useCallback(() => {
+    const socket = socketRef.current;
+    if (socket?.connected && publicToken && attemptId) {
+      resetAiAudio();
+      requestSpeakCurrentQuestion(socket, { publicToken, attemptId });
+    }
+  }, [attemptId, publicToken, resetAiAudio]);
+
   return {
     phase,
     statusLabel,
@@ -292,6 +309,8 @@ export function useInterviewRealtime(input: UseInterviewRealtimeInput) {
     streamingMessage,
     audioState,
     replayAiAudio: handleReplayAiAudio,
+    requestWelcomeSpeech,
+    requestCurrentQuestionSpeech,
     isConnected,
     markAnswerSending,
     resetPhase,

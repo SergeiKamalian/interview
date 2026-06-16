@@ -4,7 +4,9 @@ import {
   getElevenLabsBaseUrl,
   type ElevenLabsConfig,
 } from '../../common/config/elevenlabs.schema';
+import { AiUsageLogService } from '../usage-logging/ai-usage-log.service';
 import { ElevenLabsConfigService } from './elevenlabs.config';
+import type { ElevenLabsTtsUsageContext } from './elevenlabs-tts.types';
 
 export type ElevenLabsTtsStreamResult = {
   mimeType: string;
@@ -44,7 +46,10 @@ export class ElevenLabsTtsService {
   private readonly cache = new Map<string, Buffer>();
   private readonly maxCacheEntries = 64;
 
-  constructor(private readonly elevenLabsConfigService: ElevenLabsConfigService) {}
+  constructor(
+    private readonly elevenLabsConfigService: ElevenLabsConfigService,
+    private readonly aiUsageLogService: AiUsageLogService,
+  ) {}
 
   isEnabled(): boolean {
     return this.elevenLabsConfigService.isTtsEnabled();
@@ -56,6 +61,7 @@ export class ElevenLabsTtsService {
 
   async *streamText(
     text: string,
+    usage?: ElevenLabsTtsUsageContext,
   ): AsyncGenerator<Buffer, ElevenLabsTtsStreamResult, void> {
     if (!this.isEnabled()) {
       return { mimeType: 'audio/mpeg', chunks: [] };
@@ -82,6 +88,7 @@ export class ElevenLabsTtsService {
     }
 
     const chunks: Buffer[] = [];
+    const startedAt = Date.now();
     for await (const chunk of this.fetchStream(
       config,
       normalized,
@@ -93,6 +100,7 @@ export class ElevenLabsTtsService {
 
     if (chunks.length > 0) {
       this.rememberCache(cacheKey, Buffer.concat(chunks));
+      await this.recordUsage(config, normalized, usage, Date.now() - startedAt);
     }
 
     return { mimeType: resolveMimeType(config.outputFormat), chunks };
@@ -149,7 +157,10 @@ export class ElevenLabsTtsService {
     );
   }
 
-  async synthesizeThinkingToBuffer(phrase: string): Promise<Buffer> {
+  async synthesizeThinkingToBuffer(
+    phrase: string,
+    usage?: ElevenLabsTtsUsageContext,
+  ): Promise<Buffer> {
     if (!this.isEnabled()) {
       return Buffer.alloc(0);
     }
@@ -172,6 +183,7 @@ export class ElevenLabsTtsService {
     }
 
     const chunks: Buffer[] = [];
+    const startedAt = Date.now();
     for await (const chunk of this.fetchStream(
       config,
       text,
@@ -186,7 +198,38 @@ export class ElevenLabsTtsService {
 
     const buffer = Buffer.concat(chunks);
     this.rememberCache(cacheKey, buffer);
+    await this.recordUsage(config, text, usage, Date.now() - startedAt, 'thinking');
     return buffer;
+  }
+
+  private async recordUsage(
+    config: ElevenLabsConfig,
+    text: string,
+    usage: ElevenLabsTtsUsageContext | undefined,
+    latencyMs: number,
+    operationSuffix?: string,
+  ): Promise<void> {
+    if (!usage) {
+      return;
+    }
+
+    const operationType = operationSuffix
+      ? `${usage.operationType}_${operationSuffix}`
+      : usage.operationType;
+
+    try {
+      await this.aiUsageLogService.logElevenLabsUsage({
+        companyId: usage.companyId,
+        interviewAttemptId: usage.interviewAttemptId,
+        model: config.modelId,
+        operationType,
+        characterCount: text.length,
+        latencyMs,
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Failed to log ElevenLabs usage: ${message}`);
+    }
   }
 
   private async *fetchStream(

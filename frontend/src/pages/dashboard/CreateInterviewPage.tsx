@@ -16,6 +16,8 @@ export function CreateInterviewPage() {
   const [level, setLevel] = useState<'junior' | 'middle' | 'senior' | 'lead'>(
     'middle',
   );
+  const [interviewerName, setInterviewerName] = useState('');
+  const [welcomeMessageTemplate, setWelcomeMessageTemplate] = useState('');
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<string | null>(null);
 
@@ -40,6 +42,8 @@ export function CreateInterviewPage() {
       title,
       jobRole,
       level,
+      interviewerName: interviewerName.trim() || undefined,
+      welcomeMessageTemplate: welcomeMessageTemplate.trim() || undefined,
       questionIds: selectedIds,
     }).unwrap();
 
@@ -96,6 +100,28 @@ export function CreateInterviewPage() {
               <option value="senior">senior</option>
               <option value="lead">lead</option>
             </select>
+          </div>
+          <Input
+            label="Имя интервьюера (TTS)"
+            value={interviewerName}
+            onChange={(e) => setInterviewerName(e.target.value)}
+            placeholder="AI-интервьюер"
+          />
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Текст приветствия
+            </label>
+            <textarea
+              value={welcomeMessageTemplate}
+              onChange={(e) => setWelcomeMessageTemplate(e.target.value)}
+              placeholder="Привет, {{candidateName}}! Я {{interviewerName}}. Сегодня у нас интервью на позицию «{{jobRole}}». Готов начать?"
+              rows={4}
+              className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Плейсхолдеры: {'{{candidateName}}'}, {'{{interviewerName}}'},{' '}
+              {'{{jobRole}}'}, {'{{title}}'}, {'{{questionCount}}'}
+            </p>
           </div>
         </div>
 

@@ -4,6 +4,10 @@ import type {
 } from '../types/follow-up-planner.types';
 import type { CheckpointStateStatus } from '../types/checkpoint-state-status.type';
 import {
+  normalizeFollowUpQuestionForCandidate,
+  sanitizeCheckpointExpectedForCandidateSpeech,
+} from './checkpoint-expected-speech.util';
+import {
   resolveSkipFollowUpReason,
   shouldSkipFollowUps,
 } from './candidate-decline.util';
@@ -162,22 +166,15 @@ export function buildNaturalTemplateFollowUp(input: {
   checkpointExpected: string;
   latestCandidateAnswer: string;
 }): string {
-  const topicHint = input.checkpointExpected
-    .replace(/^кандидат\s+(объясняет|говорит),?\s*что\s+/i, '')
-    .replace(/\.$/, '')
-    .trim();
-  const answerSnippet = input.latestCandidateAnswer.trim();
+  const topicHint = sanitizeCheckpointExpectedForCandidateSpeech(
+    input.checkpointExpected,
+  );
 
-  if (answerSnippet) {
-    const snippetPreview =
-      answerSnippet.length > 80
-        ? `${answerSnippet.slice(0, 80).trim()}…`
-        : answerSnippet;
+  const question = topicHint
+    ? `Понял, спасибо. Можете подробнее рассказать — ${topicHint}?`
+    : 'Понял, спасибо. Можете подробнее рассказать?';
 
-    return `Понял, спасибо — про «${snippetPreview}» услышал. Можете своими словами дополнить${topicHint ? `: ${topicHint}` : ' по этой теме'}?`;
-  }
-
-  return `Хорошо, давайте разберёмся. Расскажите своими словами, как вы понимаете «${input.questionText}»${topicHint ? ` — в частности, ${topicHint}` : ''}?`;
+  return normalizeFollowUpQuestionForCandidate(question);
 }
 
 /** @deprecated Use buildNaturalTemplateFollowUp — kept for tests */

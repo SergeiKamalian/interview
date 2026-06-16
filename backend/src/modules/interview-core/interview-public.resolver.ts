@@ -1,4 +1,5 @@
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { BeginInterviewAttemptInput } from './dto/begin-interview-attempt.input';
 import { StartPublicInterviewInput } from './dto/start-public-interview.input';
 import { SubmitInterviewAnswerInput } from './dto/submit-interview-answer.input';
 import { InterviewPublicService } from './interview-public.service';
@@ -27,6 +28,13 @@ export class InterviewPublicResolver {
     @Args('input') input: StartPublicInterviewInput,
   ): Promise<StartPublicInterviewPayload> {
     return this.interviewPublicService.startPublicInterview(input);
+  }
+
+  @Mutation(() => InterviewSessionType)
+  beginInterviewAttempt(
+    @Args('input') input: BeginInterviewAttemptInput,
+  ): Promise<InterviewSessionType> {
+    return this.interviewPublicService.beginInterviewAttempt(input);
   }
 
   @Query(() => InterviewSessionType)

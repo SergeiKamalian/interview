@@ -20,6 +20,7 @@ import {
 } from '../media/media-asset.service';
 import { DatabaseService } from '../../common/database/database.service';
 import type { StartPublicInterviewInput } from './dto/start-public-interview.input';
+import type { BeginInterviewAttemptInput } from './dto/begin-interview-attempt.input';
 import {
   buildSessionPayload,
   buildStartPayload,
@@ -28,6 +29,7 @@ import {
 } from './interview-core.mapper';
 import { InterviewCoreRepository } from './interview-core.repository';
 import { PublicTokenService } from './public-token.service';
+import { resolveWelcomeMessage } from './utils/interview-welcome.util';
 import type {
   InterviewSessionType,
   PublicInterviewType,
@@ -133,6 +135,15 @@ export class InterviewPublicService {
       );
 
       if (!attempt) {
+        const welcomeText = resolveWelcomeMessage({
+          template: interview.welcomeMessageTemplate,
+          interviewerName: interview.interviewerName,
+          candidateName: input.fullName.trim(),
+          jobRole: interview.jobRole,
+          title: interview.title,
+          questionCount: questions.length,
+        });
+
         attempt = await this.repository.createAttempt(
           {
             companyId: interview.companyId,
@@ -142,25 +153,15 @@ export class InterviewPublicService {
           query,
         );
 
-        const firstQuestion = questions[0];
         await this.repository.appendMessage(
           {
             companyId: interview.companyId,
             attemptId: attempt.id,
-            interviewQuestionId: firstQuestion.id,
+            interviewQuestionId: null,
             role: 'ai',
-            content: firstQuestion.questionText,
+            content: welcomeText,
             sequenceOrder: 1,
-            messageKind: adaptiveEnabled ? 'main_question' : null,
-          },
-          query,
-        );
-
-        await this.checkpointStateService.ensureCheckpointStatesForQuestion(
-          {
-            companyId: interview.companyId,
-            attemptId: attempt.id,
-            interviewQuestionId: firstQuestion.id,
+            messageKind: 'welcome',
           },
           query,
         );
@@ -170,25 +171,152 @@ export class InterviewPublicService {
         ? await this.repository.countMainAnswerMessages(attempt.id)
         : await this.repository.countCandidateMessages(attempt.id);
       const currentQuestion = questions[answered] ?? questions[0];
+      const isWelcomePending = attempt.status === 'pending';
 
       return {
         companyId: interview.companyId,
         attemptId: attempt.id,
-        currentQuestionId: currentQuestion.id,
-        currentQuestionText: currentQuestion.questionText,
+        currentQuestionId: isWelcomePending ? null : currentQuestion.id,
+        currentQuestionText: isWelcomePending
+          ? null
+          : currentQuestion.questionText,
         totalQuestions: questions.length,
+        isWelcomePending,
       };
     });
 
-    if (adaptiveEnabled) {
+    if (adaptiveEnabled && !result.isWelcomePending) {
       await this.adaptiveInterviewSubmitService.initializeQuestionAiState({
         companyId: result.companyId,
         attemptId: result.attemptId,
-        interviewQuestionId: result.currentQuestionId,
+        interviewQuestionId: result.currentQuestionId!,
       });
     }
 
     return buildStartPayload(result);
+  }
+
+  async beginInterviewAttempt(
+    input: BeginInterviewAttemptInput,
+  ): Promise<InterviewSessionType> {
+    const attemptId = Number(input.attemptId);
+    const interview = await this.repository.findInterviewByAttemptId(
+      attemptId,
+      input.publicToken,
+    );
+
+    if (!interview) {
+      throw new NotFoundException('Interview attempt not found');
+    }
+
+    const attempt = await this.repository.findAttemptById(
+      attemptId,
+      input.publicToken,
+    );
+
+    if (!attempt) {
+      throw new NotFoundException('Interview attempt not found');
+    }
+
+    if (attempt.status !== 'pending') {
+      return this.getSession(input.publicToken, input.attemptId);
+    }
+
+    const questions = await this.repository.listQuestionsForInterview(
+      interview.id,
+    );
+
+    if (questions.length === 0) {
+      throw new BadRequestException({
+        message: 'Interview has no questions',
+        code: 'INTERVIEW_HAS_NO_QUESTIONS',
+      });
+    }
+
+    const adaptiveEnabled = this.isAdaptiveEnabled();
+    const firstQuestion = questions[0];
+
+    await this.database.withTransaction(async (query) => {
+      const started = await this.repository.beginAttempt(attemptId, query);
+      if (!started) {
+        return;
+      }
+
+      await this.repository.appendMessage(
+        {
+          companyId: interview.companyId,
+          attemptId,
+          interviewQuestionId: firstQuestion.id,
+          role: 'ai',
+          content: firstQuestion.questionText,
+          sequenceOrder: 2,
+          messageKind: adaptiveEnabled ? 'main_question' : null,
+        },
+        query,
+      );
+
+      await this.checkpointStateService.ensureCheckpointStatesForQuestion(
+        {
+          companyId: interview.companyId,
+          attemptId,
+          interviewQuestionId: firstQuestion.id,
+        },
+        query,
+      );
+    });
+
+    if (adaptiveEnabled) {
+      await this.adaptiveInterviewSubmitService.initializeQuestionAiState({
+        companyId: interview.companyId,
+        attemptId,
+        interviewQuestionId: firstQuestion.id,
+      });
+    }
+
+    return this.getSession(input.publicToken, input.attemptId);
+  }
+
+  private async resolveSessionWelcomeContext(
+    attemptId: number,
+    publicToken: string,
+  ): Promise<{
+    welcomeMessage: string | null;
+    isWelcomePending: boolean;
+  }> {
+    const attempt = await this.repository.findAttemptById(attemptId, publicToken);
+    if (!attempt) {
+      return { welcomeMessage: null, isWelcomePending: false };
+    }
+
+    const isWelcomePending = attempt.status === 'pending';
+    if (!isWelcomePending) {
+      return { welcomeMessage: null, isWelcomePending: false };
+    }
+
+    const [interview, candidate] = await Promise.all([
+      this.repository.findInterviewByAttemptId(attemptId, publicToken),
+      this.repository.findCandidateByAttemptId(attemptId),
+    ]);
+
+    if (!interview || !candidate) {
+      return { welcomeMessage: null, isWelcomePending: true };
+    }
+
+    const questions = await this.repository.listQuestionsForInterview(
+      interview.id,
+    );
+
+    return {
+      welcomeMessage: resolveWelcomeMessage({
+        template: interview.welcomeMessageTemplate,
+        interviewerName: interview.interviewerName,
+        candidateName: candidate.fullName,
+        jobRole: interview.jobRole,
+        title: interview.title,
+        questionCount: questions.length,
+      }),
+      isWelcomePending: true,
+    };
   }
 
   async getSession(
@@ -221,6 +349,11 @@ export class InterviewPublicService {
       adaptiveEnabled,
     });
 
+    const welcomeContext = await this.resolveSessionWelcomeContext(
+      attemptId,
+      publicToken,
+    );
+
     const sessionInProgress =
       attempt.status === 'in_progress' &&
       (answeredMainQuestions < questions.length ||
@@ -237,8 +370,14 @@ export class InterviewPublicService {
       messages,
       totalQuestions: questions.length,
       answeredQuestions: answeredMainQuestions,
-      currentQuestionText: currentQuestion.currentQuestionText,
-      currentQuestionId: currentQuestion.currentQuestionId,
+      currentQuestionText: welcomeContext.isWelcomePending
+        ? null
+        : currentQuestion.currentQuestionText,
+      currentQuestionId: welcomeContext.isWelcomePending
+        ? null
+        : currentQuestion.currentQuestionId,
+      welcomeMessage: welcomeContext.welcomeMessage,
+      isWelcomePending: welcomeContext.isWelcomePending,
     });
   }
 

@@ -46,6 +46,10 @@ function resolveMessageLabel(message: Message): string {
     return 'Уточняющий вопрос';
   }
 
+  if (message.messageKind === 'welcome') {
+    return 'Приветствие';
+  }
+
   return 'Основной вопрос';
 }
 

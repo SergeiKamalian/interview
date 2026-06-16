@@ -21,6 +21,7 @@ export enum MessageRoleEnum {
 }
 
 export enum InterviewMessageKindEnum {
+  welcome = 'welcome',
   main_question = 'main_question',
   main_answer = 'main_answer',
   follow_up_question = 'follow_up_question',
@@ -67,6 +68,12 @@ export class InterviewType {
 
   @Field()
   isVideoEnabled!: boolean;
+
+  @Field(() => String, { nullable: true })
+  interviewerName?: string | null;
+
+  @Field(() => String, { nullable: true })
+  welcomeMessageTemplate?: string | null;
 }
 
 @ObjectType()
@@ -130,6 +137,12 @@ export class InterviewSessionType {
 
   @Field(() => [InterviewMessageType])
   messages!: InterviewMessageType[];
+
+  @Field(() => String, { nullable: true })
+  welcomeMessage?: string | null;
+
+  @Field()
+  isWelcomePending!: boolean;
 }
 
 @ObjectType()
@@ -137,8 +150,8 @@ export class StartPublicInterviewPayload {
   @Field()
   attemptId!: string;
 
-  @Field()
-  currentQuestionText!: string;
+  @Field(() => String, { nullable: true })
+  currentQuestionText?: string | null;
 
   @Field(() => Int)
   totalQuestions!: number;

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { AiProviderService } from '../ai-provider/ai-provider.service';
 import { estimateAiCostUsd } from './ai-usage-cost';
+import { estimateElevenLabsCostUsd } from './elevenlabs-usage-cost';
 import { AiUsageLogRepository } from './ai-usage-log.repository';
 import type {
   AiUsageCostSummary,
@@ -65,6 +66,38 @@ export class AiUsageLogService {
       latencyMs: input.latencyMs,
       status: input.status,
       correlationId: input.correlationId,
+    });
+  }
+
+  async logElevenLabsUsage(input: {
+    companyId: number;
+    interviewAttemptId?: number | null;
+    model: string;
+    operationType: string;
+    characterCount: number;
+    latencyMs?: number | null;
+  }): Promise<void> {
+    if (input.characterCount <= 0) {
+      return;
+    }
+
+    const costUsd = estimateElevenLabsCostUsd({
+      characterCount: input.characterCount,
+    });
+
+    await this.aiUsageLogRepository.create({
+      companyId: input.companyId,
+      interviewAttemptId: input.interviewAttemptId ?? null,
+      interviewMessageId: null,
+      provider: 'elevenlabs',
+      model: input.model,
+      operationType: input.operationType,
+      promptTokens: input.characterCount,
+      completionTokens: 0,
+      latencyMs: input.latencyMs ?? null,
+      status: 'success',
+      correlationId: this.createCorrelationId(),
+      costUsd,
     });
   }
 }

@@ -75,3 +75,13 @@ export function requestSpeakCurrentQuestion(
 ): void {
   socket.emit('speak_current_question', input);
 }
+
+export function requestSpeakWelcome(
+  socket: Socket,
+  input: {
+    publicToken: string;
+    attemptId: string;
+  },
+): void {
+  socket.emit('speak_welcome', input);
+}
