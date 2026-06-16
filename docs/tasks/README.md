@@ -47,6 +47,7 @@ docs/tasks/
     11-⬜-video/
     12-⬜-ats-integrations/
     13-⬜-deployment/
+    14-⬜-evaluation-accuracy-analytics/
 ```
 
 ---
@@ -68,6 +69,7 @@ docs/tasks/
 11 — video
 12 — ats-integrations
 13 — deployment
+14 — evaluation-accuracy-analytics (scoring honesty, HR analytics, golden set)
 ```
 
 Важно: design docs в `docs/database/` и SQL migrations — source of truth для feature-блоков 04+.

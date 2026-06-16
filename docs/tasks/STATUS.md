@@ -66,7 +66,7 @@ docs/tasks/list/10-🟡-voice/subtasks/004-⬜-add-speech-to-text.md
 Last updated:
 
 ```txt
-2026-06-15
+2026-06-16
 ```
 
 ---
@@ -89,6 +89,7 @@ Last updated:
 
 ## Next blocks
 
+- [ ] Block `14-⬜-evaluation-accuracy-analytics` — Scoring accuracy, coverage vs accuracy, HR report (see `docs/evaluation-accuracy/README.md`)
 - [ ] Block `11-⬜-video` — Video interview recording
 - [ ] Block `12-⬜-ats-integrations` — ATS integrations
 - [ ] Block `13-⬜-deployment` — Deployment
