@@ -1,4 +1,7 @@
-import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview-context.types';
+import type {
+  AdaptiveCheckpointDefinition,
+  AdaptiveInterviewContextPacket,
+} from '../types/adaptive-interview-context.types';
 import type { CheckpointGuardAdjustment } from '../types/checkpoint-guard-adjustment.types';
 import type { CheckpointStateStatus } from '../types/checkpoint-state-status.type';
 import type { EvaluationEvidenceSource } from '../types/evaluation-evidence-source.type';
@@ -9,13 +12,17 @@ import type {
 import { getPerTurnCheckpointEvaluationPromptVersion } from '../prompts/per-turn-checkpoint-evaluation.prompt';
 import {
   matchesDistinctiveBadAnswerClaim,
+  overlapsQuestionBadAnswerExamples,
   rationaleIndicatesSoundEvidence,
 } from './bad-answer-signature.util';
 import { isTargetedTopicRefusal } from './candidate-decline.util';
 import { extractFalseClaimQuote } from './false-claim-quote.util';
 import { mergeCheckpointEvaluation } from './merge-checkpoint-evaluation.util';
 import { alignRationaleDepthWithScore } from './rationale-depth-alignment.util';
-import { getPositiveEvidenceScoreFloor } from './positive-evidence-floor.util';
+import {
+  getContradictionScoreCap,
+  getPositiveEvidenceScoreFloor,
+} from './hint-driven-evidence.util';
 
 export type ApplyCheckpointScoreFloorsResult = {
   evaluation: PerTurnCheckpointEvaluationAiResponse;
@@ -55,26 +62,30 @@ export function applyCheckpointScoreFloors(
             applyPositiveEvidenceFloor(
               applyExplicitRefusalCap(
                 applyBadExampleOverlapCap(
-                  applyRationaleContradictionCap(
-                    applySemanticContradictionCap(
+                  applySemanticContradictionCap(
+                    applyRationaleContradictionCap(
                       result,
-                      latestCandidateText,
                       checkpoint.score,
                     ),
-                    checkpoint.score,
+                    latestCandidateText,
+                    fullCandidateText,
+                    checkpoint,
                   ),
                   latestCandidateText,
-                  badExamples,
+                  fullCandidateText,
+                  [
+                    ...badExamples,
+                    ...(checkpoint.badExamples ?? []),
+                    ...(checkpoint.questionBadExamples ?? []),
+                  ],
                   checkpoint.score,
                 ),
                 latestCandidateText,
-                checkpoint.score,
-                result.checkpointKey,
+                checkpoint,
               ),
               latestCandidateText,
               fullCandidateText,
-              checkpoint.score,
-              result.checkpointKey,
+              checkpoint,
             ),
           checkpoint.score,
         ),
@@ -95,6 +106,7 @@ export function applyCheckpointScoreFloors(
           result,
           guardedResult,
           latestCandidateText,
+          checkpoint,
         ),
         promptVersion,
       });
@@ -122,9 +134,10 @@ export function applyCheckpointScoreFloors(
         context.targetCheckpointKey === result.checkpointKey,
       incomingAllowsScoreDecrease: resolveIncomingAllowsScoreDecrease(
         context,
-        result.checkpointKey,
+        checkpoint,
         guardedWithQuote.rationale,
         latestCandidateText,
+        fullCandidateText,
       ),
     });
 
@@ -154,6 +167,7 @@ function resolveAdjustmentReason(
   original: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
   guarded: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
   candidateText: string,
+  checkpoint: AdaptiveCheckpointDefinition,
 ): CheckpointGuardAdjustment['reason'] {
   if (
     original.status === 'covered' &&
@@ -165,7 +179,9 @@ function resolveAdjustmentReason(
     return 'rationale_contradiction_cap';
   }
 
-  if (getContradictionScoreCap(original.checkpointKey, candidateText) !== null) {
+  if (
+    getContradictionScoreCap(checkpoint, candidateText, checkpoint.score) !== null
+  ) {
     return 'semantic_contradiction_cap';
   }
 
@@ -233,12 +249,11 @@ function attachFalseClaimEvidence(
 function applyExplicitRefusalCap(
   result: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
   latestCandidateText: string,
-  maxScore: number,
-  checkpointKey: string,
+  checkpoint: AdaptiveCheckpointDefinition,
 ): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
   if (
     !isTargetedTopicRefusal(latestCandidateText) ||
-    !refusalTargetsCheckpoint(latestCandidateText, checkpointKey) ||
+    !refusalTargetsCheckpoint(latestCandidateText, checkpoint) ||
     result.scoreAwarded <= 0
   ) {
     return result;
@@ -254,32 +269,24 @@ function applyExplicitRefusalCap(
 
 function refusalTargetsCheckpoint(
   answer: string,
-  checkpointKey: string,
+  checkpoint: AdaptiveCheckpointDefinition,
 ): boolean {
   const normalized = answer.toLowerCase();
-  const topicPatterns: Record<string, RegExp[]> = {
-    lanes_priority: [
-      /lanes/i,
-      /приоритет/i,
-      /transition/i,
-      /deferred/i,
-      /concurrent\s+api/i,
-    ],
-    scheduling: [/планирован/i, /scheduler/i, /scheduling/i],
-    render_phase: [/render\s+phase/i, /wip\s+tree/i],
-    commit_phase: [/commit\s+phase/i, /layout\s+effect/i],
-    commit_limitation: [/concurrent\s+mode/i, /commit/i],
-    fiber_pointers: [/fiber-узл/i, /child/i, /sibling/i],
-    stack_vs_fiber: [/stack/i, /reconciler/i],
-    fiber_definition: [/fiber/i, /reconcil/i],
-  };
+  const source = `${checkpoint.title} ${checkpoint.expected} ${checkpoint.checkpointKey.replace(/_/g, ' ')}`;
+  const tokens = source
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((token) => token.length >= 4);
 
-  const patterns = topicPatterns[checkpointKey];
-  if (!patterns) {
+  if (tokens.length === 0) {
     return false;
   }
 
-  return patterns.some((pattern) => pattern.test(normalized));
+  const hits = tokens.filter((token) => normalized.includes(token)).length;
+  const threshold = Math.min(2, tokens.length);
+
+  return hits >= threshold;
 }
 
 function stripTrailingDepth(rationale: string | null | undefined): string {
@@ -325,7 +332,8 @@ function applyRationaleContradictionCap(
     return result;
   }
 
-  const cap = partialScoreForMax(maxScore);
+  const accuracyWrong = /accuracy\s*=\s*wrong/i.test(rationale);
+  const cap = accuracyWrong ? 0 : partialScoreForMax(maxScore);
   return {
     ...result,
     scoreAwarded: cap,
@@ -336,8 +344,9 @@ function applyRationaleContradictionCap(
 
 function applyBadExampleOverlapCap(
   result: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
-  candidateText: string,
-  _badExamples: string[],
+  latestCandidateText: string,
+  fullCandidateText: string,
+  badExamples: string[],
   maxScore: number,
 ): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
   if (result.scoreAwarded <= 0) {
@@ -348,7 +357,13 @@ function applyBadExampleOverlapCap(
     return result;
   }
 
-  if (!matchesDistinctiveBadAnswerClaim(candidateText)) {
+  const overlapsBadExample =
+    matchesDistinctiveBadAnswerClaim(latestCandidateText) ||
+    matchesDistinctiveBadAnswerClaim(fullCandidateText) ||
+    overlapsQuestionBadAnswerExamples(latestCandidateText, badExamples) ||
+    overlapsQuestionBadAnswerExamples(fullCandidateText, badExamples);
+
+  if (!overlapsBadExample) {
     return result;
   }
 
@@ -432,20 +447,20 @@ function applyPositiveEvidenceFloor(
   result: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
   latestCandidateText: string,
   fullCandidateText: string,
-  maxScore: number,
-  checkpointKey: string,
+  checkpoint: AdaptiveCheckpointDefinition,
 ): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
   if (
     isTargetedTopicRefusal(latestCandidateText) &&
-    refusalTargetsCheckpoint(latestCandidateText, checkpointKey)
+    refusalTargetsCheckpoint(latestCandidateText, checkpoint)
   ) {
     return result;
   }
 
   const floor = getPositiveEvidenceScoreFloor(
-    checkpointKey,
+    checkpoint.evaluationHints,
     latestCandidateText,
     fullCandidateText,
+    checkpoint.score,
   );
   if (floor === null || matchesDistinctiveBadAnswerClaim(latestCandidateText)) {
     return result;
@@ -467,7 +482,10 @@ function applyPositiveEvidenceFloor(
     return result;
   }
 
-  const scoreAwarded = Math.min(maxScore, Math.max(result.scoreAwarded, floor));
+  const scoreAwarded = Math.min(
+    checkpoint.score,
+    Math.max(result.scoreAwarded, floor),
+  );
   const cleanedRationale = (result.rationale ?? '')
     .replace(
       /depth\s*=\s*false_claim\.?\s*Score capped: overlaps bad answer example\.?/gi,
@@ -480,7 +498,7 @@ function applyPositiveEvidenceFloor(
     ...result,
     scoreAwarded,
     status:
-      scoreAwarded >= maxScore
+      scoreAwarded >= checkpoint.score
         ? 'covered'
         : scoreAwarded > 0
           ? 'partial'
@@ -527,189 +545,24 @@ function strongPartialScoreForMax(maxScore: number): number {
 
 function applySemanticContradictionCap(
   result: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
-  candidateText: string,
-  maxScore: number,
+  latestCandidateText: string,
+  fullCandidateText: string,
+  checkpoint: AdaptiveCheckpointDefinition,
 ): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
-  const cap = getContradictionScoreCap(result.checkpointKey, candidateText);
+  const cap =
+    getContradictionScoreCap(checkpoint, latestCandidateText, checkpoint.score) ??
+    getContradictionScoreCap(checkpoint, fullCandidateText, checkpoint.score);
   if (cap === null || result.scoreAwarded <= cap) {
     return result;
   }
 
-  const scoreAwarded = Math.min(maxScore, cap);
+  const scoreAwarded = Math.min(checkpoint.score, cap);
   return {
     ...result,
     scoreAwarded,
     status: scoreAwarded > 0 ? 'partial' : 'missed',
     rationale: `${result.rationale} depth=false_claim. Semantic guard capped score because candidate evidence contains a direct contradiction.`,
   };
-}
-
-function getContradictionScoreCap(
-  checkpointKey: string,
-  candidateText: string,
-): number | null {
-  const has = (patterns: RegExp[]) =>
-    patterns.some((pattern) => pattern.test(candidateText));
-
-  if (
-    checkpointKey === 'type_safety' &&
-    has([
-      /строк.{0,80}(?:выход|верн).{0,40}числ/i,
-      /string.{0,80}(?:return|верн|выход).{0,40}number/i,
-      /не\s+связывает\s+вход\s+и\s+выход/i,
-      /вернуть\s+уже\s+другой\s+t/i,
-      /любой\s+тип\s+результата\s+независимо\s+от\s+вход/i,
-    ])
-  ) {
-    return 0;
-  }
-
-  if (
-    checkpointKey === 'type_parameter' &&
-    has([/generic.{0,40}(?:как|вроде)\s+any/i, /почти\s+как\s+any/i])
-  ) {
-    return 0.5;
-  }
-
-  if (
-    checkpointKey === 'constraints' &&
-    has([
-      /сам\s+(?:узна[её]т|пойм[её]т)\s+все\s+поля/i,
-      /можно\s+обращаться\s+к\s+любому\s+полю/i,
-    ])
-  ) {
-    return 0;
-  }
-
-  if (
-    checkpointKey === 'run_timing' &&
-    has([/до\s+рендер/i, /before\s+render/i, /заранее\s+подготовить\s+dom/i])
-  ) {
-    return 0;
-  }
-
-  if (
-    checkpointKey === 'dependency_array' &&
-    has([
-      /зависимост.{0,80}заново\s+отрис/i,
-      /эффект\s+запускает\s+(?:этот\s+)?ререндер/i,
-      /react\s+понимал\s+когда\s+надо\s+заново\s+отрис/i,
-    ])
-  ) {
-    return 0;
-  }
-
-  if (
-    checkpointKey === 'cleanup' &&
-    has([
-      /сразу.{0,80}(?:clearinterval|unsubscribe|отпис)/i,
-      /react\s+.*сам\s+.*чист/i,
-      /cleanup\s+не\s+.*обязательно/i,
-      /return\s+cleanup\s+.*не\s+нуж/i,
-    ])
-  ) {
-    return 0.5;
-  }
-
-  if (
-    checkpointKey === 'side_effects' &&
-    has([/вместо\s+usestate/i, /нужен.{0,80}перерис/i])
-  ) {
-    return 0.5;
-  }
-
-  if (
-    checkpointKey === 'scheduling' &&
-    hasPositiveRequestIdleCallbackClaim(candidateText)
-  ) {
-    return partialScoreForMax(1);
-  }
-
-  if (
-    checkpointKey === 'stack_vs_fiber' &&
-    has([
-      /через\s+promises?/i,
-      /полностью\s+асинхронн/i,
-      /клики\s+всегда\s+проходят/i,
-      /redux/i,
-    ])
-  ) {
-    return partialScoreForMax(1);
-  }
-
-  if (
-    checkpointKey === 'fiber_pointers' &&
-    has([
-      /\bparent\b.*\bnext\b/i,
-      /лежат\s+в\s+redux/i,
-      /virtual\s+dom.{0,40}(?:fiber|узл)/i,
-      /хранит.{0,40}virtual\s+dom/i,
-    ])
-  ) {
-    return partialScoreForMax(1);
-  }
-
-  if (
-    checkpointKey === 'commit_phase' &&
-    has([
-      /useeffect.{0,40}commit/i,
-      /useeffect.{0,40}до\s+paint/i,
-      /тоже\s+в\s+commit.{0,40}до\s+paint/i,
-      /fiber.{0,40}разбивает.{0,40}commit/i,
-      /commit.{0,40}куск/i,
-      /commit.{0,40}5\s*ms/i,
-      /commit.{0,60}(?:может|можно)\s+прерыв/i,
-      /(?:может|можно)\s+прервать.{0,40}commit/i,
-      /requestidlecallback/i,
-    ])
-  ) {
-    return partialScoreForMax(1);
-  }
-
-  if (
-    checkpointKey === 'lanes_priority' &&
-    has([
-      /lanes?.{0,40}redux/i,
-      /redux.{0,40}lanes?/i,
-      /requestidlecallback/i,
-    ])
-  ) {
-    return partialScoreForMax(1);
-  }
-
-  if (
-    checkpointKey === 'commit_limitation' &&
-    has([
-      /concurrent.{0,40}не\s+лаг/i,
-      /вообще\s+не\s+лаг/i,
-      /не\s+лагает.{0,40}тысяч/i,
-      /10000|10\s*000/,
-    ])
-  ) {
-    return 0;
-  }
-
-  if (
-    checkpointKey === 'render_phase' &&
-    has([
-      /requestidlecallback/i,
-      /concurrent.{0,40}не\s+лаг/i,
-    ])
-  ) {
-    return partialScoreForMax(1);
-  }
-
-  return null;
-}
-
-function hasPositiveRequestIdleCallbackClaim(candidateText: string): boolean {
-  if (/(?:не|not|instead\s+of|а\s+не)\s+.{0,30}request\s*idle\s*callback/i.test(
-    candidateText,
-  )) {
-    return false;
-  }
-
-  return /request\s*idle\s*callback|requestidlecallback/i.test(candidateText);
 }
 
 function rationaleIndicatesOmissionNotContradiction(
@@ -727,13 +580,14 @@ function rationaleIndicatesOmissionNotContradiction(
 
 function resolveIncomingAllowsScoreDecrease(
   context: AdaptiveInterviewContextPacket,
-  checkpointKey: string,
+  checkpoint: AdaptiveCheckpointDefinition,
   rationale: string | null | undefined,
   latestCandidateText: string,
+  fullCandidateText: string,
 ): boolean {
   if (
     isTargetedTopicRefusal(latestCandidateText) &&
-    refusalTargetsCheckpoint(latestCandidateText, checkpointKey)
+    refusalTargetsCheckpoint(latestCandidateText, checkpoint)
   ) {
     return true;
   }
@@ -749,12 +603,23 @@ function resolveIncomingAllowsScoreDecrease(
   if (
     context.latestAnswerMessageKind === 'follow_up_answer' &&
     context.targetCheckpointKey &&
-    context.targetCheckpointKey !== checkpointKey
+    context.targetCheckpointKey !== checkpoint.checkpointKey
   ) {
-    return getContradictionScoreCap(checkpointKey, latestCandidateText) !== null;
+    return (
+      getContradictionScoreCap(
+        checkpoint,
+        latestCandidateText,
+        checkpoint.score,
+      ) !== null ||
+      getContradictionScoreCap(
+        checkpoint,
+        fullCandidateText,
+        checkpoint.score,
+      ) !== null
+    );
   }
 
   return true;
 }
 
-export { getContradictionScoreCap };
+export { getContradictionScoreCap } from './hint-driven-evidence.util';

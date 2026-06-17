@@ -3,6 +3,7 @@ import {
   IsEnum,
   IsInt,
   IsNotEmpty,
+  IsOptional,
   IsString,
   MaxLength,
   Min,
@@ -25,4 +26,10 @@ export class AnswerExampleInput {
   @IsInt()
   @Min(0)
   sortOrder!: number;
+
+  @Field(() => String, { nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  checkpointKey?: string | null;
 }

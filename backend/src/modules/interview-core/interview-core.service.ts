@@ -54,6 +54,7 @@ export class InterviewCoreService {
     );
 
     const topicNames = new Map<number, string>();
+    const topicWeights = new Map<number, number>();
     await Promise.all(
       loadedQuestions.map(async (question) => {
         const topic = await this.questionBankRepository.findTopicById(
@@ -61,6 +62,7 @@ export class InterviewCoreService {
         );
         if (topic) {
           topicNames.set(question.topicId, topic.name);
+          topicWeights.set(question.topicId, topic.interviewWeight);
         }
       }),
     );
@@ -85,6 +87,7 @@ export class InterviewCoreService {
           welcomeMessageTemplate: input.welcomeMessageTemplate?.trim() ?? null,
           questions: loadedQuestions,
           topicNames,
+          topicWeights,
         },
         query,
       ),

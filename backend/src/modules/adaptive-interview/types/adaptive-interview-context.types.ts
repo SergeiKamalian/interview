@@ -1,3 +1,5 @@
+import type { CheckpointEvaluationHints } from './checkpoint-evaluation-hints.type';
+
 export type AdaptiveLocalTurn = {
   sequenceOrder: number;
   role: 'ai' | 'candidate';
@@ -23,6 +25,11 @@ export type AdaptiveCheckpointDefinition = {
   expected: string;
   score: number;
   sortOrder: number;
+  evaluationHints?: CheckpointEvaluationHints | null;
+  goodExamples?: string[];
+  badExamples?: string[];
+  questionGoodExamples?: string[];
+  questionBadExamples?: string[];
 };
 
 export type AdaptiveFollowUpLimits = {

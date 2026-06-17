@@ -29,8 +29,8 @@ export const GraphqlOperations = {
   },
   CandidateReport: {
     operationName: 'CandidateReport',
-    document: "query CandidateReport($candidateId: ID!) { candidateReport(candidateId: $candidateId) { candidateId fullName email phone linkedinUrl githubUrl shortlistStatus shortlistReason latestFinalEvaluation { id totalScore category hireRecommendation summary detailedSummary strengths weaknesses risks needsManualReview categoryBreakdown { categoryKey categoryLabel scoreNormalized weight contribution } } interviewHistory { attemptId interviewId interviewTitle jobRole status completedAt totalScore } } }",
-    sha256Hash: '2e49229966b6099a0385fb032860d4dc81693258b6799fc9e48262b1ba653994',
+    document: "query CandidateReport($candidateId: ID!) { candidateReport(candidateId: $candidateId) { candidateId fullName email phone linkedinUrl githubUrl shortlistStatus shortlistReason latestFinalEvaluation { id totalScore finalScore totalWeight averageScore strengthCategory category hireRecommendation summary detailedSummary strengths weaknesses risks needsManualReview categoryBreakdown { categoryKey categoryLabel scoreNormalized weight contribution } topicEvaluations { topic score weight weightedScore strengthCategory } } interviewHistory { attemptId interviewId interviewTitle jobRole status completedAt totalScore } } }",
+    sha256Hash: 'e98130646ad36a3d9f1c5aa98c0c2fe845855d1b9317fc031657d37d0ddaa39c',
   },
   CheckpointResultsByAttempt: {
     operationName: 'CheckpointResultsByAttempt',
@@ -59,13 +59,13 @@ export const GraphqlOperations = {
   },
   EvaluateInterviewAttempt: {
     operationName: 'EvaluateInterviewAttempt',
-    document: "mutation EvaluateInterviewAttempt($attemptId: ID!) { evaluateInterviewAttempt(attemptId: $attemptId) { questionCount finalEvaluation { id totalScore category hireRecommendation summary needsManualReview categoryBreakdown { categoryKey categoryLabel scoreNormalized weight contribution } } } }",
-    sha256Hash: '2acd8d61f7ff4cf8ea99df9a08adcf77936d10de4378995b4874cf968b740963',
+    document: "mutation EvaluateInterviewAttempt($attemptId: ID!) { evaluateInterviewAttempt(attemptId: $attemptId) { questionCount finalEvaluation { id totalScore finalScore totalWeight averageScore strengthCategory category hireRecommendation summary needsManualReview categoryBreakdown { categoryKey categoryLabel scoreNormalized weight contribution } topicEvaluations { topic score weight weightedScore strengthCategory } } } }",
+    sha256Hash: '2429eaadb867d49c11f6a87f7631462e64f11cf79a942596c4b66bac961eec66',
   },
   FinalEvaluationByAttempt: {
     operationName: 'FinalEvaluationByAttempt',
-    document: "query FinalEvaluationByAttempt($attemptId: ID!) { finalEvaluationByAttempt(attemptId: $attemptId) { id interviewAttemptId totalScore category hireRecommendation summary detailedSummary strengths weaknesses risks needsManualReview categoryBreakdown { categoryKey categoryLabel scoreNormalized weight contribution } } }",
-    sha256Hash: 'cd4cb86339b655f673884211206dd9dd2824a792047eb6a374f02a5e83a4ae8f',
+    document: "query FinalEvaluationByAttempt($attemptId: ID!) { finalEvaluationByAttempt(attemptId: $attemptId) { id interviewAttemptId totalScore finalScore totalWeight averageScore strengthCategory category hireRecommendation summary detailedSummary strengths weaknesses risks needsManualReview categoryBreakdown { categoryKey categoryLabel scoreNormalized weight contribution } topicEvaluations { topic score weight weightedScore strengthCategory } } }",
+    sha256Hash: '49d58bccde94872474e29fdc631ea7558b711ffa83fb3890c341f842ef88615b',
   },
   Hello: {
     operationName: 'Hello',
@@ -79,8 +79,8 @@ export const GraphqlOperations = {
   },
   InterviewDetails: {
     operationName: 'InterviewDetails',
-    document: "query InterviewDetails($interviewId: ID!) { interviewDetails(interviewId: $interviewId) { id title jobRole status questionCount publicUrl createdAt evaluationStatus primaryFinalEvaluation { id totalScore category hireRecommendation summary strengths weaknesses risks needsManualReview categoryBreakdown { categoryKey categoryLabel scoreNormalized weight contribution } } attempts { attemptId candidateId candidateName candidateEmail status startedAt completedAt overallScore hireRecommendation evaluationStatus } } }",
-    sha256Hash: 'ed66729a9ed16a39e43bb047972fe16c6d1920d1bee4abc725dbd7312f092ea8',
+    document: "query InterviewDetails($interviewId: ID!) { interviewDetails(interviewId: $interviewId) { id title jobRole status questionCount publicUrl createdAt evaluationStatus primaryFinalEvaluation { id totalScore finalScore totalWeight averageScore strengthCategory category hireRecommendation summary strengths weaknesses risks needsManualReview categoryBreakdown { categoryKey categoryLabel scoreNormalized weight contribution } topicEvaluations { topic score weight weightedScore strengthCategory } } attempts { attemptId candidateId candidateName candidateEmail status startedAt completedAt overallScore hireRecommendation evaluationStatus } } }",
+    sha256Hash: '93243e0e3d26a43f9fd25da1de04870e34cf5624c09be9ce575a1c61ae04e79a',
   },
   InterviewSession: {
     operationName: 'InterviewSession',

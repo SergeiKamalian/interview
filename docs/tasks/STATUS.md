@@ -48,19 +48,19 @@ Active subtask ID:
 Last completed subtask:
 
 ```txt
-TASK-14.14 — Follow-up answer weight < main answer
+TASK-14.16 — DB checkpoint evaluation hints + snapshot
 ```
 
 Next recommended subtask:
 
 ```txt
-Block 11-⬜-video or user choice
+Block 11-⬜-video
 ```
 
 Last updated:
 
 ```txt
-2026-06-16 (block 14 tails closed)
+2026-06-17 (TASK-14.16 done)
 ```
 
 ---
@@ -81,6 +81,8 @@ Last updated:
 - [x] TASK-14.12 — A/B prompt versioning
 - [x] TASK-14.13 — Verify topic_opener not scored
 - [x] TASK-14.14 — Follow-up answer weight < main answer
+- [x] TASK-14.15 — Bank-driven guards (remove fiber hardcode)
+- [x] TASK-14.16 — DB checkpoint evaluation hints + snapshot
 
 ---
 

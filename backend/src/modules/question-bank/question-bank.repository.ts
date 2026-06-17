@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { DatabaseService } from '../../common/database/database.service';
 import type { DbQueryParam } from '../../common/database/database.types';
+import { parseCheckpointEvaluationHints } from '../adaptive-interview/types/checkpoint-evaluation-hints.type';
 import type { AnswerExampleEntity } from './entities/answer-example.entity';
 import type { ProfessionEntity } from './entities/profession.entity';
 import type { QuestionCheckpointEntity } from './entities/question-checkpoint.entity';
@@ -46,6 +47,7 @@ interface LookupRow extends RowDataPacket {
 
 interface TopicRow extends LookupRow {
   skill_id: number | null;
+  interview_weight: string;
 }
 
 interface CheckpointRow extends RowDataPacket {
@@ -54,6 +56,7 @@ interface CheckpointRow extends RowDataPacket {
   checkpoint_key: string;
   title: string;
   expected: string;
+  evaluation_hints: unknown;
   score: string;
   sort_order: number;
   created_at: Date;
@@ -63,6 +66,7 @@ interface CheckpointRow extends RowDataPacket {
 interface ExampleRow extends RowDataPacket {
   id: number;
   question_id: number;
+  checkpoint_key: string | null;
   example_type: AnswerExampleType;
   example_text: string;
   sort_order: number;
@@ -193,7 +197,7 @@ export class QuestionBankRepository {
 
   async findTopicById(id: number): Promise<TopicEntity | null> {
     const rows = await this.database.query<TopicRow[]>(
-      `SELECT id, skill_id, code, name, is_active, created_at, updated_at
+      `SELECT id, skill_id, code, name, interview_weight, is_active, created_at, updated_at
        FROM topics
        WHERE id = ? AND is_active = 1
        LIMIT 1`,
@@ -224,7 +228,7 @@ export class QuestionBankRepository {
     questionId: number,
   ): Promise<QuestionCheckpointEntity[]> {
     const rows = await this.database.query<CheckpointRow[]>(
-      `SELECT id, question_id, checkpoint_key, title, expected, score, sort_order, created_at, updated_at
+      `SELECT id, question_id, checkpoint_key, title, expected, evaluation_hints, score, sort_order, created_at, updated_at
        FROM question_checkpoints
        WHERE question_id = ?
        ORDER BY sort_order ASC`,
@@ -345,13 +349,16 @@ export class QuestionBankRepository {
     for (const checkpoint of data.checkpoints) {
       await query<ResultSetHeader>(
         `INSERT INTO question_checkpoints (
-           question_id, checkpoint_key, title, expected, score, sort_order
-         ) VALUES (?, ?, ?, ?, ?, ?)`,
+           question_id, checkpoint_key, title, expected, evaluation_hints, score, sort_order
+         ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           questionId,
           checkpoint.checkpointKey,
           checkpoint.title,
           checkpoint.expected,
+          checkpoint.evaluationHints
+            ? JSON.stringify(checkpoint.evaluationHints)
+            : null,
           checkpoint.score,
           checkpoint.sortOrder,
         ],
@@ -366,10 +373,11 @@ export class QuestionBankRepository {
     for (const example of data.answerExamples) {
       await query<ResultSetHeader>(
         `INSERT INTO answer_examples (
-           question_id, example_type, example_text, sort_order
-         ) VALUES (?, ?, ?, ?)`,
+           question_id, checkpoint_key, example_type, example_text, sort_order
+         ) VALUES (?, ?, ?, ?, ?)`,
         [
           questionId,
+          example.checkpointKey ?? null,
           example.exampleType,
           example.exampleText,
           example.sortOrder,
@@ -411,14 +419,14 @@ export class QuestionBankRepository {
         [question.id],
       ),
       this.database.query<CheckpointRow[]>(
-        `SELECT id, question_id, checkpoint_key, title, expected, score, sort_order, created_at, updated_at
+        `SELECT id, question_id, checkpoint_key, title, expected, evaluation_hints, score, sort_order, created_at, updated_at
          FROM question_checkpoints
          WHERE question_id = ?
          ORDER BY sort_order ASC`,
         [question.id],
       ),
       this.database.query<ExampleRow[]>(
-        `SELECT id, question_id, example_type, example_text, sort_order, created_at
+        `SELECT id, question_id, checkpoint_key, example_type, example_text, sort_order, created_at
          FROM answer_examples
          WHERE question_id = ?
          ORDER BY sort_order ASC`,
@@ -508,6 +516,7 @@ export class QuestionBankRepository {
       skillId: row.skill_id,
       code: row.code,
       name: row.name,
+      interviewWeight: Number(row.interview_weight),
       isActive: row.is_active === 1,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -532,6 +541,7 @@ export class QuestionBankRepository {
       checkpointKey: row.checkpoint_key,
       title: row.title,
       expected: row.expected,
+      evaluationHints: parseCheckpointEvaluationHints(row.evaluation_hints),
       score: Number(row.score),
       sortOrder: row.sort_order,
       createdAt: row.created_at,
@@ -543,6 +553,7 @@ export class QuestionBankRepository {
     return {
       id: row.id,
       questionId: row.question_id,
+      checkpointKey: row.checkpoint_key,
       exampleType: row.example_type,
       exampleText: row.example_text,
       sortOrder: row.sort_order,

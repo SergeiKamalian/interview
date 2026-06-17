@@ -56,11 +56,12 @@ erDiagram
 | Source | Snapshot table |
 |--------|----------------|
 | `questions` | `interview_questions` |
-| `question_checkpoints` | `interview_question_checkpoints` |
+| `question_checkpoints` (+ `evaluation_hints`) | `interview_question_checkpoints` |
+| `answer_examples` | `interview_answer_examples` |
 
 Rationale: checkpoint keys queryable, FK integrity, AI eval matches keys exactly.
 
-`interview_questions` also stores `topic_name` (denormalized label for analytics).
+`interview_questions` also stores `topic_name` (denormalized label for analytics) and `topic_weight` (snapshot of `topics.interview_weight` at interview creation).
 
 ---
 

@@ -2,6 +2,7 @@ import type {
   FinalEvaluationCategory,
   HireRecommendation,
 } from '../ai-evaluation/types/evaluation.types';
+import type { StrengthCategory } from './scoring.constants';
 
 export type QuestionScoreInput = {
   interviewQuestionId: number;
@@ -10,7 +11,16 @@ export type QuestionScoreInput = {
   level: string;
   score: number;
   maxScore: number;
+  topicWeight?: number;
   needsManualReview: boolean;
+};
+
+export type TopicSessionEvaluation = {
+  topic: string;
+  score: number;
+  weight: number;
+  weightedScore: number;
+  strengthCategory: StrengthCategory;
 };
 
 export type CategoryBreakdownItem = {
@@ -22,10 +32,15 @@ export type CategoryBreakdownItem = {
 };
 
 export type InterviewScoreResult = {
+  finalScore: number;
   totalScoreNormalized: number;
   totalScoreOutOfTen: number;
+  totalWeight: number;
+  averageScore: number;
+  strengthCategory: StrengthCategory;
   category: FinalEvaluationCategory;
   hireRecommendation: HireRecommendation;
+  topics: TopicSessionEvaluation[];
   breakdown: CategoryBreakdownItem[];
   needsManualReview: boolean;
 };

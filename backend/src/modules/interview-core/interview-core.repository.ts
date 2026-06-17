@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { DatabaseService } from '../../common/database/database.service';
 import type { DbQueryParam } from '../../common/database/database.types';
+import { parseCheckpointEvaluationHints } from '../adaptive-interview/types/checkpoint-evaluation-hints.type';
 import type { QuestionWithDetailsEntity } from '../question-bank/entities/question.entity';
 import type { QuestionLevel } from '../question-bank/types/question-level.enum';
 import type { CandidateEntity } from './entities/candidate.entity';
@@ -15,6 +16,7 @@ import type {
   MessageRole,
 } from './entities/interview-message.entity';
 import type { MessageKind } from './types/message-kind.type';
+import type { InterviewAnswerExampleEntity } from './entities/interview-answer-example.entity';
 import type { InterviewQuestionCheckpointEntity } from './entities/interview-question-checkpoint.entity';
 import type { InterviewQuestionEntity } from './entities/interview-question.entity';
 import type { InterviewStatus } from './types/interview-status.enum';
@@ -52,6 +54,7 @@ interface InterviewQuestionRow extends RowDataPacket {
   level: QuestionLevel;
   difficulty: 'basic' | 'intermediate' | 'advanced';
   topic_name: string | null;
+  topic_weight: string;
   created_at: Date;
 }
 
@@ -101,7 +104,18 @@ interface InterviewQuestionCheckpointRow extends RowDataPacket {
   checkpoint_key: string;
   title: string;
   expected: string;
+  evaluation_hints: unknown;
   score: string;
+  sort_order: number;
+  created_at: Date;
+}
+
+interface InterviewAnswerExampleRow extends RowDataPacket {
+  id: number;
+  interview_question_id: number;
+  checkpoint_key: string | null;
+  example_type: 'good' | 'bad';
+  example_text: string;
   sort_order: number;
   created_at: Date;
 }
@@ -135,6 +149,7 @@ export type CreateInterviewData = {
   welcomeMessageTemplate?: string | null;
   questions: QuestionWithDetailsEntity[];
   topicNames: Map<number, string>;
+  topicWeights: Map<number, number>;
 };
 
 @Injectable()
@@ -173,12 +188,13 @@ export class InterviewCoreRepository {
     for (let index = 0; index < data.questions.length; index += 1) {
       const question = data.questions[index];
       const topicName = data.topicNames.get(question.topicId) ?? null;
+      const topicWeight = data.topicWeights.get(question.topicId) ?? 1;
 
       const questionResult = await query<ResultSetHeader>(
         `INSERT INTO interview_questions (
            interview_id, source_question_id, sort_order, question_text,
-           short_answer, ideal_answer, max_score, level, difficulty, topic_name
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           short_answer, ideal_answer, max_score, level, difficulty, topic_name, topic_weight
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           interviewId,
           question.id,
@@ -190,6 +206,7 @@ export class InterviewCoreRepository {
           question.level,
           question.difficulty,
           topicName,
+          topicWeight,
         ],
       );
 
@@ -198,15 +215,33 @@ export class InterviewCoreRepository {
       for (const checkpoint of question.checkpoints) {
         await query<ResultSetHeader>(
           `INSERT INTO interview_question_checkpoints (
-             interview_question_id, checkpoint_key, title, expected, score, sort_order
-           ) VALUES (?, ?, ?, ?, ?, ?)`,
+             interview_question_id, checkpoint_key, title, expected, evaluation_hints, score, sort_order
+           ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [
             interviewQuestionId,
             checkpoint.checkpointKey,
             checkpoint.title,
             checkpoint.expected,
+            checkpoint.evaluationHints
+              ? JSON.stringify(checkpoint.evaluationHints)
+              : null,
             checkpoint.score,
             checkpoint.sortOrder,
+          ],
+        );
+      }
+
+      for (const example of question.answerExamples) {
+        await query<ResultSetHeader>(
+          `INSERT INTO interview_answer_examples (
+             interview_question_id, checkpoint_key, example_type, example_text, sort_order
+           ) VALUES (?, ?, ?, ?, ?)`,
+          [
+            interviewQuestionId,
+            example.checkpointKey,
+            example.exampleType,
+            example.exampleText,
+            example.sortOrder,
           ],
         );
       }
@@ -285,7 +320,8 @@ export class InterviewCoreRepository {
   ): Promise<InterviewQuestionEntity[]> {
     const rows = await this.database.query<InterviewQuestionRow[]>(
       `SELECT id, interview_id, source_question_id, sort_order, question_text,
-              short_answer, ideal_answer, max_score, level, difficulty, topic_name, created_at
+              short_answer, ideal_answer, max_score, level, difficulty, topic_name,
+              topic_weight, created_at
        FROM interview_questions
        WHERE interview_id = ?
        ORDER BY sort_order ASC`,
@@ -300,7 +336,8 @@ export class InterviewCoreRepository {
   ): Promise<InterviewQuestionEntity | null> {
     const rows = await this.database.query<InterviewQuestionRow[]>(
       `SELECT id, interview_id, source_question_id, sort_order, question_text,
-              short_answer, ideal_answer, max_score, level, difficulty, topic_name, created_at
+              short_answer, ideal_answer, max_score, level, difficulty, topic_name,
+              topic_weight, created_at
        FROM interview_questions
        WHERE id = ?
        LIMIT 1`,
@@ -315,7 +352,7 @@ export class InterviewCoreRepository {
     interviewQuestionId: number,
   ): Promise<InterviewQuestionCheckpointEntity[]> {
     const rows = await this.database.query<InterviewQuestionCheckpointRow[]>(
-      `SELECT id, interview_question_id, checkpoint_key, title, expected, score, sort_order, created_at
+      `SELECT id, interview_question_id, checkpoint_key, title, expected, evaluation_hints, score, sort_order, created_at
        FROM interview_question_checkpoints
        WHERE interview_question_id = ?
        ORDER BY sort_order ASC`,
@@ -323,6 +360,20 @@ export class InterviewCoreRepository {
     );
 
     return rows.map((row) => this.mapInterviewQuestionCheckpoint(row));
+  }
+
+  async findAnswerExamplesByInterviewQuestionId(
+    interviewQuestionId: number,
+  ): Promise<InterviewAnswerExampleEntity[]> {
+    const rows = await this.database.query<InterviewAnswerExampleRow[]>(
+      `SELECT id, interview_question_id, checkpoint_key, example_type, example_text, sort_order, created_at
+       FROM interview_answer_examples
+       WHERE interview_question_id = ?
+       ORDER BY sort_order ASC`,
+      [interviewQuestionId],
+    );
+
+    return rows.map((row) => this.mapInterviewAnswerExample(row));
   }
 
   async findBadAnswerExamplesBySourceQuestionId(
@@ -750,6 +801,7 @@ export class InterviewCoreRepository {
       level: row.level,
       difficulty: row.difficulty,
       topicName: row.topic_name,
+      topicWeight: Number(row.topic_weight),
       createdAt: row.created_at,
     };
   }
@@ -763,7 +815,22 @@ export class InterviewCoreRepository {
       checkpointKey: row.checkpoint_key,
       title: row.title,
       expected: row.expected,
+      evaluationHints: parseCheckpointEvaluationHints(row.evaluation_hints),
       score: Number(row.score),
+      sortOrder: row.sort_order,
+      createdAt: row.created_at,
+    };
+  }
+
+  private mapInterviewAnswerExample(
+    row: InterviewAnswerExampleRow,
+  ): InterviewAnswerExampleEntity {
+    return {
+      id: row.id,
+      interviewQuestionId: row.interview_question_id,
+      checkpointKey: row.checkpoint_key,
+      exampleType: row.example_type,
+      exampleText: row.example_text,
       sortOrder: row.sort_order,
       createdAt: row.created_at,
     };

@@ -89,6 +89,7 @@ export class FinalEvaluationService {
             level: question?.level ?? 'middle',
             score: summary.score,
             maxScore: summary.maxScore,
+            topicWeight: question?.topicWeight,
             needsManualReview: summary.needsManualReview,
           };
         })
@@ -101,6 +102,7 @@ export class FinalEvaluationService {
             level: question?.level ?? 'middle',
             score: evaluation.score,
             maxScore: evaluation.maxScore,
+            topicWeight: question?.topicWeight,
             needsManualReview: evaluation.needsManualReview,
           };
         });
@@ -112,21 +114,25 @@ export class FinalEvaluationService {
     const evidenceContext = useAdaptiveSummaries
       ? buildFinalEvidenceContext({
           summaries: adaptiveSummaries,
-          totalScoreOutOfTen: scoreResult.totalScoreOutOfTen,
+          totalScoreOutOfTen: scoreResult.finalScore,
           category: scoreResult.category,
           hireRecommendation: scoreResult.hireRecommendation,
           categoryBreakdown: scoreResult.breakdown.map(
             (item) =>
-              `${item.categoryLabel}=${item.scoreNormalized} weight=${item.weight} contribution=${item.contribution}`,
+              `${item.categoryLabel}=${item.scoreNormalized / 10} weight=${item.weight} contribution=${item.contribution}`,
           ),
         })
       : null;
 
     const systemPrompt = buildFinalEvaluationSystemPrompt();
     const userPrompt = buildFinalEvaluationUserPrompt({
-      totalScoreOutOfTen: scoreResult.totalScoreOutOfTen,
+      finalScore: scoreResult.finalScore,
+      totalWeight: scoreResult.totalWeight,
+      averageScore: scoreResult.averageScore,
+      strengthCategory: scoreResult.strengthCategory,
       category: scoreResult.category,
       hireRecommendation: scoreResult.hireRecommendation,
+      topicEvaluations: scoreResult.topics,
       questionSummaries: evidenceContext
         ? evidenceContext.questionSummaries
         : questionEvaluations.map(
@@ -135,7 +141,7 @@ export class FinalEvaluationService {
           ),
       categoryBreakdown: scoreResult.breakdown.map(
         (item) =>
-          `${item.categoryLabel}=${item.scoreNormalized} weight=${item.weight} contribution=${item.contribution}`,
+          `${item.categoryLabel}=${item.scoreNormalized / 10} weight=${item.weight} contribution=${item.contribution}`,
       ),
       evidenceSource: evidenceContext?.source,
     });
@@ -190,7 +196,7 @@ export class FinalEvaluationService {
     return this.finalEvaluationRepository.upsertByAttemptId({
       companyId,
       interviewAttemptId: attemptId,
-      totalScore: scoreResult.totalScoreOutOfTen,
+      totalScore: scoreResult.finalScore,
       category: scoreResult.category,
       hireRecommendation: scoreResult.hireRecommendation,
       summary: validation.data.summary,

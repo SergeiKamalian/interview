@@ -14,6 +14,7 @@ export type InterviewQuestionEntity = {
   level: QuestionLevel;
   difficulty: QuestionDifficulty;
   topicName: string | null;
+  topicWeight: number;
   createdAt: Date;
 };
 

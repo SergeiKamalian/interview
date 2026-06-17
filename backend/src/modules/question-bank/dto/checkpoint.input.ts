@@ -1,5 +1,13 @@
 import { Field, Float, InputType, Int } from '@nestjs/graphql';
-import { IsInt, IsNotEmpty, IsNumber, IsString, Min } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
+import { CheckpointEvaluationHintsInput } from './checkpoint-evaluation-hints.input';
 
 @InputType()
 export class CheckpointInput {
@@ -17,6 +25,10 @@ export class CheckpointInput {
   @IsString()
   @IsNotEmpty()
   expected!: string;
+
+  @Field(() => CheckpointEvaluationHintsInput, { nullable: true })
+  @IsOptional()
+  evaluationHints?: CheckpointEvaluationHintsInput;
 
   @Field(() => Float)
   @IsNumber()

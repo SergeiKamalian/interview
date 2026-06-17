@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useInterviewAiAudio } from '@features/voice-interview/tts/useInterviewAiAudio';
 import { useInterviewThinkingSound } from '@features/voice-interview/tts/useInterviewThinkingSound';
+import { env } from '@shared/config/env';
 import {
   createInterviewRealtimeClient,
   joinInterviewAttemptRoom,
@@ -131,7 +132,7 @@ export function useInterviewRealtime(input: UseInterviewRealtimeInput) {
   stopThinkingRef.current = stopThinking;
 
   useEffect(() => {
-    if (enabled && publicToken && attemptId) {
+    if (enabled && env.interviewAudioEnabled && publicToken && attemptId) {
       void preloadThinkingSound();
     }
   }, [attemptId, enabled, preloadThinkingSound, publicToken]);
@@ -201,9 +202,10 @@ export function useInterviewRealtime(input: UseInterviewRealtimeInput) {
         }
 
         if (
-          event.eventType === 'ai.audio.stream_started' ||
-          event.eventType === 'ai.audio.stream_chunk' ||
-          event.eventType === 'ai.audio.stream_completed'
+          env.interviewAudioEnabled &&
+          (event.eventType === 'ai.audio.stream_started' ||
+            event.eventType === 'ai.audio.stream_chunk' ||
+            event.eventType === 'ai.audio.stream_completed')
         ) {
           if (event.eventType === 'ai.audio.stream_started') {
             stopThinkingRef.current();
@@ -275,6 +277,10 @@ export function useInterviewRealtime(input: UseInterviewRealtimeInput) {
   }, [phase]);
 
   const handleReplayAiAudio = useCallback(() => {
+    if (!env.interviewAudioEnabled) {
+      return;
+    }
+
     if (audioState?.objectUrl) {
       replayAiAudio();
       return;
@@ -287,6 +293,10 @@ export function useInterviewRealtime(input: UseInterviewRealtimeInput) {
   }, [attemptId, audioState?.objectUrl, publicToken, replayAiAudio]);
 
   const requestWelcomeSpeech = useCallback(() => {
+    if (!env.interviewAudioEnabled) {
+      return;
+    }
+
     const socket = socketRef.current;
     if (socket?.connected && publicToken && attemptId) {
       resetAiAudio();
@@ -295,6 +305,10 @@ export function useInterviewRealtime(input: UseInterviewRealtimeInput) {
   }, [attemptId, publicToken, resetAiAudio]);
 
   const requestCurrentQuestionSpeech = useCallback(() => {
+    if (!env.interviewAudioEnabled) {
+      return;
+    }
+
     const socket = socketRef.current;
     if (socket?.connected && publicToken && attemptId) {
       resetAiAudio();

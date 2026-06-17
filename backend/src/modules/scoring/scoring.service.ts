@@ -4,15 +4,26 @@ import type {
   HireRecommendation,
 } from '../ai-evaluation/types/evaluation.types';
 import {
+  DEFAULT_TOPIC_WEIGHT,
+  mapStrengthCategory,
   readHireThresholds,
   readScoreThresholds,
   SCORE_NORMALIZED_MAX,
+  SCORE_OUT_OF_TEN_MAX,
 } from './scoring.constants';
 import type {
   CategoryBreakdownItem,
   InterviewScoreResult,
   QuestionScoreInput,
+  TopicSessionEvaluation,
 } from './scoring.types';
+
+type TopicAggregate = {
+  topic: string;
+  earned: number;
+  max: number;
+  weight: number;
+};
 
 @Injectable()
 export class ScoringService {
@@ -20,65 +31,42 @@ export class ScoringService {
     questions: QuestionScoreInput[],
   ): InterviewScoreResult {
     if (questions.length === 0) {
-      return {
-        totalScoreNormalized: 0,
-        totalScoreOutOfTen: 0,
-        category: 'weak',
-        hireRecommendation: 'strong_reject',
-        breakdown: [],
-        needsManualReview: false,
-      };
+      return buildEmptyResult();
     }
 
-    const groups = new Map<
-      string,
-      { label: string; earned: number; max: number }
-    >();
+    const topicGroups = aggregateByTopic(questions);
+    const topics = topicGroups.map((group) => toTopicSessionEvaluation(group));
+    const totalWeight = topics.reduce((sum, topic) => sum + topic.weight, 0);
+    const finalScore =
+      totalWeight > 0
+        ? roundOneDecimal(
+            topics.reduce((sum, topic) => sum + topic.weightedScore, 0) /
+              totalWeight,
+          )
+        : 0;
 
-    for (const question of questions) {
-      const categoryKey = buildCategoryKey(question);
-      const label = buildCategoryLabel(question);
-      const current = groups.get(categoryKey) ?? {
-        label,
-        earned: 0,
-        max: 0,
-      };
+    const averageScore =
+      topics.length > 0
+        ? roundOneDecimal(
+            topics.reduce((sum, topic) => sum + topic.score, 0) /
+              topics.length,
+          )
+        : 0;
 
-      current.earned += question.score;
-      current.max += question.maxScore;
-      groups.set(categoryKey, current);
-    }
-
-    let totalEarned = 0;
-    let totalMax = 0;
-    const breakdown: CategoryBreakdownItem[] = [];
-
-    for (const [categoryKey, group] of groups.entries()) {
-      totalEarned += group.earned;
-      totalMax += group.max;
-
-      breakdown.push({
-        categoryKey,
-        categoryLabel: group.label,
-        scoreNormalized: normalizeScore(group.earned, group.max),
-        weight: group.max,
-        contribution: 0,
-      });
-    }
-
-    breakdown.sort((left, right) =>
-      left.categoryLabel.localeCompare(right.categoryLabel),
-    );
-
-    const totalScoreNormalized = normalizeScore(totalEarned, totalMax);
-    const withContributions = recalculateContributions(breakdown, totalMax);
+    const totalScoreNormalized = roundOneDecimal(finalScore * 10);
+    const breakdown = buildBreakdown(topics, totalWeight);
 
     return {
+      finalScore,
       totalScoreNormalized,
-      totalScoreOutOfTen: roundOneDecimal(totalScoreNormalized / 10),
+      totalScoreOutOfTen: finalScore,
+      totalWeight: roundOneDecimal(totalWeight),
+      averageScore,
+      strengthCategory: mapStrengthCategory(finalScore),
       category: mapCategory(totalScoreNormalized),
       hireRecommendation: mapHireRecommendation(totalScoreNormalized),
-      breakdown: withContributions,
+      topics,
+      breakdown,
       needsManualReview: questions.some(
         (question) => question.needsManualReview,
       ),
@@ -86,41 +74,99 @@ export class ScoringService {
   }
 }
 
-function buildCategoryKey(question: QuestionScoreInput): string {
-  return [
-    question.topicName?.trim() || 'general',
-    question.difficulty,
-    question.level,
-  ].join(':');
+function buildEmptyResult(): InterviewScoreResult {
+  return {
+    finalScore: 0,
+    totalScoreNormalized: 0,
+    totalScoreOutOfTen: 0,
+    totalWeight: 0,
+    averageScore: 0,
+    strengthCategory: 'weak',
+    category: 'weak',
+    hireRecommendation: 'strong_reject',
+    topics: [],
+    breakdown: [],
+    needsManualReview: false,
+  };
 }
 
-function buildCategoryLabel(question: QuestionScoreInput): string {
-  const topic = question.topicName?.trim() || 'General';
-  return `${topic} (${question.level}/${question.difficulty})`;
+function aggregateByTopic(questions: QuestionScoreInput[]): TopicAggregate[] {
+  const groups = new Map<string, TopicAggregate>();
+
+  for (const question of questions) {
+    const topic = question.topicName?.trim() || 'General';
+    const current = groups.get(topic) ?? {
+      topic,
+      earned: 0,
+      max: 0,
+      weight: resolveTopicWeight(question.topicWeight),
+    };
+
+    current.earned += question.score;
+    current.max += question.maxScore;
+    current.weight = Math.max(
+      current.weight,
+      resolveTopicWeight(question.topicWeight),
+    );
+    groups.set(topic, current);
+  }
+
+  return [...groups.values()].sort((left, right) =>
+    left.topic.localeCompare(right.topic),
+  );
 }
 
-function normalizeScore(earned: number, max: number): number {
+function toTopicSessionEvaluation(group: TopicAggregate): TopicSessionEvaluation {
+  const score = normalizeQuestionScoreToTen(group.earned, group.max);
+  const weight = resolveTopicWeight(group.weight);
+
+  return {
+    topic: group.topic,
+    score,
+    weight,
+    weightedScore: roundOneDecimal(score * weight),
+    strengthCategory: mapStrengthCategory(score),
+  };
+}
+
+function buildBreakdown(
+  topics: TopicSessionEvaluation[],
+  totalWeight: number,
+): CategoryBreakdownItem[] {
+  return topics.map((topic) => ({
+    categoryKey: slugifyTopic(topic.topic),
+    categoryLabel: topic.topic,
+    scoreNormalized: roundOneDecimal(topic.score * 10),
+    weight: topic.weight,
+    contribution:
+      totalWeight > 0
+        ? roundOneDecimal(topic.weightedScore / totalWeight)
+        : 0,
+  }));
+}
+
+function normalizeQuestionScoreToTen(earned: number, max: number): number {
   if (max <= 0) {
     return 0;
   }
 
-  return roundOneDecimal((earned / max) * SCORE_NORMALIZED_MAX);
+  return roundOneDecimal((earned / max) * SCORE_OUT_OF_TEN_MAX);
 }
 
-function recalculateContributions(
-  breakdown: CategoryBreakdownItem[],
-  totalMax: number,
-): CategoryBreakdownItem[] {
-  if (totalMax <= 0) {
-    return breakdown.map((item) => ({ ...item, contribution: 0 }));
+function resolveTopicWeight(weight: number | undefined): number {
+  if (weight === undefined || !Number.isFinite(weight) || weight <= 0) {
+    return DEFAULT_TOPIC_WEIGHT;
   }
 
-  return breakdown.map((item) => ({
-    ...item,
-    contribution: roundOneDecimal(
-      (item.scoreNormalized * item.weight) / totalMax,
-    ),
-  }));
+  return weight;
+}
+
+function slugifyTopic(topic: string): string {
+  return topic
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
 }
 
 function mapCategory(score: number): FinalEvaluationCategory {

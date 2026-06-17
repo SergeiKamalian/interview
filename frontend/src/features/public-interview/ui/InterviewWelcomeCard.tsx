@@ -1,3 +1,4 @@
+import { env } from '@shared/config/env';
 import { InterviewAiAudioControls } from '@features/voice-interview/tts/InterviewAiAudioControls';
 import type { InterviewAiAudioState } from '@features/voice-interview/tts/useInterviewAiAudio';
 import { Button } from '@shared/ui';
@@ -26,17 +27,19 @@ export function InterviewWelcomeCard({
         <p className="whitespace-pre-wrap">{welcomeMessage}</p>
       </div>
 
-      <InterviewAiAudioControls
-        audioState={
-          aiAudioState ?? {
-            streamId: 'welcome-pending',
-            mimeType: 'audio/mpeg',
-            status: 'buffering',
-            objectUrl: null,
+      {env.interviewAudioEnabled ? (
+        <InterviewAiAudioControls
+          audioState={
+            aiAudioState ?? {
+              streamId: 'welcome-pending',
+              mimeType: 'audio/mpeg',
+              status: 'buffering',
+              objectUrl: null,
+            }
           }
-        }
-        onReplay={() => onReplayWelcome?.()}
-      />
+          onReplay={() => onReplayWelcome?.()}
+        />
+      ) : null}
 
       <Button
         onClick={() => void onBegin()}

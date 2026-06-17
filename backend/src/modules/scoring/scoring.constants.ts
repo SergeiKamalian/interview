@@ -1,5 +1,19 @@
 export const SCORE_NORMALIZED_MIN = 0;
 export const SCORE_NORMALIZED_MAX = 100;
+export const SCORE_OUT_OF_TEN_MAX = 10;
+export const DEFAULT_TOPIC_WEIGHT = 1;
+
+export const DEFAULT_STRENGTH_THRESHOLDS = {
+  medium: 5,
+  strong: 7.5,
+} as const;
+
+export type StrengthCategory = 'weak' | 'medium' | 'strong';
+
+export type StrengthThresholds = {
+  medium: number;
+  strong: number;
+};
 
 export const DEFAULT_SCORE_THRESHOLDS = {
   weak: 40,
@@ -73,6 +87,36 @@ export function readHireThresholds(
       DEFAULT_HIRE_THRESHOLDS.invite,
     ),
   };
+}
+
+export function readStrengthThresholds(
+  env: NodeJS.ProcessEnv = process.env,
+): StrengthThresholds {
+  return {
+    medium: readThreshold(
+      env.SCORE_STRENGTH_THRESHOLD_MEDIUM,
+      DEFAULT_STRENGTH_THRESHOLDS.medium,
+    ),
+    strong: readThreshold(
+      env.SCORE_STRENGTH_THRESHOLD_STRONG,
+      DEFAULT_STRENGTH_THRESHOLDS.strong,
+    ),
+  };
+}
+
+export function mapStrengthCategory(
+  scoreOutOfTen: number,
+  thresholds: StrengthThresholds = readStrengthThresholds(),
+): StrengthCategory {
+  if (scoreOutOfTen >= thresholds.strong) {
+    return 'strong';
+  }
+
+  if (scoreOutOfTen >= thresholds.medium) {
+    return 'medium';
+  }
+
+  return 'weak';
 }
 
 function readThreshold(raw: string | undefined, fallback: number): number {

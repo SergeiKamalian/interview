@@ -69,7 +69,9 @@ Lookup tables. `topics.skill_id` optional FK → `skills`.
 | professions | skills | topics |
 |-------------|--------|--------|
 | `code` UNIQUE | `code` UNIQUE | `code` UNIQUE |
-| `name` | `name` | `name`, `skill_id` |
+| `name` | `name` | `name`, `skill_id`, `interview_weight` DECIMAL(4,2) DEFAULT 1 |
+
+`interview_weight` — важность темы в итоговой оценке интервью (1–10). Снапшот → `interview_questions.topic_weight`. См. `docs/scoring/interview-weighted-score.md`.
 
 ### `questions`
 
@@ -102,6 +104,7 @@ Weight = колонка `score` (отдельная `checkpoint_weights` не н
 |--------|-------|
 | `checkpoint_key` | UNIQUE per `question_id` |
 | `title`, `expected` | Criterion text |
+| `evaluation_hints` | JSON: `mustConcepts`, `falseClaims`, `complexityTier`, `weightRationale` — см. [checkpoint-weight-rubric](../../question-bank/checkpoint-weight-rubric.md) |
 | `score` | Weight toward max_score |
 | `sort_order` | Display order |
 
@@ -112,6 +115,7 @@ Weight = колонка `score` (отдельная `checkpoint_weights` не н
 | Column | Notes |
 |--------|-------|
 | `example_type` | ENUM `good` \| `bad` |
+| `checkpoint_key` | NULL = question-level; set = per-checkpoint example |
 | `example_text` | TEXT |
 
 ---
@@ -139,8 +143,9 @@ Weight = колонка `score` (отдельная `checkpoint_weights` не н
 При создании interview:
 
 1. Copy `questions` → `interview_questions`
-2. Copy `question_checkpoints` → `interview_question_checkpoints`
-3. Snapshot immutable — изменения в question bank не влияют на активные интервью
+2. Copy `question_checkpoints` (+ `evaluation_hints`) → `interview_question_checkpoints`
+3. Copy `answer_examples` → `interview_answer_examples`
+4. Snapshot immutable — изменения в question bank не влияют на активные интервью
 
 ---
 

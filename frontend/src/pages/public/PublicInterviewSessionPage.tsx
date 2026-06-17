@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { env } from '@shared/config/env';
 import { uploadInterviewAudio } from '@features/voice-interview/api/audioUploadApi';
 import {
   useBeginInterviewAttemptMutation,
@@ -133,7 +134,11 @@ export function PublicInterviewSessionPage() {
         isSubmitting={isSubmitting}
         statusLabel={statusLabel}
         aiAudioState={audioState}
-        showQuestionAudioControls={isConnected && Boolean(data.currentQuestionText)}
+        showQuestionAudioControls={
+          env.interviewAudioEnabled &&
+          isConnected &&
+          Boolean(data.currentQuestionText)
+        }
         onReplayAiAudio={replayAiAudio}
         onSubmitVoiceAnswer={async ({ blob, mimeType, durationSec }) => {
           markAnswerSending();

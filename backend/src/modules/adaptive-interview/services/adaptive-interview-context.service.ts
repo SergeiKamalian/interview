@@ -7,6 +7,7 @@ import { InterviewCoreRepository } from '../../interview-core/interview-core.rep
 import { getAdaptiveInterviewContextLimits } from '../config/adaptive-interview-context.config';
 import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview-context.types';
 import { buildAdaptiveInterviewContextPacket } from '../utils/build-adaptive-interview-context.util';
+import { attachSnapshotExamplesToCheckpoints } from '../utils/attach-snapshot-examples.util';
 import { CheckpointStateRepository } from '../repositories/checkpoint-state.repository';
 
 @Injectable()
@@ -29,7 +30,7 @@ export class AdaptiveInterviewContextService {
       throw new NotFoundException('Interview question not found');
     }
 
-    const [messages, snapshotCheckpoints, checkpointStates, badAnswerExamples] =
+    const [messages, snapshotCheckpoints, checkpointStates, snapshotExamples] =
       await Promise.all([
       this.interviewRepository.listMessages(attemptId),
       this.interviewRepository.findCheckpointsByInterviewQuestionId(
@@ -39,11 +40,9 @@ export class AdaptiveInterviewContextService {
         attemptId,
         interviewQuestionId,
       ),
-      interviewQuestion.sourceQuestionId
-        ? this.interviewRepository.findBadAnswerExamplesBySourceQuestionId(
-            interviewQuestion.sourceQuestionId,
-          )
-        : Promise.resolve([]),
+      this.interviewRepository.findAnswerExamplesByInterviewQuestionId(
+        interviewQuestionId,
+      ),
     ]);
 
     if (snapshotCheckpoints.length === 0) {
@@ -57,6 +56,35 @@ export class AdaptiveInterviewContextService {
       (message) => message.interviewAttemptId === attemptId,
     );
 
+    const checkpoints = attachSnapshotExamplesToCheckpoints(
+      snapshotCheckpoints.map((checkpoint) => ({
+        checkpointKey: checkpoint.checkpointKey,
+        title: checkpoint.title,
+        expected: checkpoint.expected,
+        score: checkpoint.score,
+        sortOrder: checkpoint.sortOrder,
+        evaluationHints: checkpoint.evaluationHints,
+      })),
+      snapshotExamples,
+    );
+
+    const badAnswerExamples = checkpoints.flatMap(
+      (checkpoint) => [
+        ...(checkpoint.badExamples ?? []),
+        ...(checkpoint.questionBadExamples ?? []),
+      ],
+    );
+
+    if (snapshotExamples.length === 0 && interviewQuestion.sourceQuestionId) {
+      const legacyBadExamples =
+        await this.interviewRepository.findBadAnswerExamplesBySourceQuestionId(
+          interviewQuestion.sourceQuestionId,
+        );
+      badAnswerExamples.push(...legacyBadExamples);
+    }
+
+    const uniqueBadExamples = [...new Set(badAnswerExamples)];
+
     return buildAdaptiveInterviewContextPacket({
       interviewQuestionId: interviewQuestion.id,
       interviewId: interviewQuestion.interviewId,
@@ -66,13 +94,7 @@ export class AdaptiveInterviewContextService {
       shortAnswer: interviewQuestion.shortAnswer,
       idealAnswer: interviewQuestion.idealAnswer,
       maxScore: interviewQuestion.maxScore,
-      checkpoints: snapshotCheckpoints.map((checkpoint) => ({
-        checkpointKey: checkpoint.checkpointKey,
-        title: checkpoint.title,
-        expected: checkpoint.expected,
-        score: checkpoint.score,
-        sortOrder: checkpoint.sortOrder,
-      })),
+      checkpoints,
       questionMessages: messages.map((message) => ({
         id: message.id,
         role: message.role,
@@ -90,7 +112,7 @@ export class AdaptiveInterviewContextService {
         followUpCount: state.followUpCount,
         evidenceSummary: state.evidenceSummary,
       })),
-      badAnswerExamples,
+      badAnswerExamples: uniqueBadExamples,
       limits: getAdaptiveInterviewContextLimits(),
     });
   }

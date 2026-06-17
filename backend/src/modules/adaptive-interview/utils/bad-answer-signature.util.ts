@@ -1,3 +1,8 @@
+import {
+  overlapsReferenceExamples,
+  textContainsPhrase,
+} from './text-evidence-overlap.util';
+
 const DISTINCTIVE_BAD_ANSWER_PATTERNS: RegExp[] = [
   /fiber.{0,60}(?:просто|это\s+просто).{0,40}virtual\s+dom/i,
   /virtual\s+dom.{0,40}(?:просто|быстрее\s+обновляет)/i,
@@ -21,6 +26,42 @@ export function matchesDistinctiveBadAnswerClaim(text: string): boolean {
   return DISTINCTIVE_BAD_ANSWER_PATTERNS.some((pattern) =>
     pattern.test(normalized),
   );
+}
+
+export function overlapsQuestionBadAnswerExamples(
+  candidateText: string,
+  badExamples: string[],
+): boolean {
+  return overlapsReferenceExamples(candidateText, badExamples);
+}
+
+export function overlapsQuestionGoodAnswerExamples(
+  candidateText: string,
+  goodExamples: string[],
+): boolean {
+  return overlapsReferenceExamples(candidateText, goodExamples);
+}
+
+export function matchesCheckpointFalseClaims(
+  candidateText: string,
+  falseClaims: string[],
+): boolean {
+  return falseClaims.some((claim) => {
+    if (/request\s*idle\s*callback|requestidlecallback/i.test(claim)) {
+      if (
+        /(?:не|not|instead\s+of|а\s+не)\s+.{0,30}request\s*idle\s*callback/i.test(
+          candidateText,
+        )
+      ) {
+        return false;
+      }
+      return /request\s*idle\s*callback|requestidlecallback/i.test(
+        candidateText,
+      );
+    }
+
+    return textContainsPhrase(candidateText, claim);
+  });
 }
 
 export function rationaleIndicatesSoundEvidence(

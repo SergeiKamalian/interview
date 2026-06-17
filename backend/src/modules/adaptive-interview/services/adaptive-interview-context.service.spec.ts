@@ -11,6 +11,7 @@ describe('AdaptiveInterviewContextService', () => {
       | 'findInterviewQuestionById'
       | 'listMessages'
       | 'findCheckpointsByInterviewQuestionId'
+      | 'findAnswerExamplesByInterviewQuestionId'
       | 'findBadAnswerExamplesBySourceQuestionId'
     >
   >;
@@ -23,6 +24,7 @@ describe('AdaptiveInterviewContextService', () => {
       findInterviewQuestionById: jest.fn(),
       listMessages: jest.fn(),
       findCheckpointsByInterviewQuestionId: jest.fn(),
+      findAnswerExamplesByInterviewQuestionId: jest.fn().mockResolvedValue([]),
       findBadAnswerExamplesBySourceQuestionId: jest.fn().mockResolvedValue([]),
     };
 
@@ -103,6 +105,7 @@ describe('AdaptiveInterviewContextService', () => {
         checkpointKey: 'side_effects',
         title: 'Side effects',
         expected: 'Mentions side effects',
+        evaluationHints: null,
         score: 1,
         sortOrder: 0,
         createdAt: new Date(),

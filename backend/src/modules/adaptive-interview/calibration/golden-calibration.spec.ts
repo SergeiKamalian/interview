@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview-context.types';
 import type { PerTurnCheckpointEvaluationAiResponse } from '../types/per-turn-evaluation.types';
 import { applyCheckpointScoreFloors } from '../utils/apply-checkpoint-score-floors.util';
+import { fiberCheckpoint } from '../utils/fiber-evaluation-hints.fixture';
 import type { GoldenCalibrationCase } from './types';
 
 const FIBER_CHECKPOINTS = [
@@ -47,6 +48,9 @@ function buildFiberContext(
     referenceAnswer: 'Fiber reconciliation engine',
     maxScore: 8,
     badAnswerExamples: [
+      'Fiber — это просто Virtual DOM. React сравнивает деревья и обновляет страницу быстрее.',
+      'Concurrent mode полностью убирает лаги. Можно рендерить 20 000 div без virtualization — Fiber всё разобьёт на кадры.',
+      'Render phase и commit phase — одно и то же. React сразу пишет в DOM во время reconcileChildFibers.',
       'Fiber использует requestIdleCallback для планирования работы',
       'Узлы Fiber хранятся в Virtual DOM и Redux',
     ],
@@ -54,13 +58,9 @@ function buildFiberContext(
     latestCandidateMessageId: 99,
     latestAnswerMessageKind: useLatestTurnOnly ? 'follow_up_answer' : null,
     targetCheckpointKey: useLatestTurnOnly ? 'scheduling' : null,
-    checkpoints: FIBER_CHECKPOINTS.map((key, index) => ({
-      checkpointKey: key,
-      title: key,
-      expected: 'test',
-      score: 1,
-      sortOrder: index,
-    })),
+    checkpoints: FIBER_CHECKPOINTS.map((key, index) =>
+      fiberCheckpoint(key, { sortOrder: index }),
+    ),
     checkpointStates: [],
     evidenceSnippets: [],
     localTurns: caseData.turns.map((turn, index) => ({

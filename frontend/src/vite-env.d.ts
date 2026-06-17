@@ -4,6 +4,7 @@ interface ImportMetaEnv {
   readonly VITE_GRAPHQL_URL: string;
   readonly VITE_API_URL?: string;
   readonly VITE_APP_NAME?: string;
+  readonly VITE_INTERVIEW_AUDIO_ENABLED?: string;
 }
 
 interface ImportMeta {

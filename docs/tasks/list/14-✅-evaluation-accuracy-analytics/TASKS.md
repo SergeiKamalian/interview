@@ -22,6 +22,8 @@
 | TASK-14.12 | [x] done | A/B prompt versioning | `012-✅-ab-prompt-versioning.md` |
 | TASK-14.13 | [x] done | Verify topic_opener not scored | `013-✅-topic-opener-not-scored.md` |
 | TASK-14.14 | [x] done | Follow-up answer weight < main answer | `014-✅-follow-up-weight-vs-main.md` |
+| TASK-14.15 | [x] done | Bank-driven guards (remove fiber hardcode) | `015-✅-bank-driven-guards.md` |
+| TASK-14.16 | [x] done | DB checkpoint evaluation hints + snapshot | `016-✅-db-checkpoint-evaluation-hints.md` |
 
 ---
 

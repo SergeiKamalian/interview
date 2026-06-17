@@ -1,10 +1,12 @@
 export const FINAL_EVALUATION_PROMPT_KEY = 'final_evaluation';
-export const FINAL_EVALUATION_PROMPT_VERSION = '1.0.0';
+export const FINAL_EVALUATION_PROMPT_VERSION = '2.0.0';
 
 export const GUARDRAIL_RULES = [
-  'Use only facts from provided question evaluations and category breakdown.',
+  'Use only facts from provided question evaluations and topic breakdown.',
   'Do not invent new skills, topics, checkpoints, or candidate statements.',
   'Strengths and weaknesses must map to supplied evaluation data.',
+  'Final score is precomputed as weighted average: sum(topicScore * topicWeight) / sum(topicWeight).',
+  'Topic weights reflect interview importance — do not change or reinterpret them.',
   'Return valid JSON only.',
 ] as const;
 
@@ -24,11 +26,23 @@ export function buildFinalEvaluationSystemPrompt(): string {
   ].join('\n');
 }
 
+export type FinalEvaluationTopicContext = {
+  topic: string;
+  score: number;
+  weight: number;
+  weightedScore: number;
+  strengthCategory: string;
+};
+
 export function buildFinalEvaluationUserPrompt(input: {
-  totalScoreOutOfTen: number;
+  finalScore: number;
+  totalWeight: number;
+  averageScore: number;
+  strengthCategory: string;
   category: string;
   hireRecommendation: string;
   questionSummaries: string[];
+  topicEvaluations: FinalEvaluationTopicContext[];
   categoryBreakdown: string[];
   evidenceSource?: 'adaptive_summaries' | 'question_evaluations';
 }): string {
@@ -38,9 +52,18 @@ export function buildFinalEvaluationUserPrompt(input: {
       ? 'Evidence source: adaptive checkpoint summaries (no full transcript).'
       : 'Evidence source: per-question evaluations.',
     '',
-    `Deterministic score (0-10): ${input.totalScoreOutOfTen}`,
-    `Category: ${input.category}`,
+    `Weighted final score (0-10): ${input.finalScore}`,
+    `Total topic weight: ${input.totalWeight}`,
+    `Unweighted average topic score (0-10): ${input.averageScore}`,
+    `Strength category: ${input.strengthCategory}`,
+    `Legacy category: ${input.category}`,
     `Recommendation: ${input.hireRecommendation}`,
+    '',
+    'Topic evaluations (score 0-10, weight = interview importance):',
+    ...input.topicEvaluations.map(
+      (topic) =>
+        `- ${topic.topic}: score=${topic.score}, weight=${topic.weight}, weightedScore=${topic.weightedScore}, category=${topic.strengthCategory}`,
+    ),
     '',
     'Question evaluations:',
     ...input.questionSummaries.map((line) => `- ${line}`),

@@ -57,28 +57,8 @@ function hasFalseClaimSignal(rationale: string): boolean {
     /material false claim/i,
     /уверенн.{0,20}(?:ошиб|неверн)/i,
     /overlaps bad answer example/i,
-    /semantic guard capped/i,
     /Score capped:.*(?:contradict|overlap|material)/i,
-    hasPositiveRequestIdleCallbackInRationale(rationale),
-    /virtual\s+dom.{0,40}(?:fiber|хран)/i,
-  ].some((pattern) =>
-    typeof pattern === 'boolean' ? pattern : pattern.test(rationale),
-  );
-}
-
-function hasPositiveRequestIdleCallbackInRationale(rationale: string): boolean {
-  const text = rationale.toLowerCase();
-  if (
-    /(?:не|not|instead|без|отсутств).{0,40}request\s*idle\s*callback/i.test(
-      text,
-    )
-  ) {
-    return false;
-  }
-
-  return /(?:использует|через|drives?|на\s+основе).{0,30}request\s*idle\s*callback/i.test(
-    text,
-  );
+  ].some((pattern) => pattern.test(rationale));
 }
 
 function extractFalseClaimSummary(
@@ -97,13 +77,6 @@ function resolveSeverity(
   depth: CheckpointDepthLevel,
   rationale: string,
 ): CheckpointRedFlagSeverity {
-  if (
-    depth === 'false_claim' &&
-    /requestidlecallback|virtual\s+dom|redux/i.test(rationale)
-  ) {
-    return 'high';
-  }
-
   if (depth === 'false_claim') {
     return 'medium';
   }

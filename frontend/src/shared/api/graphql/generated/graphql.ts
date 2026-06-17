@@ -98,6 +98,11 @@ export type InterviewStatus =
   | 'archived'
   | 'draft';
 
+export type InterviewStrengthCategory =
+  | 'medium'
+  | 'strong'
+  | 'weak';
+
 export type LoginInput = {
   email: string;
   password: string;
@@ -196,7 +201,7 @@ export type CandidateReportQueryVariables = Exact<{
 }>;
 
 
-export type CandidateReportQuery = { candidateReport: { candidateId: string, fullName: string, email: string, phone: string | null, linkedinUrl: string | null, githubUrl: string | null, shortlistStatus: string, shortlistReason: string | null, latestFinalEvaluation: { id: string, totalScore: number, category: FinalEvaluationCategory, hireRecommendation: HireRecommendation, summary: string, detailedSummary: string | null, strengths: Array<string>, weaknesses: Array<string>, risks: Array<string>, needsManualReview: boolean, categoryBreakdown: Array<{ categoryKey: string, categoryLabel: string, scoreNormalized: number, weight: number, contribution: number }> } | null, interviewHistory: Array<{ attemptId: string, interviewId: string, interviewTitle: string, jobRole: string, status: AttemptStatus, completedAt: number | null, totalScore: number | null }> } };
+export type CandidateReportQuery = { candidateReport: { candidateId: string, fullName: string, email: string, phone: string | null, linkedinUrl: string | null, githubUrl: string | null, shortlistStatus: string, shortlistReason: string | null, latestFinalEvaluation: { id: string, totalScore: number, finalScore: number, totalWeight: number, averageScore: number | null, strengthCategory: InterviewStrengthCategory, category: FinalEvaluationCategory, hireRecommendation: HireRecommendation, summary: string, detailedSummary: string | null, strengths: Array<string>, weaknesses: Array<string>, risks: Array<string>, needsManualReview: boolean, categoryBreakdown: Array<{ categoryKey: string, categoryLabel: string, scoreNormalized: number, weight: number, contribution: number }>, topicEvaluations: Array<{ topic: string, score: number, weight: number, weightedScore: number, strengthCategory: InterviewStrengthCategory }> } | null, interviewHistory: Array<{ attemptId: string, interviewId: string, interviewTitle: string, jobRole: string, status: AttemptStatus, completedAt: number | null, totalScore: number | null }> } };
 
 export type CheckpointResultsByAttemptQueryVariables = Exact<{
   attemptId: string | number;
@@ -239,14 +244,14 @@ export type EvaluateInterviewAttemptMutationVariables = Exact<{
 }>;
 
 
-export type EvaluateInterviewAttemptMutation = { evaluateInterviewAttempt: { questionCount: number, finalEvaluation: { id: string, totalScore: number, category: FinalEvaluationCategory, hireRecommendation: HireRecommendation, summary: string, needsManualReview: boolean, categoryBreakdown: Array<{ categoryKey: string, categoryLabel: string, scoreNormalized: number, weight: number, contribution: number }> } } };
+export type EvaluateInterviewAttemptMutation = { evaluateInterviewAttempt: { questionCount: number, finalEvaluation: { id: string, totalScore: number, finalScore: number, totalWeight: number, averageScore: number | null, strengthCategory: InterviewStrengthCategory, category: FinalEvaluationCategory, hireRecommendation: HireRecommendation, summary: string, needsManualReview: boolean, categoryBreakdown: Array<{ categoryKey: string, categoryLabel: string, scoreNormalized: number, weight: number, contribution: number }>, topicEvaluations: Array<{ topic: string, score: number, weight: number, weightedScore: number, strengthCategory: InterviewStrengthCategory }> } } };
 
 export type FinalEvaluationByAttemptQueryVariables = Exact<{
   attemptId: string | number;
 }>;
 
 
-export type FinalEvaluationByAttemptQuery = { finalEvaluationByAttempt: { id: string, interviewAttemptId: string, totalScore: number, category: FinalEvaluationCategory, hireRecommendation: HireRecommendation, summary: string, detailedSummary: string | null, strengths: Array<string>, weaknesses: Array<string>, risks: Array<string>, needsManualReview: boolean, categoryBreakdown: Array<{ categoryKey: string, categoryLabel: string, scoreNormalized: number, weight: number, contribution: number }> } | null };
+export type FinalEvaluationByAttemptQuery = { finalEvaluationByAttempt: { id: string, interviewAttemptId: string, totalScore: number, finalScore: number, totalWeight: number, averageScore: number | null, strengthCategory: InterviewStrengthCategory, category: FinalEvaluationCategory, hireRecommendation: HireRecommendation, summary: string, detailedSummary: string | null, strengths: Array<string>, weaknesses: Array<string>, risks: Array<string>, needsManualReview: boolean, categoryBreakdown: Array<{ categoryKey: string, categoryLabel: string, scoreNormalized: number, weight: number, contribution: number }>, topicEvaluations: Array<{ topic: string, score: number, weight: number, weightedScore: number, strengthCategory: InterviewStrengthCategory }> } | null };
 
 export type HelloQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -265,7 +270,7 @@ export type InterviewDetailsQueryVariables = Exact<{
 }>;
 
 
-export type InterviewDetailsQuery = { interviewDetails: { id: string, title: string, jobRole: string, status: InterviewStatus, questionCount: number, publicUrl: string, createdAt: number, evaluationStatus: string, primaryFinalEvaluation: { id: string, totalScore: number, category: FinalEvaluationCategory, hireRecommendation: HireRecommendation, summary: string, strengths: Array<string>, weaknesses: Array<string>, risks: Array<string>, needsManualReview: boolean, categoryBreakdown: Array<{ categoryKey: string, categoryLabel: string, scoreNormalized: number, weight: number, contribution: number }> } | null, attempts: Array<{ attemptId: string, candidateId: string, candidateName: string, candidateEmail: string, status: AttemptStatus, startedAt: number | null, completedAt: number | null, overallScore: number | null, hireRecommendation: HireRecommendation | null, evaluationStatus: string }> } };
+export type InterviewDetailsQuery = { interviewDetails: { id: string, title: string, jobRole: string, status: InterviewStatus, questionCount: number, publicUrl: string, createdAt: number, evaluationStatus: string, primaryFinalEvaluation: { id: string, totalScore: number, finalScore: number, totalWeight: number, averageScore: number | null, strengthCategory: InterviewStrengthCategory, category: FinalEvaluationCategory, hireRecommendation: HireRecommendation, summary: string, strengths: Array<string>, weaknesses: Array<string>, risks: Array<string>, needsManualReview: boolean, categoryBreakdown: Array<{ categoryKey: string, categoryLabel: string, scoreNormalized: number, weight: number, contribution: number }>, topicEvaluations: Array<{ topic: string, score: number, weight: number, weightedScore: number, strengthCategory: InterviewStrengthCategory }> } | null, attempts: Array<{ attemptId: string, candidateId: string, candidateName: string, candidateEmail: string, status: AttemptStatus, startedAt: number | null, completedAt: number | null, overallScore: number | null, hireRecommendation: HireRecommendation | null, evaluationStatus: string }> } };
 
 export type InterviewSessionQueryVariables = Exact<{
   publicToken: string;
@@ -502,6 +507,10 @@ export const CandidateReportDocument = new TypedDocumentString(`
     latestFinalEvaluation {
       id
       totalScore
+      finalScore
+      totalWeight
+      averageScore
+      strengthCategory
       category
       hireRecommendation
       summary
@@ -516,6 +525,13 @@ export const CandidateReportDocument = new TypedDocumentString(`
         scoreNormalized
         weight
         contribution
+      }
+      topicEvaluations {
+        topic
+        score
+        weight
+        weightedScore
+        strengthCategory
       }
     }
     interviewHistory {
@@ -629,6 +645,10 @@ export const EvaluateInterviewAttemptDocument = new TypedDocumentString(`
     finalEvaluation {
       id
       totalScore
+      finalScore
+      totalWeight
+      averageScore
+      strengthCategory
       category
       hireRecommendation
       summary
@@ -640,6 +660,13 @@ export const EvaluateInterviewAttemptDocument = new TypedDocumentString(`
         weight
         contribution
       }
+      topicEvaluations {
+        topic
+        score
+        weight
+        weightedScore
+        strengthCategory
+      }
     }
   }
 }
@@ -650,6 +677,10 @@ export const FinalEvaluationByAttemptDocument = new TypedDocumentString(`
     id
     interviewAttemptId
     totalScore
+    finalScore
+    totalWeight
+    averageScore
+    strengthCategory
     category
     hireRecommendation
     summary
@@ -664,6 +695,13 @@ export const FinalEvaluationByAttemptDocument = new TypedDocumentString(`
       scoreNormalized
       weight
       contribution
+    }
+    topicEvaluations {
+      topic
+      score
+      weight
+      weightedScore
+      strengthCategory
     }
   }
 }
@@ -699,6 +737,10 @@ export const InterviewDetailsDocument = new TypedDocumentString(`
     primaryFinalEvaluation {
       id
       totalScore
+      finalScore
+      totalWeight
+      averageScore
+      strengthCategory
       category
       hireRecommendation
       summary
@@ -712,6 +754,13 @@ export const InterviewDetailsDocument = new TypedDocumentString(`
         scoreNormalized
         weight
         contribution
+      }
+      topicEvaluations {
+        topic
+        score
+        weight
+        weightedScore
+        strengthCategory
       }
     }
     attempts {

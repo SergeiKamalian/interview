@@ -1,5 +1,11 @@
 import { Field, Float, ObjectType, registerEnumType } from '@nestjs/graphql';
 
+export enum InterviewStrengthCategoryEnum {
+  weak = 'weak',
+  medium = 'medium',
+  strong = 'strong',
+}
+
 export enum FinalEvaluationCategoryEnum {
   weak = 'weak',
   basic = 'basic',
@@ -16,6 +22,10 @@ export enum HireRecommendationEnum {
   strong_invite = 'strong_invite',
 }
 
+registerEnumType(InterviewStrengthCategoryEnum, {
+  name: 'InterviewStrengthCategory',
+});
+
 registerEnumType(FinalEvaluationCategoryEnum, {
   name: 'FinalEvaluationCategory',
 });
@@ -23,6 +33,24 @@ registerEnumType(FinalEvaluationCategoryEnum, {
 registerEnumType(HireRecommendationEnum, {
   name: 'HireRecommendation',
 });
+
+@ObjectType()
+export class TopicSessionEvaluationType {
+  @Field()
+  topic!: string;
+
+  @Field(() => Float)
+  score!: number;
+
+  @Field(() => Float)
+  weight!: number;
+
+  @Field(() => Float)
+  weightedScore!: number;
+
+  @Field(() => InterviewStrengthCategoryEnum)
+  strengthCategory!: InterviewStrengthCategoryEnum;
+}
 
 @ObjectType()
 export class CategoryBreakdownType {
@@ -53,6 +81,18 @@ export class FinalEvaluationType {
   @Field(() => Float)
   totalScore!: number;
 
+  @Field(() => Float)
+  finalScore!: number;
+
+  @Field(() => Float)
+  totalWeight!: number;
+
+  @Field(() => Float, { nullable: true })
+  averageScore?: number | null;
+
+  @Field(() => InterviewStrengthCategoryEnum)
+  strengthCategory!: InterviewStrengthCategoryEnum;
+
   @Field(() => FinalEvaluationCategoryEnum)
   category!: FinalEvaluationCategoryEnum;
 
@@ -79,4 +119,7 @@ export class FinalEvaluationType {
 
   @Field(() => [CategoryBreakdownType])
   categoryBreakdown!: CategoryBreakdownType[];
+
+  @Field(() => [TopicSessionEvaluationType])
+  topicEvaluations!: TopicSessionEvaluationType[];
 }
