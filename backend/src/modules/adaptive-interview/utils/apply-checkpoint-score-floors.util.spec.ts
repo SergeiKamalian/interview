@@ -467,7 +467,13 @@ describe('applyCheckpointScoreFloors', () => {
 
     const context: AdaptiveInterviewContextPacket = {
       ...buildGenericsContext(correctScheduling, [
-        { role: 'candidate', sequenceOrder: 1, content: wrongCommit },
+        {
+          role: 'candidate',
+          sequenceOrder: 1,
+          content: wrongCommit,
+          messageKind: 'follow_up_answer',
+          targetCheckpointKey: 'commit_phase',
+        },
       ]),
       checkpoints: [fiberCheckpoint('scheduling')],
     };

@@ -24,6 +24,22 @@
 | TASK-14.14 | [x] done | Follow-up answer weight < main answer | `014-✅-follow-up-weight-vs-main.md` |
 | TASK-14.15 | [x] done | Bank-driven guards (remove fiber hardcode) | `015-✅-bank-driven-guards.md` |
 | TASK-14.16 | [x] done | DB checkpoint evaluation hints + snapshot | `016-✅-db-checkpoint-evaluation-hints.md` |
+| TASK-14.17 | [x] done | Scoring accuracy, red flags & legacy sync | `017-✅-scoring-red-flags-evidence-sync.md` |
+| TASK-14.18 | [ ] todo | Probe-or-Accept: не штрафовать без уточняющего | `018-⬜-probe-or-accept-policy.md` |
+| TASK-14.19 | [ ] todo | Weight-based follow-up budget allocator | `019-⬜-weight-budget-follow-up-allocator.md` |
+| TASK-14.20 | [ ] todo | Transitive checkpoint floors (сложный → простой) | `020-⬜-transitive-checkpoint-floors.md` |
+| TASK-14.21 | [ ] todo | Topic mismatch redirect (ответ не на тот checkpoint) | `021-⬜-topic-mismatch-redirect.md` |
+
+---
+
+## Roadmap (adaptive probing — после 14.17)
+
+```txt
+14.18 Probe-or-Accept     → shallow accept + OpenAI prompts 2.6 (turn policy block)
+14.19 Budget allocator    → weight × gap + budget block в turn prompt
+14.20 Transitive floors   → bank impliesCheckpointFloors + hints в turn prompt
+14.21 Topic mismatch      → useEffect vs useState redirect, не сразу 0
+```
 
 ---
 

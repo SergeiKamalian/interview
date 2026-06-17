@@ -11,6 +11,7 @@ import {
   parseDepthFromRationale,
 } from '../../adaptive-interview/utils/checkpoint-depth.util';
 import { aggregateCheckpointRedFlags } from '../../adaptive-interview/utils/checkpoint-red-flags.util';
+import { parseCheckpointEvaluationHints } from '../../adaptive-interview/types/checkpoint-evaluation-hints.type';
 import type {
   AdaptiveCheckpointReviewType,
   AdaptiveCheckpointStateType,
@@ -27,6 +28,7 @@ interface CheckpointDefRow extends RowDataPacket {
   interview_question_id: number;
   checkpoint_key: string;
   title: string;
+  evaluation_hints: unknown;
 }
 
 @Injectable()
@@ -59,7 +61,7 @@ export class AdaptiveCheckpointReviewService {
     );
 
     const checkpointDefs = await this.database.query<CheckpointDefRow[]>(
-      `SELECT iqc.interview_question_id, iqc.checkpoint_key, iqc.title
+      `SELECT iqc.interview_question_id, iqc.checkpoint_key, iqc.title, iqc.evaluation_hints
        FROM interview_question_checkpoints iqc
        INNER JOIN interview_questions iq ON iq.id = iqc.interview_question_id
        INNER JOIN interview_attempts ia ON ia.interview_id = iq.interview_id
@@ -82,6 +84,7 @@ export class AdaptiveCheckpointReviewService {
       rationale: string | null;
       evidenceSummary: string | null;
       status: string;
+      evaluationHints: ReturnType<typeof parseCheckpointEvaluationHints>;
     }> = [];
 
     for (const question of questionRows) {
@@ -120,6 +123,7 @@ export class AdaptiveCheckpointReviewService {
           rationale: mapped.rationale ?? null,
           evidenceSummary: mapped.evidenceSummary ?? null,
           status: mapped.status,
+          evaluationHints: parseCheckpointEvaluationHints(def.evaluation_hints),
         });
 
         return mapped;

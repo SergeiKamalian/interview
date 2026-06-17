@@ -16,7 +16,13 @@ import {
   rationaleIndicatesSoundEvidence,
 } from './bad-answer-signature.util';
 import { isTargetedTopicRefusal } from './candidate-decline.util';
-import { extractFalseClaimQuote } from './false-claim-quote.util';
+import {
+  collectCheckpointEvidenceText,
+  collectFullCandidateText,
+  collectLatestCandidateText,
+  stripNeutralMetaphors,
+} from './checkpoint-evidence-text.util';
+import { extractMatchedFalseClaimQuote } from './false-claim-quote.util';
 import { mergeCheckpointEvaluation } from './merge-checkpoint-evaluation.util';
 import { alignRationaleDepthWithScore } from './rationale-depth-alignment.util';
 import {
@@ -52,44 +58,60 @@ export function applyCheckpointScoreFloors(
       return result;
     }
 
+    const effectiveMaxScore = priorState?.maxScore ?? checkpoint.score;
+    const checkpointEvidenceText = collectCheckpointEvidenceText(
+      context,
+      result.checkpointKey,
+    );
+    const latestTurnText = collectLatestCandidateText(context);
+    const isTargetedFollowUp =
+      context.latestAnswerMessageKind === 'follow_up_answer' &&
+      context.targetCheckpointKey === result.checkpointKey;
+    const evaluationText = isTargetedFollowUp
+      ? latestTurnText
+      : checkpointEvidenceText;
+    const floorLatestText = latestTurnText;
+    const floorFullText = isTargetedFollowUp
+      ? latestTurnText
+      : checkpointEvidenceText;
+
     const aiSnapshot = {
       status: result.status,
       scoreAwarded: result.scoreAwarded,
     };
 
     const guardedResult = enforceStatusScoreAlignment(
-        applyRationaleScoreAlignment(
-            applyPositiveEvidenceFloor(
+      applyRationaleScoreAlignment(
+          applyPositiveEvidenceFloor(
               applyExplicitRefusalCap(
                 applyBadExampleOverlapCap(
                   applySemanticContradictionCap(
-                    applyRationaleContradictionCap(
-                      result,
-                      checkpoint.score,
-                    ),
-                    latestCandidateText,
-                    fullCandidateText,
+                    applyRationaleContradictionCap(result, effectiveMaxScore),
+                    evaluationText,
                     checkpoint,
+                    effectiveMaxScore,
                   ),
-                  latestCandidateText,
-                  fullCandidateText,
+                  evaluationText,
+                  checkpointEvidenceText,
                   [
                     ...badExamples,
                     ...(checkpoint.badExamples ?? []),
                     ...(checkpoint.questionBadExamples ?? []),
                   ],
-                  checkpoint.score,
+                  checkpoint.evaluationHints?.neutralMetaphors,
+                  effectiveMaxScore,
                 ),
-                latestCandidateText,
+                latestTurnText,
                 checkpoint,
               ),
-              latestCandidateText,
-              fullCandidateText,
-              checkpoint,
-            ),
-          checkpoint.score,
-        ),
-      checkpoint.score,
+            floorLatestText,
+            floorFullText,
+            checkpoint,
+            effectiveMaxScore,
+          ),
+        effectiveMaxScore,
+      ),
+      effectiveMaxScore,
     );
 
     if (
@@ -105,7 +127,7 @@ export function applyCheckpointScoreFloors(
         reason: resolveAdjustmentReason(
           result,
           guardedResult,
-          latestCandidateText,
+          latestTurnText,
           checkpoint,
         ),
         promptVersion,
@@ -114,8 +136,8 @@ export function applyCheckpointScoreFloors(
 
     const guardedWithQuote = attachFalseClaimEvidence(
       guardedResult,
-      latestCandidateText,
-      result.checkpointKey,
+      checkpointEvidenceText,
+      checkpoint,
     );
 
     const merged = mergeCheckpointEvaluation({
@@ -127,29 +149,47 @@ export function applyCheckpointScoreFloors(
       incomingStatus: guardedWithQuote.status,
       incomingEvidenceSummary: guardedWithQuote.evidenceSummary,
       incomingRationale: guardedWithQuote.rationale,
-      maxScore: checkpoint.score,
+      maxScore: effectiveMaxScore,
       evidenceSource: options.evidenceSource,
-      relaxFollowUpWeight:
-        context.latestAnswerMessageKind === 'follow_up_answer' &&
-        context.targetCheckpointKey === result.checkpointKey,
+      relaxFollowUpWeight: isTargetedFollowUp,
       incomingAllowsScoreDecrease: resolveIncomingAllowsScoreDecrease(
         context,
         checkpoint,
         guardedWithQuote.rationale,
-        latestCandidateText,
-        fullCandidateText,
+        latestTurnText,
+        checkpointEvidenceText,
       ),
     });
 
+    const realigned =
+      isTargetedFollowUp &&
+      (evaluation.candidateDisposition === 'declined' ||
+        isTargetedTopicRefusal(latestTurnText))
+        ? {
+            ...result,
+            scoreAwarded: merged.scoreAwarded,
+            status: merged.status as PerTurnCheckpointEvaluationStatus,
+            rationale: merged.rationale ?? result.rationale,
+          }
+        : applyRationaleScoreAlignment(
+            {
+              ...result,
+              scoreAwarded: merged.scoreAwarded,
+              status: merged.status as PerTurnCheckpointEvaluationStatus,
+              rationale: merged.rationale ?? result.rationale,
+            },
+            effectiveMaxScore,
+          );
+
     return {
       ...result,
-      scoreAwarded: merged.scoreAwarded,
-      status: merged.status as PerTurnCheckpointEvaluationStatus,
+      scoreAwarded: realigned.scoreAwarded,
+      status: realigned.status as PerTurnCheckpointEvaluationStatus,
       evidenceSummary: merged.evidenceSummary,
       rationale: alignRationaleDepthWithScore(
-        normalizeRationaleDepth(merged.rationale ?? result.rationale),
-        merged.scoreAwarded,
-        checkpoint.score,
+        normalizeRationaleDepth(realigned.rationale ?? result.rationale),
+        realigned.scoreAwarded,
+        effectiveMaxScore,
       ),
     };
   });
@@ -192,25 +232,13 @@ function resolveAdjustmentReason(
   return 'bad_example_overlap_cap';
 }
 
-function collectFullCandidateText(context: AdaptiveInterviewContextPacket): string {
-  return [
-    ...context.localTurns
-      .filter((turn) => turn.role === 'candidate')
-      .map((turn) => turn.content),
-    context.latestCandidateAnswer,
-  ]
-    .join(' ')
-    .toLowerCase();
-}
-
-function collectLatestCandidateText(
-  context: AdaptiveInterviewContextPacket,
-): string {
-  return (context.latestCandidateAnswer ?? '').toLowerCase();
-}
-
 function hasFalseClaimInRationale(rationale: string | null | undefined): boolean {
-  return /depth\s*=\s*false_claim/i.test(rationale ?? '');
+  const value = rationale ?? '';
+  return (
+    /depth\s*=\s*false_claim/i.test(value) ||
+    (/semantic guard capped/i.test(value) &&
+      !/similarity\s*=\s*bad_example/i.test(value))
+  );
 }
 
 function normalizeRationaleDepth(rationale: string | null | undefined): string {
@@ -228,14 +256,17 @@ function normalizeRationaleDepth(rationale: string | null | undefined): string {
 
 function attachFalseClaimEvidence(
   result: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
-  latestCandidateText: string,
-  checkpointKey: string,
+  checkpointEvidenceText: string,
+  checkpoint: AdaptiveCheckpointDefinition,
 ): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
   if (!hasFalseClaimInRationale(result.rationale)) {
     return result;
   }
 
-  const quote = extractFalseClaimQuote(latestCandidateText, checkpointKey);
+  const quote = extractMatchedFalseClaimQuote(
+    checkpointEvidenceText,
+    checkpoint.evaluationHints?.falseClaims,
+  );
   if (!quote) {
     return result;
   }
@@ -344,9 +375,10 @@ function applyRationaleContradictionCap(
 
 function applyBadExampleOverlapCap(
   result: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
-  latestCandidateText: string,
-  fullCandidateText: string,
+  evaluationText: string,
+  _fullCandidateText: string,
   badExamples: string[],
+  neutralMetaphors: string[] | undefined,
   maxScore: number,
 ): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
   if (result.scoreAwarded <= 0) {
@@ -357,11 +389,14 @@ function applyBadExampleOverlapCap(
     return result;
   }
 
+  const strippedEvaluation = stripNeutralMetaphors(
+    evaluationText,
+    neutralMetaphors,
+  );
+
   const overlapsBadExample =
-    matchesDistinctiveBadAnswerClaim(latestCandidateText) ||
-    matchesDistinctiveBadAnswerClaim(fullCandidateText) ||
-    overlapsQuestionBadAnswerExamples(latestCandidateText, badExamples) ||
-    overlapsQuestionBadAnswerExamples(fullCandidateText, badExamples);
+    matchesDistinctiveBadAnswerClaim(strippedEvaluation) ||
+    overlapsQuestionBadAnswerExamples(strippedEvaluation, badExamples);
 
   if (!overlapsBadExample) {
     return result;
@@ -372,7 +407,7 @@ function applyBadExampleOverlapCap(
     ...result,
     scoreAwarded: Math.min(result.scoreAwarded, cap),
     status: 'partial',
-    rationale: `${result.rationale} depth=false_claim. Score capped: overlaps bad answer example.`,
+    rationale: `${result.rationale} similarity=bad_example. Score capped: overlaps bad answer example.`,
   };
 }
 
@@ -381,6 +416,10 @@ function applyRationaleScoreAlignment(
   maxScore: number,
 ): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
   const rationale = result.rationale ?? '';
+  if (result.scoreAwarded <= 0) {
+    return result;
+  }
+
   if (
     /depth\s*=\s*false_claim/i.test(rationale) ||
     /accuracy\s*=\s*wrong/i.test(rationale)
@@ -448,6 +487,7 @@ function applyPositiveEvidenceFloor(
   latestCandidateText: string,
   fullCandidateText: string,
   checkpoint: AdaptiveCheckpointDefinition,
+  maxScore: number,
 ): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
   if (
     isTargetedTopicRefusal(latestCandidateText) &&
@@ -460,7 +500,7 @@ function applyPositiveEvidenceFloor(
     checkpoint.evaluationHints,
     latestCandidateText,
     fullCandidateText,
-    checkpoint.score,
+    maxScore,
   );
   if (floor === null || matchesDistinctiveBadAnswerClaim(latestCandidateText)) {
     return result;
@@ -473,38 +513,25 @@ function applyPositiveEvidenceFloor(
     return result;
   }
 
-  const overlapFalseClaim = /overlaps bad answer example/i.test(
-    result.rationale ?? '',
-  );
   const underScored = result.scoreAwarded < floor;
 
-  if (!overlapFalseClaim && !underScored) {
+  if (!underScored) {
     return result;
   }
 
-  const scoreAwarded = Math.min(
-    checkpoint.score,
-    Math.max(result.scoreAwarded, floor),
-  );
-  const cleanedRationale = (result.rationale ?? '')
-    .replace(
-      /depth\s*=\s*false_claim\.?\s*Score capped: overlaps bad answer example\.?/gi,
-      '',
-    )
-    .replace(/\s{2,}/g, ' ')
-    .trim();
+  const scoreAwarded = Math.min(maxScore, Math.max(result.scoreAwarded, floor));
 
   return {
     ...result,
     scoreAwarded,
     status:
-      scoreAwarded >= checkpoint.score
+      scoreAwarded >= maxScore
         ? 'covered'
         : scoreAwarded > 0
           ? 'partial'
           : 'missed',
-    rationale: cleanedRationale
-      ? `${cleanedRationale} Positive evidence floor applied.`
+    rationale: result.rationale
+      ? `${result.rationale} Positive evidence floor applied.`
       : 'Positive evidence floor applied.',
   };
 }
@@ -545,18 +572,16 @@ function strongPartialScoreForMax(maxScore: number): number {
 
 function applySemanticContradictionCap(
   result: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
-  latestCandidateText: string,
-  fullCandidateText: string,
+  candidateText: string,
   checkpoint: AdaptiveCheckpointDefinition,
+  maxScore: number,
 ): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
-  const cap =
-    getContradictionScoreCap(checkpoint, latestCandidateText, checkpoint.score) ??
-    getContradictionScoreCap(checkpoint, fullCandidateText, checkpoint.score);
+  const cap = getContradictionScoreCap(checkpoint, candidateText, maxScore);
   if (cap === null || result.scoreAwarded <= cap) {
     return result;
   }
 
-  const scoreAwarded = Math.min(checkpoint.score, cap);
+  const scoreAwarded = Math.min(maxScore, cap);
   return {
     ...result,
     scoreAwarded,

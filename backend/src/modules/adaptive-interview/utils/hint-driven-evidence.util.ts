@@ -1,6 +1,6 @@
 import type { CheckpointEvaluationHints } from '../types/checkpoint-evaluation-hints.type';
 import { matchesCheckpointFalseClaims } from './bad-answer-signature.util';
-import { countMatchedConcepts } from './text-evidence-overlap.util';
+import { countMatchedConcepts, textContainsPhrase } from './text-evidence-overlap.util';
 import { getLegacyContradictionScoreCap } from './legacy-contradiction-cap.util';
 
 export function getPositiveEvidenceScoreFloor(
@@ -9,8 +9,19 @@ export function getPositiveEvidenceScoreFloor(
   fullCandidateText: string,
   maxScore: number,
 ): number | null {
-  if (!hints?.mustConcepts?.length || maxScore <= 0) {
+  if (maxScore <= 0) {
     return null;
+  }
+
+  const evidenceText = fullCandidateText.trim() || latestCandidateText.trim();
+  const groupFloor = getRequiredConceptGroupsScoreFloor(
+    hints,
+    evidenceText,
+    maxScore,
+  );
+
+  if (!hints?.mustConcepts?.length) {
+    return groupFloor;
   }
 
   const minMatched = hints.minMatchedConcepts ?? 1;
@@ -19,7 +30,7 @@ export function getPositiveEvidenceScoreFloor(
     text.trim(),
   );
 
-  let best: number | null = null;
+  let best: number | null = groupFloor;
   for (const text of candidates) {
     const matched = countMatchedConcepts(text, hints.mustConcepts);
     if (matched < minMatched) {
@@ -31,6 +42,43 @@ export function getPositiveEvidenceScoreFloor(
   }
 
   return best;
+}
+
+export function getRequiredConceptGroupsScoreFloor(
+  hints: CheckpointEvaluationHints | null | undefined,
+  candidateText: string,
+  maxScore: number,
+): number | null {
+  const groups = hints?.requiredConceptGroups;
+  if (!groups?.length || maxScore <= 0 || !candidateText.trim()) {
+    return null;
+  }
+
+  let matchedGroups = 0;
+  for (const group of groups) {
+    if (group.some((concept) => textContainsPhrase(candidateText, concept))) {
+      matchedGroups += 1;
+    }
+  }
+
+  if (matchedGroups === 0) {
+    return null;
+  }
+
+  const coverageRatio = matchedGroups / groups.length;
+  const proportional = Number((maxScore * coverageRatio).toFixed(2));
+  if (matchedGroups >= groups.length) {
+    const fullFraction = hints?.positiveFloorScore ?? 0.85;
+    return Number((maxScore * fullFraction).toFixed(2));
+  }
+
+  const moderateFraction = Math.max(
+    coverageRatio,
+    (hints?.positiveFloorScore ?? 0.75) * coverageRatio,
+  );
+  return Number(
+    Math.max(proportional, maxScore * moderateFraction).toFixed(2),
+  );
 }
 
 export function getContradictionScoreCapFromHints(

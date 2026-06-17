@@ -34,6 +34,12 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
   WHEN 'fiber_pointers' THEN JSON_OBJECT(
     'mustConcepts', JSON_ARRAY('child', 'sibling', 'return', 'alternate', 'current', 'потомок', 'обход'),
     'falseClaims', JSON_ARRAY('parent и next', 'лежат в Redux', 'Virtual DOM хранит'),
+    'neutralMetaphors', JSON_ARRAY('карточка', 'рабочий узел', 'рабочая единица'),
+    'requiredConceptGroups', JSON_ARRAY(
+      JSON_ARRAY('child', 'потомок', 'первый ребенок', 'first child', 'ребенок'),
+      JSON_ARRAY('sibling', 'сосед', 'neighbor', 'соседний'),
+      JSON_ARRAY('return', 'родител', 'parent')
+    ),
     'minMatchedConcepts', 3,
     'positiveFloorScore', 0.85
   )
@@ -68,7 +74,10 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
       'shouldYield', 'should yield', '5ms', 'chunk', 'куск', 'тайм-слайс', 'yield'
     ),
     'falseClaims', JSON_ARRAY(
-      'requestIdleCallback', 'idle callback', 'request idle callback'
+      'Fiber планирует через requestIdleCallback',
+      'планирование через requestIdleCallback',
+      'scheduler использует requestIdleCallback',
+      'requestIdleCallback для планирования'
     ),
     'minMatchedConcepts', 2,
     'positiveFloorScore', 0.85

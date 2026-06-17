@@ -1,8 +1,10 @@
+import type { CheckpointEvaluationHints } from '../types/checkpoint-evaluation-hints.type';
 import {
   parseDepthFromRationale,
   type CheckpointDepthLevel,
 } from './checkpoint-depth.util';
-import { extractFalseClaimQuote } from './false-claim-quote.util';
+import { matchesCheckpointFalseClaims } from './bad-answer-signature.util';
+import { extractMatchedFalseClaimQuote } from './false-claim-quote.util';
 
 export type CheckpointRedFlagSeverity = 'low' | 'medium' | 'high';
 
@@ -20,6 +22,7 @@ type RedFlagInput = {
   rationale: string | null;
   evidenceSummary: string | null;
   status: string;
+  evaluationHints?: CheckpointEvaluationHints | null;
 };
 
 export function aggregateCheckpointRedFlags(
@@ -34,31 +37,75 @@ function buildRedFlag(checkpoint: RedFlagInput): CheckpointRedFlag | null {
   const depth = parseDepthFromRationale(checkpoint.rationale);
   const rationale = checkpoint.rationale ?? '';
 
-  if (depth === 'false_claim' || hasFalseClaimSignal(rationale)) {
-    const quote =
-      extractFalseClaimQuote(checkpoint.evidenceSummary, checkpoint.checkpointKey) ??
-      (depth === 'false_claim' ? checkpoint.evidenceSummary : null);
-
-    return {
-      checkpointKey: checkpoint.checkpointKey,
-      checkpointTitle: checkpoint.checkpointTitle,
-      summary: extractFalseClaimSummary(rationale, checkpoint.checkpointTitle),
-      candidateQuote: quote,
-      severity: resolveSeverity(depth, rationale),
-    };
+  if (hasBadExampleSimilarityOnly(rationale)) {
+    return null;
   }
 
-  return null;
+  const evidenceText =
+    checkpoint.evidenceSummary?.trim() ||
+    extractEvidenceFromRationale(rationale) ||
+    '';
+
+  const semanticFalseClaim =
+    depth === 'false_claim' ||
+    (checkpoint.evaluationHints?.falseClaims?.length
+      ? matchesCheckpointFalseClaims(
+          evidenceText,
+          checkpoint.evaluationHints.falseClaims,
+        )
+      : hasSemanticFalseClaimSignal(rationale));
+
+  if (!semanticFalseClaim) {
+    return null;
+  }
+
+  if (
+    checkpoint.evaluationHints?.falseClaims?.length &&
+    evidenceText &&
+    !matchesCheckpointFalseClaims(
+      evidenceText,
+      checkpoint.evaluationHints.falseClaims,
+    ) &&
+    depth !== 'false_claim'
+  ) {
+    return null;
+  }
+
+  const quote =
+    extractMatchedFalseClaimQuote(
+      evidenceText,
+      checkpoint.evaluationHints?.falseClaims,
+    ) ?? (depth === 'false_claim' ? checkpoint.evidenceSummary : null);
+
+  return {
+    checkpointKey: checkpoint.checkpointKey,
+    checkpointTitle: checkpoint.checkpointTitle,
+    summary: extractFalseClaimSummary(rationale, checkpoint.checkpointTitle),
+    candidateQuote: quote,
+    severity: resolveSeverity(depth, rationale),
+  };
 }
 
-function hasFalseClaimSignal(rationale: string): boolean {
+function hasBadExampleSimilarityOnly(rationale: string): boolean {
+  return (
+    /similarity\s*=\s*bad_example/i.test(rationale) &&
+    !/depth\s*=\s*false_claim/i.test(rationale) &&
+    !/accuracy\s*=\s*wrong/i.test(rationale)
+  );
+}
+
+function hasSemanticFalseClaimSignal(rationale: string): boolean {
   return [
     /depth\s*=\s*false_claim/i,
     /material false claim/i,
-    /уверенн.{0,20}(?:ошиб|неверн)/i,
-    /overlaps bad answer example/i,
-    /Score capped:.*(?:contradict|overlap|material)/i,
+    /semantic guard capped/i,
+    /Score capped:.*contradict/i,
   ].some((pattern) => pattern.test(rationale));
+}
+
+function extractEvidenceFromRationale(rationale: string): string | null {
+  const quoted = rationale.match(/[«"]([^»"]{12,})[»"]/);
+  return quoted?.[1]?.trim() ?? null;
 }
 
 function extractFalseClaimSummary(
@@ -77,7 +124,7 @@ function resolveSeverity(
   depth: CheckpointDepthLevel,
   rationale: string,
 ): CheckpointRedFlagSeverity {
-  if (depth === 'false_claim') {
+  if (depth === 'false_claim' || /accuracy\s*=\s*wrong/i.test(rationale)) {
     return 'medium';
   }
 

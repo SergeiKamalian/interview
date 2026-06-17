@@ -3,6 +3,7 @@ import type { CheckpointDefinition } from './types/checkpoint-evaluation.types';
 import type { CheckpointEvaluationResultItem } from './types/evaluation.types';
 
 const PARTIAL_SCORE_RATIO = 0.5;
+const MET_SCORE_RATIO = 0.85;
 
 export function mapCheckpointResultsForStorage(
   checkpoints: CheckpointDefinition[],
@@ -23,15 +24,31 @@ export function mapCheckpointResultsForStorage(
       };
     }
 
+    const scoreAwarded = resolveStoredScoreAwarded(checkpoint.score, result);
+
     return {
       checkpointKey: checkpoint.checkpointKey,
-      matched: result.status === 'met' || result.status === 'partially_met',
-      scoreAwarded: roundScore(
-        awardCheckpointScore(checkpoint.score, result.status),
-      ),
+      matched:
+        scoreAwarded >= checkpoint.score * MET_SCORE_RATIO ||
+        result.status === 'met',
+      scoreAwarded: roundScore(scoreAwarded),
       evidenceQuote: result.evidenceQuote || null,
     };
   });
+}
+
+function resolveStoredScoreAwarded(
+  maxCheckpointScore: number,
+  result: CheckpointEvaluationResultItem,
+): number {
+  if (
+    typeof result.scoreAwarded === 'number' &&
+    Number.isFinite(result.scoreAwarded)
+  ) {
+    return Math.min(maxCheckpointScore, Math.max(0, result.scoreAwarded));
+  }
+
+  return awardCheckpointScore(maxCheckpointScore, result.status);
 }
 
 function awardCheckpointScore(

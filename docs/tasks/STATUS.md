@@ -26,7 +26,7 @@ Active block:
 Block status:
 
 ```txt
-✅ done
+🟡 in progress
 ```
 
 Block title:
@@ -42,25 +42,31 @@ Evaluation accuracy & HR analytics
 Active subtask ID:
 
 ```txt
-(none — block 14 complete)
+TASK-14.18 — Probe-or-Accept: не штрафовать без уточняющего
 ```
 
 Last completed subtask:
 
 ```txt
-TASK-14.16 — DB checkpoint evaluation hints + snapshot
+TASK-14.17 — Scoring accuracy, red flags & legacy sync
 ```
 
 Next recommended subtask:
 
 ```txt
-Block 11-⬜-video
+TASK-14.18 — Probe-or-Accept + OpenAI prompts 2.6
+```
+
+Planned (block 14):
+
+```txt
+14.18 Probe-or-Accept + prompts 2.6 → 14.19 Budget → 14.20 Transitive → 14.21 Topic mismatch redirect
 ```
 
 Last updated:
 
 ```txt
-2026-06-17 (TASK-14.16 done)
+2026-06-17 (TASK-14.17 closed ✅; active → 14.18)
 ```
 
 ---
@@ -83,6 +89,7 @@ Last updated:
 - [x] TASK-14.14 — Follow-up answer weight < main answer
 - [x] TASK-14.15 — Bank-driven guards (remove fiber hardcode)
 - [x] TASK-14.16 — DB checkpoint evaluation hints + snapshot
+- [x] TASK-14.17 — Scoring accuracy, red flags & legacy sync
 
 ---
 

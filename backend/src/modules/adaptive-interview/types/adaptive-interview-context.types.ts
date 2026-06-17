@@ -4,6 +4,8 @@ export type AdaptiveLocalTurn = {
   sequenceOrder: number;
   role: 'ai' | 'candidate';
   content: string;
+  messageKind?: 'main_answer' | 'follow_up_answer' | null;
+  targetCheckpointKey?: string | null;
 };
 
 export type AdaptiveEvidenceSnippet = {

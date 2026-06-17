@@ -26,6 +26,18 @@ describe('parseCheckpointEvaluationHints', () => {
     });
   });
 
+  it('parses neutral metaphors and concept groups', () => {
+    expect(
+      parseCheckpointEvaluationHints({
+        neutralMetaphors: ['карточка'],
+        requiredConceptGroups: [['child', 'sibling'], ['return']],
+      }),
+    ).toEqual({
+      neutralMetaphors: ['карточка'],
+      requiredConceptGroups: [['child', 'sibling'], ['return']],
+    });
+  });
+
   it('parses complexity tier metadata', () => {
     expect(
       parseCheckpointEvaluationHints({

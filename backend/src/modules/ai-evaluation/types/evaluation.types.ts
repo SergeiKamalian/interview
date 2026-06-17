@@ -20,6 +20,7 @@ export type CheckpointEvaluationResultItem = {
   confidence: number;
   evidenceQuote: string;
   reasoningShort: string;
+  scoreAwarded?: number;
 };
 
 export type CheckpointEvaluationAiResponse = {

@@ -122,5 +122,12 @@ function buildLocalTurns(
     sequenceOrder: message.sequenceOrder,
     role: message.role,
     content: boundText(message.content, maxTextLength),
+    messageKind:
+      message.messageKind === 'follow_up_answer'
+        ? 'follow_up_answer'
+        : message.messageKind === 'main_answer'
+          ? 'main_answer'
+          : null,
+    targetCheckpointKey: message.targetCheckpointKey ?? null,
   }));
 }

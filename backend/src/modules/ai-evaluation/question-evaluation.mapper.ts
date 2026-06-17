@@ -71,7 +71,7 @@ export function summarizeCheckpointResults(
       continue;
     }
 
-    const awarded = awardCheckpointScore(checkpoint.score, result.status);
+    const awarded = resolveQuestionScoreAwarded(checkpoint.score, result);
     score += awarded;
 
     if (result.status === 'met') {
@@ -123,6 +123,20 @@ function awardCheckpointScore(
   }
 
   return 0;
+}
+
+function resolveQuestionScoreAwarded(
+  maxCheckpointScore: number,
+  result: CheckpointEvaluationResultItem,
+): number {
+  if (
+    typeof result.scoreAwarded === 'number' &&
+    Number.isFinite(result.scoreAwarded)
+  ) {
+    return Math.min(maxCheckpointScore, Math.max(0, result.scoreAwarded));
+  }
+
+  return awardCheckpointScore(maxCheckpointScore, result.status);
 }
 
 function roundScore(value: number): number {

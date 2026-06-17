@@ -12,6 +12,7 @@ export function mapCheckpointStateToEvaluationResult(
     reasoningShort:
       state.rationale?.trim() || state.evidenceSummary?.trim() || 'No rationale',
     evidenceQuote: state.evidenceSummary?.trim() || '',
+    scoreAwarded: state.scoreAwarded,
   };
 }
 
