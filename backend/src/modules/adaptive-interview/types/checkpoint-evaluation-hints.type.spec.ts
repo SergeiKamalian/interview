@@ -52,6 +52,44 @@ describe('parseCheckpointEvaluationHints', () => {
     });
   });
 
+  it('parses probePolicy from bank JSON', () => {
+    expect(
+      parseCheckpointEvaluationHints({
+        complexityTier: 'advanced',
+        probePolicy: {
+          requireProbeBeforeFinalPartial: true,
+          minScoreAfterShallowAccept: 0.55,
+        },
+        mustConcepts: ['scheduler'],
+      }),
+    ).toEqual({
+      complexityTier: 'advanced',
+      probePolicy: {
+        requireProbeBeforeFinalPartial: true,
+        minScoreAfterShallowAccept: 0.55,
+      },
+      mustConcepts: ['scheduler'],
+    });
+  });
+
+  it('parses probeConceptGroups from bank JSON', () => {
+    expect(
+      parseCheckpointEvaluationHints({
+        mustConcepts: ['scheduler'],
+        probeConceptGroups: [
+          { match: ['scheduler', 'планирован'], ask: 'scheduler' },
+          { match: ['MessageChannel'], ask: 'MessageChannel' },
+        ],
+      }),
+    ).toEqual({
+      mustConcepts: ['scheduler'],
+      probeConceptGroups: [
+        { match: ['scheduler', 'планирован'], ask: 'scheduler' },
+        { match: ['MessageChannel'], ask: 'MessageChannel' },
+      ],
+    });
+  });
+
   it('returns null for empty hints', () => {
     expect(parseCheckpointEvaluationHints(null)).toBeNull();
     expect(parseCheckpointEvaluationHints({})).toBeNull();

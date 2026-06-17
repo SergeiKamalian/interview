@@ -6,7 +6,7 @@ import {
 } from './interviewer-voice.prompt';
 
 export const FOLLOW_UP_PLANNER_PROMPT_KEY = 'follow_up_planner';
-export const FOLLOW_UP_PLANNER_PROMPT_VERSION = '2.5.0';
+export const FOLLOW_UP_PLANNER_PROMPT_VERSION = '2.6.0';
 
 const RESPONSE_JSON_SCHEMA = `{
   "follow_up_question": "interviewer «я» → candidate «вы»: varied short opener (not «Понял, спасибо» every time) or none, then ONE direct follow-up question in Russian — never quote the candidate's words",
@@ -20,6 +20,8 @@ export type FollowUpPlannerPromptInput = {
   checkpointExpected: string;
   latestCandidateAnswer: string;
   previousFollowUpQuestions: string[];
+  followUpKind?: 'depth_probe' | 'residual_probe' | 'generic';
+  missingMustConcepts?: string[];
 };
 
 const INTERVIEWER_PERSONA = [
@@ -54,19 +56,41 @@ function buildPreviousFollowUpsBlock(
 }
 
 function buildSharedUserContext(input: FollowUpPlannerPromptInput): string {
+  const probeBlock =
+    input.followUpKind === 'depth_probe' &&
+    (input.missingMustConcepts?.length ?? 0) > 0
+      ? [
+          '',
+          'Mandatory depth probe (not generic recap):',
+          `Missing concepts to ask about: ${input.missingMustConcepts!.join(', ')}`,
+          'Acknowledge the correct general idea briefly, then ask about 1–2 missing concepts in plain Russian.',
+        ].join('\n')
+      : input.followUpKind === 'residual_probe' &&
+          (input.missingMustConcepts?.length ?? 0) > 0
+        ? [
+            '',
+            'Residual gap probe (candidate answered part of a compound follow-up):',
+            `Still missing: ${input.missingMustConcepts!.join(', ')}`,
+            'Acknowledge what they got right, then ask ONLY about the missing part — e.g. «Ок, это верно. А … — что добавите?»',
+          ].join('\n')
+        : '';
+
   return [
     'Main interview question:',
     input.questionText,
     '',
     'Internal clarification goal (guidance only — never quote these labels to the candidate):',
     `Topic hint: ${sanitizeTopicHint(input.checkpointExpected)}`,
+    probeBlock,
     '',
     'Candidate latest answer:',
     input.latestCandidateAnswer || '(empty)',
     '',
     'Follow-ups already asked for this main question (do not repeat topic OR opener phrasing):',
     buildPreviousFollowUpsBlock(input.previousFollowUpQuestions),
-  ].join('\n');
+  ]
+    .filter((line) => line !== '')
+    .join('\n');
 }
 
 function sanitizeTopicHint(checkpointExpected: string): string {

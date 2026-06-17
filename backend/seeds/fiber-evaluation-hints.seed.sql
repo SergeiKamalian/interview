@@ -19,6 +19,11 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
     'positiveFloorScore', 0.85
   )
   WHEN 'stack_vs_fiber' THEN JSON_OBJECT(
+    'complexityTier', 'core_plus',
+    'probePolicy', JSON_OBJECT(
+      'requireProbeBeforeFinalPartial', true,
+      'minScoreAfterShallowAccept', 0.55
+    ),
     'mustConcepts', JSON_ARRAY(
       'call stack', 'стек', 'рекурсив', 'синхрон', 'React 16',
       'связный список', 'linked list', 'work loop', 'fiber-узл',
@@ -48,6 +53,16 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
       'wip', 'work-in-progress', 'work in progress', 'alternate', 'current tree',
       'чернов', 'DOM не', 'не трога', 'не мутир', 'прерыва', 'shouldYield', 'render phase'
     ),
+    'probeConceptGroups', JSON_ARRAY(
+      JSON_OBJECT(
+        'match', JSON_ARRAY('render phase', 'DOM не', 'не трога', 'прерыва'),
+        'ask', 'render phase и почему DOM не трогается'
+      ),
+      JSON_OBJECT(
+        'match', JSON_ARRAY('wip', 'work-in-progress', 'work in progress', 'alternate', 'current tree', 'чернов'),
+        'ask', 'WIP tree и alternate/current'
+      )
+    ),
     'falseClaims', JSON_ARRAY(
       'render пишет в DOM', 'render phase пишет в DOM',
       'useEffect до paint', 'reconcileChildFibers сразу в DOM'
@@ -69,9 +84,29 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
     'positiveFloorScore', 0.85
   )
   WHEN 'scheduling' THEN JSON_OBJECT(
+    'complexityTier', 'advanced',
+    'probePolicy', JSON_OBJECT(
+      'requireProbeBeforeFinalPartial', true,
+      'shallowAcceptMaxFraction', 0.5,
+      'minScoreAfterShallowAccept', 0.55
+    ),
     'mustConcepts', JSON_ARRAY(
       'scheduler', 'планирован', 'MessageChannel', 'postMessage',
       'shouldYield', 'should yield', '5ms', 'chunk', 'куск', 'тайм-слайс', 'yield'
+    ),
+    'probeConceptGroups', JSON_ARRAY(
+      JSON_OBJECT(
+        'match', JSON_ARRAY('scheduler', 'планирован'),
+        'ask', 'scheduler'
+      ),
+      JSON_OBJECT(
+        'match', JSON_ARRAY('MessageChannel', 'postMessage'),
+        'ask', 'MessageChannel и postMessage'
+      ),
+      JSON_OBJECT(
+        'match', JSON_ARRAY('shouldYield', 'should yield', '5ms', 'yield'),
+        'ask', 'shouldYield и time slicing (~5ms)'
+      )
     ),
     'falseClaims', JSON_ARRAY(
       'Fiber планирует через requestIdleCallback',

@@ -32,6 +32,9 @@ export class AdaptiveCheckpointStateType {
   @Field()
   depthLabel!: string;
 
+  @Field()
+  probeStatus!: string;
+
   @Field(() => Float)
   coveragePercent!: number;
 

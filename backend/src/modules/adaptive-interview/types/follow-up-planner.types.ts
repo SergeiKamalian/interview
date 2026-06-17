@@ -51,7 +51,10 @@ export type FollowUpPolicyInput = {
   stagnationLimit?: number;
   recentScoreDeltas?: number[];
   latestCandidateAnswer?: string | null;
+  /** Cumulative candidate text per checkpoint (main + targeted follow-ups). */
+  checkpointEvidenceTextByKey?: Record<string, string>;
   candidateDispositionFromAi?: CandidateAnswerDisposition | null;
+  stickyTargetCheckpointKey?: string | null;
 };
 
 export type FollowUpPolicyDecision =
@@ -65,6 +68,8 @@ export type FollowUpPolicyDecision =
       checkpointTitle: string;
       checkpointExpected: string;
       reason: string;
+      followUpKind?: 'depth_probe' | 'residual_probe' | 'generic';
+      missingMustConcepts?: string[];
     };
 
 export type FollowUpPlannerOptions = {

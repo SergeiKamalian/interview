@@ -31,6 +31,16 @@ describe('checkpoint-expected-speech.util', () => {
     );
   });
 
+  it('strips rubric checkpoint title from shallow-accept probe template', () => {
+    expect(
+      normalizeFollowUpQuestionForCandidate(
+        'Вы верно описали общую идею про Понимает планирование Fiber. Уточните, пожалуйста: scheduler, планирован?',
+      ),
+    ).toBe(
+      'Вы верно описали общую идею. Уточните, пожалуйста: scheduler, планирован?',
+    );
+  });
+
   it('strips quoted recap of candidate answer', () => {
     expect(
       stripCandidateAnswerEchoFromFollowUp(

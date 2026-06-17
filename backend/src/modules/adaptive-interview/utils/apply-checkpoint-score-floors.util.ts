@@ -29,6 +29,16 @@ import {
   getContradictionScoreCap,
   getPositiveEvidenceScoreFloor,
 } from './hint-driven-evidence.util';
+import {
+  appendProbePendingRationale,
+  deriveProbeStatus,
+  getMissingMustConcepts,
+  getShallowAcceptFloorFraction,
+  getShallowAcceptFloorScore,
+  hasFalseClaimSignal,
+  isProbePendingRationale,
+  resolveComplexityTier,
+} from './probe-policy.util';
 
 export type ApplyCheckpointScoreFloorsResult = {
   evaluation: PerTurnCheckpointEvaluationAiResponse;
@@ -82,33 +92,46 @@ export function applyCheckpointScoreFloors(
 
     const guardedResult = enforceStatusScoreAlignment(
       applyRationaleScoreAlignment(
+        applyShallowAcceptFloor(
           applyPositiveEvidenceFloor(
-              applyExplicitRefusalCap(
-                applyBadExampleOverlapCap(
-                  applySemanticContradictionCap(
-                    applyRationaleContradictionCap(result, effectiveMaxScore),
-                    evaluationText,
-                    checkpoint,
-                    effectiveMaxScore,
-                  ),
+            applyExplicitRefusalCap(
+              applyBadExampleOverlapCap(
+                applySemanticContradictionCap(
+                  applyRationaleContradictionCap(result, effectiveMaxScore),
                   evaluationText,
-                  checkpointEvidenceText,
-                  [
-                    ...badExamples,
-                    ...(checkpoint.badExamples ?? []),
-                    ...(checkpoint.questionBadExamples ?? []),
-                  ],
-                  checkpoint.evaluationHints?.neutralMetaphors,
+                  checkpoint,
                   effectiveMaxScore,
                 ),
-                latestTurnText,
-                checkpoint,
+                evaluationText,
+                checkpointEvidenceText,
+                [
+                  ...badExamples,
+                  ...(checkpoint.badExamples ?? []),
+                  ...(checkpoint.questionBadExamples ?? []),
+                ],
+                checkpoint.evaluationHints?.neutralMetaphors,
+                effectiveMaxScore,
               ),
+                  latestTurnText,
+                  checkpoint,
+                  priorState,
+                  context.maxScore,
+                  isTargetedFollowUp,
+                ),
             floorLatestText,
             floorFullText,
             checkpoint,
             effectiveMaxScore,
+            isTargetedFollowUp,
           ),
+          {
+            checkpoint,
+            priorState,
+            checkpointEvidenceText,
+            latestTurnText,
+            questionMaxScore: context.maxScore,
+          },
+        ),
         effectiveMaxScore,
       ),
       effectiveMaxScore,
@@ -159,6 +182,14 @@ export function applyCheckpointScoreFloors(
         latestTurnText,
         checkpointEvidenceText,
       ),
+      provisionalScoreFloor: resolveProvisionalScoreFloor({
+        checkpoint,
+        priorState,
+        checkpointEvidenceText,
+        latestTurnText,
+        questionMaxScore: context.maxScore,
+        guardedResult: guardedWithQuote,
+      }),
     });
 
     const realigned =
@@ -184,7 +215,7 @@ export function applyCheckpointScoreFloors(
     return {
       ...result,
       scoreAwarded: realigned.scoreAwarded,
-      status: realigned.status as PerTurnCheckpointEvaluationStatus,
+      status: realigned.status,
       evidenceSummary: merged.evidenceSummary,
       rationale: alignRationaleDepthWithScore(
         normalizeRationaleDepth(realigned.rationale ?? result.rationale),
@@ -220,7 +251,8 @@ function resolveAdjustmentReason(
   }
 
   if (
-    getContradictionScoreCap(checkpoint, candidateText, checkpoint.score) !== null
+    getContradictionScoreCap(checkpoint, candidateText, checkpoint.score) !==
+    null
   ) {
     return 'semantic_contradiction_cap';
   }
@@ -232,7 +264,9 @@ function resolveAdjustmentReason(
   return 'bad_example_overlap_cap';
 }
 
-function hasFalseClaimInRationale(rationale: string | null | undefined): boolean {
+function hasFalseClaimInRationale(
+  rationale: string | null | undefined,
+): boolean {
   const value = rationale ?? '';
   return (
     /depth\s*=\s*false_claim/i.test(value) ||
@@ -281,12 +315,51 @@ function applyExplicitRefusalCap(
   result: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
   latestCandidateText: string,
   checkpoint: AdaptiveCheckpointDefinition,
+  priorState?: AdaptiveInterviewContextPacket['checkpointStates'][number],
+  questionMaxScore?: number,
+  isTargetedFollowUp = false,
 ): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
+  if (!isTargetedTopicRefusal(latestCandidateText)) {
+    return result;
+  }
+
   if (
-    !isTargetedTopicRefusal(latestCandidateText) ||
-    !refusalTargetsCheckpoint(latestCandidateText, checkpoint) ||
-    result.scoreAwarded <= 0
+    !refusalTargetsCheckpoint(latestCandidateText, checkpoint) &&
+    !isTargetedFollowUp
   ) {
+    return result;
+  }
+
+  const maxScore = priorState?.maxScore ?? checkpoint.score;
+  const hints = checkpoint.evaluationHints;
+  const tier = resolveComplexityTier(
+    hints,
+    checkpoint.score,
+    questionMaxScore ?? maxScore,
+  );
+  const probedOrPartial =
+    (priorState?.followUpCount ?? 0) > 0 ||
+    (priorState?.scoreAwarded ?? 0) > 0 ||
+    result.scoreAwarded > 0;
+
+  if (probedOrPartial && hints?.probePolicy) {
+    const fraction = getShallowAcceptFloorFraction({
+      hints,
+      tier,
+      probeStatus: 'probed',
+    });
+    const floor = getShallowAcceptFloorScore(maxScore, fraction);
+    const scoreAwarded = Math.max(floor, Math.min(result.scoreAwarded, floor));
+
+    return {
+      ...result,
+      scoreAwarded,
+      status: scoreAwarded > 0 ? 'partial' : 'missed',
+      rationale: `${stripTrailingDepth(result.rationale)} depth=heard_of. Explicit refusal after probe; shallow accept closed.`,
+    };
+  }
+
+  if (result.scoreAwarded <= 0) {
     return result;
   }
 
@@ -436,14 +509,15 @@ function applyRationaleScoreAlignment(
     ?.toLowerCase();
 
   let minScore: number | null = null;
-  if (
-    accuracy === 'full' &&
-    (depth === 'knows' || depth === 'understands')
-  ) {
+  if (accuracy === 'full' && (depth === 'knows' || depth === 'understands')) {
     minScore = maxScore;
   } else if (accuracy === 'full' && depth === 'partial_knowledge') {
     minScore = strongPartialScoreForMax(maxScore);
-  } else if (coverage === 'high' && accuracy === 'partial' && depth === 'understands') {
+  } else if (
+    coverage === 'high' &&
+    accuracy === 'partial' &&
+    depth === 'understands'
+  ) {
     minScore = strongPartialScoreForMax(maxScore);
   } else if (
     coverage === 'high' &&
@@ -482,16 +556,178 @@ function applyRationaleScoreAlignment(
   };
 }
 
+function applyShallowAcceptFloor(
+  result: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
+  input: {
+    checkpoint: AdaptiveCheckpointDefinition;
+    priorState:
+      | AdaptiveInterviewContextPacket['checkpointStates'][number]
+      | undefined;
+    checkpointEvidenceText: string;
+    latestTurnText: string;
+    questionMaxScore: number;
+  },
+): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
+  const state = {
+    status: result.status as CheckpointStateStatus,
+    scoreAwarded: result.scoreAwarded,
+    maxScore: input.priorState?.maxScore ?? input.checkpoint.score,
+    followUpCount: input.priorState?.followUpCount ?? 0,
+    rationale: result.rationale,
+  };
+
+  if (
+    hasFalseClaimInRationale(result.rationale) ||
+    /semantic guard capped/i.test(result.rationale ?? '') ||
+    hasFalseClaimSignal(
+      input.checkpoint,
+      state,
+      input.latestTurnText,
+      input.checkpointEvidenceText,
+    )
+  ) {
+    return result;
+  }
+
+  const hints = input.checkpoint.evaluationHints;
+  const probeStatus = deriveProbeStatus({
+    checkpoint: input.checkpoint,
+    state,
+    hints,
+    questionMaxScore: input.questionMaxScore,
+    candidateEvidenceText: input.checkpointEvidenceText,
+    latestCandidateText: input.latestTurnText,
+  });
+
+  if (probeStatus === 'closed') {
+    return result;
+  }
+
+  if (!hints?.probePolicy && !hints?.complexityTier) {
+    return result;
+  }
+
+  if (result.scoreAwarded <= 0 && probeStatus !== 'open') {
+    return result;
+  }
+
+  const tier = resolveComplexityTier(
+    hints,
+    input.checkpoint.score,
+    input.questionMaxScore,
+  );
+
+  if (
+    probeStatus === 'provisional' &&
+    !hints?.probePolicy &&
+    !['mention', 'basic', 'core_plus'].includes(tier)
+  ) {
+    return result;
+  }
+
+  const fraction = getShallowAcceptFloorFraction({
+    hints,
+    tier,
+    probeStatus,
+  });
+  const floor = getShallowAcceptFloorScore(state.maxScore, fraction);
+
+  if (result.scoreAwarded >= floor) {
+    if (probeStatus === 'open' && !isProbePendingRationale(result.rationale)) {
+      const missing = getMissingMustConcepts(
+        hints,
+        input.checkpointEvidenceText,
+      );
+      return {
+        ...result,
+        status: 'partial',
+        rationale: appendProbePendingRationale(result.rationale, missing),
+      };
+    }
+
+    return result;
+  }
+
+  const missing = getMissingMustConcepts(hints, input.checkpointEvidenceText);
+  const scoreAwarded = Math.min(
+    state.maxScore,
+    Math.max(result.scoreAwarded, floor),
+  );
+
+  return {
+    ...result,
+    scoreAwarded,
+    status: scoreAwarded > 0 ? 'partial' : 'missed',
+    rationale:
+      probeStatus === 'open'
+        ? appendProbePendingRationale(result.rationale, missing)
+        : `${result.rationale ?? ''} Shallow accept floor applied.`.trim(),
+  };
+}
+
+function resolveProvisionalScoreFloor(input: {
+  checkpoint: AdaptiveCheckpointDefinition;
+  priorState:
+    | AdaptiveInterviewContextPacket['checkpointStates'][number]
+    | undefined;
+  checkpointEvidenceText: string;
+  latestTurnText: string;
+  questionMaxScore: number;
+  guardedResult: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number];
+}): number | undefined {
+  const maxScore = input.priorState?.maxScore ?? input.checkpoint.score;
+  const state = {
+    status: input.guardedResult.status as CheckpointStateStatus,
+    scoreAwarded: input.priorState?.scoreAwarded ?? 0,
+    maxScore,
+    followUpCount: input.priorState?.followUpCount ?? 0,
+    rationale:
+      input.guardedResult.rationale ?? input.priorState?.rationale ?? null,
+  };
+  const hints = input.checkpoint.evaluationHints;
+  const probeStatus = deriveProbeStatus({
+    checkpoint: input.checkpoint,
+    state,
+    hints,
+    questionMaxScore: input.questionMaxScore,
+    candidateEvidenceText: input.checkpointEvidenceText,
+    latestCandidateText: input.latestTurnText,
+  });
+
+  if (probeStatus === 'closed') {
+    return undefined;
+  }
+
+  if (!hints?.probePolicy && !hints?.complexityTier) {
+    return undefined;
+  }
+
+  const tier = resolveComplexityTier(
+    hints,
+    input.checkpoint.score,
+    input.questionMaxScore,
+  );
+  const fraction = getShallowAcceptFloorFraction({
+    hints,
+    tier,
+    probeStatus,
+  });
+
+  return getShallowAcceptFloorScore(maxScore, fraction);
+}
+
 function applyPositiveEvidenceFloor(
   result: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
   latestCandidateText: string,
   fullCandidateText: string,
   checkpoint: AdaptiveCheckpointDefinition,
   maxScore: number,
+  isTargetedFollowUp = false,
 ): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
   if (
     isTargetedTopicRefusal(latestCandidateText) &&
-    refusalTargetsCheckpoint(latestCandidateText, checkpoint)
+    (refusalTargetsCheckpoint(latestCandidateText, checkpoint) ||
+      isTargetedFollowUp)
   ) {
     return result;
   }
@@ -621,7 +857,9 @@ function resolveIncomingAllowsScoreDecrease(
     return false;
   }
 
-  if (rationaleIndicatesOmissionNotContradiction((rationale ?? '').toLowerCase())) {
+  if (
+    rationaleIndicatesOmissionNotContradiction((rationale ?? '').toLowerCase())
+  ) {
     return false;
   }
 

@@ -10,6 +10,7 @@ import type {
 import type { CheckpointStateStatus } from '../types/checkpoint-state-status.type';
 import { evaluateFollowUpPolicy } from '../utils/follow-up-policy.util';
 import type { InterviewCheckpointStateEntity } from '../entities/interview-checkpoint-state.entity';
+import { collectCheckpointEvidenceText } from '../utils/checkpoint-evidence-text.util';
 
 @Injectable()
 export class FollowUpPolicyService {
@@ -23,6 +24,13 @@ export class FollowUpPolicyService {
     const limits = getAdaptiveInterviewContextLimits();
 
     const weightConfig = getFollowUpEvidenceWeightConfig();
+
+    const checkpointEvidenceTextByKey = Object.fromEntries(
+      context.checkpoints.map((checkpoint) => [
+        checkpoint.checkpointKey,
+        collectCheckpointEvidenceText(context, checkpoint.checkpointKey),
+      ]),
+    );
 
     const input: FollowUpPolicyInput = {
       questionMaxScore: context.maxScore,
@@ -44,7 +52,9 @@ export class FollowUpPolicyService {
       stagnationLimit: weightConfig.stagnationLimit,
       recentScoreDeltas,
       latestCandidateAnswer: context.latestCandidateAnswer,
+      checkpointEvidenceTextByKey,
       candidateDispositionFromAi: candidateDispositionFromAi ?? undefined,
+      stickyTargetCheckpointKey: context.targetCheckpointKey,
     };
 
     return evaluateFollowUpPolicy(input);

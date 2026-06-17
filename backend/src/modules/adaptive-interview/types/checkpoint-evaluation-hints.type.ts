@@ -1,3 +1,5 @@
+import type { CheckpointProbePolicy } from './checkpoint-probe-policy.type';
+
 export type CheckpointComplexityTier =
   | 'mention'
   | 'basic'
@@ -25,6 +27,18 @@ export type CheckpointEvaluationHints = {
   positiveFloorScore?: number;
   /** Fraction of max_score cap when falseClaims match (default: 0.5; use 0 for hard reject). */
   falseClaimCapFraction?: number;
+  /** Probe-or-accept policy (14.18). */
+  probePolicy?: CheckpointProbePolicy;
+  /**
+   * Bank-driven labels for depth/residual probe follow-ups.
+   * `match` — evidence stems (subset/overlap with mustConcepts); `ask` — phrase shown to candidate.
+   */
+  probeConceptGroups?: ProbeConceptGroup[];
+};
+
+export type ProbeConceptGroup = {
+  match: string[];
+  ask: string;
 };
 
 export function parseCheckpointEvaluationHints(
@@ -73,6 +87,8 @@ export function parseCheckpointEvaluationHints(
     Number.isFinite(record.falseClaimCapFraction)
       ? Math.min(1, Math.max(0, record.falseClaimCapFraction))
       : undefined;
+  const probePolicy = parseProbePolicy(record.probePolicy);
+  const probeConceptGroups = normalizeProbeConceptGroups(record.probeConceptGroups);
 
   if (
     mustConcepts.length === 0 &&
@@ -83,7 +99,9 @@ export function parseCheckpointEvaluationHints(
     positiveFloorScore === undefined &&
     falseClaimCapFraction === undefined &&
     complexityTier === undefined &&
-    weightRationale === undefined
+    weightRationale === undefined &&
+    probePolicy === undefined &&
+    probeConceptGroups.length === 0
   ) {
     return null;
   }
@@ -100,7 +118,83 @@ export function parseCheckpointEvaluationHints(
     minMatchedConcepts,
     positiveFloorScore,
     falseClaimCapFraction,
+    probePolicy,
+    probeConceptGroups:
+      probeConceptGroups.length > 0 ? probeConceptGroups : undefined,
   };
+}
+
+function parseProbePolicy(raw: unknown): CheckpointProbePolicy | undefined {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    return undefined;
+  }
+
+  const record = raw as Record<string, unknown>;
+  const requireProbeBeforeFinalPartial =
+    typeof record.requireProbeBeforeFinalPartial === 'boolean'
+      ? record.requireProbeBeforeFinalPartial
+      : undefined;
+  const shallowAcceptMaxFraction = normalizeFraction(
+    record.shallowAcceptMaxFraction,
+  );
+  const minScoreAfterShallowAccept = normalizeFraction(
+    record.minScoreAfterShallowAccept,
+  );
+  const allowResidualGapProbe =
+    typeof record.allowResidualGapProbe === 'boolean'
+      ? record.allowResidualGapProbe
+      : undefined;
+
+  if (
+    requireProbeBeforeFinalPartial === undefined &&
+    shallowAcceptMaxFraction === undefined &&
+    minScoreAfterShallowAccept === undefined &&
+    allowResidualGapProbe === undefined
+  ) {
+    return undefined;
+  }
+
+  return {
+    requireProbeBeforeFinalPartial,
+    shallowAcceptMaxFraction,
+    minScoreAfterShallowAccept,
+    allowResidualGapProbe,
+  };
+}
+
+function normalizeProbeConceptGroups(value: unknown): ProbeConceptGroup[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const groups: ProbeConceptGroup[] = [];
+
+  for (const item of value) {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+      continue;
+    }
+
+    const record = item as Record<string, unknown>;
+    const match = normalizeStringArray(record.match);
+    const ask =
+      typeof record.ask === 'string' && record.ask.trim().length > 0
+        ? record.ask.trim()
+        : '';
+
+    if (match.length > 0 && ask.length > 0) {
+      groups.push({ match, ask });
+    }
+  }
+
+  return groups;
+}
+
+function normalizeFraction(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined;
+  }
+
+  return Math.min(1, Math.max(0, value));
 }
 
 function normalizeStringArray(value: unknown): string[] {

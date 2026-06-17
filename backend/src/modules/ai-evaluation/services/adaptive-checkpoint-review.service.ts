@@ -12,6 +12,8 @@ import {
 } from '../../adaptive-interview/utils/checkpoint-depth.util';
 import { aggregateCheckpointRedFlags } from '../../adaptive-interview/utils/checkpoint-red-flags.util';
 import { parseCheckpointEvaluationHints } from '../../adaptive-interview/types/checkpoint-evaluation-hints.type';
+import { deriveProbeStatus } from '../../adaptive-interview/utils/probe-policy.util';
+import type { CheckpointStateStatus } from '../../adaptive-interview/types/checkpoint-state-status.type';
 import type {
   AdaptiveCheckpointReviewType,
   AdaptiveCheckpointStateType,
@@ -28,6 +30,7 @@ interface CheckpointDefRow extends RowDataPacket {
   interview_question_id: number;
   checkpoint_key: string;
   title: string;
+  score: number;
   evaluation_hints: unknown;
 }
 
@@ -61,7 +64,7 @@ export class AdaptiveCheckpointReviewService {
     );
 
     const checkpointDefs = await this.database.query<CheckpointDefRow[]>(
-      `SELECT iqc.interview_question_id, iqc.checkpoint_key, iqc.title, iqc.evaluation_hints
+      `SELECT iqc.interview_question_id, iqc.checkpoint_key, iqc.title, iqc.score, iqc.evaluation_hints
        FROM interview_question_checkpoints iqc
        INNER JOIN interview_questions iq ON iq.id = iqc.interview_question_id
        INNER JOIN interview_attempts ia ON ia.interview_id = iq.interview_id
@@ -94,6 +97,7 @@ export class AdaptiveCheckpointReviewService {
       );
       const defs = defsByQuestion.get(question.interview_question_id) ?? [];
       const stateByKey = new Map(states.map((state) => [state.checkpointKey, state]));
+      const questionMaxScore = defs.reduce((total, def) => total + def.score, 0);
 
       const checkpoints: AdaptiveCheckpointStateType[] = defs.map((def) => {
         const state = stateByKey.get(def.checkpoint_key);
@@ -101,6 +105,26 @@ export class AdaptiveCheckpointReviewService {
         const depth = parseDepthFromRationale(rationale);
         const coverage = parseCoverageFromRationale(rationale);
         const accuracy = parseAccuracyFromRationale(rationale);
+        const evaluationHints = parseCheckpointEvaluationHints(def.evaluation_hints);
+        const probeStatus = deriveProbeStatus({
+          checkpoint: {
+            checkpointKey: def.checkpoint_key,
+            title: def.title,
+            expected: '',
+            score: def.score,
+            sortOrder: 0,
+            evaluationHints,
+          },
+          state: {
+            status: (state?.status ?? 'unseen') as CheckpointStateStatus,
+            scoreAwarded: state?.scoreAwarded ?? 0,
+            maxScore: state?.maxScore ?? def.score,
+            followUpCount: state?.followUpCount ?? 0,
+            rationale,
+          },
+          hints: evaluationHints,
+          questionMaxScore: questionMaxScore,
+        });
 
         const mapped: AdaptiveCheckpointStateType = {
           checkpointKey: def.checkpoint_key,
@@ -113,6 +137,7 @@ export class AdaptiveCheckpointReviewService {
           confidence: state?.confidence ?? null,
           needsManualReview: state?.needsManualReview ?? false,
           depthLabel: depthLabelRu(depth),
+          probeStatus,
           coveragePercent: coveragePercent(coverage),
           accuracyPercent: accuracyPercent(accuracy),
         };

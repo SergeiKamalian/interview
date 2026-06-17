@@ -42,31 +42,31 @@ Evaluation accuracy & HR analytics
 Active subtask ID:
 
 ```txt
-TASK-14.18 — Probe-or-Accept: не штрафовать без уточняющего
+TASK-14.19 — Weight-based follow-up budget allocator
 ```
 
 Last completed subtask:
 
 ```txt
-TASK-14.17 — Scoring accuracy, red flags & legacy sync
+TASK-14.22 — Residual gap probe (narrowing follow-up)
 ```
 
 Next recommended subtask:
 
 ```txt
-TASK-14.18 — Probe-or-Accept + OpenAI prompts 2.6
+TASK-14.19 — Weight Budget Allocator
 ```
 
 Planned (block 14):
 
 ```txt
-14.18 Probe-or-Accept + prompts 2.6 → 14.19 Budget → 14.20 Transitive → 14.21 Topic mismatch redirect
+14.19 Budget → 14.20 Transitive → 14.21 Topic mismatch
 ```
 
 Last updated:
 
 ```txt
-2026-06-17 (TASK-14.17 closed ✅; active → 14.18)
+2026-06-17 (TASK-14.22 closed ✅; active → 14.19)
 ```
 
 ---
@@ -90,6 +90,8 @@ Last updated:
 - [x] TASK-14.15 — Bank-driven guards (remove fiber hardcode)
 - [x] TASK-14.16 — DB checkpoint evaluation hints + snapshot
 - [x] TASK-14.17 — Scoring accuracy, red flags & legacy sync
+- [x] TASK-14.18 — Probe-or-Accept + OpenAI prompts 2.6
+- [x] TASK-14.22 — Residual gap probe (narrowing follow-up)
 
 ---
 

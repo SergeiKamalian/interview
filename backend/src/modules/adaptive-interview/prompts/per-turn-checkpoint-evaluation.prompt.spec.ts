@@ -4,24 +4,56 @@ import {
   PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION,
 } from './per-turn-checkpoint-evaluation.prompt';
 import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview-context.types';
+import { fiberCheckpoint } from '../utils/fiber-evaluation-hints.fixture';
 
 describe('per-turn checkpoint evaluation prompt', () => {
-  it('requires coverage vs accuracy checklist and depth taxonomy', () => {
+  it('requires cumulative scoring and probe-or-accept rules in system prompt', () => {
     const prompt = buildPerTurnCheckpointEvaluationSystemPrompt();
 
-    expect(PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION).toBe('2.5.3');
-    expect(prompt).toContain('LATEST answer has highest weight');
+    expect(PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION).toBe('2.6.0');
+    expect(prompt).toContain('cumulative evidence');
+    expect(prompt).toContain('Probe-or-accept');
+    expect(prompt).toContain('probe=pending');
+    expect(prompt).not.toContain('LATEST answer has highest weight');
     expect(prompt).toContain('Per-checkpoint mental checklist');
     expect(prompt).toContain('Coverage vs accuracy');
-    expect(prompt).toContain('depth=mention_only');
-    expect(prompt).toContain('depth=false_claim');
-    expect(prompt).toContain('Half-right / half-wrong answers');
-    expect(prompt).toContain('status MUST be partial');
-    expect(prompt).toContain('Evaluate semantic correctness');
-    expect(prompt).toContain(
-      'Do NOT award credit just because the candidate mentions a relevant term',
-    );
-    expect(prompt).toContain('Confident false statements MUST cap');
+  });
+
+  it('includes interview policy block when probe is required', () => {
+    const userPrompt = buildPerTurnCheckpointEvaluationUserPrompt({
+      interviewQuestionId: 1,
+      interviewId: 1,
+      attemptId: 77,
+      companyId: 1,
+      questionText: 'Fiber question',
+      referenceAnswer: 'Fiber',
+      maxScore: 8,
+      checkpoints: [
+        fiberCheckpoint('scheduling', { score: 2.5, sortOrder: 6 }),
+      ],
+      badAnswerExamples: [],
+      latestCandidateAnswer:
+        'Планирование Fiber — React не делает весь рендер одним блоком.',
+      latestCandidateMessageId: 1,
+      checkpointStates: [
+        {
+          checkpointKey: 'scheduling',
+          status: 'partial',
+          scoreAwarded: 0.25,
+          maxScore: 2.5,
+          followUpCount: 0,
+          rationale:
+            'depth=partial_knowledge coverage=medium accuracy=partial',
+        },
+      ],
+      evidenceSnippets: [],
+      localTurns: [],
+      followUpLimits: { maxPerQuestion: 3, maxPerCheckpoint: 1, usedForQuestion: 0 },
+    } satisfies AdaptiveInterviewContextPacket);
+
+    expect(userPrompt).toContain('Interview policy (this turn)');
+    expect(userPrompt).toContain('Probe status: open');
+    expect(userPrompt).toContain('probe=pending');
   });
 
   it('includes follow-up target checkpoint in user prompt', () => {

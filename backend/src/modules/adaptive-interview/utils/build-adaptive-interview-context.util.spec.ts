@@ -117,6 +117,7 @@ describe('buildAdaptiveInterviewContextPacket', () => {
         scoreAwarded: 0.5,
         maxScore: 1,
         followUpCount: 1,
+        rationale: null,
       },
     ]);
     expect(packet.evidenceSnippets).toEqual([

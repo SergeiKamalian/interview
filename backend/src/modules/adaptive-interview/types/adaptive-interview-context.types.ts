@@ -19,6 +19,7 @@ export type AdaptiveCheckpointStateSnapshot = {
   scoreAwarded: number;
   maxScore: number;
   followUpCount: number;
+  rationale?: string | null;
 };
 
 export type AdaptiveCheckpointDefinition = {
@@ -86,6 +87,7 @@ export type BuildAdaptiveInterviewContextInput = {
     maxScore: number;
     followUpCount: number;
     evidenceSummary: string | null;
+    rationale?: string | null;
   }>;
   badAnswerExamples?: string[];
   limits: {

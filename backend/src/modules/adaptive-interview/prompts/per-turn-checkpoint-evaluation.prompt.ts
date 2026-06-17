@@ -1,8 +1,12 @@
 import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview-context.types';
+import {
+  buildInterviewPolicyTurnBlock,
+  formatInterviewPolicyTurnBlock,
+} from '../utils/build-interview-policy-turn-block.util';
 
 export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_KEY =
   'per_turn_checkpoint_evaluation';
-export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION = '2.5.3';
+export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION = '2.6.0';
 
 export function getPerTurnCheckpointEvaluationPromptVersion(): string {
   const override = process.env.PER_TURN_EVAL_PROMPT_VERSION?.trim();
@@ -30,8 +34,9 @@ export function buildPerTurnCheckpointEvaluationSystemPrompt(): string {
   return [
     'You are a strict technical interview evaluator for a live adaptive interview.',
     'Assess the latest candidate answer together with earlier local turns for the current question.',
-    'For EACH checkpoint, the LATEST answer has highest weight: a confident false claim in the latest answer must reduce that checkpoint even if an earlier turn was correct.',
-    'Evidence is cumulative for context, but scoring must reflect contradictions and explicit refusals in the latest answer.',
+    'Score each checkpoint from cumulative evidence (main answer + targeted follow-ups for that checkpoint).',
+    'Latest answer priority applies ONLY for contradiction, false claim, or explicit decline/refusal on that checkpoint.',
+    'Otherwise do NOT finalize missed/partial just because optional mustConcept details were absent in the latest sentence alone.',
     '',
     'Rules:',
     '- Use ONLY the checkpoints provided in the user message.',
@@ -89,6 +94,12 @@ export function buildPerTurnCheckpointEvaluationSystemPrompt(): string {
     '- Do NOT give all zeros when earlier local turns already demonstrated partial knowledge unless the latest answer contradicts or refuses that checkpoint.',
     '- If the latest answer declines only one sub-aspect, keep scores from earlier turns.',
     '- On follow-up answers, score the targeted checkpoint primarily from the latest answer; do not zero unrelated checkpoints unless the latest answer contradicts them.',
+    '',
+    'Probe-or-accept (when Interview policy block is present):',
+    '- While probe_status=open: do NOT set missed solely because mustConcept details were not named yet.',
+    '- Shallow but correct answers → partial with depth=partial_knowledge and rationale including probe=pending.',
+    '- Do NOT write «candidate does not know [detail]» for details that were not asked in dialogue yet.',
+    '- Finalize missed on advanced checkpoints only after probe, decline, false_claim, or repeated mismatch.',
   '- Also set candidate_disposition from the latest answer:',
     '  - engaged: candidate tries to answer substantively, even if incorrect;',
     '  - declined: candidate refuses or clearly says they do not know / cannot answer;',
@@ -158,10 +169,17 @@ export function buildPerTurnCheckpointEvaluationUserPrompt(
         ].join('\n')
       : '';
 
+  const policyBlock = formatInterviewPolicyTurnBlock(
+    buildInterviewPolicyTurnBlock(context),
+  );
+
+  const policySection = policyBlock ? ['', policyBlock, ''] : [];
+
   return [
     'Evaluate the latest candidate answer for the current question only.',
     '',
     targetBlock,
+    ...policySection,
     'Question:',
     context.questionText,
     '',

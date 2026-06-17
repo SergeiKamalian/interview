@@ -1,5 +1,9 @@
 import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview-context.types';
 import {
+  buildInterviewPolicyTurnBlock,
+  formatInterviewPolicyTurnBlock,
+} from '../utils/build-interview-policy-turn-block.util';
+import {
   INTERVIEWER_FIRST_PERSON_VOICE_RULES,
   INTERVIEWER_FOLLOW_UP_REMINDER,
 } from './interviewer-voice.prompt';
@@ -29,7 +33,8 @@ export function buildEvaluateConversationSystemPrompt(
     'Conversation mode:',
     '- The first user message establishes immutable interview context for this question.',
     '- Each later user message is only a new candidate turn — do NOT ask to repeat full context.',
-    '- Use conversation history plus the latest turn; scores are cumulative and must never decrease.',
+    '- Later user messages may include an Interview policy block — follow it for this turn.',
+    '- Use conversation history plus the latest turn; scores are cumulative and must never decrease except on false claim / decline.',
     '- Cumulative does not mean lenient: do not increase scores for keyword mentions that are false or semantically wrong.',
     combinedTurn
       ? [
@@ -86,16 +91,27 @@ export function buildEvaluateConversationTurnUserPrompt(
           )
           .join('\n');
 
+  const policyBlock = formatInterviewPolicyTurnBlock(
+    buildInterviewPolicyTurnBlock(context),
+  );
+
   const lines = [
     'New candidate answer to evaluate:',
     context.latestCandidateAnswer || '(empty)',
     '',
+  ];
+
+  if (policyBlock) {
+    lines.push(policyBlock, '');
+  }
+
+  lines.push(
     'Current checkpoint states (never decrease scores below these):',
     stateBlock,
     '',
     `Return JSON with candidate_disposition and exactly ${context.checkpoints.length} checkpoint_results.`,
     'Use checkpoint_key values from the established session context.',
-  ];
+  );
 
   if (combinedTurn) {
     lines.push(

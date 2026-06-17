@@ -134,6 +134,9 @@ export class FollowUpPlannerService {
     }
 
     const limits = getAdaptiveInterviewContextLimits();
+    const targetCheckpoint = context.checkpoints.find(
+      (checkpoint) => checkpoint.checkpointKey === policy.targetCheckpointKey,
+    );
     const templateQuestion = buildNaturalTemplateFollowUp({
       questionText: context.questionText,
       checkpointTitle: policy.checkpointTitle,
@@ -142,6 +145,9 @@ export class FollowUpPlannerService {
         (followUp) => followUp.questionText,
       ),
       seed: attemptId + interviewQuestionId + followUpsUsedForQuestion,
+      followUpKind: policy.followUpKind,
+      missingMustConcepts: policy.missingMustConcepts,
+      evaluationHints: targetCheckpoint?.evaluationHints,
     });
     const correlationId = this.aiUsageLogService.createCorrelationId();
     const aiDebugMeta = { ...debugMeta, correlationId };
@@ -155,6 +161,8 @@ export class FollowUpPlannerService {
       previousFollowUpQuestions: existingFollowUps.map(
         (followUp) => followUp.questionText,
       ),
+      followUpKind: policy.followUpKind,
+      missingMustConcepts: policy.missingMustConcepts,
     };
 
     const systemPrompt = buildFollowUpPlannerSystemPrompt();

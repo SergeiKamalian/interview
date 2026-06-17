@@ -38,6 +38,7 @@ export function buildAdaptiveInterviewContextPacket(
       scoreAwarded: state.scoreAwarded,
       maxScore: state.maxScore,
       followUpCount: state.followUpCount,
+      rationale: state.rationale ?? null,
     }))
     .sort((left, right) => left.checkpointKey.localeCompare(right.checkpointKey));
 

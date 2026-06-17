@@ -2,7 +2,7 @@
 
 ## Status
 
-- [ ] todo
+- [x] done
 
 ## Контекст (прочитать агенту первым делом)
 
@@ -349,4 +349,28 @@ pnpm build
 
 ## Completion Notes
 
-_(заполнить агенту при закрытии)_
+**Verification:**
+
+```bash
+cd backend
+pnpm test -- probe-policy build-interview-policy follow-up-policy apply-checkpoint-score-floors golden-calibration per-turn-checkpoint-evaluation
+pnpm test
+pnpm build
+```
+
+**Expected:** all tests green; prompt version `2.6.0`; scheduling shallow golden ≥ 0.55×max.
+
+**Result:** 176 passed, 1 skipped; build OK.
+
+**Implemented:**
+
+- `probe-policy.util.ts` — `probeRequired`, `deriveProbeStatus`, shallow accept floors, probe follow-up template
+- `build-interview-policy-turn-block.util.ts` — dynamic turn block for evaluator/conversation prompts
+- `applyShallowAcceptFloor` + provisional merge floor in guards/merge
+- Follow-up policy: probe priority, no exhausted-partial block for open probes, no early-stop when advanced probe pending
+- Prompts **2.6.0** (evaluator + conversation + follow-up planner)
+- GraphQL `probeStatus` on `AdaptiveCheckpointStateType`
+- Fiber seed/fixture: `probePolicy` + `complexityTier` on scheduling, stack_vs_fiber, fiber_definition
+- Golden cases: `react-fiber-scheduling-shallow-needs-probe`, `-after-probe-decline`, `-basic-tier-shallow-accept`
+
+**Manual smoke (recommended):** new Fiber attempt → shallow scheduling answer → follow-up про scheduler до перехода к другому checkpoint.

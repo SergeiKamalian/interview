@@ -3,6 +3,11 @@ import type { CheckpointEvaluationHints } from '../types/checkpoint-evaluation-h
 export const FIBER_EVALUATION_HINTS: Record<string, CheckpointEvaluationHints> =
   {
     fiber_definition: {
+      complexityTier: 'basic',
+      probePolicy: {
+        requireProbeBeforeFinalPartial: false,
+        minScoreAfterShallowAccept: 0.55,
+      },
       mustConcepts: [
         'reconciliation',
         'reconciler',
@@ -23,6 +28,11 @@ export const FIBER_EVALUATION_HINTS: Record<string, CheckpointEvaluationHints> =
       positiveFloorScore: 0.85,
     },
     stack_vs_fiber: {
+      complexityTier: 'core_plus',
+      probePolicy: {
+        requireProbeBeforeFinalPartial: true,
+        minScoreAfterShallowAccept: 0.55,
+      },
       mustConcepts: [
         'call stack',
         'стек',
@@ -72,6 +82,16 @@ export const FIBER_EVALUATION_HINTS: Record<string, CheckpointEvaluationHints> =
         'прерыва',
         'render phase',
       ],
+      probeConceptGroups: [
+        {
+          match: ['render phase', 'DOM не', 'не трога', 'прерыва'],
+          ask: 'render phase и почему DOM не трогается',
+        },
+        {
+          match: ['wip', 'work-in-progress', 'alternate', 'current tree', 'чернов'],
+          ask: 'WIP tree и alternate/current',
+        },
+      ],
       falseClaims: ['render пишет в DOM'],
       minMatchedConcepts: 2,
       positiveFloorScore: 0.85,
@@ -94,6 +114,12 @@ export const FIBER_EVALUATION_HINTS: Record<string, CheckpointEvaluationHints> =
       positiveFloorScore: 0.85,
     },
     scheduling: {
+      complexityTier: 'advanced',
+      probePolicy: {
+        requireProbeBeforeFinalPartial: true,
+        shallowAcceptMaxFraction: 0.5,
+        minScoreAfterShallowAccept: 0.55,
+      },
       mustConcepts: [
         'scheduler',
         'планирован',
@@ -101,6 +127,17 @@ export const FIBER_EVALUATION_HINTS: Record<string, CheckpointEvaluationHints> =
         'shouldYield',
         '5ms',
         'yield',
+      ],
+      probeConceptGroups: [
+        { match: ['scheduler', 'планирован'], ask: 'scheduler' },
+        {
+          match: ['MessageChannel', 'postMessage'],
+          ask: 'MessageChannel и postMessage',
+        },
+        {
+          match: ['shouldYield', 'should yield', '5ms', 'yield'],
+          ask: 'shouldYield и time slicing (~5ms)',
+        },
       ],
       falseClaims: [
         'Fiber планирует через requestIdleCallback',

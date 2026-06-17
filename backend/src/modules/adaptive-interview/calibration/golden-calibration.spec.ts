@@ -34,10 +34,28 @@ function buildFiberContext(
   caseData: GoldenCalibrationCase,
 ): AdaptiveInterviewContextPacket {
   const candidateTurns = caseData.turns.filter((turn) => turn.role === 'candidate');
-  const useLatestTurnOnly = caseData.id === 'react-fiber-attempt42-paraphrase';
+  const useLatestTurnOnly =
+    caseData.id === 'react-fiber-attempt42-paraphrase' ||
+    caseData.id === 'react-fiber-scheduling-after-probe-decline';
+  const isFollowUpAnswer = useLatestTurnOnly && candidateTurns.length > 1;
   const candidateText = useLatestTurnOnly
     ? (candidateTurns[candidateTurns.length - 1]?.content ?? '')
     : candidateTurns.map((turn) => turn.content).join(' ');
+
+  const checkpointStates =
+    caseData.id === 'react-fiber-scheduling-after-probe-decline'
+      ? [
+          {
+            checkpointKey: 'scheduling',
+            status: 'partial',
+            scoreAwarded: 1.38,
+            maxScore: 2.5,
+            followUpCount: 1,
+            rationale:
+              'depth=partial_knowledge, probe=pending coverage=medium accuracy=partial',
+          },
+        ]
+      : [];
 
   return {
     companyId: 1,
@@ -56,12 +74,15 @@ function buildFiberContext(
     ],
     latestCandidateAnswer: candidateText,
     latestCandidateMessageId: 99,
-    latestAnswerMessageKind: useLatestTurnOnly ? 'follow_up_answer' : null,
-    targetCheckpointKey: useLatestTurnOnly ? 'scheduling' : null,
+    latestAnswerMessageKind: isFollowUpAnswer ? 'follow_up_answer' : null,
+    targetCheckpointKey: isFollowUpAnswer ? 'scheduling' : null,
     checkpoints: FIBER_CHECKPOINTS.map((key, index) =>
-      fiberCheckpoint(key, { sortOrder: index }),
+      fiberCheckpoint(key, {
+        sortOrder: index,
+        score: key === 'scheduling' ? 2.5 : undefined,
+      }),
     ),
-    checkpointStates: [],
+    checkpointStates,
     evidenceSnippets: [],
     localTurns: caseData.turns.map((turn, index) => ({
       role: 'candidate' as const,
@@ -135,6 +156,13 @@ describe('golden calibration (mocked AI)', () => {
           expect(actual?.scoreAwarded).toBeLessThanOrEqual(
             expected.score_awarded.max + 0.01,
           );
+        }
+
+        if (
+          caseData.id === 'react-fiber-scheduling-shallow-needs-probe' &&
+          expected.checkpoint_key === 'scheduling'
+        ) {
+          expect(actual?.rationale ?? '').toMatch(/probe\s*=\s*pending/i);
         }
       }
     },

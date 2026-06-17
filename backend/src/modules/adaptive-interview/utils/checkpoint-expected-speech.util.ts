@@ -76,6 +76,10 @@ export function normalizeFollowUpQuestionForCandidate(question: string): string 
   );
 
   text = text.replace(CANDIDATE_RUBRIC_INLINE, '');
+  text = text.replace(
+    /общую идею про\s+(?:понимает|объясняет|знает|отличает)\s+([^?.]+)/gi,
+    'общую идею',
+  );
   text = fixThirdPersonRubricStemInFollowUp(text);
   text = stripCandidateAnswerEchoFromFollowUp(text);
   text = text.replace(/\s{2,}/g, ' ').replace(/\s+\?/g, '?').replace(/\?\?+/g, '?');

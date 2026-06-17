@@ -111,6 +111,7 @@ export class AdaptiveInterviewContextService {
         maxScore: state.maxScore,
         followUpCount: state.followUpCount,
         evidenceSummary: state.evidenceSummary,
+        rationale: state.rationale,
       })),
       badAnswerExamples: uniqueBadExamples,
       limits: getAdaptiveInterviewContextLimits(),

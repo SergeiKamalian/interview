@@ -26,6 +26,8 @@ export type MergeCheckpointEvaluationInput = {
   relaxFollowUpWeight?: boolean;
   /** When true, a worse incoming turn may reduce the merged score (false claim / refusal). */
   incomingAllowsScoreDecrease?: boolean;
+  /** Minimum score while probe is open/provisional (14.18). */
+  provisionalScoreFloor?: number;
 };
 
 export type MergeCheckpointEvaluationResult = {
@@ -38,7 +40,9 @@ export type MergeCheckpointEvaluationResult = {
 export function mergeCheckpointEvaluation(
   input: MergeCheckpointEvaluationInput,
 ): MergeCheckpointEvaluationResult {
-  const weightedIncoming = applyFollowUpEvidenceWeight(
+  const allowsDecrease = incomingAllowsScoreDecrease(input);
+
+  let weightedIncoming = applyFollowUpEvidenceWeight(
     input.currentScoreAwarded,
     input.incomingScoreAwarded,
     input.maxScore,
@@ -46,7 +50,13 @@ export function mergeCheckpointEvaluation(
     input.relaxFollowUpWeight,
   );
 
-  const allowsDecrease = incomingAllowsScoreDecrease(input);
+  if (
+    !allowsDecrease &&
+    input.provisionalScoreFloor !== undefined &&
+    weightedIncoming < input.provisionalScoreFloor
+  ) {
+    weightedIncoming = input.provisionalScoreFloor;
+  }
 
   const mergedScore =
     allowsDecrease && weightedIncoming < input.currentScoreAwarded
