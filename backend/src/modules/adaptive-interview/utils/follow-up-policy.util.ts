@@ -14,32 +14,39 @@ import {
   shouldSkipFollowUps,
 } from './candidate-decline.util';
 import {
+  inferFollowUpAnswerTone,
   pickFollowUpAcknowledgment,
   pickFollowUpQuestionStem,
 } from './follow-up-acknowledgment.util';
 import {
+  allocateFollowUpBudget,
+  buildBudgetAllocatorCandidate,
+  type FollowUpBudgetConfig,
+  hasProbeRequiredAbovePriority,
+  maxFollowUpsForCheckpoint,
+} from './follow-up-budget-allocator.util';
+import {
   buildProbeFollowUpQuestion,
   buildResidualGapFollowUpQuestion,
-  compareProbePriority,
   getMissingMustConcepts,
-  hasPendingProbe,
   isExhaustedPartialForFollowUp,
   isWithinCheckpointFollowUpBudget,
   probeRequired,
   residualGapProbeRequired,
 } from './probe-policy.util';
+import { isHighPriorityForStagnationBypass } from './probe-priority.util';
+import {
+  buildTopicRedirectFollowUpQuestion,
+  detectTopicMismatch,
+  inferExpectedCheckpointKey,
+} from './topic-mismatch.util';
+import { hasTransitiveRedirectExhausted } from './transitive-checkpoint-floors.util';
 
 const ELIGIBLE_STATUSES = new Set<CheckpointStateStatus>([
   'missed',
   'unclear',
   'partial',
 ]);
-
-const STATUS_PRIORITY: Record<string, number> = {
-  unclear: 0,
-  partial: 1,
-  missed: 2,
-};
 
 function getCheckpointEvidenceText(
   input: FollowUpPolicyInput,
@@ -50,6 +57,15 @@ function getCheckpointEvidenceText(
     input.latestCandidateAnswer ??
     ''
   );
+}
+
+function resolveBudgetConfig(input: FollowUpPolicyInput): FollowUpBudgetConfig {
+  return {
+    maxFollowUpsPerQuestion: input.maxFollowUpsPerQuestion,
+    maxFollowUpsHeavyCheckpoint: input.maxFollowUpsHeavyCheckpoint ?? 2,
+    heavyCheckpointWeightRatio: input.heavyCheckpointWeightRatio ?? 0.2,
+    minPriorityToProbe: input.minPriorityToProbe ?? 0.15,
+  };
 }
 
 export function evaluateFollowUpPolicy(
@@ -85,16 +101,37 @@ export function evaluateFollowUpPolicy(
     };
   }
 
+  const checkpointByKey = new Map(
+    input.checkpoints.map((checkpoint) => [checkpoint.checkpointKey, checkpoint]),
+  );
+
+  const topicRedirectDecision = resolveTopicRedirectDecision(input, checkpointByKey);
+  if (topicRedirectDecision) {
+    return topicRedirectDecision;
+  }
+
+  const budgetConfig = resolveBudgetConfig(input);
+  const allocatorCandidates = buildAllocatorCandidates(input, budgetConfig);
   const stagnationLimit = input.stagnationLimit ?? 2;
   const recentDeltas = input.recentScoreDeltas ?? [];
-  if (
+  const stagnationTriggered =
     recentDeltas.length >= stagnationLimit &&
-    recentDeltas.slice(-stagnationLimit).every((delta) => delta <= 0)
-  ) {
-    return {
-      shouldAskFollowUp: false,
-      reason: 'follow_up_stagnation',
-    };
+    recentDeltas.slice(-stagnationLimit).every((delta) => delta <= 0);
+
+  if (stagnationTriggered) {
+    const bypassStagnation = allocatorCandidates.some((candidate) =>
+      isHighPriorityForStagnationBypass(
+        candidate.priorityResult,
+        budgetConfig.minPriorityToProbe,
+      ),
+    );
+
+    if (!bypassStagnation) {
+      return {
+        shouldAskFollowUp: false,
+        reason: 'follow_up_stagnation',
+      };
+    }
   }
 
   const questionScore = input.checkpointStates.reduce(
@@ -112,20 +149,17 @@ export function evaluateFollowUpPolicy(
     const depth = parseDepthFromRationale(state.rationale ?? null);
     return depth === 'mention_only' || depth === 'heard_of';
   });
-  const pendingAdvancedProbe = hasPendingProbe({
-    checkpoints: input.checkpoints,
-    checkpointStates: input.checkpointStates,
-    questionMaxScore: input.questionMaxScore,
-    latestCandidateText: input.latestCandidateAnswer ?? '',
-    candidateEvidenceText: input.latestCandidateAnswer ?? '',
-    checkpointEvidenceTextByKey: input.checkpointEvidenceTextByKey,
-    maxFollowUpsPerCheckpoint: input.maxFollowUpsPerCheckpoint,
+  const pendingRequiredProbe = hasProbeRequiredAbovePriority({
+    candidates: allocatorCandidates,
+    config: budgetConfig,
   });
+  const pendingTopicRedirect = hasPendingTopicRedirect(input);
 
   if (
     questionScoreSufficient &&
     !hasMentionOnlyMissed &&
-    !pendingAdvancedProbe
+    !pendingRequiredProbe &&
+    !pendingTopicRedirect
   ) {
     return {
       shouldAskFollowUp: false,
@@ -133,11 +167,178 @@ export function evaluateFollowUpPolicy(
     };
   }
 
+  const allocation = allocateFollowUpBudget({
+    candidates: allocatorCandidates,
+    followUpsUsedForQuestion: input.followUpsUsedForQuestion,
+    config: budgetConfig,
+    stickyTargetCheckpointKey: input.stickyTargetCheckpointKey,
+    questionScoreSufficient,
+  });
+
+  if (!allocation.canProbe || !allocation.selectedCheckpointKey) {
+    return {
+      shouldAskFollowUp: false,
+      reason: allocation.reason,
+    };
+  }
+
+  const selectedCheckpoint = checkpointByKey.get(
+    allocation.selectedCheckpointKey,
+  );
+  if (!selectedCheckpoint) {
+    return {
+      shouldAskFollowUp: false,
+      reason: 'no_eligible_checkpoints',
+    };
+  }
+
+  const selectedState = input.checkpointStates.find(
+    (state) => state.checkpointKey === allocation.selectedCheckpointKey,
+  );
+  if (!selectedState) {
+    return {
+      shouldAskFollowUp: false,
+      reason: 'no_eligible_checkpoints',
+    };
+  }
+
+  const selectedEvidenceText = getCheckpointEvidenceText(
+    input,
+    allocation.selectedCheckpointKey,
+  );
+  const missingMustConcepts = getMissingMustConcepts(
+    selectedCheckpoint.evaluationHints,
+    selectedEvidenceText,
+  );
+  const isDepthProbe = probeRequired({
+    checkpoint: selectedCheckpoint,
+    state: selectedState,
+    hints: selectedCheckpoint.evaluationHints,
+    questionMaxScore: input.questionMaxScore,
+    candidateEvidenceText: selectedEvidenceText,
+    latestCandidateText: input.latestCandidateAnswer ?? '',
+  });
+  const isResidualProbe =
+    !isDepthProbe &&
+    residualGapProbeRequired({
+      checkpoint: selectedCheckpoint,
+      state: selectedState,
+      hints: selectedCheckpoint.evaluationHints,
+      questionMaxScore: input.questionMaxScore,
+      candidateEvidenceText: selectedEvidenceText,
+      latestCandidateText: input.latestCandidateAnswer ?? '',
+    });
+
+  return {
+    shouldAskFollowUp: true,
+    targetCheckpointKey: allocation.selectedCheckpointKey,
+    checkpointTitle: selectedCheckpoint.title,
+    checkpointExpected: selectedCheckpoint.expected,
+    reason: isDepthProbe
+      ? 'checkpoint_probe_required'
+      : isResidualProbe
+        ? 'checkpoint_residual_gap_probe'
+        : allocation.reason,
+    followUpKind: isDepthProbe
+      ? 'depth_probe'
+      : isResidualProbe
+        ? 'residual_probe'
+        : 'generic',
+    missingMustConcepts,
+  };
+}
+
+function resolveTopicRedirectDecision(
+  input: FollowUpPolicyInput,
+  checkpointByKey: Map<string, FollowUpPolicyInput['checkpoints'][number]>,
+): FollowUpPolicyDecision | null {
+  const expectedCheckpointKey = inferExpectedCheckpointKey({
+    checkpoints: input.checkpoints,
+    targetCheckpointKey: input.stickyTargetCheckpointKey,
+    questionText: input.questionText,
+  });
+
+  if (!expectedCheckpointKey) {
+    return null;
+  }
+
+  const expectedState = input.checkpointStates.find(
+    (state) => state.checkpointKey === expectedCheckpointKey,
+  );
+  if (
+    expectedState &&
+    hasTransitiveRedirectExhausted(expectedState.rationale)
+  ) {
+    return null;
+  }
+
+  const mismatch = detectTopicMismatch({
+    expectedCheckpointKey,
+    latestCandidateAnswer: input.latestCandidateAnswer ?? '',
+    checkpoints: input.checkpoints,
+    checkpointResults: input.latestCheckpointResults,
+    checkpointStates: input.checkpointStates,
+  });
+
+  const shouldRedirect =
+    !(
+      expectedState &&
+      hasTransitiveRedirectExhausted(expectedState.rationale)
+    ) &&
+    (mismatch.isMismatch ||
+      input.candidateDispositionFromAi === 'misunderstood_question');
+
+  if (!shouldRedirect) {
+    return null;
+  }
+
+  const expectedCheckpoint = checkpointByKey.get(expectedCheckpointKey);
+  if (!expectedCheckpoint) {
+    return null;
+  }
+
+  return {
+    shouldAskFollowUp: true,
+    targetCheckpointKey: expectedCheckpointKey,
+    checkpointTitle: expectedCheckpoint.title,
+    checkpointExpected: expectedCheckpoint.expected,
+    reason: 'topic_mismatch_redirect',
+    followUpKind: 'topic_redirect',
+    answeredCheckpointKey: mismatch.answeredCheckpointKey,
+  };
+}
+
+function hasPendingTopicRedirect(input: FollowUpPolicyInput): boolean {
+  if (input.candidateDispositionFromAi === 'misunderstood_question') {
+    return true;
+  }
+
+  const expectedCheckpointKey = inferExpectedCheckpointKey({
+    checkpoints: input.checkpoints,
+    targetCheckpointKey: input.stickyTargetCheckpointKey,
+    questionText: input.questionText,
+  });
+
+  if (!expectedCheckpointKey) {
+    return false;
+  }
+
+  const expectedState = input.checkpointStates.find(
+    (state) => state.checkpointKey === expectedCheckpointKey,
+  );
+
+  return /redirect\s*=\s*pending/i.test(expectedState?.rationale ?? '');
+}
+
+function buildAllocatorCandidates(
+  input: FollowUpPolicyInput,
+  budgetConfig: FollowUpBudgetConfig,
+) {
   const checkpointByKey = new Map(
     input.checkpoints.map((checkpoint) => [checkpoint.checkpointKey, checkpoint]),
   );
 
-  const eligible = input.checkpointStates
+  return input.checkpointStates
     .filter((state) => isEligibleCheckpointState(state))
     .filter((state) => {
       const checkpoint = checkpointByKey.get(state.checkpointKey);
@@ -161,172 +362,50 @@ export function evaluateFollowUpPolicy(
     })
     .filter((state) => {
       const checkpoint = checkpointByKey.get(state.checkpointKey);
+      if (!checkpoint) {
+        return true;
+      }
+
       const candidateEvidenceText = getCheckpointEvidenceText(
         input,
         state.checkpointKey,
       );
-      const needsResidual =
-        checkpoint !== undefined &&
-        residualGapProbeRequired({
-          checkpoint,
-          state,
-          hints: checkpoint.evaluationHints,
-          questionMaxScore: input.questionMaxScore,
-          candidateEvidenceText,
-          latestCandidateText: input.latestCandidateAnswer ?? '',
-        });
+      const perCheckpointCap = maxFollowUpsForCheckpoint({
+        checkpoint,
+        hints: checkpoint.evaluationHints,
+        questionMaxScore: input.questionMaxScore,
+        config: budgetConfig,
+      });
+      const needsResidual = residualGapProbeRequired({
+        checkpoint,
+        state,
+        hints: checkpoint.evaluationHints,
+        questionMaxScore: input.questionMaxScore,
+        candidateEvidenceText,
+        latestCandidateText: input.latestCandidateAnswer ?? '',
+      });
 
       return isWithinCheckpointFollowUpBudget({
         state,
-        maxFollowUpsPerCheckpoint: input.maxFollowUpsPerCheckpoint,
+        maxFollowUpsPerCheckpoint: perCheckpointCap,
         residualGapProbeRequired: needsResidual,
       });
     })
-    .filter((state) => {
-      const checkpoint = checkpointByKey.get(state.checkpointKey);
-      if (!checkpoint || input.questionMaxScore <= 0) {
-        return true;
-      }
-
-      const isLowWeight =
-        checkpoint.score / input.questionMaxScore <
-        input.lowWeightCheckpointRatio;
-
-      return !(questionScoreSufficient && isLowWeight && !pendingAdvancedProbe);
-    })
     .map((state) => {
-      const checkpoint = checkpointByKey.get(state.checkpointKey);
-      return {
-        checkpointKey: state.checkpointKey,
-        title: checkpoint?.title ?? state.checkpointKey,
-        expected: checkpoint?.expected ?? '',
-        weight: checkpoint?.score ?? 0,
-        sortOrder: checkpoint?.sortOrder ?? 0,
-        status: state.status,
-        scoreAwarded: state.scoreAwarded,
-        maxScore: state.maxScore,
-        followUpCount: state.followUpCount,
-        checkpoint: checkpoint!,
+      const checkpoint = checkpointByKey.get(state.checkpointKey)!;
+
+      return buildBudgetAllocatorCandidate({
+        checkpoint,
         state,
-        hints: checkpoint?.evaluationHints,
-      };
-    })
-    .filter((item) => item.checkpoint)
-    .sort((left, right) => {
-      const stickyKey = input.stickyTargetCheckpointKey;
-      if (stickyKey) {
-        const leftEvidence = getCheckpointEvidenceText(input, left.checkpointKey);
-        const rightEvidence = getCheckpointEvidenceText(input, right.checkpointKey);
-        const leftSticky =
-          left.checkpointKey === stickyKey &&
-          (probeRequired({
-            checkpoint: left.checkpoint,
-            state: left.state,
-            hints: left.hints,
-            questionMaxScore: input.questionMaxScore,
-            candidateEvidenceText: leftEvidence,
-            latestCandidateText: input.latestCandidateAnswer ?? '',
-          }) ||
-            residualGapProbeRequired({
-              checkpoint: left.checkpoint,
-              state: left.state,
-              hints: left.hints,
-              questionMaxScore: input.questionMaxScore,
-              candidateEvidenceText: leftEvidence,
-              latestCandidateText: input.latestCandidateAnswer ?? '',
-            }));
-        const rightSticky =
-          right.checkpointKey === stickyKey &&
-          (probeRequired({
-            checkpoint: right.checkpoint,
-            state: right.state,
-            hints: right.hints,
-            questionMaxScore: input.questionMaxScore,
-            candidateEvidenceText: rightEvidence,
-            latestCandidateText: input.latestCandidateAnswer ?? '',
-          }) ||
-            residualGapProbeRequired({
-              checkpoint: right.checkpoint,
-              state: right.state,
-              hints: right.hints,
-              questionMaxScore: input.questionMaxScore,
-              candidateEvidenceText: rightEvidence,
-              latestCandidateText: input.latestCandidateAnswer ?? '',
-            }));
-
-        if (leftSticky !== rightSticky) {
-          return leftSticky ? -1 : 1;
-        }
-      }
-
-      const probeCompare = compareProbePriority(
-        left,
-        right,
-        input.questionMaxScore,
-        getCheckpointEvidenceText(input, left.checkpointKey),
-        getCheckpointEvidenceText(input, right.checkpointKey),
-      );
-      if (probeCompare !== 0) {
-        return probeCompare;
-      }
-
-      return compareCandidates(left, right);
+        questionMaxScore: input.questionMaxScore,
+        candidateEvidenceText: getCheckpointEvidenceText(
+          input,
+          state.checkpointKey,
+        ),
+        latestCandidateText: input.latestCandidateAnswer ?? '',
+        config: budgetConfig,
+      });
     });
-
-  if (eligible.length === 0) {
-    return {
-      shouldAskFollowUp: false,
-      reason: questionScoreSufficient
-        ? 'sufficient_question_score'
-        : 'no_eligible_checkpoints',
-    };
-  }
-
-  const selected = eligible[0]!;
-  const selectedCheckpoint = checkpointByKey.get(selected.checkpointKey)!;
-  const selectedEvidenceText = getCheckpointEvidenceText(
-    input,
-    selected.checkpointKey,
-  );
-  const missingMustConcepts = getMissingMustConcepts(
-    selectedCheckpoint.evaluationHints,
-    selectedEvidenceText,
-  );
-  const isDepthProbe = probeRequired({
-    checkpoint: selectedCheckpoint,
-    state: selected.state,
-    hints: selectedCheckpoint.evaluationHints,
-    questionMaxScore: input.questionMaxScore,
-    candidateEvidenceText: selectedEvidenceText,
-    latestCandidateText: input.latestCandidateAnswer ?? '',
-  });
-  const isResidualProbe = !isDepthProbe &&
-    residualGapProbeRequired({
-      checkpoint: selectedCheckpoint,
-      state: selected.state,
-      hints: selectedCheckpoint.evaluationHints,
-      questionMaxScore: input.questionMaxScore,
-      candidateEvidenceText: selectedEvidenceText,
-      latestCandidateText: input.latestCandidateAnswer ?? '',
-    });
-
-  return {
-    shouldAskFollowUp: true,
-    targetCheckpointKey: selected.checkpointKey,
-    checkpointTitle: selected.title,
-    checkpointExpected: selected.expected,
-    reason: isDepthProbe
-      ? 'checkpoint_probe_required'
-      : isResidualProbe
-        ? 'checkpoint_residual_gap_probe'
-        : `checkpoint_${selected.status}`,
-    followUpKind: isDepthProbe
-      ? 'depth_probe'
-      : isResidualProbe
-        ? 'residual_probe'
-        : 'generic',
-    missingMustConcepts,
-  };
 }
 
 function isEligibleCheckpointState(state: {
@@ -345,31 +424,6 @@ function isEligibleCheckpointState(state: {
   return true;
 }
 
-function compareCandidates(
-  left: {
-    weight: number;
-    status: CheckpointStateStatus;
-    sortOrder: number;
-  },
-  right: {
-    weight: number;
-    status: CheckpointStateStatus;
-    sortOrder: number;
-  },
-): number {
-  if (right.weight !== left.weight) {
-    return right.weight - left.weight;
-  }
-
-  const leftStatusPriority = STATUS_PRIORITY[left.status] ?? 99;
-  const rightStatusPriority = STATUS_PRIORITY[right.status] ?? 99;
-  if (leftStatusPriority !== rightStatusPriority) {
-    return leftStatusPriority - rightStatusPriority;
-  }
-
-  return left.sortOrder - right.sortOrder;
-}
-
 export function buildNaturalTemplateFollowUp(input: {
   questionText: string;
   checkpointTitle?: string;
@@ -378,9 +432,33 @@ export function buildNaturalTemplateFollowUp(input: {
   previousFollowUpQuestions?: string[];
   seed?: number;
   missingMustConcepts?: string[];
-  followUpKind?: 'depth_probe' | 'residual_probe' | 'generic';
+  followUpKind?: 'depth_probe' | 'residual_probe' | 'topic_redirect' | 'generic';
   evaluationHints?: CheckpointEvaluationHints | null;
+  answeredCheckpointTitle?: string | null;
+  targetScoreAwarded?: number;
+  targetMaxScore?: number;
+  targetRationale?: string | null;
 }): string {
+  const seed =
+    input.seed ??
+    (input.checkpointTitle ?? input.checkpointExpected ?? input.questionText)
+      .length;
+  const previousFollowUpQuestions = input.previousFollowUpQuestions ?? [];
+  const answerTone = inferFollowUpAnswerTone({
+    scoreAwarded: input.targetScoreAwarded,
+    maxScore: input.targetMaxScore,
+    rationale: input.targetRationale,
+  });
+
+  if (input.followUpKind === 'topic_redirect') {
+    return normalizeFollowUpQuestionForCandidate(
+      buildTopicRedirectFollowUpQuestion({
+        expectedCheckpointTitle: input.checkpointTitle ?? '',
+        answeredCheckpointTitle: input.answeredCheckpointTitle,
+      }),
+    );
+  }
+
   if (
     input.followUpKind === 'depth_probe' &&
     (input.missingMustConcepts?.length ?? 0) > 0
@@ -390,6 +468,9 @@ export function buildNaturalTemplateFollowUp(input: {
         checkpointTitle: input.checkpointTitle ?? '',
         missingMustConcepts: input.missingMustConcepts ?? [],
         hints: input.evaluationHints,
+        seed,
+        previousFollowUpQuestions,
+        answerTone,
       }),
     );
   }
@@ -402,16 +483,15 @@ export function buildNaturalTemplateFollowUp(input: {
       buildResidualGapFollowUpQuestion({
         missingMustConcepts: input.missingMustConcepts ?? [],
         hints: input.evaluationHints,
+        seed,
+        previousFollowUpQuestions,
       }),
     );
   }
 
-  const seed =
-    input.seed ??
-    (input.checkpointTitle ?? input.checkpointExpected ?? input.questionText).length;
   const acknowledgment = pickFollowUpAcknowledgment(
     seed,
-    input.previousFollowUpQuestions ?? [],
+    previousFollowUpQuestions,
   );
   const stem = pickFollowUpQuestionStem(seed + 1);
   const topicHint = rephraseCheckpointTitleForFollowUp(

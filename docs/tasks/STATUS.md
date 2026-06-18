@@ -42,31 +42,25 @@ Evaluation accuracy & HR analytics
 Active subtask ID:
 
 ```txt
-TASK-14.19 — Weight-based follow-up budget allocator
+(none — block 14 subtasks complete)
 ```
 
 Last completed subtask:
 
 ```txt
-TASK-14.22 — Residual gap probe (narrowing follow-up)
+TASK-14.21 — Topic mismatch redirect
 ```
 
 Next recommended subtask:
 
 ```txt
-TASK-14.19 — Weight Budget Allocator
-```
-
-Planned (block 14):
-
-```txt
-14.19 Budget → 14.20 Transitive → 14.21 Topic mismatch
+(block 14 complete — see STATUS.md Done)
 ```
 
 Last updated:
 
 ```txt
-2026-06-17 (TASK-14.22 closed ✅; active → 14.19)
+2026-06-17 (TASK-14.20 + 14.21 closed ✅)
 ```
 
 ---
@@ -91,6 +85,9 @@ Last updated:
 - [x] TASK-14.16 — DB checkpoint evaluation hints + snapshot
 - [x] TASK-14.17 — Scoring accuracy, red flags & legacy sync
 - [x] TASK-14.18 — Probe-or-Accept + OpenAI prompts 2.6
+- [x] TASK-14.19 — Weight-based follow-up budget allocator
+- [x] TASK-14.20 — Transitive checkpoint floors
+- [x] TASK-14.21 — Topic mismatch redirect
 - [x] TASK-14.22 — Residual gap probe (narrowing follow-up)
 
 ---

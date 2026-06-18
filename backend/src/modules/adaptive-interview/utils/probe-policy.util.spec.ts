@@ -96,12 +96,35 @@ describe('probe-policy.util', () => {
       checkpointTitle: 'Понимает планирование Fiber',
       missingMustConcepts: ['scheduler', 'планирован', 'MessageChannel'],
       hints: FIBER_EVALUATION_HINTS.scheduling,
+      seed: 3,
+      previousFollowUpQuestions: [
+        'Хорошо. Вы верно описали общую идею. Уточните, пожалуйста — lazy?',
+      ],
     });
 
     expect(question).not.toContain('Понимает');
     expect(question).toContain('scheduler');
     expect(question).toContain('MessageChannel');
-    expect(question).toMatch(/^Хорошо\. Вы верно описали общую идею\./);
+    expect(question).not.toMatch(/^Хорошо\. Вы верно описали общую идею\./);
+  });
+
+  it('varies probe follow-ups across turns with same seed offset', () => {
+    const first = buildProbeFollowUpQuestion({
+      checkpointTitle: 'Lazy loading',
+      missingMustConcepts: ['module level', 'render'],
+      hints: null,
+      seed: 1,
+      previousFollowUpQuestions: [],
+    });
+    const second = buildProbeFollowUpQuestion({
+      checkpointTitle: 'Lazy loading',
+      missingMustConcepts: ['module level', 'render'],
+      hints: null,
+      seed: 2,
+      previousFollowUpQuestions: [first],
+    });
+
+    expect(second).not.toBe(first);
   });
 
   it('resolves probe phrases from bank probeConceptGroups only', () => {
@@ -168,9 +191,10 @@ describe('probe-policy.util', () => {
     const question = buildResidualGapFollowUpQuestion({
       missingMustConcepts: ['wip', 'alternate', 'current tree'],
       hints: FIBER_EVALUATION_HINTS.render_phase,
+      seed: 2,
     });
 
-    expect(question).toMatch(/^Ок, это верно\./);
+    expect(question).toMatch(/верно|схвач|прав/i);
     expect(question).toContain('WIP tree');
   });
 });

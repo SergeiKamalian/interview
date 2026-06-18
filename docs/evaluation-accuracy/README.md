@@ -245,6 +245,27 @@ Checkpoint считается «закрытым» для follow-up policy ко�
 - Stop когда 2 follow-ups подряд не улучшили score.
 - Разный вес: main_answer evidence > follow_up_answer evidence (subtask 014).
 
+### 5.4.1 Follow-up budget (TASK-14.19)
+
+**Реализовано:** deterministic **Weight Budget Allocator** (`probe-priority.util.ts`, `follow-up-budget-allocator.util.ts`).
+
+- Глобальный бюджет: `ADAPTIVE_MAX_FOLLOW_UPS_PER_QUESTION=4` (default).
+- **Priority** = `(weight/max) × gapScore × tierMultiplier × uncertaintyMultiplier`.
+- **Per-checkpoint cap:** mention/basic → 0 (shallow only); heavy (weight ≥ 2 или advanced+) → до 2; иначе 1.
+- Ниже `ADAPTIVE_MIN_PRIORITY_TO_PROBE` (0.15) → shallow accept без probe.
+- `probeRequired` advanced checkpoints резервируют budget; early stop при sufficient score **не** срабатывает, пока такой probe pending.
+- Turn user prompt: блок `Follow-up budget (this question)` в `buildInterviewPolicyTurnBlock`.
+
+Env: `ADAPTIVE_MAX_FOLLOW_UPS_HEAVY_CHECKPOINT`, `ADAPTIVE_HEAVY_CHECKPOINT_WEIGHT_RATIO`, `ADAPTIVE_MIN_PRIORITY_TO_PROBE`. Bank override: `evaluation_hints.probePolicy.maxFollowUps`, `minPriorityToProbe`.
+
+### 5.4.2 Transitive checkpoint floors (TASK-14.20)
+
+Bank `impliesCheckpointFloors`: strong **source** checkpoint (≥75% max, probed/closed, no false claim) raises **floor** on related targets — never auto-`covered`. Fiber: scheduling → lanes_priority (0.5), fiber_definition (0.45); stack_vs_fiber → fiber_definition (0.55). Weak source (e.g. scheduling 0.25 unprobed) triggers nothing.
+
+### 5.4.3 Topic mismatch redirect (TASK-14.21)
+
+New disposition `misunderstood_question`: substantive answer about **wrong checkpoint** (e.g. useState when asked useEffect). Policy issues `topic_redirect` follow-up (priority above generic probe, max 1 per target via `redirect=asked`). Guards prevent immediate `missed` score 0 on expected checkpoint; cross-checkpoint credit on the answered checkpoint preserved.
+
 ### 5.5 HR Analytics / Report
 
 **Сейчас:** dashboard показывает score, messages — без structured per-checkpoint HR view.

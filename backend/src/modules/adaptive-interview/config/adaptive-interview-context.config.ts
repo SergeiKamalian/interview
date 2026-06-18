@@ -1,7 +1,11 @@
 export const ADAPTIVE_INTERVIEW_CONTEXT_DEFAULTS = {
   localTurnLimit: 10,
-  maxFollowUpsPerQuestion: 3,
+  /** 4 allows one depth probe on heavy checkpoint + residual/narrowing without early exhaustion */
+  maxFollowUpsPerQuestion: 4,
   maxFollowUpsPerCheckpoint: 1,
+  maxFollowUpsHeavyCheckpoint: 2,
+  heavyCheckpointWeightRatio: 0.2,
+  minPriorityToProbe: 0.15,
   maxTextLength: 500,
   maxReferenceAnswerLength: 600,
   /** 0.85 = stop follow-ups when question score is sufficient */
@@ -13,6 +17,9 @@ export type AdaptiveInterviewContextLimits = {
   localTurnLimit: number;
   maxFollowUpsPerQuestion: number;
   maxFollowUpsPerCheckpoint: number;
+  maxFollowUpsHeavyCheckpoint: number;
+  heavyCheckpointWeightRatio: number;
+  minPriorityToProbe: number;
   maxTextLength: number;
   maxReferenceAnswerLength: number;
   questionScoreSufficientRatio: number;
@@ -83,6 +90,18 @@ export function getAdaptiveInterviewContextLimits(): AdaptiveInterviewContextLim
       process.env.ADAPTIVE_MAX_FOLLOW_UPS_PER_CHECKPOINT,
       ADAPTIVE_INTERVIEW_CONTEXT_DEFAULTS.maxFollowUpsPerCheckpoint,
     ),
+    maxFollowUpsHeavyCheckpoint: readNonNegativeInt(
+      process.env.ADAPTIVE_MAX_FOLLOW_UPS_HEAVY_CHECKPOINT,
+      ADAPTIVE_INTERVIEW_CONTEXT_DEFAULTS.maxFollowUpsHeavyCheckpoint,
+    ),
+    heavyCheckpointWeightRatio: readPositiveFloat(
+      process.env.ADAPTIVE_HEAVY_CHECKPOINT_WEIGHT_RATIO,
+      ADAPTIVE_INTERVIEW_CONTEXT_DEFAULTS.heavyCheckpointWeightRatio,
+    ),
+    minPriorityToProbe: readMinPriority(
+      process.env.ADAPTIVE_MIN_PRIORITY_TO_PROBE,
+      ADAPTIVE_INTERVIEW_CONTEXT_DEFAULTS.minPriorityToProbe,
+    ),
     maxTextLength: ADAPTIVE_INTERVIEW_CONTEXT_DEFAULTS.maxTextLength,
     maxReferenceAnswerLength:
       ADAPTIVE_INTERVIEW_CONTEXT_DEFAULTS.maxReferenceAnswerLength,
@@ -140,6 +159,35 @@ function readPositiveInt(value: string | undefined, fallback: number): number {
 
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 1) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
+function readNonNegativeInt(
+  value: string | undefined,
+  fallback: number,
+): number {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
+function readMinPriority(value: string | undefined, fallback: number): number {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
     return fallback;
   }
 

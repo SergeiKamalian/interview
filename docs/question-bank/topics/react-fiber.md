@@ -32,6 +32,18 @@
 
 **Σ weight = 10.00**
 
+## Transitive implied floors (14.20)
+
+When a **strong source** checkpoint is closed (≥75% max, probed/no false claim), bank `impliesCheckpointFloors` raises **minimum score floors** on related targets — never auto-`covered`:
+
+| Source (strong) | Target | Floor fraction |
+|-----------------|--------|----------------|
+| scheduling | lanes_priority | 0.50 |
+| scheduling | fiber_definition | 0.45 |
+| stack_vs_fiber | fiber_definition | 0.55 |
+
+Weak/shallow source (e.g. scheduling 0.25 unprobed) does **not** trigger transitive floors.
+
 ## interview_weight = 8
 
 Ключевая тема для senior React-интервью: сильно влияет на `finalScore`, но не единственная (не 10).

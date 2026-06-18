@@ -111,6 +111,10 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
   WHEN 'lazy_api' THEN JSON_OBJECT(
     'complexityTier', 'basic',
     'weightRationale', 'dynamic import + suspend — ядро темы',
+    'probePolicy', JSON_OBJECT(
+      'requireProbeBeforeFinalPartial', false,
+      'minScoreAfterShallowAccept', 0.55
+    ),
     'mustConcepts', JSON_ARRAY(
       'React.lazy', 'lazy', 'dynamic import', 'import()', 'chunk', 'Promise', 'suspend',
       'ленив', 'отложен', 'отдельн'
@@ -125,6 +129,18 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
   WHEN 'suspense_fallback' THEN JSON_OBJECT(
     'complexityTier', 'basic',
     'weightRationale', 'без Suspense lazy не работает в UI',
+    'probePolicy', JSON_OBJECT(
+      'requireProbeBeforeFinalPartial', false,
+      'minScoreAfterShallowAccept', 0.55
+    ),
+    'confusionPairs', JSON_ARRAY(
+      JSON_OBJECT(
+        'checkpointKey', 'suspense_fallback',
+        'oftenConfusedWith', JSON_ARRAY('error_boundary'),
+        'anchorTermsExpected', JSON_ARRAY('Suspense', 'fallback', 'loading', 'загрузк', 'spinner', 'skeleton'),
+        'anchorTermsWrongTopic', JSON_ARRAY('ErrorBoundary', 'error boundary', 'ловит ошибк', 'network error')
+      )
+    ),
     'mustConcepts', JSON_ARRAY(
       'Suspense', 'fallback', 'спиннер', 'skeleton', 'placeholder', 'загрузк', 'loading',
       'приостанов', 'suspend', 'пока груз'
@@ -139,6 +155,10 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
   WHEN 'code_splitting' THEN JSON_OBJECT(
     'complexityTier', 'basic',
     'weightRationale', 'bundler автоматически режет chunk',
+    'probePolicy', JSON_OBJECT(
+      'requireProbeBeforeFinalPartial', false,
+      'minScoreAfterShallowAccept', 0.55
+    ),
     'mustConcepts', JSON_ARRAY(
       'code splitting', 'chunk', 'Webpack', 'Vite', 'bundler', 'dynamic import',
       'отдельн', 'файл', 'бандл', 'сборк'
@@ -153,6 +173,10 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
   WHEN 'default_export' THEN JSON_OBJECT(
     'complexityTier', 'basic',
     'weightRationale', 'частая ошибка: named export без .then',
+    'probePolicy', JSON_OBJECT(
+      'requireProbeBeforeFinalPartial', false,
+      'minScoreAfterShallowAccept', 0.55
+    ),
     'mustConcepts', JSON_ARRAY(
       'default export', 'named export', '.then', 'mod.', 'default: mod',
       'именован', 'экспорт', 'UserCard'
@@ -167,6 +191,25 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
   WHEN 'module_level_lazy' THEN JSON_OBJECT(
     'complexityTier', 'intermediate',
     'weightRationale', 'pitfall: lazy внутри render ломает кеш chunk',
+    'probePolicy', JSON_OBJECT(
+      'requireProbeBeforeFinalPartial', true,
+      'shallowAcceptMaxFraction', 0.5,
+      'minScoreAfterShallowAccept', 0.55
+    ),
+    'impliesCheckpointFloors', JSON_ARRAY(
+      JSON_OBJECT('checkpointKey', 'lazy_api', 'floorFraction', 0.55),
+      JSON_OBJECT('checkpointKey', 'default_export', 'floorFraction', 0.45)
+    ),
+    'probeConceptGroups', JSON_ARRAY(
+      JSON_OBJECT(
+        'match', JSON_ARRAY('уровень модуля', 'module level', 'вне компонент', 'вне function'),
+        'ask', 'почему lazy объявляют на уровне модуля, а не внутри компонента'
+      ),
+      JSON_OBJECT(
+        'match', JSON_ARRAY('на каждом рендер', 'внутри render', 'в теле функции'),
+        'ask', 'что ломается если создавать lazy на каждом рендере'
+      )
+    ),
     'mustConcepts', JSON_ARRAY(
       'уровень модуля', 'module level', 'вне компонент', 'на каждом рендер',
       'const Chart = lazy', 'не внутри функции', 'вне function'
@@ -181,6 +224,32 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
   WHEN 'error_boundary' THEN JSON_OBJECT(
     'complexityTier', 'intermediate',
     'weightRationale', 'production: network fail chunk — ErrorBoundary, не Suspense',
+    'probePolicy', JSON_OBJECT(
+      'requireProbeBeforeFinalPartial', true,
+      'shallowAcceptMaxFraction', 0.5,
+      'minScoreAfterShallowAccept', 0.55
+    ),
+    'impliesCheckpointFloors', JSON_ARRAY(
+      JSON_OBJECT('checkpointKey', 'suspense_fallback', 'floorFraction', 0.5)
+    ),
+    'confusionPairs', JSON_ARRAY(
+      JSON_OBJECT(
+        'checkpointKey', 'error_boundary',
+        'oftenConfusedWith', JSON_ARRAY('suspense_fallback'),
+        'anchorTermsExpected', JSON_ARRAY('ErrorBoundary', 'error boundary', 'chunk fail', 'network', 'Failed to load'),
+        'anchorTermsWrongTopic', JSON_ARRAY('fallback', 'spinner', 'Suspense ловит', 'loading UI')
+      )
+    ),
+    'probeConceptGroups', JSON_ARRAY(
+      JSON_OBJECT(
+        'match', JSON_ARRAY('ErrorBoundary', 'error boundary', 'chunk fail', 'network'),
+        'ask', 'как ErrorBoundary обрабатывает ошибку загрузки chunk'
+      ),
+      JSON_OBJECT(
+        'match', JSON_ARRAY('Suspense', 'fallback'),
+        'ask', 'чем Suspense отличается от ErrorBoundary при failed import'
+      )
+    ),
     'mustConcepts', JSON_ARRAY(
       'ErrorBoundary', 'error boundary', 'ошибк загруз', 'chunk fail',
       'сеть', 'network', 'упадёт', 'прод', 'Failed to load'
@@ -193,8 +262,27 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
     'positiveFloorScore', 0.85
   )
   WHEN 'when_to_use' THEN JSON_OBJECT(
-    'complexityTier', 'intermediate',
+    'complexityTier', 'advanced',
     'weightRationale', 'route/modal vs lazy всего на первом экране',
+    'probePolicy', JSON_OBJECT(
+      'requireProbeBeforeFinalPartial', true,
+      'shallowAcceptMaxFraction', 0.5,
+      'minScoreAfterShallowAccept', 0.55
+    ),
+    'impliesCheckpointFloors', JSON_ARRAY(
+      JSON_OBJECT('checkpointKey', 'code_splitting', 'floorFraction', 0.45),
+      JSON_OBJECT('checkpointKey', 'lazy_api', 'floorFraction', 0.4)
+    ),
+    'probeConceptGroups', JSON_ARRAY(
+      JSON_OBJECT(
+        'match', JSON_ARRAY('route', 'React Router', 'роут', 'модал', 'drawer'),
+        'ask', 'где lazy даёт выигрыш — route-level или modal'
+      ),
+      JSON_OBJECT(
+        'match', JSON_ARRAY('первый экран', 'overhead', 'мелк', 'кнопк'),
+        'ask', 'когда lazy не стоит применять'
+      )
+    ),
     'mustConcepts', JSON_ARRAY(
       'route', 'роут', 'React Router', 'модал', 'drawer', 'admin',
       'chart', 'editor', 'первый экран', 'overhead', 'тяжёл'
@@ -258,3 +346,33 @@ JOIN (
   UNION ALL SELECT 'default_export', 'bad',
          'lazy работает с любым named export без .then обёртки.', 32
 ) cp;
+
+-- Backfill snapshot from bank (re-run safe).
+UPDATE interview_question_checkpoints iqc
+JOIN interview_questions iq ON iq.id = iqc.interview_question_id
+JOIN question_checkpoints qc
+  ON qc.question_id = iq.source_question_id
+ AND qc.checkpoint_key = iqc.checkpoint_key
+SET iqc.evaluation_hints = qc.evaluation_hints
+WHERE qc.evaluation_hints IS NOT NULL;
+
+DELETE iae FROM interview_answer_examples iae
+JOIN interview_questions iq ON iq.id = iae.interview_question_id
+JOIN questions q ON q.id = iq.source_question_id
+JOIN topics t ON t.id = q.topic_id AND t.code = 'react_lazy_suspense'
+WHERE iae.checkpoint_key IS NOT NULL;
+
+INSERT INTO interview_answer_examples (
+  interview_question_id, checkpoint_key, example_type, example_text, sort_order
+)
+SELECT iq.id, ae.checkpoint_key, ae.example_type, ae.example_text, ae.sort_order
+FROM interview_questions iq
+JOIN answer_examples ae ON ae.question_id = iq.source_question_id
+WHERE ae.checkpoint_key IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM interview_answer_examples iae
+    WHERE iae.interview_question_id = iq.id
+      AND iae.checkpoint_key <=> ae.checkpoint_key
+      AND iae.example_type = ae.example_type
+      AND iae.sort_order = ae.sort_order
+  );

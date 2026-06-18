@@ -26,7 +26,13 @@ export const perTurnCheckpointEvaluationItemSchema = Joi.object({
 export const perTurnCheckpointEvaluationResponseSchema =
   Joi.object<PerTurnCheckpointEvaluationJsonResponse>({
     candidate_disposition: Joi.string()
-      .valid('engaged', 'declined', 'confused', 'off_topic')
+      .valid(
+        'engaged',
+        'declined',
+        'confused',
+        'off_topic',
+        'misunderstood_question',
+      )
       .required(),
     checkpoint_results: Joi.array()
       .items(perTurnCheckpointEvaluationItemSchema)

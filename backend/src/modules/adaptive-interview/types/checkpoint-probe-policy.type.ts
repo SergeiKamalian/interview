@@ -15,6 +15,10 @@ export type CheckpointProbePolicy = {
   minScoreAfterShallowAccept?: number;
   /** When false, skip residual narrowing follow-up after partial compound answer. Default true. */
   allowResidualGapProbe?: boolean;
+  /** Bank override: max follow-ups on this checkpoint (14.19). */
+  maxFollowUps?: number;
+  /** Bank override: min probe priority to allocate a follow-up (14.19). */
+  minPriorityToProbe?: number;
 };
 
 /** Extra follow-up slot on a checkpoint when residual gap probe is required. */

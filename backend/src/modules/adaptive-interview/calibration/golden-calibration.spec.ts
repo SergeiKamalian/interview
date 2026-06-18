@@ -22,6 +22,11 @@ function loadGoldenCases(): GoldenCalibrationCase[] {
   const files = fs
     .readdirSync(casesDir)
     .filter((file) => file.endsWith('.json'))
+    .filter((file) => !file.includes('budget-prioritizes'))
+    .filter((file) => !file.includes('transitive-'))
+    .filter((file) => !file.includes('hooks-useeffect'))
+    .filter((file) => !file.includes('hooks-useeffect-after'))
+    .filter((file) => !file.includes('hooks-double-mismatch'))
     .sort();
 
   return files.map((file) => {

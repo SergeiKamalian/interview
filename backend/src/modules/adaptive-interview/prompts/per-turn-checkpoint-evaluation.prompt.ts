@@ -6,7 +6,7 @@ import {
 
 export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_KEY =
   'per_turn_checkpoint_evaluation';
-export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION = '2.6.0';
+export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION = '2.7.0';
 
 export function getPerTurnCheckpointEvaluationPromptVersion(): string {
   const override = process.env.PER_TURN_EVAL_PROMPT_VERSION?.trim();
@@ -14,7 +14,7 @@ export function getPerTurnCheckpointEvaluationPromptVersion(): string {
 }
 
 const RESPONSE_JSON_SCHEMA = `{
-  "candidate_disposition": "engaged | declined | confused | off_topic",
+  "candidate_disposition": "engaged | declined | confused | off_topic | misunderstood_question",
   "checkpoint_results": [
     {
       "checkpoint_key": "string — must match one of the provided checkpoint keys exactly",
@@ -104,7 +104,8 @@ export function buildPerTurnCheckpointEvaluationSystemPrompt(): string {
     '  - engaged: candidate tries to answer substantively, even if incorrect;',
     '  - declined: candidate refuses or clearly says they do not know / cannot answer;',
     '  - confused: candidate explicitly says they do not understand the question or topic;',
-    '  - off_topic: unrelated nonsense — answer does not engage with the question.',
+    '  - off_topic: unrelated nonsense — answer does not engage with the question;',
+    '  - misunderstood_question: substantive answer about a DIFFERENT checkpoint/topic than expected (e.g. useState when asked useEffect).',
     '- Return valid JSON only, with no markdown fences or extra commentary.',
     '',
     'Required JSON shape:',

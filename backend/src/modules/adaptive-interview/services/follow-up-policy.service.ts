@@ -20,6 +20,7 @@ export class FollowUpPolicyService {
     followUpsUsedForQuestion: number,
     candidateDispositionFromAi?: CandidateAnswerDisposition | null,
     recentScoreDeltas?: number[],
+    latestCheckpointResults?: FollowUpPolicyInput['latestCheckpointResults'],
   ): FollowUpPolicyDecision {
     const limits = getAdaptiveInterviewContextLimits();
 
@@ -47,6 +48,9 @@ export class FollowUpPolicyService {
       followUpsUsedForQuestion,
       maxFollowUpsPerQuestion: limits.maxFollowUpsPerQuestion,
       maxFollowUpsPerCheckpoint: limits.maxFollowUpsPerCheckpoint,
+      maxFollowUpsHeavyCheckpoint: limits.maxFollowUpsHeavyCheckpoint,
+      heavyCheckpointWeightRatio: limits.heavyCheckpointWeightRatio,
+      minPriorityToProbe: limits.minPriorityToProbe,
       questionScoreSufficientRatio: limits.questionScoreSufficientRatio,
       lowWeightCheckpointRatio: limits.lowWeightCheckpointRatio,
       stagnationLimit: weightConfig.stagnationLimit,
@@ -55,6 +59,8 @@ export class FollowUpPolicyService {
       checkpointEvidenceTextByKey,
       candidateDispositionFromAi: candidateDispositionFromAi ?? undefined,
       stickyTargetCheckpointKey: context.targetCheckpointKey,
+      questionText: context.questionText,
+      latestCheckpointResults,
     };
 
     return evaluateFollowUpPolicy(input);

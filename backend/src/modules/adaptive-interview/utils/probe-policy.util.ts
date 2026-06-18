@@ -17,6 +17,12 @@ import {
 } from './checkpoint-depth.util';
 import { getContradictionScoreCap } from './hint-driven-evidence.util';
 import { countMatchedConcepts } from './text-evidence-overlap.util';
+import {
+  type FollowUpAnswerTone,
+  pickProbeAcknowledgment,
+  pickProbeQuestionStem,
+  pickResidualAcknowledgment,
+} from './follow-up-acknowledgment.util';
 
 const PROBE_REQUIRED_TIERS = new Set<CheckpointComplexityTier>([
   'intermediate',
@@ -653,31 +659,49 @@ export function buildProbeFollowUpQuestion(input: {
   checkpointTitle: string;
   missingMustConcepts: string[];
   hints?: CheckpointEvaluationHints | null;
+  seed?: number;
+  previousFollowUpQuestions?: string[];
+  answerTone?: FollowUpAnswerTone;
 }): string {
+  const seed = input.seed ?? input.missingMustConcepts.length;
+  const previous = input.previousFollowUpQuestions ?? [];
+  const tone = input.answerTone ?? 'good';
+  const acknowledgment = pickProbeAcknowledgment(tone, seed, previous);
+  const stem = pickProbeQuestionStem(seed + 1, previous);
+
   const conceptList = resolveProbePhrasesForCandidate(
     input.hints,
     input.missingMustConcepts,
   );
 
   if (!conceptList) {
-    return 'Хорошо. Вы верно описали общую идею. Можете уточнить технические детали?';
+    if (tone === 'weak') {
+      return `${acknowledgment} Давайте разберём технические детали — что сможете добавить?`;
+    }
+    return `${acknowledgment} Можете уточнить технические детали?`;
   }
 
-  return `Хорошо. Вы верно описали общую идею. Уточните, пожалуйста — ${conceptList}?`;
+  return `${acknowledgment} ${stem} ${conceptList}?`;
 }
 
 export function buildResidualGapFollowUpQuestion(input: {
   missingMustConcepts: string[];
   hints?: CheckpointEvaluationHints | null;
+  seed?: number;
+  previousFollowUpQuestions?: string[];
 }): string {
+  const seed = input.seed ?? input.missingMustConcepts.length;
+  const previous = input.previousFollowUpQuestions ?? [];
+  const acknowledgment = pickResidualAcknowledgment(seed, previous);
+
   const conceptList = resolveProbePhrasesForCandidate(
     input.hints,
     input.missingMustConcepts,
   );
 
   if (!conceptList) {
-    return 'Ок, это верно. Можете добавить ещё детали по этой теме?';
+    return `${acknowledgment} Можете добавить ещё детали по этой теме?`;
   }
 
-  return `Ок, это верно. А ${conceptList} — что сможете добавить?`;
+  return `${acknowledgment} А ${conceptList} — что сможете добавить?`;
 }

@@ -34,6 +34,23 @@ export type CheckpointEvaluationHints = {
    * `match` — evidence stems (subset/overlap with mustConcepts); `ask` — phrase shown to candidate.
    */
   probeConceptGroups?: ProbeConceptGroup[];
+  /** When THIS checkpoint is closed strong, raise floors on other checkpoints (14.20). */
+  impliesCheckpointFloors?: ImpliesCheckpointFloor[];
+  /** Common wrong-topic answers for topic mismatch redirect (14.21). */
+  confusionPairs?: ConfusionPair[];
+};
+
+export type ImpliesCheckpointFloor = {
+  checkpointKey: string;
+  floorFraction: number;
+  minSourceScoreFraction?: number;
+};
+
+export type ConfusionPair = {
+  checkpointKey: string;
+  oftenConfusedWith: string[];
+  anchorTermsExpected?: string[];
+  anchorTermsWrongTopic?: string[];
 };
 
 export type ProbeConceptGroup = {
@@ -89,6 +106,10 @@ export function parseCheckpointEvaluationHints(
       : undefined;
   const probePolicy = parseProbePolicy(record.probePolicy);
   const probeConceptGroups = normalizeProbeConceptGroups(record.probeConceptGroups);
+  const impliesCheckpointFloors = normalizeImpliesCheckpointFloors(
+    record.impliesCheckpointFloors,
+  );
+  const confusionPairs = normalizeConfusionPairs(record.confusionPairs);
 
   if (
     mustConcepts.length === 0 &&
@@ -101,7 +122,9 @@ export function parseCheckpointEvaluationHints(
     complexityTier === undefined &&
     weightRationale === undefined &&
     probePolicy === undefined &&
-    probeConceptGroups.length === 0
+    probeConceptGroups.length === 0 &&
+    impliesCheckpointFloors.length === 0 &&
+    confusionPairs.length === 0
   ) {
     return null;
   }
@@ -121,6 +144,10 @@ export function parseCheckpointEvaluationHints(
     probePolicy,
     probeConceptGroups:
       probeConceptGroups.length > 0 ? probeConceptGroups : undefined,
+    impliesCheckpointFloors:
+      impliesCheckpointFloors.length > 0 ? impliesCheckpointFloors : undefined,
+    confusionPairs:
+      confusionPairs.length > 0 ? confusionPairs : undefined,
   };
 }
 
@@ -144,12 +171,21 @@ function parseProbePolicy(raw: unknown): CheckpointProbePolicy | undefined {
     typeof record.allowResidualGapProbe === 'boolean'
       ? record.allowResidualGapProbe
       : undefined;
+  const maxFollowUps =
+    typeof record.maxFollowUps === 'number' &&
+    Number.isInteger(record.maxFollowUps) &&
+    record.maxFollowUps >= 0
+      ? record.maxFollowUps
+      : undefined;
+  const minPriorityToProbe = normalizeMinPriority(record.minPriorityToProbe);
 
   if (
     requireProbeBeforeFinalPartial === undefined &&
     shallowAcceptMaxFraction === undefined &&
     minScoreAfterShallowAccept === undefined &&
-    allowResidualGapProbe === undefined
+    allowResidualGapProbe === undefined &&
+    maxFollowUps === undefined &&
+    minPriorityToProbe === undefined
   ) {
     return undefined;
   }
@@ -159,7 +195,17 @@ function parseProbePolicy(raw: unknown): CheckpointProbePolicy | undefined {
     shallowAcceptMaxFraction,
     minScoreAfterShallowAccept,
     allowResidualGapProbe,
+    maxFollowUps,
+    minPriorityToProbe,
   };
+}
+
+function normalizeMinPriority(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined;
+  }
+
+  return Math.min(1, Math.max(0, value));
 }
 
 function normalizeProbeConceptGroups(value: unknown): ProbeConceptGroup[] {
@@ -237,4 +283,78 @@ function normalizeComplexityTier(
 
   const normalized = value.trim().toLowerCase() as CheckpointComplexityTier;
   return COMPLEXITY_TIERS.includes(normalized) ? normalized : undefined;
+}
+
+function normalizeImpliesCheckpointFloors(
+  value: unknown,
+): ImpliesCheckpointFloor[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const floors: ImpliesCheckpointFloor[] = [];
+
+  for (const item of value) {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+      continue;
+    }
+
+    const record = item as Record<string, unknown>;
+    const checkpointKey =
+      typeof record.checkpointKey === 'string' &&
+      record.checkpointKey.trim().length > 0
+        ? record.checkpointKey.trim()
+        : '';
+    const floorFraction = normalizeFraction(record.floorFraction);
+    const minSourceScoreFraction = normalizeFraction(
+      record.minSourceScoreFraction,
+    );
+
+    if (!checkpointKey || floorFraction === undefined) {
+      continue;
+    }
+
+    floors.push({
+      checkpointKey,
+      floorFraction,
+      minSourceScoreFraction,
+    });
+  }
+
+  return floors;
+}
+
+function normalizeConfusionPairs(value: unknown): ConfusionPair[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const pairs: ConfusionPair[] = [];
+
+  for (const item of value) {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+      continue;
+    }
+
+    const record = item as Record<string, unknown>;
+    const checkpointKey =
+      typeof record.checkpointKey === 'string' &&
+      record.checkpointKey.trim().length > 0
+        ? record.checkpointKey.trim()
+        : '';
+    const oftenConfusedWith = normalizeStringArray(record.oftenConfusedWith);
+
+    if (!checkpointKey || oftenConfusedWith.length === 0) {
+      continue;
+    }
+
+    pairs.push({
+      checkpointKey,
+      oftenConfusedWith,
+      anchorTermsExpected: normalizeStringArray(record.anchorTermsExpected),
+      anchorTermsWrongTopic: normalizeStringArray(record.anchorTermsWrongTopic),
+    });
+  }
+
+  return pairs;
 }

@@ -101,6 +101,10 @@ export function shouldSkipFollowUps(input: {
     return (input.followUpsUsedForQuestion ?? 0) >= 1;
   }
 
+  if (input.aiDisposition === 'misunderstood_question') {
+    return false;
+  }
+
   return false;
 }
 

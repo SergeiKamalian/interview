@@ -463,6 +463,15 @@ export class AdaptiveInterviewSubmitService {
         followUpsUsedForQuestion: contextPacket.followUpLimits.usedForQuestion,
         avoidLlmFallback: evaluation.status === 'valid',
         recentScoreDeltas: isFollowUpAnswer ? [scoreDelta] : undefined,
+        latestCheckpointResults:
+          evaluation.status === 'valid'
+            ? evaluation.states.map((state) => ({
+                checkpointKey: state.checkpointKey,
+                status: state.status,
+                scoreAwarded: state.scoreAwarded,
+                rationale: state.rationale,
+              }))
+            : undefined,
       },
     );
     planTimer.finish({ status: planResult.status });

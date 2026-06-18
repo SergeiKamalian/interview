@@ -24,8 +24,10 @@ import type {
   FollowUpPlannerOptions,
 } from '../types/follow-up-planner.types';
 import { boundText } from '../utils/build-adaptive-interview-context.util';
+import { buildFollowUpBudgetPromptBlock } from '../utils/build-interview-policy-turn-block.util';
 import { normalizeFollowUpQuestionForCandidate } from '../utils/checkpoint-expected-speech.util';
 import { buildNaturalTemplateFollowUp } from '../utils/follow-up-policy.util';
+import { inferFollowUpAnswerTone } from '../utils/follow-up-acknowledgment.util';
 import { isSuggestedFollowUpUsable } from '../utils/parse-suggested-follow-up.util';
 import { AdaptiveInterviewContextService } from './adaptive-interview-context.service';
 import { FollowUpPlannerValidatorService } from './follow-up-planner-validator.service';
@@ -116,6 +118,7 @@ export class FollowUpPlannerService {
       followUpsUsedForQuestion,
       options.candidateDispositionFromAi,
       options.recentScoreDeltas,
+      options.latestCheckpointResults,
     );
     policyTimer.finish({
       shouldAskFollowUp: policy.shouldAskFollowUp,
@@ -137,17 +140,36 @@ export class FollowUpPlannerService {
     const targetCheckpoint = context.checkpoints.find(
       (checkpoint) => checkpoint.checkpointKey === policy.targetCheckpointKey,
     );
+    const targetCheckpointState = checkpointStates.find(
+      (state) => state.checkpointKey === policy.targetCheckpointKey,
+    );
+    const previousFollowUpQuestions = existingFollowUps.map(
+      (followUp) => followUp.questionText,
+    );
+    const followUpSeed = attemptId + interviewQuestionId + followUpsUsedForQuestion;
+    const answerTone = inferFollowUpAnswerTone({
+      scoreAwarded: targetCheckpointState?.scoreAwarded,
+      maxScore: targetCheckpointState?.maxScore,
+      rationale: targetCheckpointState?.rationale,
+    });
     const templateQuestion = buildNaturalTemplateFollowUp({
       questionText: context.questionText,
       checkpointTitle: policy.checkpointTitle,
       latestCandidateAnswer: context.latestCandidateAnswer,
-      previousFollowUpQuestions: existingFollowUps.map(
-        (followUp) => followUp.questionText,
-      ),
-      seed: attemptId + interviewQuestionId + followUpsUsedForQuestion,
+      previousFollowUpQuestions,
+      seed: followUpSeed,
       followUpKind: policy.followUpKind,
       missingMustConcepts: policy.missingMustConcepts,
       evaluationHints: targetCheckpoint?.evaluationHints,
+      answeredCheckpointTitle: policy.answeredCheckpointKey
+        ? context.checkpoints.find(
+            (checkpoint) =>
+              checkpoint.checkpointKey === policy.answeredCheckpointKey,
+          )?.title
+        : null,
+      targetScoreAwarded: targetCheckpointState?.scoreAwarded,
+      targetMaxScore: targetCheckpointState?.maxScore,
+      targetRationale: targetCheckpointState?.rationale,
     });
     const correlationId = this.aiUsageLogService.createCorrelationId();
     const aiDebugMeta = { ...debugMeta, correlationId };
@@ -158,11 +180,20 @@ export class FollowUpPlannerService {
       checkpointTitle: policy.checkpointTitle,
       checkpointExpected: policy.checkpointExpected,
       latestCandidateAnswer: context.latestCandidateAnswer,
-      previousFollowUpQuestions: existingFollowUps.map(
-        (followUp) => followUp.questionText,
-      ),
+      previousFollowUpQuestions,
       followUpKind: policy.followUpKind,
       missingMustConcepts: policy.missingMustConcepts,
+      answerTone,
+      followUpBudgetBlock: buildFollowUpBudgetPromptBlock(
+        context,
+        policy.targetCheckpointKey,
+      ),
+      answeredCheckpointTitle: policy.answeredCheckpointKey
+        ? context.checkpoints.find(
+            (checkpoint) =>
+              checkpoint.checkpointKey === policy.answeredCheckpointKey,
+          )?.title ?? null
+        : null,
     };
 
     const systemPrompt = buildFollowUpPlannerSystemPrompt();

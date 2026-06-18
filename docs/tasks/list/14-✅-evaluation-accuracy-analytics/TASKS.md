@@ -27,9 +27,9 @@
 | TASK-14.17 | [x] done | Scoring accuracy, red flags & legacy sync | `017-✅-scoring-red-flags-evidence-sync.md` |
 | TASK-14.18 | [x] done | Probe-or-Accept: не штрафовать без уточняющего | `018-✅-probe-or-accept-policy.md` |
 | TASK-14.22 | [x] done | Residual gap probe (narrowing follow-up) | `022-✅-residual-gap-probe.md` |
-| TASK-14.19 | [ ] todo | Weight-based follow-up budget allocator | `019-⬜-weight-budget-follow-up-allocator.md` |
-| TASK-14.20 | [ ] todo | Transitive checkpoint floors (сложный → простой) | `020-⬜-transitive-checkpoint-floors.md` |
-| TASK-14.21 | [ ] todo | Topic mismatch redirect (ответ не на тот checkpoint) | `021-⬜-topic-mismatch-redirect.md` |
+| TASK-14.19 | [x] done | Weight-based follow-up budget allocator | `019-✅-weight-budget-follow-up-allocator.md` |
+| TASK-14.20 | [x] done | Transitive checkpoint floors (сложный → простой) | `020-✅-transitive-checkpoint-floors.md` |
+| TASK-14.21 | [x] done | Topic mismatch redirect (ответ не на тот checkpoint) | `021-✅-topic-mismatch-redirect.md` |
 
 ---
 

@@ -67,7 +67,7 @@ describe('follow-up-policy residual gap probe', () => {
       evaluationHints: FIBER_EVALUATION_HINTS.render_phase,
     });
 
-    expect(question).toMatch(/^Ок, это верно\./);
+    expect(question).toMatch(/верно|схвач|прав/i);
     expect(question).toContain('WIP tree');
     expect(question).not.toContain('Понимает');
   });

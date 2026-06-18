@@ -2,7 +2,7 @@
 
 ## Status
 
-- [ ] todo
+- [x] done
 
 ## Контекст (прочитать агенту первым делом)
 
@@ -67,7 +67,7 @@ priority =
 | `tierMultiplier` | complexityTier | mention 0.3, basic 0.6, core_plus 0.8, intermediate 1.0, advanced 1.2, expert 1.3 |
 | `uncertaintyMultiplier` | 1.0 if status=unclear; 0.9 partial; 0.7 missed | state |
 
-**Eligible** только если 14.18 probe policy разрешает (не closed, не exhausted incorrectly).
+**Eligible** только если 14.18 probe policy разрешает (не closed, not exhausted incorrectly).
 
 ---
 
@@ -220,13 +220,13 @@ Follow-up budget (this question):
 
 ## Acceptance criteria
 
-- [ ] Fiber: при 2+ partial checkpoints probe идёт в **scheduling** раньше, чем в **fiber_pointers** (weight)
-- [ ] `ADAPTIVE_QUESTION_SCORE_SUFFICIENT_RATIO` не останавливает interview при pending `probeRequired` advanced
-- [ ] mention/basic tier: 0 follow-ups из allocator
-- [ ] heavy checkpoint (weight ≥ 2.0): до 2 follow-ups если первый не closed gap
-- [ ] Unit tests + integration с follow-up-policy
-- [ ] `pnpm test` + `pnpm build` OK
-- [ ] Turn user prompt включает follow-up budget block когда allocator active
+- [x] Fiber: при 2+ partial checkpoints probe идёт в **scheduling** раньше, чем в **fiber_pointers** (weight)
+- [x] `ADAPTIVE_QUESTION_SCORE_SUFFICIENT_RATIO` не останавливает interview при pending `probeRequired` advanced
+- [x] mention/basic tier: 0 follow-ups из allocator
+- [x] heavy checkpoint (weight ≥ 2.0): до 2 follow-ups если первый не closed gap
+- [x] Unit tests + integration с follow-up-policy
+- [x] `pnpm test` + `pnpm build` OK
+- [x] Turn user prompt включает follow-up budget block когда allocator active
 
 ---
 
@@ -251,4 +251,21 @@ Manual: replay Fiber casual profile — scheduling должен получить
 
 ## Completion Notes
 
-_(заполнить агенту при закрытии)_
+**Default `ADAPTIVE_MAX_FOLLOW_UPS_PER_QUESTION=4` (было 3):** на Fiber (8 CP) типичный сценарий — 1 depth probe на scheduling (2.5) + 1 residual/narrowing + 1 generic на core_plus; 3 часто исчерпывались до advanced probe при «хорошем» суммарном score.
+
+**Команды:**
+
+```bash
+cd backend
+pnpm test -- probe-priority follow-up-budget follow-up-policy build-interview-policy
+pnpm test   # 195 passed, 1 skipped
+pnpm build  # OK
+```
+
+**Ожидание / результат:**
+
+- `follow-up-budget-allocator.util.spec`: scheduling выбирается раньше fiber_pointers; mention/basic cap=0; heavy cap=2.
+- `follow-up-policy.probe.spec`: early stop не срабатывает при pending scheduling probe; golden `react-fiber-budget-prioritizes-scheduling.json` → target scheduling.
+- `build-interview-policy-turn-block.util.spec`: prompt содержит `Follow-up budget`, `Priority rank`, `Remaining`.
+
+**Изменённые файлы:** `probe-priority.util.ts`, `follow-up-budget-allocator.util.ts`, `follow-up-policy.util.ts`, `build-interview-policy-turn-block.util.ts`, `adaptive-interview-context.config.ts`, `checkpoint-probe-policy.type.ts`, `follow-up-planner.prompt.ts`, `follow-up-planner.service.ts`, specs, golden case, `docs/evaluation-accuracy/README.md`.

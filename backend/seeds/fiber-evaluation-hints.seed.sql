@@ -24,6 +24,9 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
       'requireProbeBeforeFinalPartial', true,
       'minScoreAfterShallowAccept', 0.55
     ),
+    'impliesCheckpointFloors', JSON_ARRAY(
+      JSON_OBJECT('checkpointKey', 'fiber_definition', 'floorFraction', 0.55)
+    ),
     'mustConcepts', JSON_ARRAY(
       'call stack', 'стек', 'рекурсив', 'синхрон', 'React 16',
       'связный список', 'linked list', 'work loop', 'fiber-узл',
@@ -89,6 +92,10 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
       'requireProbeBeforeFinalPartial', true,
       'shallowAcceptMaxFraction', 0.5,
       'minScoreAfterShallowAccept', 0.55
+    ),
+    'impliesCheckpointFloors', JSON_ARRAY(
+      JSON_OBJECT('checkpointKey', 'lanes_priority', 'floorFraction', 0.5),
+      JSON_OBJECT('checkpointKey', 'fiber_definition', 'floorFraction', 0.45)
     ),
     'mustConcepts', JSON_ARRAY(
       'scheduler', 'планирован', 'MessageChannel', 'postMessage',

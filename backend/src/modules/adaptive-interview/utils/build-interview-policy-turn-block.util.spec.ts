@@ -43,7 +43,7 @@ describe('buildInterviewPolicyTurnBlock', () => {
         },
       ],
       followUpLimits: {
-        maxPerQuestion: 3,
+        maxPerQuestion: 4,
         maxPerCheckpoint: 1,
         usedForQuestion: 0,
       },
@@ -56,6 +56,9 @@ describe('buildInterviewPolicyTurnBlock', () => {
     expect(block).toContain('Interview policy (this turn)');
     expect(block).toContain('scheduling');
     expect(block).toContain('Probe status: open');
+    expect(block).toContain('Follow-up budget (this question)');
+    expect(block).toContain('Remaining:');
+    expect(block).toContain('Priority rank:');
     expect(block).toContain('probe=pending');
     expect(block).toContain('MessageChannel');
   });

@@ -30,6 +30,15 @@ import {
   getPositiveEvidenceScoreFloor,
 } from './hint-driven-evidence.util';
 import {
+  applyTransitiveCheckpointFloors,
+  applyTransitiveFloorToGuardedResult,
+  type TransitiveGuardedCheckpoint,
+} from './transitive-checkpoint-floors.util';
+import {
+  appendTopicRedirectPendingRationale,
+  inferExpectedCheckpointKey,
+} from './topic-mismatch.util';
+import {
   appendProbePendingRationale,
   deriveProbeStatus,
   getMissingMustConcepts,
@@ -55,8 +64,29 @@ export function applyCheckpointScoreFloors(
   const badExamples = context.badAnswerExamples ?? [];
   const promptVersion = getPerTurnCheckpointEvaluationPromptVersion();
   const adjustments: CheckpointGuardAdjustment[] = [];
+  const expectedCheckpointKey =
+    inferExpectedCheckpointKey({
+      checkpoints: context.checkpoints,
+      targetCheckpointKey: context.targetCheckpointKey,
+      questionText: context.questionText,
+    }) ?? context.targetCheckpointKey;
 
-  const checkpointResults = evaluation.checkpointResults.map((result) => {
+  type GuardDraft = {
+    original: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number];
+    checkpoint: AdaptiveCheckpointDefinition;
+    priorState?: AdaptiveInterviewContextPacket['checkpointStates'][number];
+    effectiveMaxScore: number;
+    guardedWithQuote: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number];
+    isTargetedFollowUp: boolean;
+    latestTurnText: string;
+    checkpointEvidenceText: string;
+    aiSnapshot: {
+      status: PerTurnCheckpointEvaluationStatus;
+      scoreAwarded: number;
+    };
+  };
+
+  const processed = evaluation.checkpointResults.map((result) => {
     const checkpoint = context.checkpoints.find(
       (item) => item.checkpointKey === result.checkpointKey,
     );
@@ -65,7 +95,7 @@ export function applyCheckpointScoreFloors(
     );
 
     if (!checkpoint) {
-      return result;
+      return { kind: 'passthrough' as const, result };
     }
 
     const effectiveMaxScore = priorState?.maxScore ?? checkpoint.score;
@@ -90,7 +120,7 @@ export function applyCheckpointScoreFloors(
       scoreAwarded: result.scoreAwarded,
     };
 
-    const guardedResult = enforceStatusScoreAlignment(
+    let guardedResult = enforceStatusScoreAlignment(
       applyRationaleScoreAlignment(
         applyShallowAcceptFloor(
           applyPositiveEvidenceFloor(
@@ -112,12 +142,12 @@ export function applyCheckpointScoreFloors(
                 checkpoint.evaluationHints?.neutralMetaphors,
                 effectiveMaxScore,
               ),
-                  latestTurnText,
-                  checkpoint,
-                  priorState,
-                  context.maxScore,
-                  isTargetedFollowUp,
-                ),
+              latestTurnText,
+              checkpoint,
+              priorState,
+              context.maxScore,
+              isTargetedFollowUp,
+            ),
             floorLatestText,
             floorFullText,
             checkpoint,
@@ -136,6 +166,14 @@ export function applyCheckpointScoreFloors(
       ),
       effectiveMaxScore,
     );
+
+    guardedResult = applyTopicMismatchProvisionalGuard({
+      result: guardedResult,
+      checkpointKey: result.checkpointKey,
+      expectedCheckpointKey,
+      candidateDisposition: evaluation.candidateDisposition,
+      priorScoreAwarded: priorState?.scoreAwarded ?? 0,
+    });
 
     if (
       guardedResult.status !== aiSnapshot.status ||
@@ -163,64 +201,129 @@ export function applyCheckpointScoreFloors(
       checkpoint,
     );
 
+    return {
+      kind: 'draft' as const,
+      original: result,
+      checkpoint,
+      priorState,
+      effectiveMaxScore,
+      guardedWithQuote,
+      isTargetedFollowUp,
+      latestTurnText,
+      checkpointEvidenceText,
+      aiSnapshot,
+    };
+  });
+
+  const transitiveEntries: TransitiveGuardedCheckpoint[] = processed
+    .filter((item): item is Extract<typeof item, { kind: 'draft' }> =>
+      item.kind === 'draft',
+    )
+    .map((item) => ({
+      checkpointKey: item.guardedWithQuote.checkpointKey,
+      checkpoint: item.checkpoint,
+      guardedResult: item.guardedWithQuote,
+      priorState: item.priorState,
+      checkpointEvidenceText: item.checkpointEvidenceText,
+      latestCandidateText: latestCandidateText,
+      questionMaxScore: context.maxScore,
+    }));
+
+  const transitiveOutcome = applyTransitiveCheckpointFloors({
+    checkpoints: context.checkpoints,
+    entries: transitiveEntries,
+  });
+
+  const checkpointResults = processed.map((item) => {
+    if (item.kind === 'passthrough') {
+      return item.result;
+    }
+
+    const transitiveApplication = transitiveOutcome.applications.find(
+      (application) =>
+        application.checkpointKey === item.guardedWithQuote.checkpointKey,
+    );
+    const guardedWithQuote = transitiveApplication
+      ? applyTransitiveFloorToGuardedResult(
+          item.guardedWithQuote,
+          transitiveApplication,
+        )
+      : item.guardedWithQuote;
+
+    if (
+      transitiveApplication &&
+      (guardedWithQuote.scoreAwarded !== item.guardedWithQuote.scoreAwarded ||
+        guardedWithQuote.status !== item.guardedWithQuote.status)
+    ) {
+      adjustments.push({
+        checkpointKey: item.guardedWithQuote.checkpointKey,
+        aiStatus: item.aiSnapshot.status,
+        aiScore: item.aiSnapshot.scoreAwarded,
+        guardedStatus: guardedWithQuote.status,
+        guardedScore: guardedWithQuote.scoreAwarded,
+        reason: 'status_score_alignment',
+        promptVersion,
+      });
+    }
+
     const merged = mergeCheckpointEvaluation({
-      currentScoreAwarded: priorState?.scoreAwarded ?? 0,
-      currentStatus: (priorState?.status ?? 'unseen') as CheckpointStateStatus,
+      currentScoreAwarded: item.priorState?.scoreAwarded ?? 0,
+      currentStatus: (item.priorState?.status ?? 'unseen') as CheckpointStateStatus,
       currentEvidenceSummary: null,
       currentRationale: null,
       incomingScoreAwarded: guardedWithQuote.scoreAwarded,
       incomingStatus: guardedWithQuote.status,
       incomingEvidenceSummary: guardedWithQuote.evidenceSummary,
       incomingRationale: guardedWithQuote.rationale,
-      maxScore: effectiveMaxScore,
+      maxScore: item.effectiveMaxScore,
       evidenceSource: options.evidenceSource,
-      relaxFollowUpWeight: isTargetedFollowUp,
+      relaxFollowUpWeight: item.isTargetedFollowUp,
       incomingAllowsScoreDecrease: resolveIncomingAllowsScoreDecrease(
         context,
-        checkpoint,
+        item.checkpoint,
         guardedWithQuote.rationale,
-        latestTurnText,
-        checkpointEvidenceText,
+        item.latestTurnText,
+        item.checkpointEvidenceText,
       ),
       provisionalScoreFloor: resolveProvisionalScoreFloor({
-        checkpoint,
-        priorState,
-        checkpointEvidenceText,
-        latestTurnText,
+        checkpoint: item.checkpoint,
+        priorState: item.priorState,
+        checkpointEvidenceText: item.checkpointEvidenceText,
+        latestTurnText: item.latestTurnText,
         questionMaxScore: context.maxScore,
         guardedResult: guardedWithQuote,
       }),
     });
 
     const realigned =
-      isTargetedFollowUp &&
+      item.isTargetedFollowUp &&
       (evaluation.candidateDisposition === 'declined' ||
-        isTargetedTopicRefusal(latestTurnText))
+        isTargetedTopicRefusal(item.latestTurnText))
         ? {
-            ...result,
+            ...item.original,
             scoreAwarded: merged.scoreAwarded,
             status: merged.status as PerTurnCheckpointEvaluationStatus,
-            rationale: merged.rationale ?? result.rationale,
+            rationale: merged.rationale ?? item.original.rationale,
           }
         : applyRationaleScoreAlignment(
             {
-              ...result,
+              ...item.original,
               scoreAwarded: merged.scoreAwarded,
               status: merged.status as PerTurnCheckpointEvaluationStatus,
-              rationale: merged.rationale ?? result.rationale,
+              rationale: merged.rationale ?? item.original.rationale,
             },
-            effectiveMaxScore,
+            item.effectiveMaxScore,
           );
 
     return {
-      ...result,
+      ...item.original,
       scoreAwarded: realigned.scoreAwarded,
       status: realigned.status,
       evidenceSummary: merged.evidenceSummary,
       rationale: alignRationaleDepthWithScore(
-        normalizeRationaleDepth(realigned.rationale ?? result.rationale),
+        normalizeRationaleDepth(realigned.rationale ?? item.original.rationale),
         realigned.scoreAwarded,
-        effectiveMaxScore,
+        item.effectiveMaxScore,
       ),
     };
   });
@@ -232,6 +335,49 @@ export function applyCheckpointScoreFloors(
     },
     adjustments,
   };
+}
+
+function applyTopicMismatchProvisionalGuard(input: {
+  result: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number];
+  checkpointKey: string;
+  expectedCheckpointKey?: string | null;
+  candidateDisposition: PerTurnCheckpointEvaluationAiResponse['candidateDisposition'];
+  priorScoreAwarded: number;
+}): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
+  if (
+    input.candidateDisposition !== 'misunderstood_question' ||
+    !input.expectedCheckpointKey ||
+    input.checkpointKey !== input.expectedCheckpointKey
+  ) {
+    return input.result;
+  }
+
+  const minProvisional = input.priorScoreAwarded;
+  if (
+    input.result.status === 'missed' &&
+    input.result.scoreAwarded <= minProvisional
+  ) {
+    return {
+      ...input.result,
+      status: 'unclear',
+      scoreAwarded: minProvisional,
+      rationale: appendTopicRedirectPendingRationale(input.result.rationale),
+    };
+  }
+
+  if (
+    input.result.scoreAwarded < minProvisional &&
+    input.result.status !== 'covered'
+  ) {
+    return {
+      ...input.result,
+      status: 'unclear',
+      scoreAwarded: minProvisional,
+      rationale: appendTopicRedirectPendingRationale(input.result.rationale),
+    };
+  }
+
+  return input.result;
 }
 
 function resolveAdjustmentReason(

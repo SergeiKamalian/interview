@@ -46,6 +46,9 @@ export type FollowUpPolicyInput = {
   followUpsUsedForQuestion: number;
   maxFollowUpsPerQuestion: number;
   maxFollowUpsPerCheckpoint: number;
+  maxFollowUpsHeavyCheckpoint?: number;
+  heavyCheckpointWeightRatio?: number;
+  minPriorityToProbe?: number;
   questionScoreSufficientRatio: number;
   lowWeightCheckpointRatio: number;
   stagnationLimit?: number;
@@ -55,6 +58,13 @@ export type FollowUpPolicyInput = {
   checkpointEvidenceTextByKey?: Record<string, string>;
   candidateDispositionFromAi?: CandidateAnswerDisposition | null;
   stickyTargetCheckpointKey?: string | null;
+  latestCheckpointResults?: Array<{
+    checkpointKey: string;
+    status: CheckpointStateStatus;
+    scoreAwarded: number;
+    rationale?: string | null;
+  }>;
+  questionText?: string;
 };
 
 export type FollowUpPolicyDecision =
@@ -68,8 +78,9 @@ export type FollowUpPolicyDecision =
       checkpointTitle: string;
       checkpointExpected: string;
       reason: string;
-      followUpKind?: 'depth_probe' | 'residual_probe' | 'generic';
+      followUpKind?: 'depth_probe' | 'residual_probe' | 'topic_redirect' | 'generic';
       missingMustConcepts?: string[];
+      answeredCheckpointKey?: string | null;
     };
 
 export type FollowUpPlannerOptions = {
@@ -79,6 +90,12 @@ export type FollowUpPlannerOptions = {
   followUpsUsedForQuestion?: number;
   avoidLlmFallback?: boolean;
   recentScoreDeltas?: number[];
+  latestCheckpointResults?: Array<{
+    checkpointKey: string;
+    status: CheckpointStateStatus;
+    scoreAwarded: number;
+    rationale?: string | null;
+  }>;
 };
 
 export type FollowUpPlannerRunResult =

@@ -10,7 +10,7 @@ describe('per-turn checkpoint evaluation prompt', () => {
   it('requires cumulative scoring and probe-or-accept rules in system prompt', () => {
     const prompt = buildPerTurnCheckpointEvaluationSystemPrompt();
 
-    expect(PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION).toBe('2.6.0');
+    expect(PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION).toBe('2.7.0');
     expect(prompt).toContain('cumulative evidence');
     expect(prompt).toContain('Probe-or-accept');
     expect(prompt).toContain('probe=pending');

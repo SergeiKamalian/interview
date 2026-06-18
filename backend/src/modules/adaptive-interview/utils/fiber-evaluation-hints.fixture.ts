@@ -33,6 +33,9 @@ export const FIBER_EVALUATION_HINTS: Record<string, CheckpointEvaluationHints> =
         requireProbeBeforeFinalPartial: true,
         minScoreAfterShallowAccept: 0.55,
       },
+      impliesCheckpointFloors: [
+        { checkpointKey: 'fiber_definition', floorFraction: 0.55 },
+      ],
       mustConcepts: [
         'call stack',
         'стек',
@@ -120,6 +123,10 @@ export const FIBER_EVALUATION_HINTS: Record<string, CheckpointEvaluationHints> =
         shallowAcceptMaxFraction: 0.5,
         minScoreAfterShallowAccept: 0.55,
       },
+      impliesCheckpointFloors: [
+        { checkpointKey: 'lanes_priority', floorFraction: 0.5 },
+        { checkpointKey: 'fiber_definition', floorFraction: 0.45 },
+      ],
       mustConcepts: [
         'scheduler',
         'планирован',
