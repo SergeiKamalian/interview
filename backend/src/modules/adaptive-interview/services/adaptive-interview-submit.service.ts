@@ -26,7 +26,10 @@ import {
 import { shouldSkipFollowUps } from '../utils/candidate-decline.util';
 import { buildCandidateTurnClassifierInput } from '../utils/build-candidate-turn-classifier-input.util';
 import { resolveClassifierEmergencyFallback } from '../utils/classifier-emergency-fallback.util';
-import type { CandidateTurnKind } from '../types/candidate-turn-classifier.types';
+import type {
+  CandidateTurnKind,
+  TopicOpenerReadiness,
+} from '../types/candidate-turn-classifier.types';
 import {
   isMetaTurnMode,
   resolveEvaluationMode,
@@ -36,6 +39,8 @@ import type { CandidateAnswerDisposition } from '../types/candidate-answer-dispo
 import { CandidateTurnClassifierService } from './candidate-turn-classifier.service';
 import { MediaAssetService } from '../../media/media-asset.service';
 import { MainQuestionOpenerService } from './main-question-opener.service';
+import { TopicOpenerScoringGateService } from './topic-opener-scoring-gate.service';
+import { shouldScoreTopicOpenerAnswer } from '../utils/topic-opener-scoring.util';
 
 @Injectable()
 export class AdaptiveInterviewSubmitService {
@@ -57,6 +62,7 @@ export class AdaptiveInterviewSubmitService {
     private readonly mediaAssetService: MediaAssetService,
     private readonly mainQuestionOpenerService: MainQuestionOpenerService,
     private readonly candidateTurnClassifierService: CandidateTurnClassifierService,
+    private readonly topicOpenerScoringGateService: TopicOpenerScoringGateService,
   ) {}
 
   async assertCanSubmit(
@@ -724,6 +730,13 @@ export class AdaptiveInterviewSubmitService {
       messageKind: 'topic_opener_answer',
     });
 
+    await this.scoreTopicOpenerAnswerIfEligible({
+      attempt: input.attempt,
+      currentQuestion: input.currentQuestion,
+      trimmedAnswer: input.trimmedAnswer,
+      candidateMessageId: saveResult.candidateMessage.id,
+    });
+
     const mainQuestionText =
       await this.mainQuestionOpenerService.generateQuestionInvite({
         attemptId,
@@ -792,6 +805,135 @@ export class AdaptiveInterviewSubmitService {
       totalMainQuestions: input.totalMainQuestions,
       currentQuestionFollowUpCount: 0,
     };
+  }
+
+  private async scoreTopicOpenerAnswerIfEligible(input: {
+    attempt: AdaptiveSubmitInput['attempt'];
+    currentQuestion: InterviewQuestionEntity;
+    trimmedAnswer: string;
+    candidateMessageId: number;
+  }): Promise<void> {
+    const attemptId = input.attempt.id;
+    const interviewQuestionId = input.currentQuestion.id;
+
+    await this.checkpointStateService.ensureCheckpointStatesForQuestion({
+      companyId: input.attempt.companyId,
+      attemptId,
+      interviewQuestionId,
+    });
+
+    const contextPacket =
+      await this.adaptiveInterviewContextService.buildContextPacket(
+        attemptId,
+        interviewQuestionId,
+      );
+
+    const classifierInput = buildCandidateTurnClassifierInput({
+      context: contextPacket,
+      attemptId,
+      interviewQuestionId,
+    });
+    const classificationResult =
+      await this.candidateTurnClassifierService.classifyTurn(classifierInput);
+
+    let candidateTurnKind: CandidateTurnKind | null = null;
+    let candidateDisposition: CandidateAnswerDisposition | null = null;
+    let openerReadiness: TopicOpenerReadiness | null = null;
+
+    if (classificationResult.status === 'valid') {
+      candidateTurnKind = classificationResult.classification.turnKind;
+      candidateDisposition = classificationResult.classification.disposition;
+      openerReadiness = classificationResult.classification.openerReadiness;
+    } else {
+      const emergencyFallback =
+        resolveClassifierEmergencyFallback(classifierInput);
+      if (emergencyFallback) {
+        candidateTurnKind = emergencyFallback.turnKind;
+        candidateDisposition = emergencyFallback.disposition;
+        openerReadiness = emergencyFallback.openerReadiness;
+      }
+    }
+
+    const evaluationMode = resolveEvaluationMode(candidateTurnKind);
+
+    if (shouldSkipEvaluation(evaluationMode)) {
+      await this.checkpointStateService.applyCandidateDeclinedKnowledge({
+        attemptId,
+        interviewQuestionId,
+      });
+      return;
+    }
+
+    const gateResult = await this.topicOpenerScoringGateService.decide({
+      topicOpenerText: classifierInput.lastInterviewerMessage ?? '',
+      candidateAnswer: input.trimmedAnswer,
+      questionText: input.currentQuestion.questionText,
+      referenceAnswer: input.currentQuestion.shortAnswer,
+      attemptId,
+      interviewQuestionId,
+    });
+
+    const gateShouldScore =
+      gateResult.status === 'valid' ? gateResult.decision.shouldScore : null;
+
+    const shouldScore = shouldScoreTopicOpenerAnswer({
+      evaluationMode,
+      candidateTurnKind,
+      gateShouldScore,
+      openerReadinessFallback: openerReadiness,
+    });
+
+    logAdaptiveAiDebug(this.logger, 'submit_answer.topic_opener_scoring', {
+      attemptId,
+      interviewQuestionId,
+      evaluationMode,
+      turnKind: candidateTurnKind,
+      gateStatus: gateResult.status,
+      gateShouldScore,
+      openerReadiness,
+      shouldScore,
+      gateReason:
+        gateResult.status === 'valid' ? gateResult.decision.reason : undefined,
+    });
+
+    if (!shouldScore) {
+      return;
+    }
+
+    this.interviewRealtimeService.emit({
+      attemptId,
+      eventType: 'ai.evaluation_started',
+      interviewQuestionId,
+      messageId: input.candidateMessageId,
+    });
+
+    const evaluateTimer = startAdaptiveAiPhaseTimer(
+      this.logger,
+      'submit_answer.topic_opener_evaluate',
+      { attemptId, interviewQuestionId },
+    );
+    const evaluation =
+      await this.perTurnCheckpointEvaluatorService.evaluateTurnAndPersist({
+        companyId: input.attempt.companyId,
+        attemptId,
+        interviewQuestionId,
+        context: contextPacket,
+        skipEnsureStates: true,
+        evaluationMode,
+        evidenceSource: 'topic_opener_answer',
+        candidateTurnKind,
+        candidateDispositionFromClassifier: candidateDisposition,
+      });
+    evaluateTimer.finish({ status: evaluation.status });
+
+    if (
+      evaluation.status === 'provider_error' ||
+      evaluation.status === 'invalid_ai_response'
+    ) {
+      this.logger.warn(
+        `Topic opener evaluator fallback attempt=${attemptId} question=${interviewQuestionId} status=${evaluation.status}`,
+      );
+    }
   }
 
   private async completeCurrentQuestion(input: {

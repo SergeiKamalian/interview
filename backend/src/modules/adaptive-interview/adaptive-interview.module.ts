@@ -15,6 +15,7 @@ import { AdaptiveInterviewSubmitService } from './services/adaptive-interview-su
 import { CheckpointStateService } from './services/checkpoint-state.service';
 import { FollowUpPlannerService } from './services/follow-up-planner.service';
 import { MainQuestionOpenerService } from './services/main-question-opener.service';
+import { TopicOpenerScoringGateService } from './services/topic-opener-scoring-gate.service';
 import { FollowUpPlannerValidatorService } from './services/follow-up-planner-validator.service';
 import { FollowUpPolicyService } from './services/follow-up-policy.service';
 import { PerTurnCheckpointEvaluatorService } from './services/per-turn-checkpoint-evaluator.service';
@@ -48,6 +49,7 @@ import { QuestionSummaryService } from './services/question-summary.service';
     FollowUpPlannerValidatorService,
     FollowUpPlannerService,
     MainQuestionOpenerService,
+    TopicOpenerScoringGateService,
     AdaptiveInterviewSubmitService,
     QuestionSummaryService,
   ],
@@ -67,6 +69,7 @@ import { QuestionSummaryService } from './services/question-summary.service';
     FollowUpPlannerService,
     FollowUpPlannerValidatorService,
     MainQuestionOpenerService,
+    TopicOpenerScoringGateService,
     AdaptiveInterviewSubmitService,
     QuestionSummaryService,
   ],

@@ -20,6 +20,7 @@ import { InterviewAiMessageStreamService } from '../../interview-realtime/interv
 import { MediaAssetService } from '../../media/media-asset.service';
 import { MainQuestionOpenerService } from './main-question-opener.service';
 import { CandidateTurnClassifierService } from './candidate-turn-classifier.service';
+import { TopicOpenerScoringGateService } from './topic-opener-scoring-gate.service';
 
 describe('AdaptiveInterviewSubmitService', () => {
   let service: AdaptiveInterviewSubmitService;
@@ -56,6 +57,9 @@ describe('AdaptiveInterviewSubmitService', () => {
       CheckpointStateService,
       'ensureCheckpointStatesForQuestion' | 'applyCandidateDeclinedKnowledge'
     >
+  >;
+  let topicOpenerScoringGate: jest.Mocked<
+    Pick<TopicOpenerScoringGateService, 'decide'>
   >;
 
   const attempt = {
@@ -173,6 +177,17 @@ describe('AdaptiveInterviewSubmitService', () => {
     checkpointStateService = {
       ensureCheckpointStatesForQuestion: jest.fn(),
       applyCandidateDeclinedKnowledge: jest.fn().mockResolvedValue(5),
+    };
+
+    topicOpenerScoringGate = {
+      decide: jest.fn().mockResolvedValue({
+        status: 'valid',
+        decision: {
+          shouldScore: false,
+          reason: 'Только готовность без объяснения',
+        },
+        rawContent: '{}',
+      }),
     };
 
     adaptiveInterviewContextService = {
@@ -317,6 +332,10 @@ describe('AdaptiveInterviewSubmitService', () => {
           provide: CandidateTurnClassifierService,
           useValue: candidateTurnClassifier,
         },
+        {
+          provide: TopicOpenerScoringGateService,
+          useValue: topicOpenerScoringGate,
+        },
       ],
     }).compile();
 
@@ -422,6 +441,7 @@ describe('AdaptiveInterviewSubmitService', () => {
           },
         },
         { provide: CandidateTurnClassifierService, useValue: candidateTurnClassifier },
+        { provide: TopicOpenerScoringGateService, useValue: topicOpenerScoringGate },
       ],
     }).compile();
 
@@ -515,6 +535,7 @@ describe('AdaptiveInterviewSubmitService', () => {
           },
         },
         { provide: CandidateTurnClassifierService, useValue: candidateTurnClassifier },
+        { provide: TopicOpenerScoringGateService, useValue: topicOpenerScoringGate },
       ],
     }).compile();
 
@@ -665,7 +686,7 @@ describe('AdaptiveInterviewSubmitService', () => {
     expect(result.currentInterviewQuestionId).toBe(11);
   });
 
-  it('does not call evaluator on topic_opener_answer (not scored)', async () => {
+  it('does not call evaluator on short topic_opener_answer', async () => {
     repository.findAwaitingTopicOpener.mockResolvedValue({
       interviewQuestionId: 10,
       topicOpenerMessageId: 20,
@@ -715,6 +736,8 @@ describe('AdaptiveInterviewSubmitService', () => {
     });
 
     expect(perTurnEvaluator.evaluateTurnAndPersist).not.toHaveBeenCalled();
+    expect(topicOpenerScoringGate.decide).toHaveBeenCalled();
+    expect(checkpointStateService.ensureCheckpointStatesForQuestion).toHaveBeenCalled();
     expect(initializeSpy).toHaveBeenCalledWith({
       companyId: 7,
       attemptId: 5,
@@ -722,6 +745,96 @@ describe('AdaptiveInterviewSubmitService', () => {
     });
     expect(result.messageKind).toBe(InterviewMessageKindEnum.main_question);
     expect(result.pendingMessageText).toContain('С чего бы вы начали');
+  });
+
+  it('scores substantive topic_opener_answer before revealing main question', async () => {
+    const substantiveOpenerAnswer =
+      'Дa, использовал React.lazy для роутов и модалок. Suspense показывает fallback пока chunk грузится, bundle режется по страницам.';
+
+    repository.findAwaitingTopicOpener.mockResolvedValue({
+      interviewQuestionId: 10,
+      topicOpenerMessageId: 20,
+      topicOpenerText: 'Давайте поговорим про lazy loading. Сталкивались?',
+    });
+    repository.getNextSequenceOrder = jest
+      .fn()
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(4);
+    repository.appendMessage = jest
+      .fn()
+      .mockResolvedValueOnce({
+        id: 21,
+        companyId: 7,
+        interviewAttemptId: 5,
+        interviewQuestionId: 10,
+        role: 'candidate',
+        messageKind: 'topic_opener_answer',
+        parentMessageId: 20,
+        targetCheckpointKey: null,
+        content: substantiveOpenerAnswer,
+        sequenceOrder: 3,
+        createdAt: new Date(),
+      })
+      .mockResolvedValueOnce({
+        id: 22,
+        companyId: 7,
+        interviewAttemptId: 5,
+        interviewQuestionId: 10,
+        role: 'ai',
+        messageKind: 'main_question',
+        parentMessageId: null,
+        targetCheckpointKey: null,
+        content: 'Ок, давайте попробуем. С чего бы вы начали объяснение?',
+        sequenceOrder: 4,
+        createdAt: new Date(),
+      });
+
+    adaptiveInterviewContextService.buildContextPacket.mockResolvedValue({
+      interviewQuestionId: 10,
+      interviewId: 1,
+      attemptId: 5,
+      companyId: 7,
+      questionText: 'What is useEffect?',
+      referenceAnswer: 'Hook',
+      maxScore: 2,
+      checkpoints: [],
+      latestCandidateAnswer: substantiveOpenerAnswer,
+      latestCandidateMessageId: 21,
+      latestAnswerMessageKind: 'topic_opener_answer',
+      checkpointStates: [],
+      evidenceSnippets: [],
+      localTurns: [],
+      followUpLimits: {
+        maxPerQuestion: 3,
+        maxPerCheckpoint: 1,
+        usedForQuestion: 0,
+      },
+    });
+
+    topicOpenerScoringGate.decide.mockResolvedValueOnce({
+      status: 'valid',
+      decision: {
+        shouldScore: true,
+        reason: 'Кандидат уже объясняет lazy loading и Suspense',
+      },
+      rawContent: '{}',
+    });
+
+    jest.spyOn(service, 'initializeQuestionAiState').mockResolvedValue();
+
+    await service.submitAnswer({
+      attempt,
+      questions,
+      trimmedAnswer: substantiveOpenerAnswer,
+    });
+
+    expect(perTurnEvaluator.evaluateTurnAndPersist).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evidenceSource: 'topic_opener_answer',
+        evaluationMode: 'full',
+        skipEnsureStates: true,
+      }),
+    );
   });
 
   it('rejects submit when all main questions are already answered', async () => {

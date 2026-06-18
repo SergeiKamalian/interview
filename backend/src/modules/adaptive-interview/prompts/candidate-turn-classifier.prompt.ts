@@ -1,7 +1,7 @@
 import type { CandidateTurnClassifierInput } from '../types/candidate-turn-classifier.types';
 
 export const CANDIDATE_TURN_CLASSIFIER_PROMPT_KEY = 'candidate_turn_classifier';
-export const CANDIDATE_TURN_CLASSIFIER_PROMPT_VERSION = '1.1.0';
+export const CANDIDATE_TURN_CLASSIFIER_PROMPT_VERSION = '1.2.0';
 
 const RESPONSE_JSON_SCHEMA = `{
   "turn_kind": "substantive_answer | scope_clarification | format_clarification | decline_whole | decline_scoped | topic_refusal | confused | off_topic",
@@ -53,11 +53,15 @@ export function buildCandidateTurnClassifierSystemPrompt(): string {
     '  ("Scheduler uses MessageChannel, right? And it yields every 5ms" = explains + confirms)',
     '- Confirmation WITHOUT any explanation -> scope_clarification, NOT substantive.',
     '',
-    'scope_clarification (speech act A — WHAT topic/scope):',
+    'scope_clarification (speech act A — WHAT topic/scope OR unclear interviewer wording):',
     '- Asks what you meant, which sub-topic, or offers alternatives ("X or Y?").',
+    '- Says they did NOT understand your question and asks you to explain/rephrase/clarify.',
+    '  ("Не понял о чем вопрос", "Можете подробнее?", "Можете переформулировать?" -> scope_clarification)',
     '- Confirms scope without teaching: "So you mean scheduler inside Fiber?"',
     '- Echoes your follow-up as a question back to you.',
     '- Technical terms may appear — they disambiguate your question, not answer it.',
+    '- PRIMARY speech act wins: if they ask you to clarify YOUR question, scope_clarification',
+    '  even when the message also contains partial/wrong technical content.',
     '',
     'format_clarification (speech act A — HOW to answer):',
     '- Brief vs detailed, high-level vs in depth, "on fingers" vs with details.',
@@ -72,10 +76,11 @@ export function buildCandidateTurnClassifierSystemPrompt(): string {
     'topic_refusal (speech act A — skip this sub-topic):',
     '- Wants to move on from the current probe only.',
     '',
-    'confused (speech act A — does not understand):',
-    '- Cannot parse the interviewer question; asks to rephrase in general.',
-    '- Vague "what do you mean?" without naming alternatives -> confused OR scope_clarification;',
-    '  prefer scope_clarification if they point at a concrete ambiguity in your last message.',
+    'confused (speech act A — rare, NOT "did not understand your question"):',
+    '- Candidate is lost mid-thought but does NOT ask you to clarify/rephrase your wording.',
+    '- Do NOT use confused when they explicitly ask what you meant or to rephrase your question',
+    '  — that is always scope_clarification (triggers interviewer clarification redirect).',
+    '- "Не понял вопрос" / "не понял о чем вопрос" / "можете переформулировать" -> scope_clarification, NOT confused.',
     '',
     'off_topic:',
     '- Unrelated content, nonsense, empty message.',
@@ -136,13 +141,14 @@ export function buildCandidateTurnClassifierUserPrompt(
     '0. Speech act: candidate asks YOU (meta) or explains to YOU (substantive)?',
     '   - If meta -> NEVER substantive_answer; pick scope/format/decline/confused.',
     '   - Technical nouns inside a question to you still = meta.',
-    '1. Meta + WHICH topic / X or Y? -> scope_clarification',
-    '2. Meta + HOW to answer (brief/detailed)? -> format_clarification',
-    '3. Meta + refuses whole question? -> decline_whole',
-    '4. Meta + refuses only this aspect? -> decline_scoped or topic_refusal',
-    '5. Meta + cannot parse question? -> confused',
-    '6. Explains / attempts answer with technical content? -> substantive_answer',
-    '7. Unrelated? -> off_topic',
+    '1. Meta + asks what YOU meant / did not understand YOUR question / rephrase? -> scope_clarification',
+    '2. Meta + WHICH topic / X or Y? -> scope_clarification',
+    '3. Meta + HOW to answer (brief/detailed)? -> format_clarification',
+    '4. Meta + refuses whole question? -> decline_whole',
+    '5. Meta + refuses only this aspect? -> decline_scoped or topic_refusal',
+    '6. Meta + lost but NOT asking you to clarify wording? -> confused (rare)',
+    '7. Explains / attempts answer with technical content (and NOT asking you to rephrase)? -> substantive_answer',
+    '8. Unrelated? -> off_topic',
     '',
     'Classify now.',
   );

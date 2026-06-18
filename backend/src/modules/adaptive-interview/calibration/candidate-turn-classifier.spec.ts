@@ -54,11 +54,7 @@ describe('candidate-turn-classifier golden dataset', () => {
 
     expect(divergent.length).toBeGreaterThanOrEqual(4);
     expect(divergent.map((item) => item.id)).toEqual(
-      expect.arrayContaining([
-        'substantive-partial-decline-other',
-        'confused-ne-ponyal',
-        'confused-rephrase',
-      ]),
+      expect.arrayContaining(['substantive-partial-decline-other']),
     );
   });
 });

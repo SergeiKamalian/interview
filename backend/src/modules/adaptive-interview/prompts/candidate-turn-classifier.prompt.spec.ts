@@ -5,8 +5,8 @@ import {
 } from '../prompts/candidate-turn-classifier.prompt';
 
 describe('candidate-turn-classifier.prompt', () => {
-  it('uses version 1.1.0', () => {
-    expect(CANDIDATE_TURN_CLASSIFIER_PROMPT_VERSION).toBe('1.1.0');
+  it('uses version 1.2.0', () => {
+    expect(CANDIDATE_TURN_CLASSIFIER_PROMPT_VERSION).toBe('1.2.0');
   });
 
   it('includes speech-act-first rules in system prompt', () => {
@@ -17,6 +17,7 @@ describe('candidate-turn-classifier.prompt', () => {
     expect(systemPrompt).toContain('NEVER substantive_answer');
     expect(systemPrompt).toContain('substantive_answer');
     expect(systemPrompt).toContain('scope_clarification');
+    expect(systemPrompt).toContain('Не понял о чем вопрос');
     expect(systemPrompt).toContain('format_clarification');
     expect(systemPrompt).toContain('decline_whole');
     expect(systemPrompt).toContain('decline_scoped');
