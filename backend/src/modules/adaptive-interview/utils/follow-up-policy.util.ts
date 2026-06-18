@@ -80,7 +80,6 @@ export function evaluateFollowUpPolicy(
 ): FollowUpPolicyDecision {
   if (
     shouldSkipFollowUps({
-      answer: input.latestCandidateAnswer ?? '',
       aiDisposition: input.candidateDispositionFromAi,
       candidateTurnKind: input.candidateTurnKind,
       followUpsUsedForQuestion: input.followUpsUsedForQuestion,
@@ -89,7 +88,6 @@ export function evaluateFollowUpPolicy(
     return {
       shouldAskFollowUp: false,
       reason: resolveSkipFollowUpReason({
-        answer: input.latestCandidateAnswer ?? '',
         aiDisposition: input.candidateDispositionFromAi,
         candidateTurnKind: input.candidateTurnKind,
       }),
@@ -535,6 +533,7 @@ function buildAllocatorCandidates(
         questionMaxScore: input.questionMaxScore,
         candidateEvidenceText,
         latestCandidateText: input.latestCandidateAnswer ?? '',
+        candidateTurnKind: input.candidateTurnKind,
       });
 
       return isWithinCheckpointFollowUpBudget({
@@ -555,6 +554,7 @@ function buildAllocatorCandidates(
           state.checkpointKey,
         ),
         latestCandidateText: input.latestCandidateAnswer ?? '',
+        candidateTurnKind: input.candidateTurnKind,
         config: budgetConfig,
       });
     });

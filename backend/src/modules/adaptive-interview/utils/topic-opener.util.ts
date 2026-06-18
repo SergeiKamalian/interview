@@ -1,42 +1,4 @@
-import {
-  isCandidateDecliningKnowledge,
-  isFullQuestionDecline,
-} from './candidate-decline.util';
-
 export type TopicOpenerReadiness = 'ready' | 'uncertain' | 'declined';
-
-const UNCERTAIN_PATTERNS: RegExp[] = [
-  /не\s+сталкивал/i,
-  /не\s+работал/i,
-  /не\s+использовал/i,
-  /только\s+слышал/i,
-  /только\s+теори/i,
-  /в\s+общих\s+чертах/i,
-  /поверхностно/i,
-  /слабо/i,
-  /немного\s+знаю/i,
-  /мало\s+знаю/i,
-  /базово/i,
-  /чуть[- ]?чуть/i,
-  /маловато/i,
-  /не\s+очень/i,
-  /может\s+быть\s+смогу/i,
-  /попробую/i,
-  /(мало|немного|чуть).{0,24}(работал|знаю|понимаю|сталкивал)/i,
-];
-
-const READY_PATTERNS: RegExp[] = [
-  /\bда\b/i,
-  /знаком/i,
-  /использовал/i,
-  /применял/i,
-  /разбираюсь/i,
-  /понимаю/i,
-  /сталкивал/i,
-  /на\s+практике/i,
-  /в\s+проектах/i,
-  /работал/i,
-];
 
 const REVEAL_FALLBACKS: Record<TopicOpenerReadiness, readonly string[]> = {
   ready: [
@@ -53,37 +15,12 @@ const REVEAL_FALLBACKS: Record<TopicOpenerReadiness, readonly string[]> = {
   ],
 };
 
-/** Classify readiness from the topic-opener answer (fallback when LLM unavailable). */
-export function classifyTopicOpenerResponse(answer: string): TopicOpenerReadiness {
-  const normalized = answer.trim();
-  if (!normalized) {
-    return 'uncertain';
-  }
-
-  if (isFullQuestionDecline(normalized)) {
-    return 'declined';
-  }
-
-  if (
-    isCandidateDecliningKnowledge(normalized) ||
-    UNCERTAIN_PATTERNS.some((pattern) => pattern.test(normalized))
-  ) {
-    return 'uncertain';
-  }
-
-  if (READY_PATTERNS.some((pattern) => pattern.test(normalized))) {
-    return 'ready';
-  }
-
-  return 'ready';
-}
-
+/** LLM outage fallback — neutral tone; opener readiness comes from classifier in submit path. */
 export function buildMainQuestionRevealFallback(input: {
   openerAnswer: string;
   seed: number;
 }): string {
-  const readiness = classifyTopicOpenerResponse(input.openerAnswer);
-  const templates = REVEAL_FALLBACKS[readiness];
+  const templates = REVEAL_FALLBACKS.uncertain;
 
   return templates[Math.abs(input.seed) % templates.length]!;
 }

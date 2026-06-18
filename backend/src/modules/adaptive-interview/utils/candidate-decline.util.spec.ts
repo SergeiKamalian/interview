@@ -1,112 +1,43 @@
-import {
-  isCandidateDecliningKnowledge,
-  isFullQuestionDecline,
-  isScopedTopicDecline,
-  isTargetedTopicRefusal,
-  shouldSkipFollowUps,
-} from './candidate-decline.util';
+import { shouldSkipFollowUps } from './candidate-decline.util';
 
-describe('isCandidateDecliningKnowledge', () => {
-  it('detects Russian decline phrases', () => {
-    expect(isCandidateDecliningKnowledge('Я ничего не знаю по useEffect')).toBe(
-      true,
-    );
-    expect(
-      isCandidateDecliningKnowledge('Не знаю про generics в TypeScript'),
-    ).toBe(true);
-    expect(isCandidateDecliningKnowledge('Без понятия')).toBe(true);
-  });
-
-  it('detects confusion and partial understanding as decline', () => {
-    expect(
-      isCandidateDecliningKnowledge(
-        'Я не очень понимаю что это и для чего',
-      ),
-    ).toBe(true);
-    expect(
-      isCandidateDecliningKnowledge('Я же сказал что не очень хорошо понимаю'),
-    ).toBe(true);
-    expect(isCandidateDecliningKnowledge('Не разбираюсь в generics')).toBe(
-      true,
-    );
-  });
-
-  it('detects English decline phrases', () => {
-    expect(isCandidateDecliningKnowledge("I don't know anything about hooks")).toBe(
-      true,
-    );
-    expect(isCandidateDecliningKnowledge('No idea')).toBe(true);
-  });
-
-  it('does not treat scoped decline as whole-question refusal', () => {
-    expect(
-      isScopedTopicDecline('На это я вряд ли смогу ответить'),
-    ).toBe(true);
-    expect(isFullQuestionDecline('На это я вряд ли смогу ответить')).toBe(
-      false,
-    );
+describe('shouldSkipFollowUps', () => {
+  it('skips follow-ups on whole decline from classifier', () => {
     expect(
       shouldSkipFollowUps({
-        answer: 'На это я вряд ли смогу ответить',
+        candidateTurnKind: 'decline_whole',
+        aiDisposition: 'engaged',
+      }),
+    ).toBe(true);
+  });
+
+  it('does not skip follow-ups on scoped decline from classifier', () => {
+    expect(
+      shouldSkipFollowUps({
+        candidateTurnKind: 'decline_scoped',
         aiDisposition: 'declined',
         followUpsUsedForQuestion: 3,
       }),
     ).toBe(false);
   });
 
-  it('detects AI negative disposition via shouldSkipFollowUps', () => {
+  it('detects AI negative disposition without regex fallback', () => {
     expect(
       shouldSkipFollowUps({
-        answer: 'Ну типа что-то с типами, но я путаюсь',
         aiDisposition: 'confused',
         followUpsUsedForQuestion: 0,
       }),
     ).toBe(false);
     expect(
       shouldSkipFollowUps({
-        answer: 'Ну типа что-то с типами, но я путаюсь',
         aiDisposition: 'confused',
         followUpsUsedForQuestion: 1,
       }),
     ).toBe(true);
     expect(
       shouldSkipFollowUps({
-        answer: 'Generics помогают переиспользовать код',
-        aiDisposition: 'engaged',
-      }),
-    ).toBe(false);
-    expect(
-      shouldSkipFollowUps({
-        answer: 'Не знаю',
         aiDisposition: 'declined',
         followUpsUsedForQuestion: 0,
       }),
     ).toBe(true);
-  });
-
-  it('does not treat substantive answers as decline', () => {
-    expect(
-      isCandidateDecliningKnowledge(
-        'useEffect запускается после рендера и нужен для side effects',
-      ),
-    ).toBe(false);
-  });
-});
-
-describe('isTargetedTopicRefusal', () => {
-  it('detects honest lanes refusal', () => {
-    expect(
-      isTargetedTopicRefusal(
-        'Честно, с lanes и приоритетами не разбирался — startTransition только названия слышал.',
-      ),
-    ).toBe(true);
-  });
-
-  it('does not treat scheduling answer with lanes vocabulary as refusal', () => {
-    expect(
-      isTargetedTopicRefusal(
-        'Fiber планирует через scheduler и lanes. Используется MessageChannel, не requestIdleCallback, не блокируя ввод и paint.',
-      ),
-    ).toBe(false);
   });
 });

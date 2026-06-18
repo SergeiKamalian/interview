@@ -509,6 +509,8 @@ describe('applyCheckpointScoreFloors', () => {
       ...buildGenericsContext('placeholder', []),
       latestCandidateAnswer:
         'Честно, с lanes и приоритетами не разбирался — startTransition только названия слышал. Давайте дальше.',
+      latestAnswerMessageKind: 'follow_up_answer',
+      targetCheckpointKey: 'lanes_priority',
       localTurns: [
         {
           role: 'candidate',
@@ -551,7 +553,11 @@ describe('applyCheckpointScoreFloors', () => {
         ],
       },
       context,
-      { evidenceSource: 'follow_up_answer' },
+      {
+        evidenceSource: 'follow_up_answer',
+        candidateTurnKind: 'topic_refusal',
+        candidateDispositionFromClassifier: 'declined',
+      },
     );
 
     expect(

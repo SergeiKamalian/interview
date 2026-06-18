@@ -5,90 +5,8 @@ import {
   isWholeDeclineTurnKind,
 } from './map-turn-kind-to-disposition.util';
 
-const DECLINE_PATTERNS: RegExp[] = [
-  /ничего\s+не\s+знаю/i,
-  /не\s+знаю/i,
-  /не\s+очень\s+(хорошо\s+)?понимаю/i,
-  /не\s+понимаю/i,
-  /плохо\s+понимаю/i,
-  /слабо\s+понимаю/i,
-  /не\s+разбираюсь/i,
-  /плохо\s+разбираюсь/i,
-  /без\s+понятия/i,
-  /не\s+в\s+курсе/i,
-  /затрудняюсь\s+ответить/i,
-  /не\s+могу\s+ответить/i,
-  /не\s+уверен(?:а)?(?:\s*,?\s*что\s+понимаю)?/i,
-  /\bdon'?t\s+know\b/i,
-  /\bdo\s+not\s+know\b/i,
-  /\bno\s+idea\b/i,
-  /\bi\s+don'?t\s+know\s+anything\b/i,
-  /\bi\s+don'?t\s+really\s+understand\b/i,
-  /\bnot\s+sure\s+i\s+understand\b/i,
-];
-
-const TARGETED_TOPIC_REFUSAL_PATTERNS: RegExp[] = [
-  /давайте\s+дальше/i,
-  /лучше\s+не\s+трогать/i,
-  /эту\s+часть\s+лучше/i,
-  /не\s+скажу/i,
-  /честно.{0,60}(?:lanes|приоритет|concurrent)/i,
-  /(?:не\s+разбирался|не\s+знаю|не\s+понимаю).{0,40}(?:lanes|приоритет|concurrent|transition|deferred)/i,
-  /только\s+названия\s+слышал/i,
-  /не\s+разбирался/i,
-];
-
-/** Declines only one sub-aspect, not the whole question (e.g. "на это не смогу ответить"). */
-const SCOPED_DECLINE_PATTERNS: RegExp[] = [
-  /на\s+эт[оаеу]/i,
-  /вряд\s+ли\s+(?:смогу|ответ)/i,
-  /не\s+смогу\s+ответить/i,
-  /(?:не\s+)?могу\s+ответить\s+на\s+это/i,
-  /именно\s+эт[оа]/i,
-  /про\s+эт[оа]\s+(?:я\s+)?(?:не|вряд)/i,
-];
-
-/** Fast local heuristic — shortcut before AI evaluate_turn. */
-export function isCandidateDecliningKnowledge(answer: string): boolean {
-  const normalized = answer.trim();
-  if (!normalized) {
-    return false;
-  }
-
-  return DECLINE_PATTERNS.some((pattern) => pattern.test(normalized));
-}
-
-export function isScopedTopicDecline(answer: string): boolean {
-  const normalized = answer.trim();
-  if (!normalized) {
-    return false;
-  }
-
-  return SCOPED_DECLINE_PATTERNS.some((pattern) => pattern.test(normalized));
-}
-
-/** Latest answer refuses the specific follow-up topic (not whole interview). */
-export function isTargetedTopicRefusal(answer: string): boolean {
-  const normalized = answer.trim();
-  if (!normalized) {
-    return false;
-  }
-
-  return TARGETED_TOPIC_REFUSAL_PATTERNS.some((pattern) => pattern.test(normalized));
-}
-
-/** Whole-question refusal — not a scoped "can't answer this part". */
-export function isFullQuestionDecline(answer: string): boolean {
-  if (isScopedTopicDecline(answer)) {
-    return false;
-  }
-
-  return isCandidateDecliningKnowledge(answer);
-}
-
-/** Classifier disposition drives follow-up skip; regex only for legacy fallbacks. */
+/** Classifier disposition drives follow-up skip; no regex on policy path. */
 export function shouldSkipFollowUps(input: {
-  answer?: string;
   aiDisposition?: CandidateAnswerDisposition | null;
   candidateTurnKind?: CandidateTurnKind | null;
   /** Follow-ups already used on this main question (planned/asked/answered). */
@@ -102,16 +20,12 @@ export function shouldSkipFollowUps(input: {
     return false;
   }
 
-  if (!input.candidateTurnKind && input.answer && isFullQuestionDecline(input.answer)) {
-    return true;
-  }
-
   if (input.aiDisposition === 'declined') {
     if (input.candidateTurnKind) {
       return isWholeDeclineTurnKind(input.candidateTurnKind);
     }
 
-    return !isScopedTopicDecline(input.answer ?? '');
+    return true;
   }
 
   if (input.aiDisposition === 'confused') {
@@ -130,14 +44,10 @@ export function shouldSkipFollowUps(input: {
 }
 
 export function resolveSkipFollowUpReason(input: {
-  answer?: string;
   aiDisposition?: CandidateAnswerDisposition | null;
   candidateTurnKind?: CandidateTurnKind | null;
 }): string {
-  if (
-    isWholeDeclineTurnKind(input.candidateTurnKind) ||
-    (!input.candidateTurnKind && input.answer && isFullQuestionDecline(input.answer))
-  ) {
+  if (isWholeDeclineTurnKind(input.candidateTurnKind)) {
     return 'candidate_declined_knowledge';
   }
 

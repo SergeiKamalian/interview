@@ -19,6 +19,7 @@ import { InterviewRealtimeService } from '../../interview-realtime/interview-rea
 import { InterviewAiMessageStreamService } from '../../interview-realtime/interview-ai-message-stream.service';
 import { MediaAssetService } from '../../media/media-asset.service';
 import { MainQuestionOpenerService } from './main-question-opener.service';
+import { CandidateTurnClassifierService } from './candidate-turn-classifier.service';
 
 describe('AdaptiveInterviewSubmitService', () => {
   let service: AdaptiveInterviewSubmitService;
@@ -197,6 +198,37 @@ describe('AdaptiveInterviewSubmitService', () => {
       }),
     };
 
+    const candidateTurnClassifier = {
+      classifyTurn: jest.fn().mockImplementation((input: { candidateAnswer: string }) => {
+        const answer = input.candidateAnswer.trim();
+        if (/ничего не знаю|не знаю/i.test(answer) && !/на это/i.test(answer)) {
+          return Promise.resolve({
+            status: 'valid' as const,
+            classification: {
+              turnKind: 'decline_whole' as const,
+              disposition: 'declined' as const,
+              confidence: 'high' as const,
+              reason: 'test decline',
+              openerReadiness: null,
+            },
+            rawContent: '{}',
+          });
+        }
+
+        return Promise.resolve({
+          status: 'valid' as const,
+          classification: {
+            turnKind: 'substantive_answer' as const,
+            disposition: 'engaged' as const,
+            confidence: 'high' as const,
+            reason: 'test answer',
+            openerReadiness: null,
+          },
+          rawContent: '{}',
+        });
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AdaptiveInterviewSubmitService,
@@ -281,6 +313,10 @@ describe('AdaptiveInterviewSubmitService', () => {
               ),
           },
         },
+        {
+          provide: CandidateTurnClassifierService,
+          useValue: candidateTurnClassifier,
+        },
       ],
     }).compile();
 
@@ -310,6 +346,27 @@ describe('AdaptiveInterviewSubmitService', () => {
   });
 
   it('skips AI evaluation and follow-ups when candidate declines knowledge', async () => {
+    adaptiveInterviewContextService.buildContextPacket.mockResolvedValueOnce({
+      interviewQuestionId: 10,
+      interviewId: 1,
+      attemptId: 5,
+      companyId: 7,
+      questionText: 'What is useEffect?',
+      referenceAnswer: 'Hook',
+      maxScore: 2,
+      checkpoints: [],
+      latestCandidateAnswer: 'Я ничего не знаю по useEffect',
+      latestCandidateMessageId: 22,
+      checkpointStates: [],
+      evidenceSnippets: [],
+      localTurns: [],
+      followUpLimits: {
+        maxPerQuestion: 3,
+        maxPerCheckpoint: 1,
+        usedForQuestion: 0,
+      },
+    });
+
     repository.getNextSequenceOrder = jest
       .fn()
       .mockResolvedValueOnce(2)

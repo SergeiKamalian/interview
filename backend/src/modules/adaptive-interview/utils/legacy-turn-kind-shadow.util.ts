@@ -1,19 +1,17 @@
-import {
-  isAnswerFormatClarification,
-  isCandidateAskingForScope,
-} from './candidate-clarification.util';
-import {
-  isCandidateDecliningKnowledge,
-  isFullQuestionDecline,
-  isScopedTopicDecline,
-  isTargetedTopicRefusal,
-} from './candidate-decline.util';
-import { classifyTopicOpenerResponse } from './topic-opener.util';
 import type {
   CandidateTurnClassifierInput,
   CandidateTurnKind,
   TopicOpenerReadiness,
 } from '../types/candidate-turn-classifier.types';
+import {
+  legacyClassifyTopicOpenerResponse,
+  legacyIsAnswerFormatClarification,
+  legacyIsCandidateAskingForScope,
+  legacyIsCandidateDecliningKnowledge,
+  legacyIsFullQuestionDecline,
+  legacyIsScopedTopicDecline,
+  legacyIsTargetedTopicRefusal,
+} from './legacy-intent-regex.util';
 
 export type LegacyTurnKindShadow = {
   turnKind: CandidateTurnKind | null;
@@ -33,7 +31,7 @@ export function inferLegacyTurnKindShadow(
   }
 
   if (input.messageKind === 'topic_opener_answer') {
-    const readiness = classifyTopicOpenerResponse(answer);
+    const readiness = legacyClassifyTopicOpenerResponse(answer);
     signals.push(`topic_opener:${readiness}`);
 
     if (readiness === 'declined') {
@@ -51,33 +49,33 @@ export function inferLegacyTurnKindShadow(
     };
   }
 
-  if (isFullQuestionDecline(answer)) {
-    signals.push('isFullQuestionDecline');
+  if (legacyIsFullQuestionDecline(answer)) {
+    signals.push('legacyIsFullQuestionDecline');
     return { turnKind: 'decline_whole', openerReadiness: null, signals };
   }
 
-  if (isTargetedTopicRefusal(answer)) {
-    signals.push('isTargetedTopicRefusal');
+  if (legacyIsTargetedTopicRefusal(answer)) {
+    signals.push('legacyIsTargetedTopicRefusal');
     return { turnKind: 'topic_refusal', openerReadiness: null, signals };
   }
 
-  if (isScopedTopicDecline(answer)) {
-    signals.push('isScopedTopicDecline');
+  if (legacyIsScopedTopicDecline(answer)) {
+    signals.push('legacyIsScopedTopicDecline');
     return { turnKind: 'decline_scoped', openerReadiness: null, signals };
   }
 
-  if (isAnswerFormatClarification(answer)) {
-    signals.push('isAnswerFormatClarification');
+  if (legacyIsAnswerFormatClarification(answer)) {
+    signals.push('legacyIsAnswerFormatClarification');
     return { turnKind: 'format_clarification', openerReadiness: null, signals };
   }
 
   if (
     input.messageKind === 'follow_up_answer' &&
-    (isCandidateAskingForScope(answer) ||
+    (legacyIsCandidateAskingForScope(answer) ||
       looksLikeLegacyClarificationQuestion(answer))
   ) {
-    if (isCandidateAskingForScope(answer)) {
-      signals.push('isCandidateAskingForScope');
+    if (legacyIsCandidateAskingForScope(answer)) {
+      signals.push('legacyIsCandidateAskingForScope');
     }
     if (looksLikeLegacyClarificationQuestion(answer)) {
       signals.push('looksLikeClarificationQuestion');
@@ -85,8 +83,8 @@ export function inferLegacyTurnKindShadow(
     return { turnKind: 'scope_clarification', openerReadiness: null, signals };
   }
 
-  if (isCandidateDecliningKnowledge(answer)) {
-    signals.push('isCandidateDecliningKnowledge');
+  if (legacyIsCandidateDecliningKnowledge(answer)) {
+    signals.push('legacyIsCandidateDecliningKnowledge');
     return { turnKind: 'decline_whole', openerReadiness: null, signals };
   }
 

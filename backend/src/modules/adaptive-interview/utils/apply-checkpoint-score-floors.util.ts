@@ -15,12 +15,9 @@ import {
   overlapsQuestionBadAnswerExamples,
   rationaleIndicatesSoundEvidence,
 } from './bad-answer-signature.util';
-import { isTargetedTopicRefusal } from './candidate-decline.util';
+import { isTargetedRefusalForPolicy } from './classifier-emergency-fallback.util';
 import type { CandidateTurnKind } from '../types/candidate-turn-classifier.types';
 import { isScopeClarificationTurn } from './candidate-clarification.util';
-import {
-  isTargetedRefusalTurnKind,
-} from './map-turn-kind-to-disposition.util';
 import {
   collectCheckpointEvidenceText,
   collectFullCandidateText,
@@ -157,12 +154,14 @@ export function applyCheckpointScoreFloors(
               priorState,
               context.maxScore,
               isTargetedFollowUp,
+              options.candidateTurnKind,
             ),
             latestTurnText,
             floorFullText,
             checkpoint,
             effectiveMaxScore,
             isTargetedFollowUp,
+            options.candidateTurnKind,
           ),
           {
             checkpoint,
@@ -306,6 +305,7 @@ export function applyCheckpointScoreFloors(
         guardedWithQuote.rationale,
         item.latestTurnText,
         item.checkpointEvidenceText,
+        options.candidateTurnKind,
       ),
       provisionalScoreFloor: resolveProvisionalScoreFloor({
         checkpoint: item.checkpoint,
@@ -352,9 +352,10 @@ export function applyCheckpointScoreFloors(
     const realigned =
       item.isTargetedFollowUp &&
       (evaluation.candidateDisposition === 'declined' ||
-        isTargetedRefusalTurnKind(options.candidateTurnKind) ||
-        (!options.candidateTurnKind &&
-          isTargetedTopicRefusal(item.latestTurnText)))
+        isTargetedRefusalForPolicy({
+          candidateTurnKind: options.candidateTurnKind,
+          latestCandidateText: item.latestTurnText,
+        }))
         ? {
             ...item.original,
             scoreAwarded: merged.scoreAwarded,
@@ -570,8 +571,14 @@ function applyExplicitRefusalCap(
   priorState?: AdaptiveInterviewContextPacket['checkpointStates'][number],
   questionMaxScore?: number,
   isTargetedFollowUp = false,
+  candidateTurnKind?: CandidateTurnKind | null,
 ): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
-  if (!isTargetedTopicRefusal(latestCandidateText)) {
+  if (
+    !isTargetedRefusalForPolicy({
+      candidateTurnKind,
+      latestCandidateText,
+    })
+  ) {
     return result;
   }
 
@@ -975,9 +982,13 @@ function applyPositiveEvidenceFloor(
   checkpoint: AdaptiveCheckpointDefinition,
   maxScore: number,
   isTargetedFollowUp = false,
+  candidateTurnKind?: CandidateTurnKind | null,
 ): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
   if (
-    isTargetedTopicRefusal(latestCandidateText) &&
+    isTargetedRefusalForPolicy({
+      candidateTurnKind,
+      latestCandidateText,
+    }) &&
     (refusalTargetsCheckpoint(latestCandidateText, checkpoint) ||
       isTargetedFollowUp)
   ) {
@@ -1104,9 +1115,13 @@ function resolveIncomingAllowsScoreDecrease(
   rationale: string | null | undefined,
   latestCandidateText: string,
   fullCandidateText: string,
+  candidateTurnKind?: CandidateTurnKind | null,
 ): boolean {
   if (
-    isTargetedTopicRefusal(latestCandidateText) &&
+    isTargetedRefusalForPolicy({
+      candidateTurnKind,
+      latestCandidateText,
+    }) &&
     refusalTargetsCheckpoint(latestCandidateText, checkpoint)
   ) {
     return true;

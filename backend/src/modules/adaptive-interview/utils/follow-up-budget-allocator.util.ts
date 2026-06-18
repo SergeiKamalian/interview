@@ -1,4 +1,5 @@
 import type { AdaptiveCheckpointDefinition } from '../types/adaptive-interview-context.types';
+import type { CandidateTurnKind } from '../types/candidate-turn-classifier.types';
 import type { CheckpointEvaluationHints } from '../types/checkpoint-evaluation-hints.type';
 import type { CheckpointStateStatus } from '../types/checkpoint-state-status.type';
 import {
@@ -322,6 +323,7 @@ export function buildBudgetAllocatorCandidate(input: {
   questionMaxScore: number;
   candidateEvidenceText: string;
   latestCandidateText?: string;
+  candidateTurnKind?: CandidateTurnKind | null;
   config: FollowUpBudgetConfig;
 }): BudgetAllocatorCandidate {
   const hints = input.checkpoint.evaluationHints;
@@ -339,6 +341,7 @@ export function buildBudgetAllocatorCandidate(input: {
     questionMaxScore: input.questionMaxScore,
     candidateEvidenceText: input.candidateEvidenceText,
     latestCandidateText: input.latestCandidateText ?? input.candidateEvidenceText,
+    candidateTurnKind: input.candidateTurnKind,
   };
 
   return {

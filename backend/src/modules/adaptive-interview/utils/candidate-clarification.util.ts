@@ -6,42 +6,10 @@ import {
   isScopeClarificationTurnKind,
   mapTurnKindToDisposition,
 } from './map-turn-kind-to-disposition.util';
-import { isCandidateDecliningKnowledge, isTargetedTopicRefusal } from './candidate-decline.util';
 import { resolveProbePhrasesForCandidate } from './probe-policy.util';
 
 /** Max candidate scope-clarification turns before moving to the next main question. */
 export const MAX_SCOPE_CLARIFICATION_TURNS_PER_QUESTION = 2;
-
-const SCOPE_ASK_PATTERNS: RegExp[] = [
-  /что\s+именно/i,
-  /что\s+конкретно/i,
-  /что\s+вы\s+имеете\s+в\s+виду/i,
-  /что\s+имеете\s+в\s+виду/i,
-  /имеете\s+в\s+виду/i,
-  /имеется\s+в\s+виду/i,
-  /можете\s+конкретн/i,
-  /уточните\s+(?:вопрос|что|какой)/i,
-  /о\s+ч[её]м\s+именно/i,
-  /к\s+чему\s+(?:вопрос|именно)/i,
-  /какой\s+именно/i,
-  /вы\s+про\s+.+\s+(?:или|ли)\s/i,
-  /вы\s+имеете\s+в\s+виду/i,
-  /вы\s+имели\s+в\s+виду/i,
-  /вы\s+говорите\s+(?:о|про)/i,
-  /речь\s+(?:идёт\s+)?(?:о|про)/i,
-  /это\s+(?:имеется\s+в\s+виду\s+)?(?:про|о)\s+/i,
-  /правильно\s+(?:я\s+)?(?:понимаю|понял)/i,
-  /верно\s*,?\s*что\s+вы/i,
-  /could\s+you\s+clarify/i,
-  /what\s+do\s+you\s+mean/i,
-  /which\s+one\s+do\s+you\s+mean/i,
-  /are\s+you\s+asking\s+about/i,
-  /you\s+mean\s+/i,
-  /(?:коротко|кратко|сжато|по делу|подробн|детал|на пальцах)/i,
-  /(?:brief|detailed|high[- ]level)/i,
-  /(?:как|how)\s+(?:именно\s+)?(?:ответить|answer)/i,
-  /вам\s+нужно\s+(?:чтобы\s+)?(?:я\s+)?(?:ответил|рассказал)/i,
-];
 
 const VAGUE_FOLLOW_UP_PATTERNS: RegExp[] = [
   /уточните\s+технические\s+детали/i,
@@ -50,20 +18,6 @@ const VAGUE_FOLLOW_UP_PATTERNS: RegExp[] = [
   /технические\s+детали\?/i,
   /что\s+сможете\s+добавить/i,
 ];
-
-/** Legacy phrase matching — shadow mode and clarification reply templates only. */
-export function isCandidateAskingForScope(answer: string): boolean {
-  const normalized = answer.trim();
-  if (!normalized) {
-    return false;
-  }
-
-  if (isCandidateDecliningKnowledge(normalized) || isTargetedTopicRefusal(normalized)) {
-    return false;
-  }
-
-  return SCOPE_ASK_PATTERNS.some((pattern) => pattern.test(normalized));
-}
 
 export function isVagueFollowUpQuestion(followUpQuestion: string): boolean {
   const normalized = followUpQuestion.trim();
@@ -181,10 +135,10 @@ export function buildClarificationFollowUpQuestion(input: {
     scopeQuestion,
   );
 
-  const isTopicConfirmation =
-    isCandidateAskingForScope(scopeQuestion) ||
-    /вы\s+говорите\s+(?:о|про)/i.test(scopeQuestion) ||
-    /(?:^|\s)да\?\s*$/i.test(scopeQuestion);
+  const isTopicConfirmation = isScopeConfirmationForTemplate({
+    candidateTurnKind: input.candidateTurnKind,
+    scopeQuestion,
+  });
 
   if (orMatch?.[1] && orMatch?.[2]) {
     const left = orMatch[1].trim();
@@ -261,4 +215,24 @@ function looksLikeClarificationQuestion(text: string): boolean {
   }
 
   return true;
+}
+
+/** Template parsing for clarification replies — not intent classification. */
+function isScopeConfirmationForTemplate(input: {
+  candidateTurnKind?: CandidateTurnKind | null;
+  scopeQuestion: string;
+}): boolean {
+  if (input.candidateTurnKind === 'scope_clarification') {
+    return true;
+  }
+
+  const scopeQuestion = input.scopeQuestion;
+  return (
+    /вы\s+говорите\s+(?:о|про)/i.test(scopeQuestion) ||
+    /(?:^|\s)да\?\s*$/i.test(scopeQuestion) ||
+    /правильно\s+(?:я\s+)?(?:понимаю|понял)/i.test(scopeQuestion) ||
+    /речь\s+(?:идёт\s+)?(?:о|про)/i.test(scopeQuestion) ||
+    /что\s+(?:именно|конкретно)/i.test(scopeQuestion) ||
+    /имеете\s+в\s+виду/i.test(scopeQuestion)
+  );
 }

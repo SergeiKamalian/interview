@@ -452,7 +452,16 @@ if classifier fails or confidence=low:
   - optional: второй retry с repair prompt
 ```
 
-Regex **только** как emergency при полном outage AI (feature flag `CLASSIFIER_REGEX_EMERGENCY_FALLBACK=false` by default).
+Regex **только** как emergency при полном outage AI:
+
+| Env | Default | Поведение |
+|-----|---------|-----------|
+| `CLASSIFIER_REGEX_EMERGENCY_FALLBACK` | `false` | При `classifyTurn` failed/invalid — `turn_kind` остаётся null, policy идёт через evaluator disposition |
+| `CLASSIFIER_REGEX_EMERGENCY_FALLBACK=true` | — | `resolveClassifierEmergencyFallback()` → `inferLegacyTurnKindShadow()` из `legacy-intent-regex.util.ts`; лог `submit_answer.classifier_emergency_fallback` |
+
+Паттерны `SCOPE_ASK_PATTERNS`, `DECLINE_PATTERNS`, `UNCERTAIN/READY_PATTERNS` живут **только** в `legacy-intent-regex.util.ts` (shadow logging + emergency). Policy path использует `turn_kind` / `isTargetedRefusalForPolicy()`.
+
+`buildClarificationFollowUpQuestion` сохраняет **template parsing** (or-choice, format reply) — это генерация ответа, не классификация intent.
 
 ---
 

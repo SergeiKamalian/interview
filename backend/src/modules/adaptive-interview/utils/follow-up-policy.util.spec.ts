@@ -169,6 +169,8 @@ describe('evaluateFollowUpPolicy', () => {
     const decision = evaluateFollowUpPolicy({
       ...baseInput,
       latestCandidateAnswer: 'Я не очень понимаю что это и для чего',
+      candidateTurnKind: 'decline_whole',
+      candidateDispositionFromAi: 'declined',
     });
 
     expect(decision).toEqual({

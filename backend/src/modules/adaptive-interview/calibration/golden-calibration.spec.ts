@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview-context.types';
+import type { CandidateTurnKind } from '../types/candidate-turn-classifier.types';
 import type { PerTurnCheckpointEvaluationAiResponse } from '../types/per-turn-evaluation.types';
 import { applyCheckpointScoreFloors } from '../utils/apply-checkpoint-score-floors.util';
 import { fiberCheckpoint } from '../utils/fiber-evaluation-hints.fixture';
@@ -120,6 +121,16 @@ function toAiResponse(
   };
 }
 
+function resolveGoldenCaseTurnKind(
+  caseData: GoldenCalibrationCase,
+): CandidateTurnKind | undefined {
+  if (caseData.id === 'react-fiber-scheduling-after-probe-decline') {
+    return 'decline_scoped';
+  }
+
+  return undefined;
+}
+
 describe('golden calibration (mocked AI)', () => {
   const cases = loadGoldenCases();
 
@@ -127,10 +138,12 @@ describe('golden calibration (mocked AI)', () => {
     '%s stays within expected score bands after guards',
     (_id, caseData) => {
       const context = buildFiberContext(caseData);
-      const { evaluation } = applyCheckpointScoreFloors(
-        toAiResponse(caseData),
-        context,
-      );
+      const aiResponse = toAiResponse(caseData);
+      const { evaluation } = applyCheckpointScoreFloors(aiResponse, context, {
+        evidenceSource: context.latestAnswerMessageKind ?? undefined,
+        candidateTurnKind: resolveGoldenCaseTurnKind(caseData),
+        candidateDispositionFromClassifier: aiResponse.candidateDisposition,
+      });
 
       const total = evaluation.checkpointResults.reduce(
         (sum, item) => sum + item.scoreAwarded,

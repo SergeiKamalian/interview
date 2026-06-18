@@ -23,10 +23,9 @@ import {
   startAdaptiveAiPhaseTimer,
   summarizeAdaptiveContextPacket,
 } from '../utils/adaptive-ai-debug.util';
-import {
-  shouldSkipFollowUps,
-} from '../utils/candidate-decline.util';
+import { shouldSkipFollowUps } from '../utils/candidate-decline.util';
 import { buildCandidateTurnClassifierInput } from '../utils/build-candidate-turn-classifier-input.util';
+import { resolveClassifierEmergencyFallback } from '../utils/classifier-emergency-fallback.util';
 import { isWholeDeclineTurnKind } from '../utils/map-turn-kind-to-disposition.util';
 import type { CandidateTurnKind } from '../types/candidate-turn-classifier.types';
 import type { CandidateAnswerDisposition } from '../types/candidate-answer-disposition.type';
@@ -62,10 +61,10 @@ export class AdaptiveInterviewSubmitService {
   ): Promise<void> {
     const [answeredMain, awaitingFollowUp, awaitingTopicOpener] =
       await Promise.all([
-      this.repository.countMainAnswerMessages(attemptId),
-      this.followUpRepository.findAwaitingAnswer(attemptId),
-      this.repository.findAwaitingTopicOpener(attemptId),
-    ]);
+        this.repository.countMainAnswerMessages(attemptId),
+        this.followUpRepository.findAwaitingAnswer(attemptId),
+        this.repository.findAwaitingTopicOpener(attemptId),
+      ]);
 
     if (
       !awaitingFollowUp &&
@@ -120,15 +119,17 @@ export class AdaptiveInterviewSubmitService {
     question: InterviewQuestionEntity;
     answeredMainQuestions: number;
   }): Promise<string> {
-    const openerText = await this.mainQuestionOpenerService.generateTopicOpener({
-      attemptId: input.attemptId,
-      interviewQuestionId: input.question.id,
-      questionText: input.question.questionText,
-      referenceAnswer: input.question.shortAnswer,
-      isFirstQuestion: input.answeredMainQuestions === 0,
-      previousQuestionCount: input.answeredMainQuestions,
-      seed: input.attemptId + input.question.id,
-    });
+    const openerText = await this.mainQuestionOpenerService.generateTopicOpener(
+      {
+        attemptId: input.attemptId,
+        interviewQuestionId: input.question.id,
+        questionText: input.question.questionText,
+        referenceAnswer: input.question.shortAnswer,
+        isFirstQuestion: input.answeredMainQuestions === 0,
+        previousQuestionCount: input.answeredMainQuestions,
+        seed: input.attemptId + input.question.id,
+      },
+    );
 
     const streamedText = this.aiMessageStreamService.isEnabled()
       ? await this.aiMessageStreamService.streamStaticText({
@@ -205,12 +206,16 @@ export class AdaptiveInterviewSubmitService {
 
     const [answeredMainBefore, awaitingFollowUp, awaitingTopicOpener] =
       await Promise.all([
-      this.repository.countMainAnswerMessages(attemptId),
-      this.followUpRepository.findAwaitingAnswer(attemptId),
-      this.repository.findAwaitingTopicOpener(attemptId),
-    ]);
+        this.repository.countMainAnswerMessages(attemptId),
+        this.followUpRepository.findAwaitingAnswer(attemptId),
+        this.repository.findAwaitingTopicOpener(attemptId),
+      ]);
 
-    if (!awaitingFollowUp && !awaitingTopicOpener && answeredMainBefore >= totalMainQuestions) {
+    if (
+      !awaitingFollowUp &&
+      !awaitingTopicOpener &&
+      answeredMainBefore >= totalMainQuestions
+    ) {
       throw new Error('All main questions already answered');
     }
 
@@ -349,14 +354,13 @@ export class AdaptiveInterviewSubmitService {
       'submit_answer.classify_turn',
       { attemptId, interviewQuestionId: currentQuestion.id },
     );
+    const classifierInput = buildCandidateTurnClassifierInput({
+      context: contextPacket,
+      attemptId,
+      interviewQuestionId: currentQuestion.id,
+    });
     const classificationResult =
-      await this.candidateTurnClassifierService.classifyTurn(
-        buildCandidateTurnClassifierInput({
-          context: contextPacket,
-          attemptId,
-          interviewQuestionId: currentQuestion.id,
-        }),
-      );
+      await this.candidateTurnClassifierService.classifyTurn(classifierInput);
     classifyTimer.finish({
       status: classificationResult.status,
       turnKind:
@@ -371,6 +375,24 @@ export class AdaptiveInterviewSubmitService {
     if (classificationResult.status === 'valid') {
       candidateTurnKind = classificationResult.classification.turnKind;
       candidateDisposition = classificationResult.classification.disposition;
+    } else {
+      const emergencyFallback =
+        resolveClassifierEmergencyFallback(classifierInput);
+      if (emergencyFallback) {
+        candidateTurnKind = emergencyFallback.turnKind;
+        candidateDisposition = emergencyFallback.disposition;
+        logAdaptiveAiDebug(
+          this.logger,
+          'submit_answer.classifier_emergency_fallback',
+          {
+            attemptId,
+            interviewQuestionId: currentQuestion.id,
+            classifierStatus: classificationResult.status,
+            turnKind: emergencyFallback.turnKind,
+            disposition: emergencyFallback.disposition,
+          },
+        );
+      }
     }
 
     if (isWholeDeclineTurnKind(candidateTurnKind)) {
@@ -426,7 +448,10 @@ export class AdaptiveInterviewSubmitService {
 
     const scoreAfter =
       evaluation.status === 'valid'
-        ? evaluation.states.reduce((total, state) => total + state.scoreAwarded, 0)
+        ? evaluation.states.reduce(
+            (total, state) => total + state.scoreAwarded,
+            0,
+          )
         : scoreBefore;
     const scoreDelta = scoreAfter - scoreBefore;
 

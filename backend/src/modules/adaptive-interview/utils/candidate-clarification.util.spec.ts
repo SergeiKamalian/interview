@@ -1,7 +1,6 @@
 import {
   buildClarificationFollowUpQuestion,
   countScopeClarificationTurns,
-  isCandidateAskingForScope,
   isScopeClarificationTurn,
   isVagueFollowUpQuestion,
   MAX_SCOPE_CLARIFICATION_TURNS_PER_QUESTION,
@@ -10,30 +9,6 @@ import {
 import { FIBER_EVALUATION_HINTS } from './fiber-evaluation-hints.fixture';
 
 describe('candidate-clarification.util', () => {
-  describe('isCandidateAskingForScope', () => {
-    it('detects Russian scope-clarification questions', () => {
-      expect(isCandidateAskingForScope('Что именно вам интересно?')).toBe(true);
-      expect(isCandidateAskingForScope('Что вы имеете в виду?')).toBe(true);
-      expect(isCandidateAskingForScope('Вы про useEffect или useState?')).toBe(
-        true,
-      );
-    });
-
-    it('detects confirmation-style scope questions', () => {
-      expect(
-        isCandidateAskingForScope(
-          'Вы говорите о этапах и методах react fiber да?',
-        ),
-      ).toBe(true);
-      expect(isCandidateAskingForScope('Речь про scheduler, да?')).toBe(true);
-    });
-
-    it('does not treat decline as scope ask', () => {
-      expect(isCandidateAskingForScope('Не знаю')).toBe(false);
-      expect(isCandidateAskingForScope('Давайте дальше')).toBe(false);
-    });
-  });
-
   describe('isVagueFollowUpQuestion', () => {
     it('detects generic vague follow-ups', () => {
       expect(
@@ -110,6 +85,7 @@ describe('candidate-clarification.util', () => {
         missingMustConcepts: ['MessageChannel', 'shouldYield'],
         hints: FIBER_EVALUATION_HINTS.scheduling,
         candidateScopeQuestion: 'Что именно вам интересно?',
+        candidateTurnKind: 'scope_clarification',
       });
 
       expect(question).toMatch(/MessageChannel|shouldYield/i);
@@ -126,6 +102,7 @@ describe('candidate-clarification.util', () => {
         hints: FIBER_EVALUATION_HINTS.scheduling,
         candidateScopeQuestion:
           'А вам нужно чтобы я ответил коротко и по делу или по деталям?',
+        candidateTurnKind: 'format_clarification',
         previousFollowUpQuestion: previousFollowUp,
       });
 
@@ -142,24 +119,12 @@ describe('candidate-clarification.util', () => {
         hints: FIBER_EVALUATION_HINTS.scheduling,
         candidateScopeQuestion:
           'Вы говорите о этапах и методах react fiber да?',
+        candidateTurnKind: 'scope_clarification',
       });
 
       expect(question).toMatch(/^Да, именно про/i);
       expect(question).toMatch(/MessageChannel|shouldYield/i);
       expect(question.length).toBeLessThan(120);
-    });
-
-    it('detects answer-format meta questions on follow-up context', () => {
-      expect(
-        resolveScopeClarificationDisposition({
-          answer:
-            'А вам нужно чтобы я ответил коротко и по делу или по деталям?',
-          aiDisposition: 'engaged',
-          candidateTurnKind: 'format_clarification',
-          isTargetedFollowUp: false,
-          isFollowUpContext: true,
-        }),
-      ).toBe('asked_for_scope');
     });
 
     it('clarifies or-choice scope questions', () => {

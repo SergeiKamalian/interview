@@ -10,7 +10,8 @@ import {
   type CheckpointProbeStatus,
 } from '../types/checkpoint-probe-policy.type';
 import type { CheckpointStateStatus } from '../types/checkpoint-state-status.type';
-import { isTargetedTopicRefusal } from './candidate-decline.util';
+import type { CandidateTurnKind } from '../types/candidate-turn-classifier.types';
+import { isTargetedRefusalForPolicy } from './classifier-emergency-fallback.util';
 import {
   parseDepthFromRationale,
   type CheckpointDepthLevel,
@@ -64,6 +65,7 @@ export type ProbeRequiredInput = {
   questionMaxScore: number;
   candidateEvidenceText?: string;
   latestCandidateText?: string;
+  candidateTurnKind?: CandidateTurnKind | null;
 };
 
 export function resolveComplexityTier(
@@ -169,7 +171,10 @@ export function probeRequired(input: ProbeRequiredInput): boolean {
   }
 
   if (
-    isTargetedTopicRefusal(latestCandidateText) &&
+    isTargetedRefusalForPolicy({
+      candidateTurnKind: input.candidateTurnKind,
+      latestCandidateText,
+    }) &&
     state.status !== 'covered'
   ) {
     return false;
@@ -258,7 +263,10 @@ export function residualGapProbeRequired(input: ProbeRequiredInput): boolean {
   }
 
   if (
-    isTargetedTopicRefusal(latestCandidateText) &&
+    isTargetedRefusalForPolicy({
+      candidateTurnKind: input.candidateTurnKind,
+      latestCandidateText,
+    }) &&
     state.status !== 'covered'
   ) {
     return false;
@@ -311,6 +319,7 @@ export function deriveProbeStatus(input: {
   questionMaxScore: number;
   candidateEvidenceText?: string;
   latestCandidateText?: string;
+  candidateTurnKind?: CandidateTurnKind | null;
 }): CheckpointProbeStatus {
   const { state } = input;
 
@@ -335,7 +344,10 @@ export function deriveProbeStatus(input: {
   }
 
   if (
-    isTargetedTopicRefusal(input.latestCandidateText ?? '') &&
+    isTargetedRefusalForPolicy({
+      candidateTurnKind: input.candidateTurnKind,
+      latestCandidateText: input.latestCandidateText ?? '',
+    }) &&
     state.status === 'missed'
   ) {
     return 'closed';

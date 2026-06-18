@@ -34,6 +34,11 @@ export function isFollowUpLlmEnabled(): boolean {
   return readBooleanFlag(process.env.ADAPTIVE_FOLLOW_UP_USE_LLM, true);
 }
 
+/** Last-resort regex intent when CandidateTurnClassifier AI is unavailable. Default off. */
+export function isClassifierRegexEmergencyFallbackEnabled(): boolean {
+  return readBooleanFlag(process.env.CLASSIFIER_REGEX_EMERGENCY_FALLBACK, false);
+}
+
 /** Legacy Chat Completions fallback: keeps Redis messages and sends full chat history. */
 export function isAdaptiveAiConversationSessionEnabled(): boolean {
   return readBooleanFlag(process.env.ADAPTIVE_AI_CONVERSATION_SESSION, true);
