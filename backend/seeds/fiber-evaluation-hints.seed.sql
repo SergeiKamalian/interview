@@ -13,7 +13,8 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
     ),
     'falseClaims', JSON_ARRAY(
       'Fiber это просто Virtual DOM', 'просто Virtual DOM',
-      'Virtual DOM быстрее обновляет', 'Fiber — это Virtual DOM'
+      'Virtual DOM быстрее обновляет', 'Fiber — это Virtual DOM',
+      'requestIdleCallback'
     ),
     'minMatchedConcepts', 2,
     'positiveFloorScore', 0.85
@@ -34,7 +35,9 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
     ),
     'falseClaims', JSON_ARRAY(
       'рендер полностью асинхронным через Promises',
-      'Fiber сделал рендер полностью асинхронным'
+      'Fiber сделал рендер полностью асинхронным',
+      'полностью асинхронным через Promises',
+      'клики всегда проходят'
     ),
     'minMatchedConcepts', 2,
     'positiveFloorScore', 0.85
@@ -79,7 +82,8 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
     ),
     'falseClaims', JSON_ARRAY(
       'render пишет в DOM', 'render phase пишет в DOM',
-      'useEffect до paint', 'reconcileChildFibers сразу в DOM'
+      'useEffect до paint', 'reconcileChildFibers сразу в DOM',
+      'requestIdleCallback', 'concurrent mode не лагает'
     ),
     'minMatchedConcepts', 2,
     'positiveFloorScore', 0.85
@@ -92,7 +96,10 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
     ),
     'falseClaims', JSON_ARRAY(
       'commit можно прервать', 'render и commit одно и то же',
-      'render phase и commit phase одно и то же'
+      'render phase и commit phase одно и то же',
+      'useEffect в commit до paint', 'useEffect до paint',
+      'разбивает commit на куски', 'commit на куски по 5ms',
+      'requestIdleCallback'
     ),
     'minMatchedConcepts', 2,
     'positiveFloorScore', 0.85
@@ -142,7 +149,8 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
     ),
     'falseClaims', JSON_ARRAY(
       'lanes в Redux', 'ReactDOM.render поддерживает concurrent',
-      'обернуть все setState в startTransition'
+      'обернуть все setState в startTransition',
+      'requestIdleCallback'
     ),
     'minMatchedConcepts', 1,
     'positiveFloorScore', 0.85
@@ -155,7 +163,9 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
     'falseClaims', JSON_ARRAY(
       'concurrent mode полностью убирает лаги',
       'concurrent mode полностью убирает',
-      'не нужна virtualization', '20 000 div без virtualization'
+      'concurrent mode не лагает',
+      'не нужна virtualization', '20 000 div без virtualization',
+      'тысяч элементов без virtualization'
     ),
     'minMatchedConcepts', 2,
     'positiveFloorScore', 0.75,

@@ -536,3 +536,48 @@ CI: `golden-calibration.spec.ts` — отдельный suite `candidate-turn-cl
 - [`docs/evaluation-accuracy/README.md`](./README.md) — общий design evaluation accuracy
 - [`docs/tasks/list/14-✅-evaluation-accuracy-analytics/subtasks/027-✅-candidate-clarification-follow-up.md`](../tasks/list/14-✅-evaluation-accuracy-analytics/subtasks/027-✅-candidate-clarification-follow-up.md) — предыдущий regex-based fix (будет superseded)
 - `backend/src/modules/adaptive-interview/prompts/per-turn-checkpoint-evaluation.prompt.ts` — disposition block станет secondary после classifier
+
+---
+
+## 14. Wave 4 — Evaluation Mode Router (после live QA attempt #91)
+
+**Проблема:** classifier v1.1.0 верно определяет intent (`scope_clarification`, `decline_scoped`), но downstream всё ещё делает **full re-score всех checkpoint'ов** на meta-turn → GUARD-02, DECL-01.
+
+**Принцип:** только `substantive_answer` может менять cumulative evidence по всем checkpoint'ам. Meta-turn'ы — **target-only или skip**.
+
+### 14.1 Таблица режимов
+
+| `turn_kind` | `EvaluationMode` | Evaluate | Non-target checkpoints |
+|-------------|------------------|----------|------------------------|
+| `substantive_answer` | `full` | LLM, все CP | guards + merge как сейчас |
+| `scope_clarification` | `clarification` | target-only или deterministic | **immutable** (priorState) |
+| `format_clarification` | `clarification` | то же | immutable |
+| `decline_scoped` | `target_refusal` | deterministic refusal cap | immutable |
+| `topic_refusal` | `target_refusal` | то же | immutable |
+| `confused` | `redirect` | light / skip | immutable |
+| `off_topic` | `redirect` | light | immutable |
+| `decline_whole` | `skip` | нет (fast path есть) | — |
+
+### 14.2 Пайплайн
+
+```txt
+classifyTurn()
+  → resolveEvaluationMode(turn_kind)
+  → submit routes: skip | target_refusal update | clarification | full evaluate
+  → guards (mode-aware freeze)
+  → policy (clarification | target_refusal | normal allocator)
+```
+
+### 14.3 Subtasks (по одному агенту)
+
+| ID | Файл | Scope |
+|----|------|-------|
+| 14.32 | `032-⬜-evaluation-mode-contract.md` | type + `resolveEvaluationMode` + unit tests |
+| 14.33 | `033-⬜-submit-evaluation-mode-routing.md` | wire mode в submit + evaluator scope |
+| 14.34 | `034-⬜-guards-merge-mode-aware-freeze.md` | GUARD-02 fix |
+| 14.35 | `035-⬜-policy-target-refusal-branch.md` | DECL-01 fix |
+| 14.36 | `036-⬜-golden-attempt91-meta-turn-regression.md` | golden case + bug closure |
+
+**Регрессионный кейс:** attempt #91 turn 6 (`decline_scoped` на `fiber_pointers`) — `fiber_definition` / `render_phase` / `commit_phase` не обнуляются; policy не re-probe тот же CP.
+
+**Вне scope wave 4:** ENC-01 (mojibake UTF-8 в UI).

@@ -11,7 +11,7 @@ import type {
 } from '../types/per-turn-evaluation.types';
 import { getPerTurnCheckpointEvaluationPromptVersion } from '../prompts/per-turn-checkpoint-evaluation.prompt';
 import {
-  matchesDistinctiveBadAnswerClaim,
+  matchesCheckpointFalseClaims,
   overlapsQuestionBadAnswerExamples,
   rationaleIndicatesSoundEvidence,
 } from './bad-answer-signature.util';
@@ -148,6 +148,7 @@ export function applyCheckpointScoreFloors(
                 ],
                 checkpoint.evaluationHints?.neutralMetaphors,
                 effectiveMaxScore,
+                checkpoint,
               ),
               latestTurnText,
               checkpoint,
@@ -712,6 +713,7 @@ function applyBadExampleOverlapCap(
   badExamples: string[],
   neutralMetaphors: string[] | undefined,
   maxScore: number,
+  checkpoint: AdaptiveCheckpointDefinition,
 ): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
   if (result.scoreAwarded <= 0) {
     return result;
@@ -727,8 +729,11 @@ function applyBadExampleOverlapCap(
   );
 
   const overlapsBadExample =
-    matchesDistinctiveBadAnswerClaim(strippedEvaluation) ||
-    overlapsQuestionBadAnswerExamples(strippedEvaluation, badExamples);
+    overlapsQuestionBadAnswerExamples(strippedEvaluation, badExamples) ||
+    matchesCheckpointFalseClaims(
+      strippedEvaluation,
+      checkpoint.evaluationHints?.falseClaims ?? [],
+    );
 
   if (!overlapsBadExample) {
     return result;
@@ -1008,7 +1013,17 @@ function applyPositiveEvidenceFloor(
     fullCandidateText,
     maxScore,
   );
-  if (floor === null || matchesDistinctiveBadAnswerClaim(latestCandidateText)) {
+  if (
+    floor === null ||
+    matchesCheckpointFalseClaims(
+      latestCandidateText,
+      checkpoint.evaluationHints?.falseClaims ?? [],
+    ) ||
+    overlapsQuestionBadAnswerExamples(latestCandidateText, [
+      ...(checkpoint.badExamples ?? []),
+      ...(checkpoint.questionBadExamples ?? []),
+    ])
+  ) {
     return result;
   }
 

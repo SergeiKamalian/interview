@@ -1,7 +1,6 @@
 import type { CheckpointEvaluationHints } from '../types/checkpoint-evaluation-hints.type';
 import { matchesCheckpointFalseClaims } from './bad-answer-signature.util';
 import { countMatchedConcepts, textContainsPhrase } from './text-evidence-overlap.util';
-import { getLegacyContradictionScoreCap } from './legacy-contradiction-cap.util';
 
 /** True when cumulative text for this checkpoint mentions its mustConcepts or concept groups. */
 export function hasDirectCheckpointEvidence(
@@ -138,17 +137,8 @@ export function getContradictionScoreCap(
   candidateText: string,
   maxScore: number,
 ): number | null {
-  const fromHints = getContradictionScoreCapFromHints(
+  return getContradictionScoreCapFromHints(
     checkpoint.evaluationHints,
-    candidateText,
-    maxScore,
-  );
-  if (fromHints !== null) {
-    return fromHints;
-  }
-
-  return getLegacyContradictionScoreCap(
-    checkpoint.checkpointKey,
     candidateText,
     maxScore,
   );

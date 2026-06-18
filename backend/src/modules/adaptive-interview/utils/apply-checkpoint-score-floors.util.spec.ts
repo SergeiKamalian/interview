@@ -26,6 +26,9 @@ function buildGenericsContext(
           'Кандидат объясняет, что generic добавляет параметр типа для функции, интерфейса, класса или типа.',
         score: 1,
         sortOrder: 0,
+        evaluationHints: {
+          falseClaims: ['generic как any', 'почти как any'],
+        },
       },
       {
         checkpointKey: 'reusability',
@@ -42,6 +45,14 @@ function buildGenericsContext(
           'Кандидат объясняет, что generics сохраняют связь входных и выходных типов без any.',
         score: 1,
         sortOrder: 2,
+        evaluationHints: {
+          falseClaims: [
+            'вернуть number',
+            'string number type safe',
+            'не связывает вход и выход',
+          ],
+          falseClaimCapFraction: 0,
+        },
       },
       {
         checkpointKey: 'constraints',
@@ -50,6 +61,12 @@ function buildGenericsContext(
           'Кандидат упоминает extends или ограничение допустимых типов.',
         score: 1,
         sortOrder: 3,
+        evaluationHints: {
+          falseClaims: [
+            'сам узнает все поля',
+            'можно обращаться к любому полю',
+          ],
+        },
       },
     ],
     checkpointStates,

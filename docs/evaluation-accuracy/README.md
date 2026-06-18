@@ -489,3 +489,20 @@ Attempt 84 (post-14.26): seq 8 → `stack_vs_fiber` (attempt 82: lazy topic_open
 14.30 Deprecate intent regex
 14.31 Bank-driven false claims (legacy-contradiction-cap)
 ```
+
+---
+
+## 16. Known open bugs (live-test backlog)
+
+| ID | Symptom | Repro | Likely layer | Status |
+|----|---------|-------|--------------|--------|
+| **ENC-01** | Кириллица в follow-up отображается как mojibake на фронте: `стек` → `ÑÑ‚ÐµÐº?`, `и` → `Ð¸` | Attempt **#91**, Q17, `stack_vs_fiber` combined_turn_template: «Как именно работает — call stack, стек?»; то же в backend debug log `plan_follow_up.combined_turn_template` | UTF-8 / charset по цепочке template → persist → GraphQL → UI (или double-encoding) | **open** — fix later |
+| **DECL-01** | После `decline_scoped` policy не skip'ает checkpoint и не pivot'ит на предложенную тему (lanes/commit); снова probe на тот же `fiber_pointers` + **Topic mismatch redirect** | Attempt **#91**, turn 6: «С child/sibling/return не углублюсь… лучше про lanes или commit phase» → classifier `decline_scoped` ✅, но `plan_follow_up.policy` → `targetCheckpointKey: fiber_pointers`, prompt `Topic mismatch redirect` | `follow-up-policy.util.ts` — нет ветки skip/mark-declined для scoped decline; путается с topic mismatch | **open** |
+| **GUARD-02** | На decline-turn guards откатывают **накопленные** covered scores (не только target checkpoint) | Attempt **#91**, turn 6 после `decline_scoped`: `fiber_definition` covered 1.0→missed 0, `stack_vs_fiber` covered 1.0→partial 0.55, `render_phase`/`commit_phase` partial→missed 0; reasons `status_score_alignment`, `bad_example_overlap_cap` | `apply-checkpoint-score-floors.util.ts` — decline/meta turn не должен пересчитывать cumulative evidence | **open** |
+| **SCORE-01** | Итоговый score attempt сильно занижен из‑за GUARD-02: dashboard **2.0/100**, strong reject, хотя по transcript кандидат показал mid-level по Fiber core | Attempt **#91**: Fiber Q earned ~2.53/8 в UI, но `fiber_definition`/`render_phase`/`commit_phase` обнулены guard'ом на decline turn; expert estimate ~4.5–5.5/8 по Fiber | Final evaluation + guard freeze policy | **open** (следствие GUARD-02) |
+
+**ENC-01 notes (2026-06-18):** баг косметический для логики classifier/policy; текст шаблона семантически верный. Связанные места: `FollowUpPlannerService` combined_turn_template, возможно streaming delta / message storage.
+
+**DECL-01 notes (2026-06-18):** classifier v1.1.0 корректно даёт `decline_scoped` + `disposition: declined`; legacy shadow `substantive_answer` (divergence=true). Ожидание: finalize `fiber_pointers` как declined/skipped, next target `lanes_priority` или `commit_phase`. Факт: `shouldAskFollowUp: true`, `combined_turn_reuse` на fiber_pointers.
+
+**GUARD-02 notes (2026-06-18):** воспроизводится на meta/decline turn с упоминанием других тем в ответе. Проверить: freeze prior checkpoint states when `turn_kind` ∈ {decline_scoped, scope_clarification, format_clarification}.

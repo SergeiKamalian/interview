@@ -5,13 +5,16 @@ import {
 } from '../prompts/candidate-turn-classifier.prompt';
 
 describe('candidate-turn-classifier.prompt', () => {
-  it('uses version 1.0.0', () => {
-    expect(CANDIDATE_TURN_CLASSIFIER_PROMPT_VERSION).toBe('1.0.0');
+  it('uses version 1.1.0', () => {
+    expect(CANDIDATE_TURN_CLASSIFIER_PROMPT_VERSION).toBe('1.1.0');
   });
 
-  it('includes turn_kind guide in system prompt', () => {
+  it('includes speech-act-first rules in system prompt', () => {
     const systemPrompt = buildCandidateTurnClassifierSystemPrompt();
 
+    expect(systemPrompt).toContain('STEP 0');
+    expect(systemPrompt).toContain('speech act');
+    expect(systemPrompt).toContain('NEVER substantive_answer');
     expect(systemPrompt).toContain('substantive_answer');
     expect(systemPrompt).toContain('scope_clarification');
     expect(systemPrompt).toContain('format_clarification');
@@ -20,7 +23,8 @@ describe('candidate-turn-classifier.prompt', () => {
     expect(systemPrompt).toContain('topic_refusal');
     expect(systemPrompt).toContain('confused');
     expect(systemPrompt).toContain('off_topic');
-    expect(systemPrompt).toContain('Never keyword matching');
+    expect(systemPrompt).toContain('Never use phrase matching');
+    expect(systemPrompt).toContain('technical words alone do NOT make substantive_answer');
   });
 
   it('includes decision checklist and dialogue context in user prompt', () => {
@@ -40,7 +44,8 @@ describe('candidate-turn-classifier.prompt', () => {
     expect(userPrompt).toContain('message_kind: follow_up_answer');
     expect(userPrompt).toContain('Target checkpoint:');
     expect(userPrompt).toContain('scheduling');
-    expect(userPrompt).toContain('Decision checklist');
+    expect(userPrompt).toContain('Decision checklist (strict order)');
+    expect(userPrompt).toContain('Speech act');
     expect(userPrompt).toContain('Что именно вам интересно?');
   });
 });

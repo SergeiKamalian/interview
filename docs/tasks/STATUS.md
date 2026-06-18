@@ -26,7 +26,7 @@ Active block:
 Block status:
 
 ```txt
-🟡 in progress (wave 3: AI intent classifier)
+🟡 in progress (wave 4: evaluation mode router)
 ```
 
 Block title:
@@ -42,25 +42,31 @@ Evaluation accuracy & HR analytics
 Active subtask ID:
 
 ```txt
-TASK-14.31 — Bank-driven false claims
+TASK-14.32 — Evaluation mode contract
+```
+
+File:
+
+```txt
+docs/tasks/list/14-✅-evaluation-accuracy-analytics/subtasks/032-⬜-evaluation-mode-contract.md
 ```
 
 Last completed subtask:
 
 ```txt
-TASK-14.30 — Deprecate legacy intent regex
+TASK-14.31 — Bank-driven false claims
 ```
 
 Next recommended subtask:
 
 ```txt
-TASK-14.31 — Bank-driven false claims
+TASK-14.32 → 14.33 → 14.34 → 14.35 → 14.36 (строго по порядку)
 ```
 
 Last updated:
 
 ```txt
-2026-06-18 (14.30 done)
+2026-06-18 (wave 4 planned, start 14.32)
 ```
 
 ---
@@ -95,12 +101,20 @@ Last updated:
 - [x] TASK-14.26 — Min probes before topic switch
 - [x] TASK-14.27 — Candidate clarification on vague follow-up
 
-## Wave 3 (in progress)
+## Wave 3 (done)
 
 - [x] TASK-14.28 — Candidate turn AI classifier
 - [x] TASK-14.29 — Wire classifier into submit + policy
 - [x] TASK-14.30 — Deprecate legacy intent regex
-- [ ] TASK-14.31 — Bank-driven false claims
+- [x] TASK-14.31 — Bank-driven false claims
+
+## Wave 4 (evaluation mode router)
+
+- [ ] TASK-14.32 — Evaluation mode contract
+- [ ] TASK-14.33 — Submit evaluation mode routing
+- [ ] TASK-14.34 — Guards + merge mode-aware freeze
+- [ ] TASK-14.35 — Policy target refusal branch
+- [ ] TASK-14.36 — Golden attempt #91 regression
 
 ---
 
