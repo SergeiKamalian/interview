@@ -14,17 +14,26 @@ ITLead / статья → topic design doc → seed SQL → interview snapshot �
 | ITLead → level / interview_weight | [itlead-level-mapping.md](./itlead-level-mapping.md) |
 | Дизайн конкретной темы | [topics/](./topics/) |
 | DDL и поля БД | [../database/schemas/question-bank.md](../database/schemas/question-bank.md) |
-| SQL seeds | `backend/seeds/*.seed.sql` |
+| SQL seeds (legacy) | `backend/seeds/*.seed.sql` |
+| JSON bank (новые темы) | `backend/seeds/topics/*.bank.json` |
+| ITLead manifest | `backend/seeds/itlead-topics.manifest.json` |
+| ITLead grid (каталог) | `backend/seeds/itlead-questions.grid.json` |
+| ITLead worklist (лист импорта) | `backend/seeds/itlead-import.worklist.json` |
+| **Промпт для Cursor (один файл)** | [ITLEAD_AGENT_PROMPT.md](./ITLEAD_AGENT_PROMPT.md) |
+| Playbook (подробности) | [itlead-import-playbook.md](./itlead-import-playbook.md) |
 
-## Workflow для новой темы (по ссылке)
+## Workflow для новой темы (по ссылке ITLead)
 
 1. Определить **уровень** (junior / middle / senior) — явно из сообщения или по [itlead-level-mapping.md](./itlead-level-mapping.md).
-2. Создать `docs/question-bank/topics/<topic_code>.md` по [шаблону](./topics/README.md).
-3. Разбить материал на checkpoints, назначить **weight** по рубрике; `SUM(weight) = 10`.
-4. В seed: `questions.level`, `questions.difficulty`, `topics.interview_weight`.
-5. Написать/обновить `backend/seeds/<topic>.seed.sql` (utf8mb4).
-6. Применить seed → создать interview → browser QA (bad / casual / formal).
-7. В Completion Notes фиксировать только **X/10** из `finalEvaluationByAttempt.totalScore`.
+2. Добавить URL в `backend/seeds/itlead-topics.manifest.json` (`status: draft`).
+3. Создать `docs/question-bank/topics/<topic_code>.md` по [шаблону](./topics/README.md).
+4. Разбить материал на checkpoints, назначить **weight** по рубрике; `SUM(weight) = 10`.
+5. Создать `backend/seeds/topics/<topic_code>.bank.json` — checkpoints, `evaluationHints`, examples (см. [seeds/topics/README.md](../../backend/seeds/topics/README.md)).
+6. Manifest → `status: ready` → `cd backend && pnpm seed:topic -- <topic_code>` (или `pnpm seed:topic -- --all`).
+7. Пересоздать interview → browser QA (bad / casual / formal).
+8. В Completion Notes фиксировать только **X/10** из `finalEvaluationByAttempt.totalScore`.
+
+**Legacy:** Fiber и lazy пока в `.seed.sql`; новые темы — через JSON + `seed:topic`.
 
 **Browser QA waits:** не `sleep 40` сразу — поллинг **10 с → snapshot → ещё 10 с** если UI не готов (кнопка, textarea, /complete).
 

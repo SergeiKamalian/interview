@@ -14,12 +14,14 @@ ITLead URL + уровень (явный или из контекста)
 
 | Источник | Что делать |
 |----------|------------|
-| Ты пишешь явно | «для senior» / «для миддлов» — **source of truth** |
+| **ITLead API** | `GET https://api.itlead.org/api/questions/{slug}` → поле `difficulty` (`JUNIOR` / `MIDDLE` / `SENIOR`) — **source of truth** |
+| Ты пишешь явно | «для senior» / «для миддлов» — если API недоступен |
 | Контекст чата | «Fiber был для senior, lazy — для middle» |
-| Содержание статьи | Fiber, reconciliation, lanes, scheduler → обычно **senior**; hooks, lazy, forms → **middle**; основы HTML/CSS → **junior** |
-| Соседние вопросы на ITLead | Сверить с roadmap React на сайте |
+| Содержание статьи | fallback, если API не отвечает |
 
-**Не гадать молча.** Если уровень неочевиден — спросить одной фразой перед seed.
+**Автосинк:** `pnpm seed:sync-itlead -- <url|slug>` читает API и обновляет `level`, `difficulty`, `interview_weight` в `*.bank.json`.
+
+Slug из URL: `https://itlead.org/interview-questions/react/react-hydration-and-ssr` → `react-hydration-and-ssr` → API `https://api.itlead.org/api/questions/react-hydration-and-ssr`.
 
 ## Таблица соответствий
 
@@ -40,6 +42,7 @@ ITLead URL + уровень (явный или из контекста)
 | Тема | ITLead | Уровень | level / difficulty | interview_weight |
 |------|--------|---------|-------------------|------------------|
 | React Fiber & Virtual DOM | [fiber](https://itlead.org/interview-questions/react/react-fiber-and-virtual-dom-update-process) | **Senior** | `senior` / `advanced` | **8** |
+| React Hydration & SSR | [hydration](https://itlead.org/interview-questions/react/react-hydration-and-ssr) | **Senior** (API) | `senior` / `advanced` | **7** |
 | React.lazy & Suspense | [lazy](https://itlead.org/interview-questions/react/reactlazy-and-suspense-lazy-components-in-react) | **Middle** | `middle` / `intermediate` | **5** |
 
 ### Middle: React.lazy
