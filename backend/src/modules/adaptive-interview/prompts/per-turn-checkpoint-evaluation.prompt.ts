@@ -6,7 +6,7 @@ import {
 
 export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_KEY =
   'per_turn_checkpoint_evaluation';
-export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION = '2.7.0';
+export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION = '2.9.0';
 
 export function getPerTurnCheckpointEvaluationPromptVersion(): string {
   const override = process.env.PER_TURN_EVAL_PROMPT_VERSION?.trim();
@@ -14,7 +14,7 @@ export function getPerTurnCheckpointEvaluationPromptVersion(): string {
 }
 
 const RESPONSE_JSON_SCHEMA = `{
-  "candidate_disposition": "engaged | declined | confused | off_topic | misunderstood_question",
+  "candidate_disposition": "engaged | declined | confused | off_topic | misunderstood_question | asked_for_scope",
   "checkpoint_results": [
     {
       "checkpoint_key": "string — must match one of the provided checkpoint keys exactly",
@@ -100,16 +100,77 @@ export function buildPerTurnCheckpointEvaluationSystemPrompt(): string {
     '- Shallow but correct answers → partial with depth=partial_knowledge and rationale including probe=pending.',
     '- Do NOT write «candidate does not know [detail]» for details that were not asked in dialogue yet.',
     '- Finalize missed on advanced checkpoints only after probe, decline, false_claim, or repeated mismatch.',
-  '- Also set candidate_disposition from the latest answer:',
+    '',
+    'Candidate disposition (MANDATORY — decide from dialogue semantics, NOT keyword matching):',
+    '- Read the latest candidate message IN CONTEXT: main question, prior local turns, and the last interviewer follow-up (if any).',
+    '- First ask: did the candidate add NEW technical evidence, or only meta-dialogue about the question itself?',
+    '- Use asked_for_scope when the latest message is ONLY clarifying/confirming what you asked — any wording, any language:',
+    '  - asking what you mean, whether they understood the topic, confirming «вы про X?», «это про scheduling?», «правильно понимаю?»',
+    '  - asking HOW to answer: «коротко или подробно?», «по делу или с деталями?», «на высоком уровне?»',
+    '  - repeating your question back without answering',
+    '  - NOT a substantive attempt to explain the topic (even if wrong)',
+    '- Use engaged when they try to answer substantively (correct or incorrect).',
+    '- Use misunderstood_question when they give a substantive answer about a DIFFERENT checkpoint than expected.',
+    '- Do NOT use misunderstood_question when the latest message is ONLY scope confirmation/clarification (any wording, ends with ?) — use asked_for_scope instead, even if they name topic terms from your follow-up.',
+    '- Use declined / confused / off_topic as defined below.',
+    '- Do NOT use keyword lists; paraphrases and informal Russian/English count.',
     '  - engaged: candidate tries to answer substantively, even if incorrect;',
     '  - declined: candidate refuses or clearly says they do not know / cannot answer;',
     '  - confused: candidate explicitly says they do not understand the question or topic;',
     '  - off_topic: unrelated nonsense — answer does not engage with the question;',
-    '  - misunderstood_question: substantive answer about a DIFFERENT checkpoint/topic than expected (e.g. useState when asked useEffect).',
+    '  - misunderstood_question: substantive answer about a DIFFERENT checkpoint/topic than expected (e.g. useState when asked useEffect);',
+    '  - asked_for_scope: meta-turn — clarification/confirmation only, NO new technical evidence.',
+    '- When candidate_disposition=asked_for_scope:',
+    '  - do NOT raise checkpoint scores from this turn;',
+    '  - keep prior scores for the targeted checkpoint;',
+    '  - targeted checkpoint: do NOT treat as covered/partial improvement from this message alone.',
     '- Return valid JSON only, with no markdown fences or extra commentary.',
     '',
     'Required JSON shape:',
     RESPONSE_JSON_SCHEMA,
+  ].join('\n');
+}
+
+function resolveLastInterviewerFollowUp(
+  context: AdaptiveInterviewContextPacket,
+): string | null {
+  for (let index = context.localTurns.length - 1; index >= 0; index -= 1) {
+    const turn = context.localTurns[index];
+    if (turn.role === 'ai') {
+      return turn.content.trim() || null;
+    }
+  }
+
+  return null;
+}
+
+function buildDispositionDecisionBlock(
+  context: AdaptiveInterviewContextPacket,
+): string {
+  const lastFollowUp = resolveLastInterviewerFollowUp(context);
+  const isFollowUpAnswer =
+    context.latestAnswerMessageKind === 'follow_up_answer' &&
+    Boolean(context.targetCheckpointKey);
+
+  if (!isFollowUpAnswer) {
+    return [
+      'Disposition check (this turn):',
+      '- Latest message is a MAIN answer — classify engaged/declined/confused/off_topic/misunderstood_question.',
+      '- Use asked_for_scope only if the main answer is purely meta (rare).',
+      '',
+    ].join('\n');
+  }
+
+  return [
+    'Disposition check (MANDATORY before scoring — semantic, not keywords):',
+    lastFollowUp
+      ? `Last interviewer follow-up: ${lastFollowUp}`
+      : 'Last interviewer follow-up: (none in local turns)',
+    `Latest candidate message: ${context.latestCandidateAnswer || '(empty)'}`,
+    '- If the candidate did NOT add technical content and only clarifies/confirms what you asked → candidate_disposition=asked_for_scope.',
+    '- Any phrasing counts (formal, informal, partial repeat of your question, «да?», «вы про X?»).',
+    '- If they explain the topic (even wrongly) → engaged or misunderstood_question, NOT asked_for_scope.',
+    '',
   ].join('\n');
 }
 
@@ -179,6 +240,7 @@ export function buildPerTurnCheckpointEvaluationUserPrompt(
   return [
     'Evaluate the latest candidate answer for the current question only.',
     '',
+    buildDispositionDecisionBlock(context),
     targetBlock,
     ...policySection,
     'Question:',

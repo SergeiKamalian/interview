@@ -17,12 +17,16 @@ import {
 } from './bad-answer-signature.util';
 import { isTargetedTopicRefusal } from './candidate-decline.util';
 import {
+  resolveScopeClarificationDisposition,
+} from './candidate-clarification.util';
+import {
   collectCheckpointEvidenceText,
   collectFullCandidateText,
   collectLatestCandidateText,
   stripNeutralMetaphors,
 } from './checkpoint-evidence-text.util';
 import { extractMatchedFalseClaimQuote } from './false-claim-quote.util';
+import { parseCoverageFromRationale } from './checkpoint-depth.util';
 import { mergeCheckpointEvaluation } from './merge-checkpoint-evaluation.util';
 import { alignRationaleDepthWithScore } from './rationale-depth-alignment.util';
 import {
@@ -110,10 +114,10 @@ export function applyCheckpointScoreFloors(
     const evaluationText = isTargetedFollowUp
       ? latestTurnText
       : checkpointEvidenceText;
-    const floorLatestText = latestTurnText;
-    const floorFullText = isTargetedFollowUp
+    const floorLatestText = isTargetedFollowUp
       ? latestTurnText
       : checkpointEvidenceText;
+    const floorFullText = floorLatestText;
 
     const aiSnapshot = {
       status: result.status,
@@ -148,7 +152,7 @@ export function applyCheckpointScoreFloors(
               context.maxScore,
               isTargetedFollowUp,
             ),
-            floorLatestText,
+            latestTurnText,
             floorFullText,
             checkpoint,
             effectiveMaxScore,
@@ -173,6 +177,20 @@ export function applyCheckpointScoreFloors(
       expectedCheckpointKey,
       candidateDisposition: evaluation.candidateDisposition,
       priorScoreAwarded: priorState?.scoreAwarded ?? 0,
+    });
+
+    const effectiveDisposition = resolveScopeClarificationDisposition({
+      answer: latestTurnText,
+      aiDisposition: evaluation.candidateDisposition,
+      isTargetedFollowUp,
+    });
+    guardedResult = applyScopeClarificationScoreFreeze({
+      result: guardedResult,
+      checkpointKey: result.checkpointKey,
+      targetCheckpointKey: context.targetCheckpointKey,
+      candidateDisposition: effectiveDisposition,
+      priorScoreAwarded: priorState?.scoreAwarded ?? 0,
+      isTargetedFollowUp,
     });
 
     if (
@@ -295,6 +313,37 @@ export function applyCheckpointScoreFloors(
       }),
     });
 
+    const scopeClarificationTurn =
+      item.isTargetedFollowUp &&
+      resolveScopeClarificationDisposition({
+        answer: item.latestTurnText,
+        aiDisposition: evaluation.candidateDisposition,
+        isTargetedFollowUp: true,
+      }) === 'asked_for_scope' &&
+      context.targetCheckpointKey === item.guardedWithQuote.checkpointKey;
+
+    if (scopeClarificationTurn) {
+      const frozenScore = item.priorState?.scoreAwarded ?? 0;
+      const frozenStatus = (item.priorState?.status ??
+        merged.status) as PerTurnCheckpointEvaluationStatus;
+
+      return {
+        ...item.original,
+        scoreAwarded: frozenScore,
+        status: frozenStatus,
+        evidenceSummary: merged.evidenceSummary,
+        rationale: alignRationaleDepthWithScore(
+          normalizeRationaleDepth(
+            appendScopeClarificationPendingRationale(
+              merged.rationale ?? item.original.rationale,
+            ),
+          ),
+          frozenScore,
+          item.effectiveMaxScore,
+        ),
+      };
+    }
+
     const realigned =
       item.isTargetedFollowUp &&
       (evaluation.candidateDisposition === 'declined' ||
@@ -378,6 +427,56 @@ function applyTopicMismatchProvisionalGuard(input: {
   }
 
   return input.result;
+}
+
+function applyScopeClarificationScoreFreeze(input: {
+  result: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number];
+  checkpointKey: string;
+  targetCheckpointKey?: string | null;
+  candidateDisposition: PerTurnCheckpointEvaluationAiResponse['candidateDisposition'] | null;
+  priorScoreAwarded: number;
+  isTargetedFollowUp: boolean;
+}): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
+  if (
+    input.candidateDisposition !== 'asked_for_scope' ||
+    !input.isTargetedFollowUp ||
+    !input.targetCheckpointKey ||
+    input.checkpointKey !== input.targetCheckpointKey
+  ) {
+    return input.result;
+  }
+
+  const frozenScore = input.priorScoreAwarded;
+  if (
+    input.result.scoreAwarded <= frozenScore &&
+    input.result.status !== 'covered'
+  ) {
+    return input.result;
+  }
+
+  return {
+    ...input.result,
+    scoreAwarded: frozenScore,
+    status:
+      frozenScore > 0 && input.result.status === 'covered'
+        ? 'partial'
+        : input.result.status === 'covered'
+          ? 'partial'
+          : input.result.status,
+    rationale: appendScopeClarificationPendingRationale(input.result.rationale),
+  };
+}
+
+function appendScopeClarificationPendingRationale(
+  rationale: string | null | undefined,
+): string {
+  const base = rationale?.trim() ?? '';
+  const tag = 'scope_clarification=pending';
+  if (base.includes(tag)) {
+    return base;
+  }
+
+  return base ? `${base}; ${tag}` : tag;
 }
 
 function resolveAdjustmentReason(
@@ -878,9 +977,16 @@ function applyPositiveEvidenceFloor(
     return result;
   }
 
+  if (
+    !isTargetedFollowUp &&
+    parseCoverageFromRationale(result.rationale) === 'none'
+  ) {
+    return result;
+  }
+
   const floor = getPositiveEvidenceScoreFloor(
     checkpoint.evaluationHints,
-    latestCandidateText,
+    isTargetedFollowUp ? latestCandidateText : '',
     fullCandidateText,
     maxScore,
   );

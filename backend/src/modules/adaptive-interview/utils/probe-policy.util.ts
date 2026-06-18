@@ -675,6 +675,10 @@ export function buildProbeFollowUpQuestion(input: {
   );
 
   if (!conceptList) {
+    const fallbackConcepts = input.missingMustConcepts.slice(0, 2).join(', ');
+    if (fallbackConcepts) {
+      return `${acknowledgment} ${stem} ${fallbackConcepts}?`;
+    }
     if (tone === 'weak') {
       return `${acknowledgment} Давайте разберём технические детали — что сможете добавить?`;
     }

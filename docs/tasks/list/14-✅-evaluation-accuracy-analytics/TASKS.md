@@ -30,8 +30,38 @@
 | TASK-14.19 | [x] done | Weight-based follow-up budget allocator | `019-✅-weight-budget-follow-up-allocator.md` |
 | TASK-14.20 | [x] done | Transitive checkpoint floors (сложный → простой) | `020-✅-transitive-checkpoint-floors.md` |
 | TASK-14.21 | [x] done | Topic mismatch redirect (ответ не на тот checkpoint) | `021-✅-topic-mismatch-redirect.md` |
+| TASK-14.23 | [x] done | UI: уверенность AI в оценке (clarity) | `023-✅-ai-evaluation-confidence-ui-clarity.md` |
+| TASK-14.24 | [x] done | Probe missed structural checkpoints | `024-✅-probe-missed-structural-checkpoints.md` |
+| TASK-14.25 | [x] done | Floors guard coverage=none | `025-✅-floors-guard-coverage-none.md` |
+| TASK-14.26 | [x] done | Min probes before topic switch | `026-✅-min-probes-before-topic-switch.md` |
+| TASK-14.27 | [x] done | Candidate clarification on vague follow-up | `027-✅-candidate-clarification-follow-up.md` |
+| TASK-14.28 | [ ] todo | Candidate turn AI classifier (intent вместо regex) | `028-⬜-candidate-turn-ai-classifier.md` |
+| TASK-14.29 | [ ] todo | Wire classifier into submit + policy | `029-⬜-wire-classifier-submit-policy.md` |
+| TASK-14.30 | [ ] todo | Deprecate legacy intent regex | `030-⬜-deprecate-legacy-intent-regex.md` |
+| TASK-14.31 | [ ] todo | Bank-driven false claims (legacy-contradiction-cap) | `031-⬜-bank-driven-false-claims.md` |
 
 ---
+
+## Post-14 wave (Attempt 82)
+
+```txt
+14.23 UI confidence clarity        ✅
+14.24 Probe missed structural CP   ✅
+14.25 Floors guard coverage=none     ✅
+14.26 Min probes before topic switch ✅
+14.27 Candidate clarification follow-up  ✅
+```
+
+## Wave 3 — AI intent classifier (вместо regex)
+
+Design: [`docs/evaluation-accuracy/candidate-turn-classifier.md`](../../../evaluation-accuracy/candidate-turn-classifier.md)
+
+```txt
+14.28 Candidate turn AI classifier     ⬜  ← START HERE
+14.29 Wire classifier into submit      ⬜
+14.30 Deprecate legacy intent regex    ⬜
+14.31 Bank-driven false claims         ⬜
+```
 
 ## Roadmap (adaptive probing — после 14.17)
 

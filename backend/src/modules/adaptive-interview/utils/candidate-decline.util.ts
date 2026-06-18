@@ -105,6 +105,10 @@ export function shouldSkipFollowUps(input: {
     return false;
   }
 
+  if (input.aiDisposition === 'asked_for_scope') {
+    return false;
+  }
+
   return false;
 }
 

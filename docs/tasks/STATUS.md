@@ -26,7 +26,7 @@ Active block:
 Block status:
 
 ```txt
-🟡 in progress
+🟡 in progress (wave 3: AI intent classifier)
 ```
 
 Block title:
@@ -42,25 +42,25 @@ Evaluation accuracy & HR analytics
 Active subtask ID:
 
 ```txt
-(none — block 14 subtasks complete)
+TASK-14.28 — Candidate turn AI classifier
 ```
 
 Last completed subtask:
 
 ```txt
-TASK-14.21 — Topic mismatch redirect
+TASK-14.27 — Candidate clarification on vague follow-up
 ```
 
 Next recommended subtask:
 
 ```txt
-(block 14 complete — see STATUS.md Done)
+TASK-14.28 — Candidate turn AI classifier (design: docs/evaluation-accuracy/candidate-turn-classifier.md)
 ```
 
 Last updated:
 
 ```txt
-2026-06-17 (TASK-14.20 + 14.21 closed ✅)
+2026-06-18 (14.28 planned — wave 3 intent classifier)
 ```
 
 ---
@@ -89,6 +89,18 @@ Last updated:
 - [x] TASK-14.20 — Transitive checkpoint floors
 - [x] TASK-14.21 — Topic mismatch redirect
 - [x] TASK-14.22 — Residual gap probe (narrowing follow-up)
+- [x] TASK-14.23 — UI: уверенность AI в оценке (clarity)
+- [x] TASK-14.24 — Probe missed structural checkpoints
+- [x] TASK-14.25 — Floors guard coverage=none
+- [x] TASK-14.26 — Min probes before topic switch
+- [x] TASK-14.27 — Candidate clarification on vague follow-up
+
+## Wave 3 (in progress)
+
+- [ ] TASK-14.28 — Candidate turn AI classifier
+- [ ] TASK-14.29 — Wire classifier into submit + policy
+- [ ] TASK-14.30 — Deprecate legacy intent regex
+- [ ] TASK-14.31 — Bank-driven false claims
 
 ---
 

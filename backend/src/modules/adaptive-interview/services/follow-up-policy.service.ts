@@ -61,6 +61,8 @@ export class FollowUpPolicyService {
       stickyTargetCheckpointKey: context.targetCheckpointKey,
       questionText: context.questionText,
       latestCheckpointResults,
+      localTurns: context.localTurns,
+      isFollowUpAnswer: context.latestAnswerMessageKind === 'follow_up_answer',
     };
 
     return evaluateFollowUpPolicy(input);

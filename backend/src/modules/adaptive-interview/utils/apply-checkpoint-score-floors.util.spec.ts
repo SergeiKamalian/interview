@@ -653,6 +653,156 @@ describe('applyCheckpointScoreFloors', () => {
     expect(scheduling?.status).toBe('covered');
   });
 
+  it('freezes targeted checkpoint score when candidate asks for scope', () => {
+    const context: AdaptiveInterviewContextPacket = {
+      ...buildGenericsContext('Что именно вам интересно?', []),
+      questionText: 'Как работает React Fiber?',
+      targetCheckpointKey: 'scheduling',
+      latestAnswerMessageKind: 'follow_up_answer',
+      checkpoints: [
+        fiberCheckpoint('scheduling', {
+          title: 'Понимает планирование Fiber',
+          expected: 'scheduler, shouldYield, MessageChannel',
+        }),
+      ],
+      checkpointStates: [
+        {
+          checkpointKey: 'scheduling',
+          status: 'partial',
+          scoreAwarded: 1.25,
+          maxScore: 2.5,
+          followUpCount: 1,
+          rationale: 'depth=partial_knowledge probe=pending',
+        },
+      ],
+      localTurns: [
+        { role: 'ai', content: 'Можете уточнить технические детали?' },
+        { role: 'candidate', content: 'Что именно вам интересно?' },
+      ],
+    };
+
+    const { evaluation } = applyCheckpointScoreFloors(
+      {
+        candidateDisposition: 'engaged',
+        checkpointResults: [
+          {
+            checkpointKey: 'scheduling',
+            status: 'covered',
+            scoreAwarded: 2.5,
+            confidence: 0.9,
+            evidenceSummary: null,
+            rationale: 'depth=understands coverage=high accuracy=full',
+          },
+        ],
+      },
+      context,
+      { evidenceSource: 'follow_up_answer' },
+    );
+
+    const scheduling = evaluation.checkpointResults.find(
+      (item) => item.checkpointKey === 'scheduling',
+    );
+
+    expect(scheduling?.scoreAwarded).toBe(1.25);
+    expect(scheduling?.rationale).toContain('scope_clarification=pending');
+  });
+
+  it('does not positive-floor lanes when scheduling follow-up mentions priorities but AI says coverage=none', () => {
+    const mainAnswer =
+      'Fiber — reconciliation engine с render и commit phase.';
+    const schedulingFollowUp =
+      'Scheduler через MessageChannel и shouldYield. startTransition снижает приоритет. Ввод в инпуте важнее тяжелой перерисовки списка.';
+
+    const scheduling = fiberCheckpoint('scheduling', { score: 2.5, sortOrder: 6 });
+    const lanes = fiberCheckpoint('lanes_priority', { score: 1.5, sortOrder: 7 });
+
+    const context: AdaptiveInterviewContextPacket = {
+      companyId: 1,
+      interviewId: 12,
+      attemptId: 82,
+      interviewQuestionId: 7,
+      questionText: 'Как работает React Fiber?',
+      referenceAnswer: 'Fiber reconciliation engine',
+      maxScore: 8,
+      badAnswerExamples: [],
+      latestCandidateAnswer: schedulingFollowUp,
+      latestCandidateMessageId: 8,
+      latestAnswerMessageKind: 'follow_up_answer',
+      targetCheckpointKey: 'scheduling',
+      checkpoints: [scheduling, lanes],
+      checkpointStates: [
+        {
+          checkpointKey: 'scheduling',
+          status: 'partial',
+          scoreAwarded: 1.38,
+          maxScore: 2.5,
+          followUpCount: 1,
+        },
+        {
+          checkpointKey: 'lanes_priority',
+          status: 'missed',
+          scoreAwarded: 0,
+          maxScore: 1.5,
+          followUpCount: 0,
+        },
+      ],
+      evidenceSnippets: [],
+      localTurns: [
+        {
+          role: 'candidate',
+          sequenceOrder: 1,
+          content: mainAnswer,
+          messageKind: 'main_answer',
+        },
+        {
+          role: 'candidate',
+          sequenceOrder: 2,
+          content: schedulingFollowUp,
+          messageKind: 'follow_up_answer',
+          targetCheckpointKey: 'scheduling',
+        },
+      ],
+      followUpLimits: {
+        maxPerQuestion: 4,
+        maxPerCheckpoint: 1,
+        usedForQuestion: 1,
+      },
+    };
+
+    const { evaluation } = applyCheckpointScoreFloors(
+      {
+        candidateDisposition: 'engaged',
+        checkpointResults: [
+          {
+            checkpointKey: 'scheduling',
+            status: 'covered',
+            scoreAwarded: 2.1,
+            confidence: 0.9,
+            evidenceSummary: 'scheduler priorities',
+            rationale: 'depth=understands coverage=high accuracy=full',
+          },
+          {
+            checkpointKey: 'lanes_priority',
+            status: 'missed',
+            scoreAwarded: 0,
+            confidence: 0.95,
+            evidenceSummary: null,
+            rationale: 'depth=none coverage=none accuracy=none',
+          },
+        ],
+      },
+      context,
+      { evidenceSource: 'follow_up_answer' },
+    );
+
+    const lanesResult = evaluation.checkpointResults.find(
+      (item) => item.checkpointKey === 'lanes_priority',
+    );
+
+    expect(lanesResult?.scoreAwarded).toBe(0);
+    expect(lanesResult?.status).toBe('missed');
+  });
+
   it('aligns fiber_pointers to covered when AI rationale says accuracy=full depth=knows', () => {
     const pointersAnswer =
       'Fiber-узел с child, sibling, return. Обход: вглубь через child, потом sibling, при тупике return.';

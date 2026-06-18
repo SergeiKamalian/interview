@@ -28,7 +28,7 @@ export const FIBER_EVALUATION_HINTS: Record<string, CheckpointEvaluationHints> =
       positiveFloorScore: 0.85,
     },
     stack_vs_fiber: {
-      complexityTier: 'core_plus',
+      complexityTier: 'intermediate',
       probePolicy: {
         requireProbeBeforeFinalPartial: true,
         minScoreAfterShallowAccept: 0.55,
@@ -49,11 +49,28 @@ export const FIBER_EVALUATION_HINTS: Record<string, CheckpointEvaluationHints> =
         'main thread',
         'shouldYield',
       ],
+      probeConceptGroups: [
+        {
+          match: ['стек', 'call stack', 'синхрон', 'рекурсив', 'React 16'],
+          ask: 'чем stack reconciler отличается от Fiber',
+        },
+      ],
       falseClaims: ['Fiber сделал рендер полностью асинхронным'],
       minMatchedConcepts: 2,
       positiveFloorScore: 0.85,
     },
     fiber_pointers: {
+      complexityTier: 'intermediate',
+      probePolicy: {
+        requireProbeBeforeFinalPartial: true,
+        minScoreAfterShallowAccept: 0.55,
+      },
+      probeConceptGroups: [
+        {
+          match: ['child', 'потомок', 'sibling', 'return', 'alternate'],
+          ask: 'child, sibling, return и alternate/current в fiber-узле',
+        },
+      ],
       mustConcepts: [
         'child',
         'sibling',

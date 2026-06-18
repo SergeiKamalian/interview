@@ -32,6 +32,7 @@ export const perTurnCheckpointEvaluationResponseSchema =
         'confused',
         'off_topic',
         'misunderstood_question',
+        'asked_for_scope',
       )
       .required(),
     checkpoint_results: Joi.array()

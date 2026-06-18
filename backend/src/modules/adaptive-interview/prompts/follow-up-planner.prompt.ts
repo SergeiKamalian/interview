@@ -7,7 +7,7 @@ import {
 } from './interviewer-voice.prompt';
 
 export const FOLLOW_UP_PLANNER_PROMPT_KEY = 'follow_up_planner';
-export const FOLLOW_UP_PLANNER_PROMPT_VERSION = '2.8.0';
+export const FOLLOW_UP_PLANNER_PROMPT_VERSION = '2.9.0';
 
 const RESPONSE_JSON_SCHEMA = `{
   "follow_up_question": "interviewer «я» → candidate «вы»: varied short opener (not «Понял, спасибо» every time) or none, then ONE direct follow-up question in Russian — never quote the candidate's words",
@@ -21,7 +21,7 @@ export type FollowUpPlannerPromptInput = {
   checkpointExpected: string;
   latestCandidateAnswer: string;
   previousFollowUpQuestions: string[];
-  followUpKind?: 'depth_probe' | 'residual_probe' | 'topic_redirect' | 'generic';
+  followUpKind?: 'depth_probe' | 'residual_probe' | 'topic_redirect' | 'clarification_redirect' | 'generic';
   missingMustConcepts?: string[];
   followUpBudgetBlock?: string;
   answeredCheckpointTitle?: string | null;
@@ -126,7 +126,21 @@ function buildSharedUserContext(input: FollowUpPlannerPromptInput): string {
               '- Ask them to answer the original topic',
               '- Do NOT scold; sound like a helpful interviewer',
             ].join('\n')
-          : '';
+          : input.followUpKind === 'clarification_redirect'
+            ? [
+                '',
+                'Scope clarification redirect (candidate asked what you mean or wants confirmation):',
+                `They did NOT answer yet — they asked for scope or confirmation («что именно?», «вы говорите о … да?»).`,
+                (input.missingMustConcepts?.length ?? 0) > 0
+                  ? `Name the specific concepts you meant: ${input.missingMustConcepts!.join(', ')}`
+                  : `Stay on topic: ${sanitizeTopicHint(input.checkpointExpected)}`,
+                'Write ONE short clarifying reply in Russian (interviewer «я» → candidate «вы»):',
+                '- If they asked «вы говорите о X да?» — start with «Да, именно про …» (or «Нет, речь про …» if they guessed wrong)',
+                '- ONE short sentence to confirm scope, ONE invite to explain — do NOT repeat the full previous probe verbatim',
+                '- Do NOT re-list every concept in a long checklist; pick 1–2 plain terms',
+                '- Do NOT switch to another main question',
+              ].join('\n')
+            : '';
 
   return [
     'Main interview question:',

@@ -19,7 +19,7 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
     'positiveFloorScore', 0.85
   )
   WHEN 'stack_vs_fiber' THEN JSON_OBJECT(
-    'complexityTier', 'core_plus',
+    'complexityTier', 'intermediate',
     'probePolicy', JSON_OBJECT(
       'requireProbeBeforeFinalPartial', true,
       'minScoreAfterShallowAccept', 0.55
@@ -40,6 +40,17 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
     'positiveFloorScore', 0.85
   )
   WHEN 'fiber_pointers' THEN JSON_OBJECT(
+    'complexityTier', 'intermediate',
+    'probePolicy', JSON_OBJECT(
+      'requireProbeBeforeFinalPartial', true,
+      'minScoreAfterShallowAccept', 0.55
+    ),
+    'probeConceptGroups', JSON_ARRAY(
+      JSON_OBJECT(
+        'match', JSON_ARRAY('child', 'потомок', 'sibling', 'return', 'alternate'),
+        'ask', 'child, sibling, return и alternate/current в fiber-узле'
+      )
+    ),
     'mustConcepts', JSON_ARRAY('child', 'sibling', 'return', 'alternate', 'current', 'потомок', 'обход'),
     'falseClaims', JSON_ARRAY('parent и next', 'лежат в Redux', 'Virtual DOM хранит'),
     'neutralMetaphors', JSON_ARRAY('карточка', 'рабочий узел', 'рабочая единица'),

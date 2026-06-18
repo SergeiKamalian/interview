@@ -27,6 +27,7 @@ import {
   isFullQuestionDecline,
   shouldSkipFollowUps,
 } from '../utils/candidate-decline.util';
+import { resolveScopeClarificationDisposition } from '../utils/candidate-clarification.util';
 import { MediaAssetService } from '../../media/media-asset.service';
 import { MainQuestionOpenerService } from './main-question-opener.service';
 
@@ -407,11 +408,23 @@ export class AdaptiveInterviewSubmitService {
       });
     }
 
+    let candidateDisposition =
+      evaluation.status === 'valid' ? evaluation.candidateDisposition : null;
+    if (evaluation.status === 'valid') {
+      candidateDisposition = resolveScopeClarificationDisposition({
+        answer: trimmedAnswer,
+        aiDisposition: evaluation.candidateDisposition,
+        isTargetedFollowUp:
+          isFollowUpAnswer && Boolean(contextPacket.targetCheckpointKey),
+        isFollowUpContext: isFollowUpAnswer,
+      });
+    }
+
     if (
       evaluation.status === 'valid' &&
       shouldSkipFollowUps({
         answer: trimmedAnswer,
-        aiDisposition: evaluation.candidateDisposition,
+        aiDisposition: candidateDisposition,
         followUpsUsedForQuestion: contextPacket.followUpLimits.usedForQuestion,
       }) &&
       !isFullQuestionDecline(trimmedAnswer)
@@ -419,7 +432,7 @@ export class AdaptiveInterviewSubmitService {
       logAdaptiveAiDebug(this.logger, 'submit_answer.candidate_declined_ai', {
         attemptId,
         interviewQuestionId: currentQuestion.id,
-        candidateDisposition: evaluation.candidateDisposition,
+        candidateDisposition,
       });
 
       await this.checkpointStateService.applyCandidateDeclinedKnowledge({
@@ -457,9 +470,7 @@ export class AdaptiveInterviewSubmitService {
             ? evaluation.suggestedFollowUp
             : undefined,
         candidateDispositionFromAi:
-          evaluation.status === 'valid'
-            ? evaluation.candidateDisposition
-            : undefined,
+          evaluation.status === 'valid' ? candidateDisposition : undefined,
         followUpsUsedForQuestion: contextPacket.followUpLimits.usedForQuestion,
         avoidLlmFallback: evaluation.status === 'valid',
         recentScoreDeltas: isFollowUpAnswer ? [scoreDelta] : undefined,

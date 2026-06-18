@@ -1,4 +1,6 @@
 import type { AdaptiveCheckpointDefinition } from '../types/adaptive-interview-context.types';
+import type { CandidateAnswerDisposition } from '../types/candidate-answer-disposition.type';
+import { isScopeClarificationTurn } from './candidate-clarification.util';
 import type { ConfusionPair } from '../types/checkpoint-evaluation-hints.type';
 import { countMatchedConcepts } from './text-evidence-overlap.util';
 import { hasTransitiveRedirectExhausted, hasWrongTopicAnchorTerms } from './transitive-checkpoint-floors.util';
@@ -44,7 +46,31 @@ export function detectTopicMismatch(input: {
     rationale?: string | null;
     followUpCount?: number;
   }>;
+  candidateDispositionFromAi?: CandidateAnswerDisposition | null;
+  isTargetedFollowUp?: boolean;
+  isFollowUpContext?: boolean;
 }): TopicMismatchDetection {
+  const answer = input.latestCandidateAnswer.trim();
+  const inFollowUpDialogue =
+    input.isTargetedFollowUp === true || input.isFollowUpContext === true;
+
+  if (
+    isScopeClarificationTurn({
+      answer,
+      aiDisposition: input.candidateDispositionFromAi,
+      isTargetedFollowUp: input.isTargetedFollowUp ?? false,
+      isFollowUpContext: inFollowUpDialogue,
+    })
+  ) {
+    return {
+      isMismatch: false,
+      answeredCheckpointKey: null,
+      expectedCheckpointKey: input.expectedCheckpointKey,
+      confidence: 0,
+      reason: 'scope_clarification_meta_turn',
+    };
+  }
+
   const expectedCheckpoint = input.checkpoints.find(
     (checkpoint) => checkpoint.checkpointKey === input.expectedCheckpointKey,
   );
@@ -65,7 +91,6 @@ export function detectTopicMismatch(input: {
     };
   }
 
-  const answer = input.latestCandidateAnswer.trim();
   if (!answer || !expectedCheckpoint) {
     return {
       isMismatch: false,
@@ -316,7 +341,14 @@ function humanizeCheckpointTitle(title: string): string {
     return 'useState';
   }
 
-  return normalized.charAt(0).toLowerCase() + normalized.slice(1);
+  const withoutRubricLead = normalized
+    .replace(/^понимает[,]?\s+/i, '')
+    .replace(/^объясняет\s+/i, '')
+    .replace(/^знает\s+/i, '')
+    .trim();
+
+  const topic = withoutRubricLead || normalized;
+  return topic.charAt(0).toLowerCase() + topic.slice(1);
 }
 
 export function appendTopicRedirectPendingRationale(

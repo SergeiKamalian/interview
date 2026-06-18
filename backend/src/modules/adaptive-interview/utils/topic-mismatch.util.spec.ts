@@ -182,3 +182,50 @@ describe('follow-up-policy topic redirect', () => {
     }
   });
 });
+
+describe('topic mismatch vs scope clarification', () => {
+  it('does not treat scope confirmation as topic mismatch when AI says misunderstood_question', () => {
+    const detection = detectTopicMismatch({
+      expectedCheckpointKey: 'fiber_definition',
+      latestCandidateAnswer: 'Вы говорите про render и commit phase, да?',
+      checkpoints: [
+        {
+          checkpointKey: 'fiber_definition',
+          title: 'Понимает, что такое Fiber',
+          expected: 'reconciliation, render phase, commit phase',
+          score: 2,
+          sortOrder: 0,
+          evaluationHints: {
+            mustConcepts: ['render phase', 'commit phase', 'reconciliation'],
+          },
+        },
+      ],
+      checkpointResults: [
+        {
+          checkpointKey: 'fiber_definition',
+          status: 'missed',
+          scoreAwarded: 0,
+          rationale: 'coverage=none accuracy=none',
+        },
+      ],
+      candidateDispositionFromAi: 'misunderstood_question',
+      isTargetedFollowUp: true,
+    });
+
+    expect(detection.isMismatch).toBe(false);
+    expect(detection.reason).toBe('scope_clarification_meta_turn');
+  });
+
+  it('humanizes rubric checkpoint titles for redirect copy', () => {
+    expect(
+      buildTopicRedirectFollowUpQuestion({
+        expectedCheckpointTitle: 'Понимает, что такое Fiber',
+      }),
+    ).toContain('что такое Fiber');
+    expect(
+      buildTopicRedirectFollowUpQuestion({
+        expectedCheckpointTitle: 'Понимает, что такое Fiber',
+      }),
+    ).not.toContain('понимает, что');
+  });
+});

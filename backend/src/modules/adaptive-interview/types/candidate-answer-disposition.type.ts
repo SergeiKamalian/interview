@@ -3,4 +3,5 @@ export type CandidateAnswerDisposition =
   | 'declined'
   | 'confused'
   | 'off_topic'
-  | 'misunderstood_question';
+  | 'misunderstood_question'
+  | 'asked_for_scope';

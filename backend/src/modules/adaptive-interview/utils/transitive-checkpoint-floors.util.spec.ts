@@ -118,6 +118,65 @@ describe('transitive-checkpoint-floors', () => {
     expect(outcome.applications).toHaveLength(0);
   });
 
+  it('does not raise transitive floor when target has coverage none and no direct evidence', () => {
+    const scheduling = fiberCheckpoint('scheduling', { score: 2.5, sortOrder: 6 });
+    const lanes = fiberCheckpoint('lanes_priority', { score: 1.5, sortOrder: 7 });
+
+    const outcome = applyTransitiveCheckpointFloors({
+      checkpoints: [scheduling, lanes],
+      entries: [
+        {
+          checkpointKey: 'scheduling',
+          checkpoint: scheduling,
+          guardedResult: {
+            checkpointKey: 'scheduling',
+            status: 'covered',
+            scoreAwarded: 2.13,
+            rationale:
+              'depth=understands coverage=high accuracy=full',
+          },
+          priorState: {
+            checkpointKey: 'scheduling',
+            status: 'covered',
+            scoreAwarded: 2.13,
+            maxScore: 2.5,
+            followUpCount: 1,
+            rationale: 'depth=understands coverage=high accuracy=full',
+          },
+          checkpointEvidenceText:
+            'Scheduler MessageChannel shouldYield yield startTransition',
+          latestCandidateText:
+            'Scheduler MessageChannel shouldYield yield startTransition приоритет',
+          questionMaxScore: 8,
+        },
+        {
+          checkpointKey: 'lanes_priority',
+          checkpoint: lanes,
+          guardedResult: {
+            checkpointKey: 'lanes_priority',
+            status: 'missed',
+            scoreAwarded: 0,
+            rationale: 'depth=none coverage=none accuracy=none',
+          },
+          priorState: {
+            checkpointKey: 'lanes_priority',
+            status: 'missed',
+            scoreAwarded: 0,
+            maxScore: 1.5,
+            followUpCount: 0,
+          },
+          checkpointEvidenceText: '',
+          latestCandidateText:
+            'Scheduler MessageChannel shouldYield yield startTransition приоритет',
+          questionMaxScore: 8,
+        },
+      ],
+    });
+
+    expect(outcome.applications).toHaveLength(0);
+    expect(outcome.floorsByKey.get('lanes_priority')).toBeUndefined();
+  });
+
   it('integrates with applyCheckpointScoreFloors for stack_vs_fiber → fiber_definition', () => {
     const context: AdaptiveInterviewContextPacket = {
       interviewQuestionId: 7,

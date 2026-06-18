@@ -482,3 +482,27 @@ docs/tasks/
 Cursor-промпты будут даваться маленькими частями.
 
 Каждый шаг должен быть проверяемым и фиксироваться в task-файлах.
+
+---
+
+## 2026-06-18 — Candidate Turn Classifier вместо regex intent detection
+
+### Решение
+
+Намерение кандидата (ответ vs уточнение vs отказ) определяется **одним маленьким LLM-вызовом** `CandidateTurnClassifier` с полем `turn_kind`, а не hardcoded regex по фразам.
+
+Regex остаётся только для:
+- парсинга structured tags от evaluator (`depth=`, `probe=pending`);
+- string transform для UX (rubric → «вы»);
+- генерации clarification reply (парсинг «X или Y»), не для классификации intent.
+
+### Причина
+
+~90 regexp-паттернов в `candidate-clarification`, `candidate-decline`, `topic-opener` дают false positive/negative, перебивают AI disposition и не масштабируются. TASK-14.27 закрыл один кейс interim fix'ом — нужна архитектурная замена.
+
+### Последствия
+
+- Новый pipeline: `classifyTurn()` → policy → (optional) `evaluate_turn()` для substantive.
+- Subtasks 14.28–14.31 в блоке 14.
+- Design doc: `docs/evaluation-accuracy/candidate-turn-classifier.md`.
+- `legacy-contradiction-cap` (technical false claims) выносится в волну 2 через question bank hints.

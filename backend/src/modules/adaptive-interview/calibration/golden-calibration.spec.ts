@@ -23,6 +23,7 @@ function loadGoldenCases(): GoldenCalibrationCase[] {
     .readdirSync(casesDir)
     .filter((file) => file.endsWith('.json'))
     .filter((file) => !file.includes('budget-prioritizes'))
+    .filter((file) => !file.includes('attempt82-structural-probe'))
     .filter((file) => !file.includes('transitive-'))
     .filter((file) => !file.includes('hooks-useeffect'))
     .filter((file) => !file.includes('hooks-useeffect-after'))

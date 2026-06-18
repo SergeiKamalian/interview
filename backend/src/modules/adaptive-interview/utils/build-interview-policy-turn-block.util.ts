@@ -129,6 +129,9 @@ export function buildInterviewPolicyTurnBlock(
     latestCandidateAnswer: context.latestCandidateAnswer,
     checkpoints: context.checkpoints,
     checkpointStates: context.checkpointStates,
+    isTargetedFollowUp:
+      context.latestAnswerMessageKind === 'follow_up_answer' &&
+      Boolean(context.targetCheckpointKey),
   });
   const topicFocusLines =
     topicMismatch.isMismatch
@@ -175,6 +178,18 @@ export function buildInterviewPolicyTurnBlock(
     '- Do NOT expect depth probe on checkpoints listed under Skipped (low priority) — apply shallow accept',
     '- Rationale MUST include probe=pending when details were not asked yet',
   );
+
+  if (
+    context.latestAnswerMessageKind === 'follow_up_answer' &&
+    context.targetCheckpointKey
+  ) {
+    lines.push(
+      '',
+      'Scope clarification:',
+      '- If latest candidate message is ONLY meta (clarify/confirm your follow-up, any wording) → candidate_disposition=asked_for_scope',
+      '- On asked_for_scope: freeze targeted checkpoint score at prior value; no new evidence this turn',
+    );
+  }
 
   return {
     targetCheckpointKey: targetKey,

@@ -231,6 +231,14 @@ export function allocateFollowUpBudget(input: {
   };
 }
 
+export function hasPendingRequiredProbe(input: {
+  candidates: BudgetAllocatorCandidate[];
+}): boolean {
+  return input.candidates.some(
+    (candidate) => candidate.isProbeRequired || candidate.isResidualGapRequired,
+  );
+}
+
 export function hasProbeRequiredAbovePriority(input: {
   candidates: BudgetAllocatorCandidate[];
   config: FollowUpBudgetConfig;

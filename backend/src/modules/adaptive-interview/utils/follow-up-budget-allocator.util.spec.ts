@@ -2,6 +2,7 @@ import { fiberCheckpoint } from './fiber-evaluation-hints.fixture';
 import {
   allocateFollowUpBudget,
   buildBudgetAllocatorCandidate,
+  hasPendingRequiredProbe,
   maxFollowUpsForCheckpoint,
 } from './follow-up-budget-allocator.util';
 
@@ -53,7 +54,7 @@ describe('follow-up-budget-allocator', () => {
 
     expect(allocation.canProbe).toBe(true);
     expect(allocation.selectedCheckpointKey).toBe('scheduling');
-    expect(allocation.skippedLowPriority).toContain('fiber_pointers');
+    expect(allocation.skippedLowPriority).not.toContain('fiber_pointers');
   });
 
   it('gives heavy checkpoint cap of 2', () => {
@@ -90,14 +91,59 @@ describe('follow-up-budget-allocator', () => {
   });
 
   it('skips low-priority checkpoints below minPriorityToProbe', () => {
+    const checkpoint = fiberCheckpoint('fiber_definition', { score: 0.5 });
+    const candidate = buildBudgetAllocatorCandidate({
+      checkpoint,
+      state: {
+        checkpointKey: 'fiber_definition',
+        status: 'partial',
+        scoreAwarded: 0.25,
+        maxScore: 0.5,
+        followUpCount: 0,
+        rationale: 'depth=partial_knowledge coverage=low accuracy=partial',
+      },
+      questionMaxScore: 8,
+      candidateEvidenceText: 'Fiber reconciliation.',
+      latestCandidateText: 'Fiber reconciliation.',
+      config: budgetConfig,
+    });
+
     const allocation = allocateFollowUpBudget({
-      candidates: [buildCandidate('fiber_pointers')],
+      candidates: [candidate],
       followUpsUsedForQuestion: 0,
       config: budgetConfig,
     });
 
     expect(allocation.canProbe).toBe(false);
     expect(allocation.reason).toBe('low_probe_priority');
-    expect(allocation.skippedLowPriority).toEqual(['fiber_pointers']);
+    expect(allocation.skippedLowPriority).toEqual(['fiber_definition']);
+  });
+
+  it('hasPendingRequiredProbe is true when probeRequired even below minPriority', () => {
+    const checkpoint = fiberCheckpoint('stack_vs_fiber', { score: 1.5 });
+    const candidate = buildBudgetAllocatorCandidate({
+      checkpoint,
+      state: {
+        checkpointKey: 'stack_vs_fiber',
+        status: 'missed',
+        scoreAwarded: 0,
+        maxScore: 1.5,
+        followUpCount: 0,
+        rationale: 'depth=none coverage=none accuracy=none',
+      },
+      questionMaxScore: 8,
+      candidateEvidenceText: attempt82MainAnswer,
+      latestCandidateText: attempt82MainAnswer,
+      config: budgetConfig,
+    });
+
+    expect(candidate.isProbeRequired).toBe(true);
+    expect(candidate.priorityResult.priority).toBeLessThan(
+      budgetConfig.minPriorityToProbe,
+    );
+    expect(hasPendingRequiredProbe({ candidates: [candidate] })).toBe(true);
   });
 });
+
+const attempt82MainAnswer =
+  'React Fiber — reconciliation engine с render и commit phase и приоритетами.';

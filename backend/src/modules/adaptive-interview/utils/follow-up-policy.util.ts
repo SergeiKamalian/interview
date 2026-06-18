@@ -10,6 +10,12 @@ import {
   rephraseCheckpointTitleForFollowUp,
 } from './checkpoint-expected-speech.util';
 import {
+  buildClarificationFollowUpQuestion,
+  countScopeClarificationTurns,
+  isScopeClarificationTurn,
+  MAX_SCOPE_CLARIFICATION_TURNS_PER_QUESTION,
+} from './candidate-clarification.util';
+import {
   resolveSkipFollowUpReason,
   shouldSkipFollowUps,
 } from './candidate-decline.util';
@@ -22,7 +28,7 @@ import {
   allocateFollowUpBudget,
   buildBudgetAllocatorCandidate,
   type FollowUpBudgetConfig,
-  hasProbeRequiredAbovePriority,
+  hasPendingRequiredProbe,
   maxFollowUpsForCheckpoint,
 } from './follow-up-budget-allocator.util';
 import {
@@ -105,6 +111,14 @@ export function evaluateFollowUpPolicy(
     input.checkpoints.map((checkpoint) => [checkpoint.checkpointKey, checkpoint]),
   );
 
+  const clarificationDecision = resolveClarificationFollowUpDecision(
+    input,
+    checkpointByKey,
+  );
+  if (clarificationDecision) {
+    return clarificationDecision;
+  }
+
   const topicRedirectDecision = resolveTopicRedirectDecision(input, checkpointByKey);
   if (topicRedirectDecision) {
     return topicRedirectDecision;
@@ -149,17 +163,18 @@ export function evaluateFollowUpPolicy(
     const depth = parseDepthFromRationale(state.rationale ?? null);
     return depth === 'mention_only' || depth === 'heard_of';
   });
-  const pendingRequiredProbe = hasProbeRequiredAbovePriority({
+  const pendingRequiredProbe = hasPendingRequiredProbe({
     candidates: allocatorCandidates,
-    config: budgetConfig,
   });
   const pendingTopicRedirect = hasPendingTopicRedirect(input);
+  const pendingScopeClarification = hasPendingScopeClarification(input);
 
   if (
     questionScoreSufficient &&
     !hasMentionOnlyMissed &&
     !pendingRequiredProbe &&
-    !pendingTopicRedirect
+    !pendingTopicRedirect &&
+    !pendingScopeClarification
   ) {
     return {
       shouldAskFollowUp: false,
@@ -248,6 +263,115 @@ export function evaluateFollowUpPolicy(
   };
 }
 
+function resolveScopeTurnContext(input: FollowUpPolicyInput): {
+  isTargetedFollowUp: boolean;
+  isFollowUpContext: boolean;
+} {
+  return {
+    isTargetedFollowUp: Boolean(input.stickyTargetCheckpointKey),
+    isFollowUpContext:
+      input.isFollowUpAnswer === true ||
+      (input.followUpsUsedForQuestion ?? 0) > 0,
+  };
+}
+
+function resolveClarificationFollowUpDecision(
+  input: FollowUpPolicyInput,
+  checkpointByKey: Map<string, FollowUpPolicyInput['checkpoints'][number]>,
+): FollowUpPolicyDecision | null {
+  const latestAnswer = input.latestCandidateAnswer ?? '';
+  const scopeContext = resolveScopeTurnContext(input);
+  const isScopeAsk = isScopeClarificationTurn({
+    answer: latestAnswer,
+    aiDisposition: input.candidateDispositionFromAi,
+    ...scopeContext,
+  });
+
+  if (!isScopeAsk) {
+    return null;
+  }
+
+  const targetKey =
+    input.stickyTargetCheckpointKey ??
+    inferExpectedCheckpointKey({
+      checkpoints: input.checkpoints,
+      targetCheckpointKey: input.stickyTargetCheckpointKey,
+      questionText: input.questionText,
+    });
+
+  if (!targetKey) {
+    return null;
+  }
+
+  const scopeTurnCount = countScopeClarificationTurns({
+    localTurns: input.localTurns ?? [],
+    latestCandidateAnswer: latestAnswer,
+    candidateDispositionFromAi: input.candidateDispositionFromAi,
+    isTargetedFollowUp:
+      scopeContext.isTargetedFollowUp || Boolean(targetKey),
+    isFollowUpContext: scopeContext.isFollowUpContext,
+  });
+
+  if (scopeTurnCount > MAX_SCOPE_CLARIFICATION_TURNS_PER_QUESTION) {
+    return {
+      shouldAskFollowUp: false,
+      reason: 'scope_clarification_exhausted',
+    };
+  }
+
+  const checkpoint = checkpointByKey.get(targetKey);
+  if (!checkpoint) {
+    return null;
+  }
+
+  const state = input.checkpointStates.find(
+    (item) => item.checkpointKey === targetKey,
+  );
+  if (!state) {
+    return null;
+  }
+
+  const evidenceText = getCheckpointEvidenceText(input, targetKey);
+  const missingMustConcepts = getMissingMustConcepts(
+    checkpoint.evaluationHints,
+    evidenceText,
+  );
+
+  return {
+    shouldAskFollowUp: true,
+    targetCheckpointKey: targetKey,
+    checkpointTitle: checkpoint.title,
+    checkpointExpected: checkpoint.expected,
+    reason: 'candidate_asked_for_scope',
+    followUpKind: 'clarification_redirect',
+    missingMustConcepts,
+  };
+}
+
+function hasPendingScopeClarification(input: FollowUpPolicyInput): boolean {
+  const latestAnswer = input.latestCandidateAnswer ?? '';
+  const scopeContext = resolveScopeTurnContext(input);
+  const isScopeAsk = isScopeClarificationTurn({
+    answer: latestAnswer,
+    aiDisposition: input.candidateDispositionFromAi,
+    ...scopeContext,
+  });
+
+  if (!isScopeAsk) {
+    return false;
+  }
+
+  const scopeTurnCount = countScopeClarificationTurns({
+    localTurns: input.localTurns ?? [],
+    latestCandidateAnswer: latestAnswer,
+    candidateDispositionFromAi: input.candidateDispositionFromAi,
+    isTargetedFollowUp: scopeContext.isTargetedFollowUp,
+    isFollowUpContext: scopeContext.isFollowUpContext,
+  });
+
+  return scopeTurnCount <= MAX_SCOPE_CLARIFICATION_TURNS_PER_QUESTION;
+}
+
 function resolveTopicRedirectDecision(
   input: FollowUpPolicyInput,
   checkpointByKey: Map<string, FollowUpPolicyInput['checkpoints'][number]>,
@@ -272,13 +396,28 @@ function resolveTopicRedirectDecision(
     return null;
   }
 
+  const scopeContext = resolveScopeTurnContext(input);
+
   const mismatch = detectTopicMismatch({
     expectedCheckpointKey,
     latestCandidateAnswer: input.latestCandidateAnswer ?? '',
     checkpoints: input.checkpoints,
     checkpointResults: input.latestCheckpointResults,
     checkpointStates: input.checkpointStates,
+    candidateDispositionFromAi: input.candidateDispositionFromAi,
+    isTargetedFollowUp: scopeContext.isTargetedFollowUp,
+    isFollowUpContext: scopeContext.isFollowUpContext,
   });
+
+  if (
+    isScopeClarificationTurn({
+      answer: input.latestCandidateAnswer ?? '',
+      aiDisposition: input.candidateDispositionFromAi,
+      ...scopeContext,
+    })
+  ) {
+    return null;
+  }
 
   const shouldRedirect =
     !(
@@ -309,6 +448,17 @@ function resolveTopicRedirectDecision(
 }
 
 function hasPendingTopicRedirect(input: FollowUpPolicyInput): boolean {
+  const scopeContext = resolveScopeTurnContext(input);
+  if (
+    isScopeClarificationTurn({
+      answer: input.latestCandidateAnswer ?? '',
+      aiDisposition: input.candidateDispositionFromAi,
+      ...scopeContext,
+    })
+  ) {
+    return false;
+  }
+
   if (input.candidateDispositionFromAi === 'misunderstood_question') {
     return true;
   }
@@ -432,7 +582,7 @@ export function buildNaturalTemplateFollowUp(input: {
   previousFollowUpQuestions?: string[];
   seed?: number;
   missingMustConcepts?: string[];
-  followUpKind?: 'depth_probe' | 'residual_probe' | 'topic_redirect' | 'generic';
+  followUpKind?: 'depth_probe' | 'residual_probe' | 'topic_redirect' | 'clarification_redirect' | 'generic';
   evaluationHints?: CheckpointEvaluationHints | null;
   answeredCheckpointTitle?: string | null;
   targetScoreAwarded?: number;
@@ -455,6 +605,24 @@ export function buildNaturalTemplateFollowUp(input: {
       buildTopicRedirectFollowUpQuestion({
         expectedCheckpointTitle: input.checkpointTitle ?? '',
         answeredCheckpointTitle: input.answeredCheckpointTitle,
+      }),
+    );
+  }
+
+  if (
+    input.followUpKind === 'clarification_redirect' &&
+    (input.missingMustConcepts?.length ?? 0) >= 0
+  ) {
+    return normalizeFollowUpQuestionForCandidate(
+      buildClarificationFollowUpQuestion({
+        checkpointTitle: input.checkpointTitle ?? '',
+        missingMustConcepts: input.missingMustConcepts ?? [],
+        hints: input.evaluationHints,
+        candidateScopeQuestion: input.latestCandidateAnswer,
+        previousFollowUpQuestion:
+          previousFollowUpQuestions[previousFollowUpQuestions.length - 1] ??
+          null,
+        seed,
       }),
     );
   }

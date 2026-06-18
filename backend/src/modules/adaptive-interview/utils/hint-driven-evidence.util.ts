@@ -3,6 +3,38 @@ import { matchesCheckpointFalseClaims } from './bad-answer-signature.util';
 import { countMatchedConcepts, textContainsPhrase } from './text-evidence-overlap.util';
 import { getLegacyContradictionScoreCap } from './legacy-contradiction-cap.util';
 
+/** True when cumulative text for this checkpoint mentions its mustConcepts or concept groups. */
+export function hasDirectCheckpointEvidence(
+  hints: CheckpointEvaluationHints | null | undefined,
+  checkpointEvidenceText: string,
+): boolean {
+  const text = checkpointEvidenceText.trim();
+  if (!text) {
+    return false;
+  }
+
+  const mustConcepts = hints?.mustConcepts ?? [];
+  if (mustConcepts.length > 0) {
+    const minMatched = hints?.minMatchedConcepts ?? 1;
+    if (countMatchedConcepts(text, mustConcepts) >= minMatched) {
+      return true;
+    }
+  }
+
+  const groups = hints?.requiredConceptGroups ?? [];
+  for (const group of groups) {
+    if (group.some((concept) => textContainsPhrase(text, concept))) {
+      return true;
+    }
+  }
+
+  if (mustConcepts.length === 0 && groups.length === 0) {
+    return true;
+  }
+
+  return false;
+}
+
 export function getPositiveEvidenceScoreFloor(
   hints: CheckpointEvaluationHints | null | undefined,
   latestCandidateText: string,

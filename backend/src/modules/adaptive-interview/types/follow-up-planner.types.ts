@@ -65,6 +65,9 @@ export type FollowUpPolicyInput = {
     rationale?: string | null;
   }>;
   questionText?: string;
+  localTurns?: AdaptiveInterviewContextPacket['localTurns'];
+  previousFollowUpQuestions?: string[];
+  isFollowUpAnswer?: boolean;
 };
 
 export type FollowUpPolicyDecision =
@@ -78,7 +81,7 @@ export type FollowUpPolicyDecision =
       checkpointTitle: string;
       checkpointExpected: string;
       reason: string;
-      followUpKind?: 'depth_probe' | 'residual_probe' | 'topic_redirect' | 'generic';
+      followUpKind?: 'depth_probe' | 'residual_probe' | 'topic_redirect' | 'clarification_redirect' | 'generic';
       missingMustConcepts?: string[];
       answeredCheckpointKey?: string | null;
     };

@@ -38,6 +38,50 @@ describe('probe-policy.util', () => {
     ).toBe(true);
   });
 
+  it('requires probe for missed structural fiber_pointers without evidence', () => {
+    const answer =
+      'React Fiber обновляет интерфейс по частям, render phase и commit phase.';
+
+    expect(
+      probeRequired({
+        checkpoint: fiberCheckpoint('fiber_pointers', { score: 1 }),
+        state: {
+          status: 'missed',
+          scoreAwarded: 0,
+          maxScore: 1,
+          followUpCount: 0,
+          rationale: 'coverage=none, accuracy=none',
+        },
+        hints: FIBER_EVALUATION_HINTS.fiber_pointers,
+        questionMaxScore: 8,
+        candidateEvidenceText: answer,
+        latestCandidateText: answer,
+      }),
+    ).toBe(true);
+  });
+
+  it('requires probe for missed stack_vs_fiber without stack comparison', () => {
+    const answer =
+      'React Fiber обновляет интерфейс по частям, render phase и commit phase.';
+
+    expect(
+      probeRequired({
+        checkpoint: fiberCheckpoint('stack_vs_fiber', { score: 1.5 }),
+        state: {
+          status: 'missed',
+          scoreAwarded: 0,
+          maxScore: 1.5,
+          followUpCount: 0,
+          rationale: 'coverage=none, accuracy=none',
+        },
+        hints: FIBER_EVALUATION_HINTS.stack_vs_fiber,
+        questionMaxScore: 8,
+        candidateEvidenceText: answer,
+        latestCandidateText: answer,
+      }),
+    ).toBe(true);
+  });
+
   it('does not require probe for basic tier checkpoint', () => {
     const checkpoint = fiberCheckpoint('fiber_definition', { score: 1 });
     const answer =

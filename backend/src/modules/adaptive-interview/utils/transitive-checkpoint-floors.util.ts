@@ -6,7 +6,9 @@ import type { ImpliesCheckpointFloor } from '../types/checkpoint-evaluation-hint
 import type { PerTurnCheckpointEvaluationStatus } from '../types/per-turn-evaluation.types';
 import {
   getPositiveEvidenceScoreFloor,
+  hasDirectCheckpointEvidence,
 } from './hint-driven-evidence.util';
+import { parseCoverageFromRationale } from './checkpoint-depth.util';
 import { textContainsPhrase } from './text-evidence-overlap.util';
 
 const DEFAULT_MIN_SOURCE_SCORE_FRACTION = 0.75;
@@ -109,6 +111,10 @@ function applyEdgeFloor(input: {
     return;
   }
 
+  if (!targetEligibleForTransitiveFloor(targetEntry)) {
+    return;
+  }
+
   const targetScore = targetEntry.guardedResult.scoreAwarded;
   if (
     targetEntry.guardedResult.status === 'covered' &&
@@ -170,6 +176,23 @@ function isStrongTransitiveSource(entry: TransitiveGuardedCheckpoint): boolean {
     guardedResult.status === 'covered' || followUpCount >= 1;
 
   return closedEnough;
+}
+
+function targetEligibleForTransitiveFloor(
+  targetEntry: TransitiveGuardedCheckpoint,
+): boolean {
+  const coverage = parseCoverageFromRationale(
+    targetEntry.guardedResult.rationale,
+  );
+
+  if (coverage !== 'none') {
+    return true;
+  }
+
+  return hasDirectCheckpointEvidence(
+    targetEntry.checkpoint.evaluationHints,
+    targetEntry.checkpointEvidenceText,
+  );
 }
 
 export function appendTransitiveFloorRationale(

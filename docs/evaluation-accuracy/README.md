@@ -412,6 +412,7 @@ Dashboard shows per-checkpoint rationale
 
 - Question bank design: `docs/database/schemas/question-bank.md`
 - Adaptive interview block: `docs/tasks/list/09-✅-adaptive-ai-interview/README.md`
+- **Candidate turn classifier (wave 3):** [`candidate-turn-classifier.md`](./candidate-turn-classifier.md)
 - ITLEAD Fiber reference: https://itlead.org/interview-questions/react/react-fiber-and-virtual-dom-update-process
 - Task block: `docs/tasks/list/14-⬜-evaluation-accuracy-analytics/`
 
@@ -435,4 +436,56 @@ Prompt version override: `PER_TURN_EVAL_PROMPT_VERSION=2.5.0` (see `.env.example
 
 ---
 
-*Last updated: 2026-06-16 — block 14 complete*
+*Last updated: 2026-06-18 — wave 3 intent classifier planned*
+
+---
+
+## 14. Post-14 findings (Attempt 82)
+
+**Reference:** interview `12`, attempt `82` — dashboard `/dashboard/interviews/12?attemptId=82`
+
+| Symptom | Root cause | Subtask |
+|---------|------------|---------|
+| `confidence 95%` на missed выглядит как «кандидат знает» | Поле = уверенность AI в оценке, UI не пояснял | **14.23** ✅ |
+| `fiber_pointers` missed без follow-up | shallow accept + low probe priority | **14.24** ✅ |
+| `lanes_priority` 0% coverage, score 0.85 | transitive/positive floors без evidence | **14.25** ✅ |
+| Fiber 1 follow-up vs lazy 5 | budget + early topic switch | **14.26** ✅ |
+| Vague probe + «Что именно?» → topic switch | meta-ответ не распознан, generic follow-up | **14.27** ✅ (regex fix — interim) |
+| Regex intent detection не масштабируется | ~90 hardcoded patterns, override AI disposition | **14.28–14.31** ⬜ |
+
+QA smoke: прогон public interview с теми же ответами → сравнить dashboard с attempt 82.  
+Attempt 84 (post-14.26): seq 8 → `stack_vs_fiber` (attempt 82: lazy topic_opener).
+
+---
+
+## 15. Wave 3 — Candidate Turn Classifier (AI вместо regex intent)
+
+**Проблема:** TASK-14.27 закрыл конкретный кейс через regex + AI disposition override. Архитектурно это **interim fix** — ~90 regexp-паттернов в intent-слое создают false positive/negative и конфликтуют с evaluator.
+
+**Решение:** отдельный маленький LLM **`CandidateTurnClassifier`** на каждый ответ кандидата. Возвращает `turn_kind` + `confidence` + `reason`. Policy читает только classifier, не regex.
+
+**Полный design (source of truth):** [`candidate-turn-classifier.md`](./candidate-turn-classifier.md)
+
+### turn_kind (краткая таблица)
+
+| turn_kind | Когда | Пример |
+|-----------|-------|--------|
+| `substantive_answer` | Есть техническое содержание (верно или нет) | «Scheduler использует MessageChannel…» |
+| `scope_clarification` | Только meta: о чём вопрос | «Что именно?», «Вы про X или Y?» |
+| `format_clarification` | Как отвечать (кратко/подробно) | «Коротко или с деталями?» |
+| `decline_whole` | Отказ от всего main question | «Не знаю», «Без понятия» |
+| `decline_scoped` | Отказ от одного аспекта | «На lanes не отвечу» |
+| `topic_refusal` | «Давайте дальше» на probe | «Эту часть лучше не трогать» |
+| `confused` | Не понял вопрос (общее) | «Переформулируйте?» |
+| `off_topic` | Не по теме | нерелевантный ответ |
+
+Подробные правила, граничные случаи и примеры — в design doc §3.
+
+### Subtasks
+
+```txt
+14.28 Classifier service + prompt + golden cases  ⬜ START
+14.29 Wire into submit + policy
+14.30 Deprecate intent regex
+14.31 Bank-driven false claims (legacy-contradiction-cap)
+```
