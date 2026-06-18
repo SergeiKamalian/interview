@@ -8,6 +8,8 @@ export type QuestionLookup = {
   id: string;
   code: string;
   name: string;
+  interviewWeight?: number;
+  skill?: QuestionLookup | null;
 };
 
 export type QuestionCheckpoint = {
@@ -35,7 +37,22 @@ export type QuestionListItem = {
   isActive: boolean;
   topic: QuestionLookup;
   profession: QuestionLookup;
-  skills: QuestionLookup[];
+  skills?: QuestionLookup[];
+  checkpoints?: QuestionCheckpoint[];
+  answerExamples?: QuestionAnswerExample[];
+};
+
+export type QuestionDetail = {
+  id: string;
+  questionText: string;
+  level: QuestionLevel;
+  difficulty: QuestionDifficulty;
+  maxScore: number;
+  isActive: boolean;
+  shortAnswer: string;
+  idealAnswer: string;
+  topic: QuestionLookup;
+  profession: QuestionLookup;
   checkpoints: QuestionCheckpoint[];
   answerExamples: QuestionAnswerExample[];
 };

@@ -11,7 +11,7 @@ export class QuestionBankFilterInput {
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(2000)
   limit?: number;
 
   @Field(() => Int, { nullable: true, defaultValue: 0 })

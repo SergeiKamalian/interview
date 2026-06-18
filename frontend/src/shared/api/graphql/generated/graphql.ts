@@ -318,19 +318,26 @@ export type PublishInterviewMutationVariables = Exact<{
 
 export type PublishInterviewMutation = { publishInterview: { id: string, status: InterviewStatus, publicUrl: string, publicToken: string } };
 
+export type QuestionBankListQueryVariables = Exact<{
+  filters?: QuestionBankFilterInput | null | undefined;
+}>;
+
+
+export type QuestionBankListQuery = { questionBank: { total: number, items: Array<{ id: string, questionText: string, level: QuestionLevel, difficulty: QuestionDifficulty, maxScore: number, isActive: boolean, topic: { id: string, code: string, name: string, interviewWeight: number, skill: { id: string, code: string, name: string } | null }, profession: { id: string, code: string, name: string } }> } };
+
 export type QuestionBankQueryVariables = Exact<{
   filters?: QuestionBankFilterInput | null | undefined;
 }>;
 
 
-export type QuestionBankQuery = { questionBank: { total: number, items: Array<{ id: string, questionText: string, level: QuestionLevel, difficulty: QuestionDifficulty, maxScore: number, isActive: boolean, topic: { id: string, code: string, name: string }, profession: { id: string, code: string, name: string }, skills: Array<{ id: string, code: string, name: string }>, checkpoints: Array<{ id: string, checkpointKey: string, title: string, expected: string, score: number, sortOrder: number }>, answerExamples: Array<{ id: string, exampleType: AnswerExampleType, exampleText: string, sortOrder: number }> }> } };
+export type QuestionBankQuery = { questionBank: { total: number, items: Array<{ id: string, questionText: string, level: QuestionLevel, difficulty: QuestionDifficulty, maxScore: number, isActive: boolean, topic: { id: string, code: string, name: string, interviewWeight: number, skill: { id: string, code: string, name: string } | null }, profession: { id: string, code: string, name: string }, skills: Array<{ id: string, code: string, name: string }>, checkpoints: Array<{ id: string, checkpointKey: string, title: string, expected: string, score: number, sortOrder: number }>, answerExamples: Array<{ id: string, exampleType: AnswerExampleType, exampleText: string, sortOrder: number }> }> } };
 
 export type QuestionQueryVariables = Exact<{
   id: string | number;
 }>;
 
 
-export type QuestionQuery = { question: { id: string, questionText: string, level: QuestionLevel, difficulty: QuestionDifficulty, maxScore: number, isActive: boolean, shortAnswer: string, idealAnswer: string, topic: { name: string }, profession: { name: string }, checkpoints: Array<{ title: string, score: number, sortOrder: number }>, answerExamples: Array<{ exampleType: AnswerExampleType, exampleText: string }> } };
+export type QuestionQuery = { question: { id: string, questionText: string, level: QuestionLevel, difficulty: QuestionDifficulty, maxScore: number, isActive: boolean, shortAnswer: string, idealAnswer: string, topic: { id: string, code: string, name: string, interviewWeight: number }, profession: { id: string, code: string, name: string }, checkpoints: Array<{ id: string, checkpointKey: string, title: string, expected: string, score: number, sortOrder: number }>, answerExamples: Array<{ id: string, exampleType: AnswerExampleType, exampleText: string, sortOrder: number }> } };
 
 export type RefreshTokensMutationVariables = Exact<{ [key: string]: never; }>;
 
@@ -882,6 +889,37 @@ export const PublishInterviewDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<PublishInterviewMutation, PublishInterviewMutationVariables>;
+export const QuestionBankListDocument = new TypedDocumentString(`
+    query QuestionBankList($filters: QuestionBankFilterInput) {
+  questionBank(filters: $filters) {
+    total
+    items {
+      id
+      questionText
+      level
+      difficulty
+      maxScore
+      isActive
+      topic {
+        id
+        code
+        name
+        interviewWeight
+        skill {
+          id
+          code
+          name
+        }
+      }
+      profession {
+        id
+        code
+        name
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<QuestionBankListQuery, QuestionBankListQueryVariables>;
 export const QuestionBankDocument = new TypedDocumentString(`
     query QuestionBank($filters: QuestionBankFilterInput) {
   questionBank(filters: $filters) {
@@ -897,6 +935,12 @@ export const QuestionBankDocument = new TypedDocumentString(`
         id
         code
         name
+        interviewWeight
+        skill {
+          id
+          code
+          name
+        }
       }
       profession {
         id
@@ -938,19 +982,29 @@ export const QuestionDocument = new TypedDocumentString(`
     shortAnswer
     idealAnswer
     topic {
+      id
+      code
       name
+      interviewWeight
     }
     profession {
+      id
+      code
       name
     }
     checkpoints {
+      id
+      checkpointKey
       title
+      expected
       score
       sortOrder
     }
     answerExamples {
+      id
       exampleType
       exampleText
+      sortOrder
     }
   }
 }

@@ -33,6 +33,8 @@ export function mapTopicToGraphql(topic: TopicEntity): TopicType {
     id: String(topic.id),
     code: topic.code,
     name: topic.name,
+    interviewWeight: topic.interviewWeight,
+    skill: topic.skill ? mapSkillToGraphql(topic.skill) : null,
   };
 }
 

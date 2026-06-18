@@ -1,4 +1,5 @@
-import { Field, ObjectType } from '@nestjs/graphql';
+import { Field, Float, ObjectType } from '@nestjs/graphql';
+import { SkillType } from './skill.type';
 
 @ObjectType()
 export class TopicType {
@@ -10,4 +11,10 @@ export class TopicType {
 
   @Field()
   name!: string;
+
+  @Field(() => Float)
+  interviewWeight!: number;
+
+  @Field(() => SkillType, { nullable: true })
+  skill?: SkillType | null;
 }

@@ -50,6 +50,15 @@ interface TopicRow extends LookupRow {
   interview_weight: string;
 }
 
+interface TopicWithSkillRow extends TopicRow {
+  skill_lookup_id: number | null;
+  skill_code: string | null;
+  skill_name: string | null;
+  skill_is_active: number | null;
+  skill_created_at: Date | null;
+  skill_updated_at: Date | null;
+}
+
 interface CheckpointRow extends RowDataPacket {
   id: number;
   question_id: number;
@@ -105,7 +114,7 @@ export class QuestionBankRepository {
     companyId: number,
     filters: QuestionBankFilterInput,
   ): Promise<{ items: QuestionWithDetailsEntity[]; total: number }> {
-    const limit = Math.min(Math.max(filters.limit ?? 20, 1), 100);
+    const limit = Math.min(Math.max(filters.limit ?? 20, 1), 2000);
     const offset = Math.max(filters.offset ?? 0, 0);
     const { whereSql, params } = this.buildFilterClause(companyId, filters);
 
@@ -196,16 +205,21 @@ export class QuestionBankRepository {
   }
 
   async findTopicById(id: number): Promise<TopicEntity | null> {
-    const rows = await this.database.query<TopicRow[]>(
-      `SELECT id, skill_id, code, name, interview_weight, is_active, created_at, updated_at
-       FROM topics
-       WHERE id = ? AND is_active = 1
+    const rows = await this.database.query<TopicWithSkillRow[]>(
+      `SELECT t.id, t.skill_id, t.code, t.name, t.interview_weight, t.is_active,
+              t.created_at, t.updated_at,
+              s.id AS skill_lookup_id, s.code AS skill_code, s.name AS skill_name,
+              s.is_active AS skill_is_active, s.created_at AS skill_created_at,
+              s.updated_at AS skill_updated_at
+       FROM topics t
+       LEFT JOIN skills s ON s.id = t.skill_id
+       WHERE t.id = ? AND t.is_active = 1
        LIMIT 1`,
       [id],
     );
 
     const row = rows[0];
-    return row ? this.mapTopic(row) : null;
+    return row ? this.mapTopicWithSkill(row) : null;
   }
 
   async findSkillsByIds(ids: number[]): Promise<SkillEntity[]> {
@@ -520,6 +534,26 @@ export class QuestionBankRepository {
       isActive: row.is_active === 1,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+    };
+  }
+
+  private mapTopicWithSkill(row: TopicWithSkillRow): TopicEntity {
+    const topic = this.mapTopic(row);
+
+    if (row.skill_lookup_id === null || row.skill_code === null || row.skill_name === null) {
+      return { ...topic, skill: null };
+    }
+
+    return {
+      ...topic,
+      skill: {
+        id: row.skill_lookup_id,
+        code: row.skill_code,
+        name: row.skill_name,
+        isActive: row.skill_is_active === 1,
+        createdAt: row.skill_created_at ?? topic.createdAt,
+        updatedAt: row.skill_updated_at ?? topic.updatedAt,
+      },
     };
   }
 

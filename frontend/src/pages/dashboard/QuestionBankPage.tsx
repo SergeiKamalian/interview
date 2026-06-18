@@ -1,18 +1,46 @@
 import { useMemo, useState } from 'react';
-import { useQuestionBankQuery } from '@features/question-bank/api/questionBankApi';
-import { QuestionBankTable } from '@widgets/question-bank/QuestionBankTable';
-import { Alert, Button, Card, Input, Spinner } from '@shared/ui';
+import { useQuestionBankListQuery } from '@features/question-bank/api/questionBankApi';
+import {
+  EMPTY_QUESTION_BANK_FILTERS,
+  filterQuestionBankItems,
+  hasActiveQuestionBankFilters,
+  type QuestionBankClientFilters,
+} from '@entities/question/lib/filterQuestionBankItems';
+import { groupQuestionsByPrimarySkill } from '@entities/question/lib/groupQuestionsBySkill';
+import { QuestionBankFiltersBar } from '@widgets/question-bank/QuestionBankFiltersBar';
+import { QuestionBankSkillAccordion } from '@widgets/question-bank/QuestionBankSkillAccordion';
+import { QuestionBankDetails } from '@widgets/question-bank/QuestionBankTable';
+import { Alert, Button, Card, Spinner } from '@shared/ui';
 
 export function QuestionBankPage() {
-  const [search, setSearch] = useState('');
+  const [filters, setFilters] = useState<QuestionBankClientFilters>(
+    EMPTY_QUESTION_BANK_FILTERS,
+  );
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const { data, isLoading, isError, error, refetch } = useQuestionBankQuery({
-    limit: 50,
-    offset: 0,
-    search: search.trim() || undefined,
-  });
+  const { data, isLoading, isError, error, refetch } = useQuestionBankListQuery();
 
   const items = useMemo(() => data?.items ?? [], [data?.items]);
+  const filteredItems = useMemo(
+    () => filterQuestionBankItems(items, filters),
+    [items, filters],
+  );
+  const skillGroups = useMemo(
+    () => groupQuestionsByPrimarySkill(filteredItems),
+    [filteredItems],
+  );
+
+  const handleFiltersChange = (next: QuestionBankClientFilters) => {
+    setFilters(next);
+
+    if (selectedId) {
+      const stillVisible = filterQuestionBankItems(items, next).some(
+        (item) => item.id === selectedId,
+      );
+      if (!stillVisible) {
+        setSelectedId(null);
+      }
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -20,7 +48,7 @@ export function QuestionBankPage() {
         <div>
           <h2 className="text-xl font-semibold text-slate-900">Question Bank</h2>
           <p className="text-sm text-slate-500">
-            База вопросов с checkpoints, весами и примерами ответов.
+            Вопросы по технологиям — фильтруйте по уровню, сложности и weight.
           </p>
         </div>
         <Button variant="primary" disabled title="Будет в следующих блоках">
@@ -29,21 +57,15 @@ export function QuestionBankPage() {
       </div>
 
       <Card>
-        <div className="mb-4 flex flex-wrap items-end gap-3">
-          <div className="min-w-[240px] flex-1">
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Поиск
-            </label>
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Текст вопроса…"
-            />
-          </div>
-          <Button variant="secondary" onClick={() => void refetch()}>
-            Обновить
-          </Button>
-        </div>
+        <QuestionBankFiltersBar
+          filters={filters}
+          onChange={handleFiltersChange}
+          onRefresh={() => void refetch()}
+          onReset={() => {
+            handleFiltersChange(EMPTY_QUESTION_BANK_FILTERS);
+          }}
+          showReset={hasActiveQuestionBankFilters(filters)}
+        />
 
         {isLoading && (
           <div className="flex items-center gap-2 text-sm text-slate-600">
@@ -63,20 +85,27 @@ export function QuestionBankPage() {
         {!isLoading && !isError && items.length === 0 && (
           <Alert variant="info" title="Пусто">
             Вопросов пока нет. Запустите seed:{' '}
-            <code>cd backend && npm run seed:question-bank</code>
+            <code>cd backend && pnpm seed:rebank</code>
           </Alert>
         )}
 
         {!isLoading && !isError && items.length > 0 && (
           <>
             <p className="mb-3 text-sm text-slate-500">
-              Всего вопросов: {data?.total ?? items.length}
+              Показано {filteredItems.length} из {data?.total ?? items.length}{' '}
+              вопросов · разделов: {skillGroups.length}
             </p>
-            <QuestionBankTable
+            <QuestionBankSkillAccordion
               items={items}
               selectedId={selectedId}
               onSelect={setSelectedId}
+              filters={filters}
             />
+            {selectedId && (
+              <div className="mt-6">
+                <QuestionBankDetails questionId={selectedId} />
+              </div>
+            )}
           </>
         )}
       </Card>

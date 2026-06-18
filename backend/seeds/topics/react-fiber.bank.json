@@ -1,0 +1,561 @@
+{
+  "topic": {
+    "code": "react_fiber",
+    "name": "React Fiber & Reconciliation",
+    "skillCode": "react",
+    "interviewWeight": 8
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как работает React Fiber и процесс обновления Virtual DOM?",
+    "shortAnswer": "React Fiber — это новая архитектура reconciliation в виде связного списка fiber-узлов, которая позволяет прерывать render phase, приоритизировать обновления и затем атомарно применять изменения к DOM в commit phase.",
+    "idealAnswer": "До React 16 reconciler обходил дерево через call stack синхронно: большое дерево могло блокировать main thread на сотни миллисекунд. Fiber заменил стек на связный список узлов с указателями child, sibling и return — работу можно прерывать через shouldYield() и продолжать с того же узла. При setState/useState обновление попадает в очередь fiber, React строит work-in-progress дерево (current.alternate), вызывает render-функции и diff-ит props/state. В render phase DOM не меняется — фаза чистая и прерываемая. После завершения WIP начинается commit phase: она синхронная и атомарная — getSnapshotBeforeUpdate, commitMutationEffects (реальные DOM-изменения), commitLayoutEffects (useLayoutEffect, lifecycle), затем после paint — useEffect. Fiber планирует работу через пакет scheduler (MessageChannel postMessage, чанки ~5ms), а не через requestIdleCallback. Приоритеты кодируются lane bitmasks: SyncLane для ввода пользователя, TransitionLane для startTransition — более высокий приоритет прерывает низкий. createRoot в React 18 включает concurrent features; ReactDOM.render остаётся на legacy sync path. Для тяжёлых списков (500+ элементов) или фильтрации при вводе используют startTransition или useDeferredValue, но commit большого числа DOM-узлов всё равно блокирует браузер — Fiber не разбивает запись в DOM, поэтому virtualization остаётся нужной. Типичные ошибки: оборачивать в startTransition обновление value инпута, думать что concurrent mode убирает весь jank, и злоупотреблять flushSync.",
+    "maxScore": 10,
+    "skills": [
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "fiber_definition",
+      "title": "Понимает, что такое Fiber",
+      "expected": "Кандидат объясняет Fiber как переосмысление reconciliation engine: связный список fiber-узлов для инкрементального, прерываемого и приоритетного рендера Virtual DOM.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "mustConcepts": [
+          "reconciliation",
+          "reconciler",
+          "fiber",
+          "связный список",
+          "fiber-узл",
+          "render phase",
+          "commit phase",
+          "прерыва",
+          "инкремент",
+          "work loop",
+          "createRoot",
+          "startTransition",
+          "useDeferredValue",
+          "React 18"
+        ],
+        "falseClaims": [
+          "Fiber это просто Virtual DOM",
+          "просто Virtual DOM",
+          "Virtual DOM быстрее обновляет",
+          "Fiber — это Virtual DOM",
+          "requestIdleCallback"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "stack_vs_fiber",
+      "title": "Отличает stack reconciler от Fiber",
+      "expected": "Кандидат говорит, что до React 16 дерево обходилось синхронно через call stack без пауз; Fiber позволяет прерывать работу и возобновлять с того же узла, чтобы UI оставался отзывчивым.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "fiber_definition",
+            "floorFraction": 0.55
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "стек",
+              "call stack",
+              "синхрон",
+              "рекурсив",
+              "React 16"
+            ],
+            "ask": "чем stack reconciler отличается от Fiber"
+          }
+        ],
+        "mustConcepts": [
+          "call stack",
+          "стек",
+          "рекурсив",
+          "синхрон",
+          "React 16",
+          "связный список",
+          "linked list",
+          "work loop",
+          "fiber-узл",
+          "прерыва",
+          "уступ",
+          "yield",
+          "main thread",
+          "shouldYield",
+          "инкремент"
+        ],
+        "falseClaims": [
+          "рендер полностью асинхронным через Promises",
+          "Fiber сделал рендер полностью асинхронным",
+          "полностью асинхронным через Promises",
+          "клики всегда проходят"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "fiber_pointers",
+      "title": "Знает структуру fiber-узла",
+      "expected": "Кандидат называет три указателя: child (первый потомок), sibling (следующий на том же уровне), return (родитель).",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "child",
+              "потомок",
+              "sibling",
+              "return",
+              "alternate"
+            ],
+            "ask": "child, sibling, return и alternate/current в fiber-узле"
+          }
+        ],
+        "mustConcepts": [
+          "child",
+          "sibling",
+          "return",
+          "alternate",
+          "current",
+          "потомок",
+          "обход"
+        ],
+        "falseClaims": [
+          "parent и next",
+          "лежат в Redux",
+          "Virtual DOM хранит"
+        ],
+        "neutralMetaphors": [
+          "карточка",
+          "рабочий узел",
+          "рабочая единица"
+        ],
+        "requiredConceptGroups": [
+          [
+            "child",
+            "потомок",
+            "первый ребенок",
+            "first child",
+            "ребенок"
+          ],
+          [
+            "sibling",
+            "сосед",
+            "neighbor",
+            "соседний"
+          ],
+          [
+            "return",
+            "родител",
+            "parent"
+          ]
+        ],
+        "minMatchedConcepts": 3,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "render_phase",
+      "title": "Объясняет render phase и WIP tree",
+      "expected": "Кандидат описывает построение work-in-progress дерева (current.alternate), diff props/state, роль key для списков; подчёркивает, что render phase чистая, прерываемая и не мутирует DOM.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "mustConcepts": [
+          "wip",
+          "work-in-progress",
+          "work in progress",
+          "alternate",
+          "current tree",
+          "чернов",
+          "DOM не",
+          "не трога",
+          "не мутир",
+          "прерыва",
+          "shouldYield",
+          "render phase"
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "render phase",
+              "DOM не",
+              "не трога",
+              "прерыва"
+            ],
+            "ask": "render phase и почему DOM не трогается"
+          },
+          {
+            "match": [
+              "wip",
+              "work-in-progress",
+              "work in progress",
+              "alternate",
+              "current tree",
+              "чернов"
+            ],
+            "ask": "WIP tree и alternate/current"
+          }
+        ],
+        "falseClaims": [
+          "render пишет в DOM",
+          "render phase пишет в DOM",
+          "useEffect до paint",
+          "reconcileChildFibers сразу в DOM",
+          "requestIdleCallback",
+          "concurrent mode не лагает"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "commit_phase",
+      "title": "Объясняет commit phase",
+      "expected": "Кандидат говорит, что commit phase синхронная и атомарная: DOM-мутации, layout effects (useLayoutEffect), затем после paint — useEffect. Понимает, что именно commit нельзя прервать.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "mustConcepts": [
+          "commit phase",
+          "commit",
+          "атомар",
+          "atomic",
+          "синхрон",
+          "before mutation",
+          "mutation",
+          "layout",
+          "passive",
+          "useLayoutEffect",
+          "useEffect"
+        ],
+        "falseClaims": [
+          "commit можно прервать",
+          "render и commit одно и то же",
+          "render phase и commit phase одно и то же",
+          "useEffect в commit до paint",
+          "useEffect до paint",
+          "разбивает commit на куски",
+          "commit на куски по 5ms",
+          "requestIdleCallback"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "scheduling",
+      "title": "Понимает планирование Fiber",
+      "expected": "Кандидат упоминает scheduler, чанки работы (~5ms), shouldYield(), MessageChannel/postMessage; может отметить, что requestIdleCallback не используется напрямую из-за грубых дедлайнов.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "advanced",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "lanes_priority",
+            "floorFraction": 0.5
+          },
+          {
+            "checkpointKey": "fiber_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "mustConcepts": [
+          "scheduler",
+          "планирован",
+          "MessageChannel",
+          "postMessage",
+          "shouldYield",
+          "should yield",
+          "5ms",
+          "chunk",
+          "куск",
+          "тайм-слайс",
+          "yield"
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "scheduler",
+              "планирован"
+            ],
+            "ask": "scheduler"
+          },
+          {
+            "match": [
+              "MessageChannel",
+              "postMessage"
+            ],
+            "ask": "MessageChannel и postMessage"
+          },
+          {
+            "match": [
+              "shouldYield",
+              "should yield",
+              "5ms",
+              "yield"
+            ],
+            "ask": "shouldYield и time slicing (~5ms)"
+          }
+        ],
+        "falseClaims": [
+          "Fiber планирует через requestIdleCallback",
+          "планирование через requestIdleCallback",
+          "scheduler использует requestIdleCallback",
+          "requestIdleCallback для планирования"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "lanes_priority",
+      "title": "Понимает приоритеты и concurrent API",
+      "expected": "Кандидат объясняет lane bitmasks (SyncLane vs TransitionLane), startTransition/useDeferredValue, createRoot vs ReactDOM.render.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "mustConcepts": [
+          "SyncLane",
+          "TransitionLane",
+          "lane",
+          "lanes",
+          "startTransition",
+          "useDeferredValue",
+          "createRoot",
+          "transition",
+          "приоритет"
+        ],
+        "falseClaims": [
+          "lanes в Redux",
+          "ReactDOM.render поддерживает concurrent",
+          "обернуть все setState в startTransition",
+          "requestIdleCallback"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "commit_limitation",
+      "title": "Знает ограничения concurrent mode",
+      "expected": "Кандидат понимает, что Fiber разбивает построение WIP, но не разбивает запись в DOM: массовый commit тысяч узлов всё равно блокирует браузер; virtualization/react-window по-прежнему нужна.",
+      "score": 1,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "mustConcepts": [
+          "прерыва",
+          "render",
+          "commit",
+          "атомар",
+          "синхрон",
+          "блокир",
+          "виртуализац",
+          "virtualization",
+          "массов",
+          "DOM-мутац",
+          "тысяч"
+        ],
+        "falseClaims": [
+          "concurrent mode полностью убирает лаги",
+          "concurrent mode полностью убирает",
+          "concurrent mode не лагает",
+          "не нужна virtualization",
+          "20 000 div без virtualization",
+          "тысяч элементов без virtualization"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Fiber заменил stack-based reconciler на связный список узлов, поэтому React может обрабатывать дерево кусками и уступать main thread при вводе пользователя. Сначала идёт render phase: строится WIP-дерево, diff-ятся fiber-узлы, DOM не трогается. Потом commit phase — синхронно применяются мутации DOM и layout effects. Для тяжёлой фильтрации большого списка я оставляю setInput синхронным, а filterLargeList оборачиваю в startTransition — так инпут не лагает, а список догоняет в фоне. Concurrent mode не отменяет jank от commit 20 000 DOM-узлов, поэтому для длинных списков всё равно нужна виртуализация.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "У каждого fiber есть child, sibling и return — обход идёт вглубь через child, потом через sibling, при тупике поднимаемся return. Приоритеты кодируются lanes: ввод пользователя (SyncLane) важнее transition-обновлений. useDeferredValue отстаёт от query на один или несколько рендеров, поэтому input остаётся мгновенным, а тяжёлый список фильтруется с низким приоритетом. createRoot в React 18 включает эти возможности, а legacy ReactDOM.render остаётся на синхронном пути.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Render phase можно прервать: React строит alternate-дерево и собирает список эффектов, не трогая реальный DOM. Commit phase — три подфазы: snapshot до мутаций, DOM updates, layout effects. useEffect выполняется уже после paint. Scheduler режет работу на ~5ms через MessageChannel, а не через requestIdleCallback. Типичная ошибка — обернуть setInputValue в startTransition: тогда лагает сам инпут; transition нужен только для вторичного тяжёлого обновления.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Fiber — это просто Virtual DOM. React сравнивает деревья и обновляет страницу быстрее.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Concurrent mode полностью убирает лаги. Можно рендерить 20 000 div без virtualization — Fiber всё разобьёт на кадры.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Чтобы приложение стало concurrent, достаточно обернуть все setState в startTransition, включая value инпута. flushSync можно использовать везде, где нужен быстрый UI.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Render phase и commit phase — одно и то же. React сразу пишет в DOM во время reconcileChildFibers.",
+      "sortOrder": 3
+    },
+    {
+      "checkpointKey": "fiber_definition",
+      "exampleType": "good",
+      "exampleText": "Fiber — reconciliation engine на связном списке: render прерываемый, commit синхронный.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "fiber_definition",
+      "exampleType": "good",
+      "exampleText": "ну типа новый движок reconciliation, render в памяти, commit уже в dom",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "stack_vs_fiber",
+      "exampleType": "good",
+      "exampleText": "Раньше call stack синхронно; Fiber — связный список, может yield и продолжить с того же узла.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "stack_vs_fiber",
+      "exampleType": "good",
+      "exampleText": "короче раньше всё через стек — мог подвиснуть, сейчас кусками с yield",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "fiber_pointers",
+      "exampleType": "good",
+      "exampleText": "child, sibling, return — обход вглубь; alternate/current для wip.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "fiber_pointers",
+      "exampleType": "good",
+      "exampleText": "ну у узла child sibling return, ещё alternate для wip",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "render_phase",
+      "exampleType": "good",
+      "exampleText": "WIP alternate в памяти, current tree на экране, DOM не трогается.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "render_phase",
+      "exampleType": "good",
+      "exampleText": "wip черновик в памяти, dom пока старый, render прерывается",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "commit_phase",
+      "exampleType": "good",
+      "exampleText": "Commit синхронный: mutation → layout (useLayoutEffect) → useEffect после paint.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "commit_phase",
+      "exampleType": "good",
+      "exampleText": "commit жёстко пишет в dom — его не прервёшь, useLayoutEffect тут",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "scheduling",
+      "exampleType": "good",
+      "exampleText": "Scheduler: shouldYield ~5ms, MessageChannel/postMessage, не requestIdleCallback.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "scheduling",
+      "exampleType": "good",
+      "exampleText": "scheduler yield через message channel, не idle callback",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "lanes_priority",
+      "exampleType": "good",
+      "exampleText": "SyncLane для ввода, TransitionLane для startTransition/useDeferredValue.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "lanes_priority",
+      "exampleType": "good",
+      "exampleText": "setState с lane, startTransition для тяжёлых обновлений",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "commit_limitation",
+      "exampleType": "good",
+      "exampleText": "Concurrent прерывает render, но commit синхронный — нужна virtualization на тысячах узлов.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "commit_limitation",
+      "exampleType": "good",
+      "exampleText": "массовый commit всё равно блокирует браузер, virtualization нужна",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "scheduling",
+      "exampleType": "bad",
+      "exampleText": "Fiber планирует через requestIdleCallback — браузер сам решает когда рендерить.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "fiber_definition",
+      "exampleType": "bad",
+      "exampleText": "Fiber — это просто Virtual DOM, React быстрее обновляет страницу.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "commit_limitation",
+      "exampleType": "bad",
+      "exampleText": "Concurrent mode полностью убирает лаги, virtualization не нужна на 20000 элементов.",
+      "sortOrder": 32
+    }
+  ],
+  "itlead": {
+    "slug": "react-fiber-and-virtual-dom-update-process",
+    "pageUrl": "https://itlead.org/interview-questions/react/react-fiber-and-virtual-dom-update-process",
+    "apiUrl": "https://api.itlead.org/api/questions/react-fiber-and-virtual-dom-update-process",
+    "difficulty": "SENIOR",
+    "titleEn": "React Fiber and Virtual DOM update process",
+    "categorySlug": "react"
+  }
+}

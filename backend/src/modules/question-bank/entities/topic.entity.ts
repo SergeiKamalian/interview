@@ -1,3 +1,5 @@
+import type { SkillEntity } from './skill.entity';
+
 export type TopicEntity = {
   id: number;
   skillId: number | null;
@@ -7,4 +9,5 @@ export type TopicEntity = {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  skill?: SkillEntity | null;
 };

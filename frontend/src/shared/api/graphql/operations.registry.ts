@@ -117,10 +117,20 @@ export const GraphqlOperations = {
     document: "mutation PublishInterview($id: ID!) { publishInterview(id: $id) { id status publicUrl publicToken } }",
     sha256Hash: 'e86d2b2b5c4a402e904bb5d8c4e4b64320284fc1873a34ed389c1fed34853277',
   },
+  QuestionBankList: {
+    operationName: 'QuestionBankList',
+    document: "query QuestionBankList($filters: QuestionBankFilterInput) { questionBank(filters: $filters) { total items { id questionText level difficulty maxScore isActive topic { id code name interviewWeight skill { id code name } } profession { id code name } } } }",
+    sha256Hash: '777fa04e2b0d6f4cbe0e6d2916328a7e7aefc6b69ddf1d252ed3f3196795a7fd',
+  },
   QuestionBank: {
     operationName: 'QuestionBank',
-    document: "query QuestionBank($filters: QuestionBankFilterInput) { questionBank(filters: $filters) { total items { id questionText level difficulty maxScore isActive topic { id code name } profession { id code name } skills { id code name } checkpoints { id checkpointKey title expected score sortOrder } answerExamples { id exampleType exampleText sortOrder } } } } query Question($id: ID!) { question(id: $id) { id questionText level difficulty maxScore isActive shortAnswer idealAnswer topic { name } profession { name } checkpoints { title score sortOrder } answerExamples { exampleType exampleText } } }",
-    sha256Hash: 'de38f6122a27af38a3b9589f16d0755060013011ad58e0979019026b63059218',
+    document: "query QuestionBank($filters: QuestionBankFilterInput) { questionBank(filters: $filters) { total items { id questionText level difficulty maxScore isActive topic { id code name interviewWeight skill { id code name } } profession { id code name } skills { id code name } checkpoints { id checkpointKey title expected score sortOrder } answerExamples { id exampleType exampleText sortOrder } } } }",
+    sha256Hash: 'ba2584cc0ffe8d47aad93c27c7bf7dfaae562e1f605a47dc6df171da1a241428',
+  },
+  Question: {
+    operationName: 'Question',
+    document: "query Question($id: ID!) { question(id: $id) { id questionText level difficulty maxScore isActive shortAnswer idealAnswer topic { id code name interviewWeight } profession { id code name } checkpoints { id checkpointKey title expected score sortOrder } answerExamples { id exampleType exampleText sortOrder } } }",
+    sha256Hash: 'ed4a698a5b73241e881c7749af32ffd214c44872851832241deb67844fca8f2f',
   },
   RefreshTokens: {
     operationName: 'RefreshTokens',

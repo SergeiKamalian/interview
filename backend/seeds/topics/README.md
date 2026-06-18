@@ -40,6 +40,7 @@ pnpm seed:topic -- --all
 | `topic.code` | `topics.code` в БД (snake_case) |
 | `topic.interviewWeight` | `topics.interview_weight` (1–10) |
 | `question.level` / `difficulty` | см. [itlead-level-mapping.md](../../docs/question-bank/itlead-level-mapping.md) |
+| `question.maxScore` | **10.00** (обязательно для всех тем) |
 | `checkpoints[].score` | **Σ = 10.00** |
 | `checkpoints[].evaluationHints` | тот же JSON, что в `question_checkpoints.evaluation_hints` |
 | `examples[]` | `checkpointKey: null` = question-level; иначе per-checkpoint |
@@ -52,25 +53,29 @@ pnpm seed:topic -- --all
 - Checkpoints, `mustConcepts`, `falseClaims`, per-checkpoint examples — структурированные данные; JSON проще валидировать и заливать без SQL-ошибок.
 - Manifest связывает URL ↔ файл ↔ статус (`draft` → `ready` → `seeded`).
 
-Legacy темы (Fiber, lazy) пока в `.seed.sql` — в manifest помечены `legacy-sql`.
+**Source of truth** — только `seeds/topics/*.bank.json` (564 файла). Редактируй JSON напрямую; `question.maxScore` и `SUM(checkpoints[].score)` всегда **10.00**.
 
-## React Fiber — не перегенерировать с нуля
+Legacy SQL (`question-bank.seed.sql`, `fiber-evaluation-hints.seed.sql`, `react-lazy-suspense.seed.sql`) — архив; в БД заливаются `react-fiber.bank.json` и `react-lazy-suspense.bank.json` как и остальные темы.
 
-Slug `react-fiber-and-virtual-dom-update-process` → `legacy-sql`, **не** создавать новый `*.bank.json` с нуля.
+## Полный rebank (wipe + seed)
 
-**Эталон качества для senior React** (hints + examples):
+```bash
+cd backend
+pnpm seed:rebank
+# без wipe (только перезалить topics/*.bank.json поверх):
+pnpm seed:rebank -- --no-wipe
+```
 
-| Файл | Что брать |
-|------|-----------|
-| `backend/seeds/question-bank.seed.sql` | checkpoints, `idealAnswer`, базовые examples |
-| `backend/seeds/fiber-evaluation-hints.seed.sql` | `evaluation_hints`: `mustConcepts`, `falseClaims`, `probeConceptGroups`, `impliesCheckpointFloors`, `confusionPairs`, `requiredConceptGroups`, per-checkpoint **good/bad examples** |
+`seed:rebank` удаляет **все интервью, попытки, кандидатов** и **весь question bank** (topics + questions), затем заливает все `seeds/topics/*.bank.json` (564 темы включая Fiber и Lazy/Suspense).
 
-При миграции Fiber в JSON или при генерации **похожих senior-тем** (reconciliation, render/commit, concurrent):
+```bash
+pnpm seed:wipe-bank      # только wipe
+pnpm seed:topic -- --all-files   # seed без wipe
+```
 
-1. Прочитай оба SQL-файла целиком — там уже откалиброванные кейсы.
-2. Переноси hints и examples **оттуда**, не придумывай заново с ITLead markdown.
-3. Checkpoint keys сохраняй как в seed: `fiber_definition`, `stack_vs_fiber`, `fiber_pointers`, `render_phase`, …
-4. Целевой файл (когда дойдём до миграции): `topics/react-fiber.bank.json` → `pnpm seed:topic -- react_fiber`.
+## React Fiber & Lazy/Suspense
+
+Как и все темы — `topics/react-fiber.bank.json`, `topics/react-lazy-suspense.bank.json`.
 
 Design doc: [docs/question-bank/topics/react-fiber.md](../../docs/question-bank/topics/react-fiber.md).
 
