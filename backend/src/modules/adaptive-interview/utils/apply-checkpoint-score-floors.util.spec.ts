@@ -1044,4 +1044,164 @@ describe('applyCheckpointScoreFloors', () => {
     expect(stack?.status).toBe('covered');
     expect(stack?.rationale).not.toContain('false_claim');
   });
+
+  it('GUARD-02: freezes non-target cumulative scores on decline_scoped meta turn (attempt #91 turn 6)', () => {
+    const declineAnswer =
+      'С child/sibling/return не углублюсь, лучше расскажу про lanes или commit phase';
+
+    const context: AdaptiveInterviewContextPacket = {
+      companyId: 1,
+      interviewId: 4,
+      attemptId: 91,
+      interviewQuestionId: 7,
+      questionText: 'Как работает React Fiber и процесс обновления Virtual DOM?',
+      referenceAnswer: 'Fiber reconciliation engine',
+      maxScore: 8,
+      badAnswerExamples: [
+        'Fiber — это просто Virtual DOM. React сравнивает деревья и обновляет страницу быстрее.',
+        'Concurrent mode полностью убирает лаги.',
+        'Fiber сделал рендер полностью асинхронным через Promises, клики всегда проходят.',
+        'Узлы Fiber лежат в Redux.',
+      ],
+      latestCandidateAnswer: declineAnswer,
+      latestCandidateMessageId: 42,
+      latestAnswerMessageKind: 'follow_up_answer',
+      targetCheckpointKey: 'fiber_pointers',
+      checkpoints: [
+        fiberCheckpoint('fiber_definition', { sortOrder: 0 }),
+        fiberCheckpoint('stack_vs_fiber', { sortOrder: 1 }),
+        fiberCheckpoint('fiber_pointers', { sortOrder: 2 }),
+        fiberCheckpoint('render_phase', { sortOrder: 3 }),
+      ],
+      checkpointStates: [
+        {
+          checkpointKey: 'fiber_definition',
+          status: 'covered',
+          scoreAwarded: 1,
+          maxScore: 1,
+          followUpCount: 0,
+          rationale: 'depth=understands coverage=high accuracy=full',
+        },
+        {
+          checkpointKey: 'stack_vs_fiber',
+          status: 'covered',
+          scoreAwarded: 1,
+          maxScore: 1,
+          followUpCount: 0,
+          rationale: 'depth=understands coverage=high accuracy=full',
+        },
+        {
+          checkpointKey: 'render_phase',
+          status: 'partial',
+          scoreAwarded: 0.75,
+          maxScore: 1,
+          followUpCount: 1,
+          rationale: 'depth=partial_knowledge probe=pending',
+        },
+        {
+          checkpointKey: 'fiber_pointers',
+          status: 'partial',
+          scoreAwarded: 0.5,
+          maxScore: 1,
+          followUpCount: 1,
+          rationale: 'depth=partial_knowledge probe=pending',
+        },
+      ],
+      evidenceSnippets: [],
+      localTurns: [
+        {
+          role: 'candidate',
+          sequenceOrder: 1,
+          content:
+            'Fiber — reconciliation engine с render и commit phase, child sibling return.',
+          messageKind: 'main_answer',
+        },
+        {
+          role: 'candidate',
+          sequenceOrder: 2,
+          content: declineAnswer,
+          messageKind: 'follow_up_answer',
+          targetCheckpointKey: 'fiber_pointers',
+        },
+      ],
+      followUpLimits: {
+        maxPerQuestion: 4,
+        maxPerCheckpoint: 1,
+        usedForQuestion: 2,
+      },
+    };
+
+    const { evaluation } = applyCheckpointScoreFloors(
+      {
+        candidateDisposition: 'declined',
+        checkpointResults: [
+          {
+            checkpointKey: 'fiber_definition',
+            status: 'missed',
+            scoreAwarded: 0,
+            confidence: 0.9,
+            evidenceSummary: null,
+            rationale:
+              'similarity=bad_example. Score capped: overlaps bad answer example.',
+          },
+          {
+            checkpointKey: 'stack_vs_fiber',
+            status: 'partial',
+            scoreAwarded: 0.55,
+            confidence: 0.9,
+            evidenceSummary: null,
+            rationale:
+              'similarity=bad_example. Score capped: overlaps bad answer example.',
+          },
+          {
+            checkpointKey: 'render_phase',
+            status: 'missed',
+            scoreAwarded: 0,
+            confidence: 0.9,
+            evidenceSummary: null,
+            rationale: 'status_score_alignment',
+          },
+          {
+            checkpointKey: 'fiber_pointers',
+            status: 'covered',
+            scoreAwarded: 1,
+            confidence: 0.9,
+            evidenceSummary: null,
+            rationale: 'depth=understands coverage=high accuracy=full',
+          },
+        ],
+      },
+      context,
+      {
+        evaluationMode: 'target_refusal',
+        evidenceSource: 'meta_turn',
+        candidateTurnKind: 'decline_scoped',
+        candidateDispositionFromClassifier: 'declined',
+      },
+    );
+
+    const fiberDefinition = evaluation.checkpointResults.find(
+      (item) => item.checkpointKey === 'fiber_definition',
+    );
+    const renderPhase = evaluation.checkpointResults.find(
+      (item) => item.checkpointKey === 'render_phase',
+    );
+    const stackVsFiber = evaluation.checkpointResults.find(
+      (item) => item.checkpointKey === 'stack_vs_fiber',
+    );
+    const fiberPointers = evaluation.checkpointResults.find(
+      (item) => item.checkpointKey === 'fiber_pointers',
+    );
+
+    expect(fiberDefinition?.scoreAwarded).toBe(1);
+    expect(fiberDefinition?.status).toBe('covered');
+    expect(fiberDefinition?.rationale).toContain('meta_turn_frozen');
+
+    expect(renderPhase?.scoreAwarded).toBeGreaterThanOrEqual(0.75);
+    expect(stackVsFiber?.scoreAwarded).toBeGreaterThanOrEqual(1);
+
+    expect(fiberPointers?.scoreAwarded).toBeGreaterThan(0);
+    expect(fiberPointers?.scoreAwarded).toBeLessThanOrEqual(0.55);
+    expect(fiberPointers?.status).toMatch(/partial|missed/);
+  });
 });

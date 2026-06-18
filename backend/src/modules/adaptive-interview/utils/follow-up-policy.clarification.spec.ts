@@ -154,6 +154,7 @@ describe('evaluateFollowUpPolicy — scope clarification', () => {
       checkpointTitle: 'Scheduling',
       latestCandidateAnswer:
         'Вы говорите о этапах и методах react fiber да?',
+      candidateTurnKind: 'scope_clarification',
       followUpKind: 'clarification_redirect',
       missingMustConcepts: ['MessageChannel', 'shouldYield'],
       evaluationHints: fiberCheckpoint('scheduling').evaluationHints,
@@ -162,7 +163,8 @@ describe('evaluateFollowUpPolicy — scope clarification', () => {
       ],
     });
 
-    expect(question).toMatch(/^Да, именно про/i);
+    expect(question).toMatch(/^Имею в виду/i);
+    expect(question).toMatch(/MessageChannel|shouldYield/i);
     expect(question).not.toMatch(/планирует работу Fiber/i);
   });
 
@@ -220,6 +222,7 @@ describe('evaluateFollowUpPolicy — scope clarification', () => {
       checkpointTitle: fiberDefinition.title,
       latestCandidateAnswer:
         'А вам нужно чтобы я ответил коротко и по делу или по деталям?',
+      candidateTurnKind: 'format_clarification',
       followUpKind: 'clarification_redirect',
       missingMustConcepts: ['render phase', 'commit phase'],
       evaluationHints: fiberDefinition.evaluationHints,

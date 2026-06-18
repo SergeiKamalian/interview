@@ -1,6 +1,6 @@
 # TASK-14.33 — Submit evaluation mode routing
 
-Status: [ ] todo
+Status: [x] done
 
 ## Prerequisite
 
@@ -51,19 +51,33 @@ Status: [ ] todo
 
 ## Acceptance criteria
 
-- [ ] `decline_scoped` turn: нет OpenAI `evaluate_turn` с 8 checkpoint keys (или narrow scope в логе)
-- [ ] `substantive_answer`: поведение без регрессии (existing specs green)
-- [ ] `scope_clarification`: target checkpoint обрабатывается, non-target = priorState в persist
-- [ ] `pnpm test -- adaptive-interview-submit per-turn-checkpoint-evaluator` pass
-- [ ] `pnpm build` pass
+- [x] `decline_scoped` turn: нет OpenAI `evaluate_turn` с 8 checkpoint keys (или narrow scope в логе)
+- [x] `substantive_answer`: поведение без регрессии (existing specs green)
+- [x] `scope_clarification`: target checkpoint обрабатывается, non-target = priorState в persist
+- [x] `pnpm test -- adaptive-interview-submit per-turn-checkpoint-evaluator` pass
+- [x] `pnpm build` pass
 
 ## Completion Notes
 
-_(заполнить агентом)_
+**Проверка:**
 
-## Changed files (ожидаемо)
+```bash
+cd backend
+pnpm test -- adaptive-interview-submit per-turn-checkpoint-evaluator resolve-evaluation-mode
+# → 3 suites, 40 passed
+pnpm build
+# → ok
+```
+
+**Ожидал:** после classify — `resolveEvaluationMode` + debug log; meta-turn'ы (`target_refusal`, `clarification`, `redirect`) без full LLM evaluate; persist только target checkpoint; `skip` через существующий decline_whole path; `substantive_answer` без регрессии.
+
+**Получил:** submit пробрасывает `evaluationMode` + `evidenceSource: meta_turn`; evaluator `evaluateMetaTurn()` строит deterministic results через `buildMetaTurnEvaluation` (refusal cap через floors на target-only seed); non-target checkpoint'ы не попадают в `applyTurnEvaluationResults`.
+
+## Changed files
 
 - `services/adaptive-interview-submit.service.ts`
 - `services/adaptive-interview-submit.service.spec.ts`
-- `services/per-turn-checkpoint-evaluator.service.ts` (narrow scope)
-- `types/evaluation-evidence-source.type.ts` (если добавлен `meta_turn`)
+- `services/per-turn-checkpoint-evaluator.service.ts`
+- `services/per-turn-checkpoint-evaluator.service.spec.ts`
+- `utils/build-meta-turn-checkpoint-evaluation.util.ts` (new)
+- `types/evaluation-evidence-source.type.ts` — добавлен `meta_turn`

@@ -8,6 +8,7 @@ import type {
   FollowUpPolicyInput,
 } from '../types/follow-up-planner.types';
 import type { CheckpointStateStatus } from '../types/checkpoint-state-status.type';
+import type { EvaluationMode } from '../types/evaluation-mode.type';
 import { evaluateFollowUpPolicy } from '../utils/follow-up-policy.util';
 import type { InterviewCheckpointStateEntity } from '../entities/interview-checkpoint-state.entity';
 import { collectCheckpointEvidenceText } from '../utils/checkpoint-evidence-text.util';
@@ -22,6 +23,7 @@ export class FollowUpPolicyService {
     recentScoreDeltas?: number[],
     latestCheckpointResults?: FollowUpPolicyInput['latestCheckpointResults'],
     candidateTurnKind?: FollowUpPolicyInput['candidateTurnKind'],
+    evaluationMode?: EvaluationMode,
   ): FollowUpPolicyDecision {
     const limits = getAdaptiveInterviewContextLimits();
 
@@ -60,6 +62,7 @@ export class FollowUpPolicyService {
       checkpointEvidenceTextByKey,
       candidateDispositionFromAi: candidateDispositionFromAi ?? undefined,
       candidateTurnKind: candidateTurnKind ?? undefined,
+      evaluationMode,
       stickyTargetCheckpointKey: context.targetCheckpointKey,
       questionText: context.questionText,
       latestCheckpointResults,

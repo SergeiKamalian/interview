@@ -28,24 +28,6 @@ export function isVagueFollowUpQuestion(followUpQuestion: string): boolean {
   return VAGUE_FOLLOW_UP_PATTERNS.some((pattern) => pattern.test(normalized));
 }
 
-export function isAnswerFormatClarification(answer: string): boolean {
-  const normalized = answer.trim();
-  if (!normalized || !/\?\s*$/.test(normalized)) {
-    return false;
-  }
-
-  return (
-    /(?:коротко|кратко|сжато|по делу|подробн|детал|на пальцах)/i.test(
-      normalized,
-    ) ||
-    /(?:brief|detailed|high[- ]level)/i.test(normalized) ||
-    /(?:как|how)\s+(?:именно\s+)?(?:ответить|answer)/i.test(normalized) ||
-    /вам\s+нужно\s+(?:чтобы\s+)?(?:я\s+)?(?:ответил|рассказал)/i.test(
-      normalized,
-    )
-  );
-}
-
 export function resolveScopeClarificationDisposition(input: {
   candidateTurnKind?: CandidateTurnKind | null;
   aiDisposition?: CandidateAnswerDisposition | null;
@@ -105,14 +87,15 @@ export function countScopeClarificationTurns(input: {
   return count;
 }
 
-export function buildClarificationFollowUpQuestion(input: {
+/**
+ * Deterministic fallback when follow-up LLM is off or failed.
+ * Intent (scope vs format vs confirmation) comes from classifier turn_kind — not regex on candidate text.
+ */
+export function buildClarificationTemplateFallback(input: {
   checkpointTitle: string;
   missingMustConcepts: string[];
   hints?: CheckpointEvaluationHints | null;
-  candidateScopeQuestion: string;
   candidateTurnKind?: CandidateTurnKind | null;
-  previousFollowUpQuestion?: string | null;
-  seed?: number;
 }): string {
   const conceptList =
     resolveProbePhrasesForCandidate(
@@ -121,38 +104,9 @@ export function buildClarificationFollowUpQuestion(input: {
       2,
     ) ?? input.missingMustConcepts.slice(0, 2).join(', ');
 
-  const scopeQuestion = input.candidateScopeQuestion.trim();
-  const previousFollowUp = input.previousFollowUpQuestion?.trim() ?? '';
-
-  if (
-    input.candidateTurnKind === 'format_clarification' ||
-    isAnswerFormatClarification(scopeQuestion)
-  ) {
-    return buildFormatClarificationReply(previousFollowUp, conceptList);
-  }
-
-  const orMatch = /вы\s+про\s+(.+?)\s+(?:или|ли)\s+(.+?)[\?\.]?$/i.exec(
-    scopeQuestion,
-  );
-
-  const isTopicConfirmation = isScopeConfirmationForTemplate({
-    candidateTurnKind: input.candidateTurnKind,
-    scopeQuestion,
-  });
-
-  if (orMatch?.[1] && orMatch?.[2]) {
-    const left = orMatch[1].trim();
-    const right = orMatch[2].trim();
-    return `Нет, речь про ${conceptList || input.checkpointTitle}, а не про ${right}. Можете рассказать именно про ${conceptList || left}?`;
-  }
-
-  if (isTopicConfirmation && conceptList) {
-    return `Да, именно про ${conceptList}. Как вы это понимаете?`;
-  }
-
-  if (isTopicConfirmation) {
-    const topic = input.checkpointTitle.trim() || 'эту часть Fiber';
-    return `Да, именно про ${topic}. Расскажите своими словами?`;
+  if (input.candidateTurnKind === 'format_clarification') {
+    const topic = conceptList || input.checkpointTitle.trim() || 'эту тему';
+    return `Кратко и по существу — про ${topic}. Как вы это видите?`;
   }
 
   if (conceptList) {
@@ -160,44 +114,11 @@ export function buildClarificationFollowUpQuestion(input: {
   }
 
   const topic = input.checkpointTitle.trim() || 'эту тему';
-  return `Имею в виду ${topic} — уточните, пожалуйста, что знаете по этому пункту?`;
+  return `Имею в виду ${topic} — расскажите, как вы это понимаете?`;
 }
 
-function buildFormatClarificationReply(
-  previousFollowUp: string,
-  conceptList: string,
-): string {
-  const askCore = extractFollowUpAskCore(previousFollowUp);
-  if (askCore) {
-    return `Кратко и по существу — ${askCore}.`;
-  }
-
-  if (conceptList) {
-    return `Кратко и по существу — про ${conceptList}. Как вы это видите?`;
-  }
-
-  return 'Кратко и по существу — ответьте на мой предыдущий вопрос, своими словами.';
-}
-
-function extractFollowUpAskCore(previousFollowUp: string): string | null {
-  if (!previousFollowUp) {
-    return null;
-  }
-
-  const match =
-    /(?:расскажите|уточните|объясните|можете\s+рассказать|как\s+вы\s+понимаете)[,:]?\s*(.+)$/i.exec(
-      previousFollowUp,
-    );
-  const core = match?.[1]?.trim() ?? previousFollowUp.trim();
-
-  if (core.length < 12) {
-    return null;
-  }
-
-  const normalized =
-    core.charAt(0).toLowerCase() + core.slice(1).replace(/\?\s*$/, '');
-  return normalized;
-}
+/** @deprecated Use buildClarificationTemplateFallback — kept for import stability during migration */
+export const buildClarificationFollowUpQuestion = buildClarificationTemplateFallback;
 
 function looksLikeClarificationQuestion(text: string): boolean {
   const normalized = text.trim();
@@ -215,24 +136,4 @@ function looksLikeClarificationQuestion(text: string): boolean {
   }
 
   return true;
-}
-
-/** Template parsing for clarification replies — not intent classification. */
-function isScopeConfirmationForTemplate(input: {
-  candidateTurnKind?: CandidateTurnKind | null;
-  scopeQuestion: string;
-}): boolean {
-  if (input.candidateTurnKind === 'scope_clarification') {
-    return true;
-  }
-
-  const scopeQuestion = input.scopeQuestion;
-  return (
-    /вы\s+говорите\s+(?:о|про)/i.test(scopeQuestion) ||
-    /(?:^|\s)да\?\s*$/i.test(scopeQuestion) ||
-    /правильно\s+(?:я\s+)?(?:понимаю|понял)/i.test(scopeQuestion) ||
-    /речь\s+(?:идёт\s+)?(?:о|про)/i.test(scopeQuestion) ||
-    /что\s+(?:именно|конкретно)/i.test(scopeQuestion) ||
-    /имеете\s+в\s+виду/i.test(scopeQuestion)
-  );
 }

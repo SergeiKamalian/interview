@@ -342,7 +342,197 @@ describe('AdaptiveInterviewSubmitService', () => {
       23,
       expect.any(Function),
     );
-    expect(perTurnEvaluator.evaluateTurnAndPersist).toHaveBeenCalled();
+    expect(perTurnEvaluator.evaluateTurnAndPersist).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evaluationMode: 'full',
+        evidenceSource: 'main_answer',
+      }),
+    );
+  });
+
+  it('routes decline_scoped through meta_turn evaluation without full LLM scope', async () => {
+    followUpRepository.findAwaitingAnswer.mockResolvedValue({
+      id: 50,
+      interviewQuestionId: 10,
+      followUpQuestionMessageId: 21,
+      checkpointKey: 'fiber_pointers',
+    });
+
+    const candidateTurnClassifier = {
+      classifyTurn: jest.fn().mockResolvedValue({
+        status: 'valid' as const,
+        classification: {
+          turnKind: 'decline_scoped' as const,
+          disposition: 'declined' as const,
+          confidence: 'high' as const,
+          reason: 'Scoped decline',
+          openerReadiness: null,
+        },
+        rawContent: '{}',
+      }),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AdaptiveInterviewSubmitService,
+        { provide: InterviewCoreRepository, useValue: repository },
+        {
+          provide: DatabaseService,
+          useValue: {
+            withTransaction: jest.fn((callback) => callback(jest.fn())),
+          },
+        },
+        { provide: CheckpointStateService, useValue: checkpointStateService },
+        { provide: PerTurnCheckpointEvaluatorService, useValue: perTurnEvaluator },
+        { provide: FollowUpPlannerService, useValue: followUpPlanner },
+        { provide: FollowUpRepository, useValue: followUpRepository },
+        {
+          provide: QuestionSummaryService,
+          useValue: { buildAndPersist: jest.fn().mockResolvedValue({ id: 1 }) },
+        },
+        { provide: InterviewRealtimeService, useValue: { emit: jest.fn() } },
+        {
+          provide: InterviewAiMessageStreamService,
+          useValue: {
+            isEnabled: jest.fn().mockReturnValue(false),
+            streamStaticText: jest.fn(async ({ text }) => text),
+          },
+        },
+        {
+          provide: AdaptiveInterviewContextService,
+          useValue: adaptiveInterviewContextService,
+        },
+        {
+          provide: AdaptiveAiConversationService,
+          useValue: { clearQuestionSessions: jest.fn() },
+        },
+        {
+          provide: AdaptiveOpenAiResponseStateService,
+          useValue: { clearEvaluateState: jest.fn() },
+        },
+        {
+          provide: MediaAssetService,
+          useValue: { linkPendingAssetToMessage: jest.fn() },
+        },
+        {
+          provide: MainQuestionOpenerService,
+          useValue: {
+            generateTopicOpener: jest.fn(),
+            generateQuestionInvite: jest.fn(),
+          },
+        },
+        { provide: CandidateTurnClassifierService, useValue: candidateTurnClassifier },
+      ],
+    }).compile();
+
+    const scopedService = module.get(AdaptiveInterviewSubmitService);
+
+    await scopedService.submitAnswer({
+      attempt,
+      questions,
+      trimmedAnswer:
+        'С child/sibling/return не углублюсь, лучше про lanes или commit phase',
+    });
+
+    expect(perTurnEvaluator.evaluateTurnAndPersist).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evaluationMode: 'target_refusal',
+        evidenceSource: 'meta_turn',
+        candidateTurnKind: 'decline_scoped',
+      }),
+    );
+  });
+
+  it('routes scope_clarification through clarification evaluation mode', async () => {
+    followUpRepository.findAwaitingAnswer.mockResolvedValue({
+      id: 51,
+      interviewQuestionId: 10,
+      followUpQuestionMessageId: 21,
+      checkpointKey: 'dependency_array',
+    });
+
+    const candidateTurnClassifier = {
+      classifyTurn: jest.fn().mockResolvedValue({
+        status: 'valid' as const,
+        classification: {
+          turnKind: 'scope_clarification' as const,
+          disposition: 'asked_for_scope' as const,
+          confidence: 'high' as const,
+          reason: 'Scope ask',
+          openerReadiness: null,
+        },
+        rawContent: '{}',
+      }),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AdaptiveInterviewSubmitService,
+        { provide: InterviewCoreRepository, useValue: repository },
+        {
+          provide: DatabaseService,
+          useValue: {
+            withTransaction: jest.fn((callback) => callback(jest.fn())),
+          },
+        },
+        { provide: CheckpointStateService, useValue: checkpointStateService },
+        { provide: PerTurnCheckpointEvaluatorService, useValue: perTurnEvaluator },
+        { provide: FollowUpPlannerService, useValue: followUpPlanner },
+        { provide: FollowUpRepository, useValue: followUpRepository },
+        {
+          provide: QuestionSummaryService,
+          useValue: { buildAndPersist: jest.fn().mockResolvedValue({ id: 1 }) },
+        },
+        { provide: InterviewRealtimeService, useValue: { emit: jest.fn() } },
+        {
+          provide: InterviewAiMessageStreamService,
+          useValue: {
+            isEnabled: jest.fn().mockReturnValue(false),
+            streamStaticText: jest.fn(async ({ text }) => text),
+          },
+        },
+        {
+          provide: AdaptiveInterviewContextService,
+          useValue: adaptiveInterviewContextService,
+        },
+        {
+          provide: AdaptiveAiConversationService,
+          useValue: { clearQuestionSessions: jest.fn() },
+        },
+        {
+          provide: AdaptiveOpenAiResponseStateService,
+          useValue: { clearEvaluateState: jest.fn() },
+        },
+        {
+          provide: MediaAssetService,
+          useValue: { linkPendingAssetToMessage: jest.fn() },
+        },
+        {
+          provide: MainQuestionOpenerService,
+          useValue: {
+            generateTopicOpener: jest.fn(),
+            generateQuestionInvite: jest.fn(),
+          },
+        },
+        { provide: CandidateTurnClassifierService, useValue: candidateTurnClassifier },
+      ],
+    }).compile();
+
+    const clarificationService = module.get(AdaptiveInterviewSubmitService);
+
+    await clarificationService.submitAnswer({
+      attempt,
+      questions,
+      trimmedAnswer: 'Вы про dependency array или cleanup?',
+    });
+
+    expect(perTurnEvaluator.evaluateTurnAndPersist).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evaluationMode: 'clarification',
+        evidenceSource: 'meta_turn',
+        candidateTurnKind: 'scope_clarification',
+      }),
+    );
   });
 
   it('skips AI evaluation and follow-ups when candidate declines knowledge', async () => {

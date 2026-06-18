@@ -26,8 +26,12 @@ import {
 import { shouldSkipFollowUps } from '../utils/candidate-decline.util';
 import { buildCandidateTurnClassifierInput } from '../utils/build-candidate-turn-classifier-input.util';
 import { resolveClassifierEmergencyFallback } from '../utils/classifier-emergency-fallback.util';
-import { isWholeDeclineTurnKind } from '../utils/map-turn-kind-to-disposition.util';
 import type { CandidateTurnKind } from '../types/candidate-turn-classifier.types';
+import {
+  isMetaTurnMode,
+  resolveEvaluationMode,
+  shouldSkipEvaluation,
+} from '../utils/resolve-evaluation-mode.util';
 import type { CandidateAnswerDisposition } from '../types/candidate-answer-disposition.type';
 import { CandidateTurnClassifierService } from './candidate-turn-classifier.service';
 import { MediaAssetService } from '../../media/media-asset.service';
@@ -395,11 +399,21 @@ export class AdaptiveInterviewSubmitService {
       }
     }
 
-    if (isWholeDeclineTurnKind(candidateTurnKind)) {
+    const evaluationMode = resolveEvaluationMode(candidateTurnKind);
+
+    logAdaptiveAiDebug(this.logger, 'submit_answer.evaluation_mode', {
+      attemptId,
+      interviewQuestionId: currentQuestion.id,
+      evaluationMode,
+      turnKind: candidateTurnKind,
+    });
+
+    if (shouldSkipEvaluation(evaluationMode)) {
       logAdaptiveAiDebug(this.logger, 'submit_answer.candidate_declined', {
         attemptId,
         interviewQuestionId: currentQuestion.id,
         candidateTurnKind,
+        evaluationMode,
         answerPreview: trimmedAnswer,
       });
 
@@ -440,7 +454,12 @@ export class AdaptiveInterviewSubmitService {
         interviewQuestionId: currentQuestion.id,
         context: contextPacket,
         skipEnsureStates: true,
-        evidenceSource: isFollowUpAnswer ? 'follow_up_answer' : 'main_answer',
+        evaluationMode,
+        evidenceSource: isMetaTurnMode(evaluationMode)
+          ? 'meta_turn'
+          : isFollowUpAnswer
+            ? 'follow_up_answer'
+            : 'main_answer',
         candidateTurnKind,
         candidateDispositionFromClassifier: candidateDisposition,
       });
@@ -526,6 +545,7 @@ export class AdaptiveInterviewSubmitService {
           evaluation.status === 'valid' ? candidateDisposition : undefined,
         candidateTurnKind:
           evaluation.status === 'valid' ? candidateTurnKind : undefined,
+        evaluationMode,
         followUpsUsedForQuestion: contextPacket.followUpLimits.usedForQuestion,
         avoidLlmFallback: evaluation.status === 'valid',
         recentScoreDeltas: isFollowUpAnswer ? [scoreDelta] : undefined,

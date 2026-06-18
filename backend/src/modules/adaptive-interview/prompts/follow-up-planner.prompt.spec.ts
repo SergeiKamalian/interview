@@ -42,4 +42,17 @@ describe('follow-up-planner.prompt v2', () => {
 
     expect(streamingPrompt).toContain('plain text only');
   });
+
+  it('passes classifier turn_kind into clarification redirect block', () => {
+    const userPrompt = buildFollowUpPlannerUserPrompt({
+      ...input,
+      followUpKind: 'clarification_redirect',
+      candidateTurnKind: 'scope_clarification',
+      missingMustConcepts: ['call stack', 'стек'],
+    });
+
+    expect(userPrompt).toContain('Classifier turn_kind: scope_clarification');
+    expect(userPrompt).toContain('Generic «о чём вы говорите?»');
+    expect(userPrompt).toContain('do NOT say «Да, именно»');
+  });
 });

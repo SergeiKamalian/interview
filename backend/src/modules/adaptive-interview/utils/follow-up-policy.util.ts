@@ -1,4 +1,5 @@
 import type { CandidateTurnKind } from '../types/candidate-turn-classifier.types';
+import type { AdaptiveCheckpointDefinition } from '../types/adaptive-interview-context.types';
 import {
   FollowUpPolicyDecision,
   FollowUpPolicyInput,
@@ -11,7 +12,7 @@ import {
   rephraseCheckpointTitleForFollowUp,
 } from './checkpoint-expected-speech.util';
 import {
-  buildClarificationFollowUpQuestion,
+  buildClarificationTemplateFallback,
   countScopeClarificationTurns,
   isScopeClarificationTurn,
   MAX_SCOPE_CLARIFICATION_TURNS_PER_QUESTION,
@@ -48,6 +49,10 @@ import {
   inferExpectedCheckpointKey,
 } from './topic-mismatch.util';
 import { hasTransitiveRedirectExhausted } from './transitive-checkpoint-floors.util';
+import {
+  isMetaTurnSuppressingTopicMismatch,
+  isTargetRefusalPolicyTurn,
+} from './resolve-evaluation-mode.util';
 
 const ELIGIBLE_STATUSES = new Set<CheckpointStateStatus>([
   'missed',
@@ -118,6 +123,14 @@ export function evaluateFollowUpPolicy(
   );
   if (clarificationDecision) {
     return clarificationDecision;
+  }
+
+  const targetRefusalDecision = resolveTargetRefusalFollowUpDecision(
+    input,
+    checkpointByKey,
+  );
+  if (targetRefusalDecision) {
+    return targetRefusalDecision;
   }
 
   const topicRedirectDecision = resolveTopicRedirectDecision(input, checkpointByKey);
@@ -373,6 +386,177 @@ function hasPendingScopeClarification(input: FollowUpPolicyInput): boolean {
   return scopeTurnCount <= MAX_SCOPE_CLARIFICATION_TURNS_PER_QUESTION;
 }
 
+function resolveTargetRefusalFollowUpDecision(
+  input: FollowUpPolicyInput,
+  checkpointByKey: Map<string, FollowUpPolicyInput['checkpoints'][number]>,
+): FollowUpPolicyDecision | null {
+  if (!isTargetRefusalPolicyTurn(input)) {
+    return null;
+  }
+
+  const refusedKey =
+    input.stickyTargetCheckpointKey ??
+    inferExpectedCheckpointKey({
+      checkpoints: input.checkpoints,
+      targetCheckpointKey: input.stickyTargetCheckpointKey,
+      questionText: input.questionText,
+    });
+
+  if (!refusedKey) {
+    return {
+      shouldAskFollowUp: false,
+      reason: 'candidate_refused_target_checkpoint',
+    };
+  }
+
+  if (input.followUpsUsedForQuestion >= input.maxFollowUpsPerQuestion) {
+    return {
+      shouldAskFollowUp: false,
+      reason: 'candidate_refused_target_checkpoint',
+    };
+  }
+
+  const budgetConfig = resolveBudgetConfig(input);
+  const allocatorCandidates = buildAllocatorCandidates(input, budgetConfig, {
+    excludeCheckpointKeys: [refusedKey],
+  });
+  const preferredPivot = inferPreferredPivotCheckpointKey(
+    input.latestCandidateAnswer ?? '',
+    input.checkpoints,
+    refusedKey,
+  );
+
+  const allocation = allocateFollowUpBudget({
+    candidates: allocatorCandidates,
+    followUpsUsedForQuestion: input.followUpsUsedForQuestion,
+    config: budgetConfig,
+    stickyTargetCheckpointKey: preferredPivot,
+    questionScoreSufficient: false,
+  });
+
+  let selectedCheckpointKey = allocation.canProbe
+    ? allocation.selectedCheckpointKey
+    : undefined;
+
+  if (
+    (!selectedCheckpointKey || selectedCheckpointKey === refusedKey) &&
+    preferredPivot
+  ) {
+    const preferredCandidate = allocatorCandidates.find(
+      (candidate) => candidate.checkpointKey === preferredPivot,
+    );
+    if (
+      preferredCandidate &&
+      preferredCandidate.state.followUpCount <
+        preferredCandidate.maxFollowUpsCap
+    ) {
+      selectedCheckpointKey = preferredPivot;
+    }
+  }
+
+  if (!selectedCheckpointKey || selectedCheckpointKey === refusedKey) {
+    return {
+      shouldAskFollowUp: false,
+      reason: 'candidate_refused_target_checkpoint',
+    };
+  }
+
+  const selectedCheckpoint = checkpointByKey.get(selectedCheckpointKey);
+  if (!selectedCheckpoint) {
+    return {
+      shouldAskFollowUp: false,
+      reason: 'candidate_refused_target_checkpoint',
+    };
+  }
+
+  const selectedState = input.checkpointStates.find(
+    (state) => state.checkpointKey === selectedCheckpointKey,
+  );
+  if (!selectedState) {
+    return {
+      shouldAskFollowUp: false,
+      reason: 'candidate_refused_target_checkpoint',
+    };
+  }
+
+  const selectedEvidenceText = getCheckpointEvidenceText(
+    input,
+    selectedCheckpointKey,
+  );
+  const missingMustConcepts = getMissingMustConcepts(
+    selectedCheckpoint.evaluationHints,
+    selectedEvidenceText,
+  );
+  const isDepthProbe = probeRequired({
+    checkpoint: selectedCheckpoint,
+    state: selectedState,
+    hints: selectedCheckpoint.evaluationHints,
+    questionMaxScore: input.questionMaxScore,
+    candidateEvidenceText: selectedEvidenceText,
+    latestCandidateText: input.latestCandidateAnswer ?? '',
+  });
+  const isResidualProbe =
+    !isDepthProbe &&
+    residualGapProbeRequired({
+      checkpoint: selectedCheckpoint,
+      state: selectedState,
+      hints: selectedCheckpoint.evaluationHints,
+      questionMaxScore: input.questionMaxScore,
+      candidateEvidenceText: selectedEvidenceText,
+      latestCandidateText: input.latestCandidateAnswer ?? '',
+    });
+
+  return {
+    shouldAskFollowUp: true,
+    targetCheckpointKey: selectedCheckpointKey,
+    checkpointTitle: selectedCheckpoint.title,
+    checkpointExpected: selectedCheckpoint.expected,
+    reason: 'candidate_refused_target_checkpoint',
+    followUpKind: isDepthProbe
+      ? 'depth_probe'
+      : isResidualProbe
+        ? 'residual_probe'
+        : 'generic',
+    missingMustConcepts,
+  };
+}
+
+function inferPreferredPivotCheckpointKey(
+  answer: string,
+  checkpoints: AdaptiveCheckpointDefinition[],
+  refusedKey: string,
+): string | null {
+  const normalized = answer.toLowerCase();
+  let bestKey: string | null = null;
+  let bestScore = 0;
+
+  for (const checkpoint of checkpoints) {
+    if (checkpoint.checkpointKey === refusedKey) {
+      continue;
+    }
+
+    const terms = [
+      checkpoint.checkpointKey.replace(/_/g, ' '),
+      ...(checkpoint.evaluationHints?.mustConcepts ?? []).slice(0, 10),
+    ];
+
+    let hits = 0;
+    for (const term of terms) {
+      const token = term.trim().toLowerCase();
+      if (token.length >= 3 && normalized.includes(token)) {
+        hits += 1;
+      }
+    }
+
+    if (hits > bestScore) {
+      bestScore = hits;
+      bestKey = checkpoint.checkpointKey;
+    }
+  }
+
+  return bestScore > 0 ? bestKey : null;
+}
+
 function resolveTopicRedirectDecision(
   input: FollowUpPolicyInput,
   checkpointByKey: Map<string, FollowUpPolicyInput['checkpoints'][number]>,
@@ -397,6 +581,15 @@ function resolveTopicRedirectDecision(
     return null;
   }
 
+  if (
+    isMetaTurnSuppressingTopicMismatch({
+      evaluationMode: input.evaluationMode,
+      candidateTurnKind: input.candidateTurnKind,
+    })
+  ) {
+    return null;
+  }
+
   const scopeContext = resolveScopeTurnContext(input);
 
   const mismatch = detectTopicMismatch({
@@ -407,6 +600,7 @@ function resolveTopicRedirectDecision(
     checkpointStates: input.checkpointStates,
     candidateDispositionFromAi: input.candidateDispositionFromAi,
     candidateTurnKind: input.candidateTurnKind,
+    evaluationMode: input.evaluationMode,
     isTargetedFollowUp: scopeContext.isTargetedFollowUp,
     isFollowUpContext: scopeContext.isFollowUpContext,
   });
@@ -449,7 +643,15 @@ function resolveTopicRedirectDecision(
 }
 
 function hasPendingTopicRedirect(input: FollowUpPolicyInput): boolean {
-  const scopeContext = resolveScopeTurnContext(input);
+  if (
+    isMetaTurnSuppressingTopicMismatch({
+      evaluationMode: input.evaluationMode,
+      candidateTurnKind: input.candidateTurnKind,
+    })
+  ) {
+    return false;
+  }
+
   if (
     isScopeClarificationTurn({
       candidateTurnKind: input.candidateTurnKind,
@@ -483,12 +685,15 @@ function hasPendingTopicRedirect(input: FollowUpPolicyInput): boolean {
 function buildAllocatorCandidates(
   input: FollowUpPolicyInput,
   budgetConfig: FollowUpBudgetConfig,
+  options: { excludeCheckpointKeys?: string[] } = {},
 ) {
+  const excludedKeys = new Set(options.excludeCheckpointKeys ?? []);
   const checkpointByKey = new Map(
     input.checkpoints.map((checkpoint) => [checkpoint.checkpointKey, checkpoint]),
   );
 
   return input.checkpointStates
+    .filter((state) => !excludedKeys.has(state.checkpointKey))
     .filter((state) => isEligibleCheckpointState(state))
     .filter((state) => {
       const checkpoint = checkpointByKey.get(state.checkpointKey);
@@ -617,16 +822,11 @@ export function buildNaturalTemplateFollowUp(input: {
     (input.missingMustConcepts?.length ?? 0) >= 0
   ) {
     return normalizeFollowUpQuestionForCandidate(
-      buildClarificationFollowUpQuestion({
+      buildClarificationTemplateFallback({
         checkpointTitle: input.checkpointTitle ?? '',
         missingMustConcepts: input.missingMustConcepts ?? [],
         hints: input.evaluationHints,
-        candidateScopeQuestion: input.latestCandidateAnswer,
         candidateTurnKind: input.candidateTurnKind,
-        previousFollowUpQuestion:
-          previousFollowUpQuestions[previousFollowUpQuestions.length - 1] ??
-          null,
-        seed,
       }),
     );
   }

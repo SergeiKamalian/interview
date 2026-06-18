@@ -410,4 +410,123 @@ describe('PerTurnCheckpointEvaluatorService', () => {
       checkpointStateRepository.markNeedsManualReviewForQuestion,
     ).toHaveBeenCalledWith(5, 10);
   });
+
+  it('skips full LLM evaluate for decline_scoped meta turn and persists target only', async () => {
+    adaptiveInterviewContextService.buildContextPacket.mockResolvedValue({
+      ...contextPacket,
+      latestAnswerMessageKind: 'follow_up_answer',
+      targetCheckpointKey: 'dependency_array',
+      latestCandidateAnswer:
+        'С child/sibling/return не углублюсь, лучше про cleanup',
+      checkpointStates: [
+        {
+          checkpointKey: 'dependency_array',
+          status: 'partial',
+          scoreAwarded: 0.5,
+          maxScore: 1,
+          followUpCount: 1,
+          rationale: 'Partial dependency array.',
+        },
+        {
+          checkpointKey: 'cleanup',
+          status: 'covered',
+          scoreAwarded: 1,
+          maxScore: 1,
+          followUpCount: 0,
+          rationale: 'Cleanup covered earlier.',
+        },
+      ],
+    });
+
+    checkpointStateRepository.applyTurnEvaluationResults.mockResolvedValue([]);
+
+    const result = await service.evaluateTurnAndPersist({
+      companyId: 7,
+      attemptId: 5,
+      interviewQuestionId: 10,
+      evaluationMode: 'target_refusal',
+      evidenceSource: 'meta_turn',
+      candidateTurnKind: 'decline_scoped',
+      candidateDispositionFromClassifier: 'declined',
+    });
+
+    expect(result.status).toBe('valid');
+    expect(aiProviderService.evaluateJson).not.toHaveBeenCalled();
+    expect(
+      checkpointStateRepository.applyTurnEvaluationResults,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evidenceSource: 'meta_turn',
+        results: [
+          expect.objectContaining({
+            checkpointKey: 'dependency_array',
+          }),
+        ],
+      }),
+    );
+    expect(
+      checkpointStateRepository.applyTurnEvaluationResults.mock.calls[0][0]
+        .results,
+    ).toHaveLength(1);
+  });
+
+  it('freezes prior target score for scope_clarification without full LLM evaluate', async () => {
+    adaptiveInterviewContextService.buildContextPacket.mockResolvedValue({
+      ...contextPacket,
+      latestAnswerMessageKind: 'follow_up_answer',
+      targetCheckpointKey: 'dependency_array',
+      latestCandidateAnswer: 'Вы про dependency array или cleanup?',
+      checkpointStates: [
+        {
+          checkpointKey: 'dependency_array',
+          status: 'partial',
+          scoreAwarded: 0.5,
+          maxScore: 1,
+          followUpCount: 1,
+          rationale: 'Partial dependency array.',
+        },
+        {
+          checkpointKey: 'cleanup',
+          status: 'covered',
+          scoreAwarded: 1,
+          maxScore: 1,
+          followUpCount: 0,
+          rationale: 'Cleanup covered earlier.',
+        },
+      ],
+    });
+
+    checkpointStateRepository.applyTurnEvaluationResults.mockResolvedValue([]);
+
+    const result = await service.evaluateTurnAndPersist({
+      companyId: 7,
+      attemptId: 5,
+      interviewQuestionId: 10,
+      evaluationMode: 'clarification',
+      evidenceSource: 'meta_turn',
+      candidateTurnKind: 'scope_clarification',
+      candidateDispositionFromClassifier: 'asked_for_scope',
+    });
+
+    expect(result.status).toBe('valid');
+    expect(aiProviderService.evaluateJson).not.toHaveBeenCalled();
+    expect(
+      checkpointStateRepository.applyTurnEvaluationResults,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        results: [
+          expect.objectContaining({
+            checkpointKey: 'dependency_array',
+            scoreAwarded: 0.5,
+            status: 'partial',
+            rationale: expect.stringContaining('scope_clarification=pending'),
+          }),
+        ],
+      }),
+    );
+    expect(
+      checkpointStateRepository.applyTurnEvaluationResults.mock.calls[0][0]
+        .results,
+    ).toHaveLength(1);
+  });
 });

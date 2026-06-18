@@ -28,6 +28,12 @@ SET qc.evaluation_hints = CASE qc.checkpoint_key
     'impliesCheckpointFloors', JSON_ARRAY(
       JSON_OBJECT('checkpointKey', 'fiber_definition', 'floorFraction', 0.55)
     ),
+    'probeConceptGroups', JSON_ARRAY(
+      JSON_OBJECT(
+        'match', JSON_ARRAY('стек', 'call stack', 'синхрон', 'рекурсив', 'React 16'),
+        'ask', 'чем stack reconciler отличается от Fiber'
+      )
+    ),
     'mustConcepts', JSON_ARRAY(
       'call stack', 'стек', 'рекурсив', 'синхрон', 'React 16',
       'связный список', 'linked list', 'work loop', 'fiber-узл',

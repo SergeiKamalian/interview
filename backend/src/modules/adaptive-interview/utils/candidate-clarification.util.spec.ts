@@ -1,5 +1,5 @@
 import {
-  buildClarificationFollowUpQuestion,
+  buildClarificationTemplateFallback,
   countScopeClarificationTurns,
   isScopeClarificationTurn,
   isVagueFollowUpQuestion,
@@ -78,64 +78,30 @@ describe('candidate-clarification.util', () => {
     });
   });
 
-  describe('buildClarificationFollowUpQuestion', () => {
-    it('names missing mustConcepts instead of staying vague', () => {
-      const question = buildClarificationFollowUpQuestion({
-        checkpointTitle: 'Scheduling',
-        missingMustConcepts: ['MessageChannel', 'shouldYield'],
-        hints: FIBER_EVALUATION_HINTS.scheduling,
-        candidateScopeQuestion: 'Что именно вам интересно?',
+  describe('buildClarificationTemplateFallback', () => {
+    it('uses bank probe phrases instead of vague mustConcepts list', () => {
+      const question = buildClarificationTemplateFallback({
+        checkpointTitle: 'Stack vs Fiber',
+        missingMustConcepts: ['call stack', 'стек'],
+        hints: FIBER_EVALUATION_HINTS.stack_vs_fiber,
         candidateTurnKind: 'scope_clarification',
       });
 
-      expect(question).toMatch(/MessageChannel|shouldYield/i);
-      expect(question).not.toContain('технические детали');
+      expect(question).toMatch(/Имею в виду/i);
+      expect(question).toMatch(/stack reconciler|Fiber/i);
+      expect(question).not.toMatch(/call stack, стек/i);
     });
 
-    it('answers format clarification without false positive acknowledgment', () => {
-      const previousFollowUp =
-        'Расскажите, как вы понимаете работу React Fiber: что именно происходит при обновлении (render/reconciliation) и чем это отличается от commit?';
-
-      const question = buildClarificationFollowUpQuestion({
+    it('uses format branch only from classifier turn_kind', () => {
+      const question = buildClarificationTemplateFallback({
         checkpointTitle: 'Fiber definition',
         missingMustConcepts: ['scheduler', 'MessageChannel'],
         hints: FIBER_EVALUATION_HINTS.scheduling,
-        candidateScopeQuestion:
-          'А вам нужно чтобы я ответил коротко и по делу или по деталям?',
         candidateTurnKind: 'format_clarification',
-        previousFollowUpQuestion: previousFollowUp,
       });
 
       expect(question).toMatch(/^Кратко и по существу/i);
-      expect(question).toMatch(/render|commit|reconciliation/i);
-      expect(question).not.toMatch(/scheduler|MessageChannel/i);
       expect(question).not.toMatch(/в целом всё так/i);
-    });
-
-    it('answers confirmation with short да-именно-pro reply', () => {
-      const question = buildClarificationFollowUpQuestion({
-        checkpointTitle: 'Scheduling',
-        missingMustConcepts: ['MessageChannel', 'shouldYield'],
-        hints: FIBER_EVALUATION_HINTS.scheduling,
-        candidateScopeQuestion:
-          'Вы говорите о этапах и методах react fiber да?',
-        candidateTurnKind: 'scope_clarification',
-      });
-
-      expect(question).toMatch(/^Да, именно про/i);
-      expect(question).toMatch(/MessageChannel|shouldYield/i);
-      expect(question.length).toBeLessThan(120);
-    });
-
-    it('clarifies or-choice scope questions', () => {
-      const question = buildClarificationFollowUpQuestion({
-        checkpointTitle: 'Scheduling',
-        missingMustConcepts: ['MessageChannel'],
-        hints: FIBER_EVALUATION_HINTS.scheduling,
-        candidateScopeQuestion: 'Вы про useEffect или useState?',
-      });
-
-      expect(question).toMatch(/не про useState/i);
     });
   });
 });

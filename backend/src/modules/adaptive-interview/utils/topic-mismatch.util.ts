@@ -1,7 +1,9 @@
 import type { AdaptiveCheckpointDefinition } from '../types/adaptive-interview-context.types';
 import type { CandidateAnswerDisposition } from '../types/candidate-answer-disposition.type';
 import type { CandidateTurnKind } from '../types/candidate-turn-classifier.types';
+import type { EvaluationMode } from '../types/evaluation-mode.type';
 import { isScopeClarificationTurn } from './candidate-clarification.util';
+import { isMetaTurnSuppressingTopicMismatch } from './resolve-evaluation-mode.util';
 import type { ConfusionPair } from '../types/checkpoint-evaluation-hints.type';
 import { countMatchedConcepts } from './text-evidence-overlap.util';
 import { hasTransitiveRedirectExhausted, hasWrongTopicAnchorTerms } from './transitive-checkpoint-floors.util';
@@ -49,12 +51,11 @@ export function detectTopicMismatch(input: {
   }>;
   candidateDispositionFromAi?: CandidateAnswerDisposition | null;
   candidateTurnKind?: CandidateTurnKind | null;
+  evaluationMode?: EvaluationMode | null;
   isTargetedFollowUp?: boolean;
   isFollowUpContext?: boolean;
 }): TopicMismatchDetection {
   const answer = input.latestCandidateAnswer.trim();
-  const inFollowUpDialogue =
-    input.isTargetedFollowUp === true || input.isFollowUpContext === true;
 
   if (
     isScopeClarificationTurn({
@@ -68,6 +69,21 @@ export function detectTopicMismatch(input: {
       expectedCheckpointKey: input.expectedCheckpointKey,
       confidence: 0,
       reason: 'scope_clarification_meta_turn',
+    };
+  }
+
+  if (
+    isMetaTurnSuppressingTopicMismatch({
+      evaluationMode: input.evaluationMode,
+      candidateTurnKind: input.candidateTurnKind,
+    })
+  ) {
+    return {
+      isMismatch: false,
+      answeredCheckpointKey: null,
+      expectedCheckpointKey: input.expectedCheckpointKey,
+      confidence: 0,
+      reason: 'meta_turn_suppressed',
     };
   }
 

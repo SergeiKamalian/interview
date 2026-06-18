@@ -39,11 +39,12 @@
 | TASK-14.29 | [x] done | Wire classifier into submit + policy | `029-✅-wire-classifier-submit-policy.md` |
 | TASK-14.30 | [x] done | Deprecate legacy intent regex | `030-✅-deprecate-legacy-intent-regex.md` |
 | TASK-14.31 | [x] done | Bank-driven false claims (legacy-contradiction-cap) | `031-✅-bank-driven-false-claims.md` |
-| TASK-14.32 | [ ] todo | Evaluation mode contract (`resolveEvaluationMode`) | `032-⬜-evaluation-mode-contract.md` |
-| TASK-14.33 | [ ] todo | Submit evaluation mode routing | `033-⬜-submit-evaluation-mode-routing.md` |
-| TASK-14.34 | [ ] todo | Guards + merge mode-aware freeze (GUARD-02) | `034-⬜-guards-merge-mode-aware-freeze.md` |
-| TASK-14.35 | [ ] todo | Policy target refusal branch (DECL-01) | `035-⬜-policy-target-refusal-branch.md` |
-| TASK-14.36 | [ ] todo | Golden attempt #91 meta-turn regression | `036-⬜-golden-attempt91-meta-turn-regression.md` |
+| TASK-14.32 | [x] done | Evaluation mode contract (`resolveEvaluationMode`) | `032-✅-evaluation-mode-contract.md` |
+| TASK-14.33 | [x] done | Submit evaluation mode routing | `033-✅-submit-evaluation-mode-routing.md` |
+| TASK-14.34 | [x] done | Guards + merge mode-aware freeze (GUARD-02) | `034-✅-guards-merge-mode-aware-freeze.md` |
+| TASK-14.35 | [x] done | Policy target refusal branch (DECL-01) | `035-✅-policy-target-refusal-branch.md` |
+| TASK-14.36 | [x] done | Golden attempt #91 meta-turn regression | `036-✅-golden-attempt91-meta-turn-regression.md` |
+| TASK-14.37 | [x] done | Fix follow-up Cyrillic mojibake (ENC-01) | `037-✅-fix-follow-up-cyrillic-mojibake.md` |
 
 ---
 
@@ -58,10 +59,10 @@ Design: [`docs/evaluation-accuracy/candidate-turn-classifier.md`](../../../evalu
 14.33 submit routing    → зависит от 14.32
 14.34 guards freeze     → зависит от 14.32, 14.33
 14.35 policy refusal    → зависит от 14.32–14.34
-14.36 golden + close    → зависит от 14.32–14.35
+14.36 golden + close    → ✅ done (wave 4 complete)
 ```
 
-Баги: GUARD-02, DECL-01, SCORE-01 (§16 README). ENC-01 — вне wave 4.
+Баги: GUARD-02, DECL-01, SCORE-01, ENC-01 — **fixed** (§16 README).
 
 ## Post-14 wave (Attempt 82)
 

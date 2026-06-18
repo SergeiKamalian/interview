@@ -1,6 +1,6 @@
 # TASK-14.34 — Guards + merge mode-aware freeze
 
-Status: [ ] todo
+Status: [x] done
 
 ## Prerequisite
 
@@ -60,19 +60,37 @@ if evaluationMode === 'clarification' && checkpointKey === target:
 
 ## Acceptance criteria
 
-- [ ] GUARD-02 сценарий в unit test — non-target scores не падают
-- [ ] `scope_clarification` freeze (14.27) — без регрессии
-- [ ] `full` substantive path — без регрессии
-- [ ] `pnpm test -- apply-checkpoint-score-floors merge-checkpoint-evaluation` pass
-- [ ] `pnpm build` pass
+- [x] GUARD-02 сценарий в unit test — non-target scores не падают
+- [x] `scope_clarification` freeze (14.27) — без регрессии
+- [x] `full` substantive path — без регрессии
+- [x] `pnpm test -- apply-checkpoint-score-floors merge-checkpoint-evaluation` pass
+- [x] `pnpm build` pass
 
 ## Completion Notes
 
-_(заполнить агентом)_
+**Проверка:**
 
-## Changed files (ожидаемо)
+```bash
+cd backend
+pnpm test -- apply-checkpoint-score-floors merge-checkpoint-evaluation build-meta-turn resolve-evaluation-mode
+# → 3 suites, 51 passed
+pnpm test -- adaptive-interview-submit per-turn-checkpoint-evaluator
+# → 2 suites, 14 passed
+pnpm build
+# → ok
+```
+
+**Ожидал:** на meta-turn non-target checkpoint'ы freeze prior cumulative scores; target_refusal применяет только refusal cap на target; merge не понижает score при `meta_turn` + `lockPriorScore`; attempt #91 turn 6 regression green.
+
+**Получил:** `shouldFreezeCheckpointOnMetaTurn` + `buildMetaTurnFrozenCheckpointResult` в floors; target_refusal — укороченный guard chain; `evaluationMode` проброшен из evaluator и build-meta-turn; merge belt-and-suspenders через `lockPriorScore` и `meta_turn_frozen` rationale tag.
+
+## Changed files
 
 - `utils/apply-checkpoint-score-floors.util.ts`
 - `utils/apply-checkpoint-score-floors.util.spec.ts`
-- `utils/merge-checkpoint-evaluation.util.ts` (если meta_turn source)
-- `services/per-turn-checkpoint-evaluator.service.ts` (pass mode to floors)
+- `utils/merge-checkpoint-evaluation.util.ts`
+- `utils/merge-checkpoint-evaluation.util.spec.ts`
+- `utils/resolve-evaluation-mode.util.ts`
+- `utils/resolve-evaluation-mode.util.spec.ts`
+- `utils/build-meta-turn-checkpoint-evaluation.util.ts`
+- `services/per-turn-checkpoint-evaluator.service.ts`

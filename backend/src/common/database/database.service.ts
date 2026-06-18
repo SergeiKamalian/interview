@@ -31,6 +31,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       user: env.mysql.user,
       password: env.mysql.password,
       database: env.mysql.database,
+      charset: 'utf8mb4',
       timezone: 'Z',
       waitForConnections: true,
       connectionLimit: 10,

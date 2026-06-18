@@ -2,6 +2,9 @@ import type { CheckpointStateStatus } from '../types/checkpoint-state-status.typ
 import type { EvaluationEvidenceSource } from '../types/evaluation-evidence-source.type';
 import { getFollowUpEvidenceWeightConfig } from '../config/follow-up-evidence-weight.config';
 
+const META_TURN_NON_TARGET_DECREASE_BLOCK =
+  /meta_turn_frozen|scope_clarification=pending|meta_turn=confused_redirect|meta_turn=off_topic_redirect/i;
+
 const STATUS_RANK: Record<CheckpointStateStatus, number> = {
   covered: 5,
   partial: 4,
@@ -28,6 +31,8 @@ export type MergeCheckpointEvaluationInput = {
   incomingAllowsScoreDecrease?: boolean;
   /** Minimum score while probe is open/provisional (14.18). */
   provisionalScoreFloor?: number;
+  /** Meta-turn non-target: never reduce cumulative score (GUARD-02). */
+  lockPriorScore?: boolean;
 };
 
 export type MergeCheckpointEvaluationResult = {
@@ -102,14 +107,29 @@ export function mergeCheckpointEvaluation(
 export function incomingAllowsScoreDecrease(
   input: Pick<
     MergeCheckpointEvaluationInput,
-    'incomingRationale' | 'incomingAllowsScoreDecrease'
+    | 'incomingRationale'
+    | 'incomingAllowsScoreDecrease'
+    | 'evidenceSource'
+    | 'lockPriorScore'
   >,
 ): boolean {
+  if (input.lockPriorScore) {
+    return false;
+  }
+
   if (input.incomingAllowsScoreDecrease) {
     return true;
   }
 
   const rationale = input.incomingRationale ?? '';
+
+  if (
+    input.evidenceSource === 'meta_turn' &&
+    META_TURN_NON_TARGET_DECREASE_BLOCK.test(rationale)
+  ) {
+    return false;
+  }
+
   return (
     /depth\s*=\s*false_claim/i.test(rationale) ||
     /semantic guard capped/i.test(rationale) ||

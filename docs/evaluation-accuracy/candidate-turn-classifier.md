@@ -572,12 +572,22 @@ classifyTurn()
 
 | ID | Файл | Scope |
 |----|------|-------|
-| 14.32 | `032-⬜-evaluation-mode-contract.md` | type + `resolveEvaluationMode` + unit tests |
-| 14.33 | `033-⬜-submit-evaluation-mode-routing.md` | wire mode в submit + evaluator scope |
-| 14.34 | `034-⬜-guards-merge-mode-aware-freeze.md` | GUARD-02 fix |
-| 14.35 | `035-⬜-policy-target-refusal-branch.md` | DECL-01 fix |
-| 14.36 | `036-⬜-golden-attempt91-meta-turn-regression.md` | golden case + bug closure |
+| 14.32 | `032-✅-evaluation-mode-contract.md` | type + `resolveEvaluationMode` + unit tests |
+| 14.33 | `033-✅-submit-evaluation-mode-routing.md` | wire mode в submit + evaluator scope |
+| 14.34 | `034-✅-guards-merge-mode-aware-freeze.md` | GUARD-02 fix |
+| 14.35 | `035-✅-policy-target-refusal-branch.md` | DECL-01 fix |
+| 14.36 | `036-✅-golden-attempt91-meta-turn-regression.md` | golden case + bug closure |
 
-**Регрессионный кейс:** attempt #91 turn 6 (`decline_scoped` на `fiber_pointers`) — `fiber_definition` / `render_phase` / `commit_phase` не обнуляются; policy не re-probe тот же CP.
+**Регрессионный кейс:** attempt #91 turn 6 (`decline_scoped` на `fiber_pointers`) — `fiber_definition` / `render_phase` / `commit_phase` не обнуляются; policy не re-probe тот же CP. Golden: `react-fiber-attempt91-decline-scoped.json`.
 
 **Вне scope wave 4:** ENC-01 (mojibake UTF-8 в UI).
+
+### 14.4 Wave 4 acceptance (complete)
+
+- [x] `EvaluationMode` contract + `resolveEvaluationMode` (14.32)
+- [x] Submit routes meta-turn → `meta_turn` evidence, skip full LLM on non-full modes (14.33)
+- [x] Guards freeze non-target checkpoint states when `evaluationMode` ∈ {clarification, target_refusal, redirect} (14.34)
+- [x] Policy `target_refusal` branch: skip re-probe, pivot to suggested topic (14.35)
+- [x] Golden regression attempt #91 turn 6 in CI (14.36)
+- [x] GUARD-02, DECL-01, SCORE-01 closed in README §16
+- [x] `pnpm test` + `pnpm build` backend green

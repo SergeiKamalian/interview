@@ -1,3 +1,4 @@
+import type { CandidateTurnKind } from '../types/candidate-turn-classifier.types';
 import { sanitizeCheckpointExpectedForCandidateSpeech } from '../utils/checkpoint-expected-speech.util';
 import type { FollowUpAnswerTone } from '../utils/follow-up-acknowledgment.util';
 import {
@@ -7,7 +8,7 @@ import {
 } from './interviewer-voice.prompt';
 
 export const FOLLOW_UP_PLANNER_PROMPT_KEY = 'follow_up_planner';
-export const FOLLOW_UP_PLANNER_PROMPT_VERSION = '2.9.0';
+export const FOLLOW_UP_PLANNER_PROMPT_VERSION = '2.10.0';
 
 const RESPONSE_JSON_SCHEMA = `{
   "follow_up_question": "interviewer «я» → candidate «вы»: varied short opener (not «Понял, спасибо» every time) or none, then ONE direct follow-up question in Russian — never quote the candidate's words",
@@ -22,6 +23,7 @@ export type FollowUpPlannerPromptInput = {
   latestCandidateAnswer: string;
   previousFollowUpQuestions: string[];
   followUpKind?: 'depth_probe' | 'residual_probe' | 'topic_redirect' | 'clarification_redirect' | 'generic';
+  candidateTurnKind?: CandidateTurnKind | null;
   missingMustConcepts?: string[];
   followUpBudgetBlock?: string;
   answeredCheckpointTitle?: string | null;
@@ -97,6 +99,41 @@ function buildPreviousFollowUpsBlock(
     : previousFollowUpQuestions.map((item) => `- ${item}`).join('\n');
 }
 
+function buildClarificationRedirectBlock(
+  input: FollowUpPlannerPromptInput,
+): string {
+  const concepts =
+    (input.missingMustConcepts?.length ?? 0) > 0
+      ? input.missingMustConcepts!.join(', ')
+      : sanitizeTopicHint(input.checkpointExpected);
+
+  if (input.candidateTurnKind === 'format_clarification') {
+    return [
+      '',
+      'Format clarification (candidate asked HOW to answer — brief vs detailed):',
+      'They did NOT answer yet — only asked about answer format.',
+      `Stay on topic: ${concepts}`,
+      'Write ONE short reply in Russian (interviewer «я» → candidate «вы»):',
+      '- Confirm format (e.g. «Кратко и по существу» or «можно подробнее») matching their preference',
+      '- Restate the same technical ask in plain language — do NOT switch topic',
+      '- Do NOT repeat the full previous probe verbatim',
+    ].join('\n');
+  }
+
+  return [
+    '',
+    'Scope clarification redirect (candidate asked what you mean):',
+    `Classifier turn_kind: ${input.candidateTurnKind ?? 'scope_clarification'}`,
+    'They did NOT answer yet — meta question only, no new technical evidence.',
+    `Concepts you meant (pick 1–2 in plain Russian): ${concepts}`,
+    'Write ONE short clarifying reply in Russian (interviewer «я» → candidate «вы»):',
+    '- Generic «о чём вы говорите?» → explain scope («Имею в виду …»), do NOT say «Да, именно»',
+    '- Confirmation «вы говорите о X да?» → «Да, именно …» or «Нет, речь про …» if wrong guess',
+    '- Disambiguation «X или Y?» → name the correct topic, not the wrong option',
+    '- ONE invite to explain; do NOT switch to another main question',
+  ].join('\n');
+}
+
 function buildSharedUserContext(input: FollowUpPlannerPromptInput): string {
   const probeBlock =
     input.followUpKind === 'depth_probe' &&
@@ -127,19 +164,7 @@ function buildSharedUserContext(input: FollowUpPlannerPromptInput): string {
               '- Do NOT scold; sound like a helpful interviewer',
             ].join('\n')
           : input.followUpKind === 'clarification_redirect'
-            ? [
-                '',
-                'Scope clarification redirect (candidate asked what you mean or wants confirmation):',
-                `They did NOT answer yet — they asked for scope or confirmation («что именно?», «вы говорите о … да?»).`,
-                (input.missingMustConcepts?.length ?? 0) > 0
-                  ? `Name the specific concepts you meant: ${input.missingMustConcepts!.join(', ')}`
-                  : `Stay on topic: ${sanitizeTopicHint(input.checkpointExpected)}`,
-                'Write ONE short clarifying reply in Russian (interviewer «я» → candidate «вы»):',
-                '- If they asked «вы говорите о X да?» — start with «Да, именно про …» (or «Нет, речь про …» if they guessed wrong)',
-                '- ONE short sentence to confirm scope, ONE invite to explain — do NOT repeat the full previous probe verbatim',
-                '- Do NOT re-list every concept in a long checklist; pick 1–2 plain terms',
-                '- Do NOT switch to another main question',
-              ].join('\n')
+            ? buildClarificationRedirectBlock(input)
             : '';
 
   return [

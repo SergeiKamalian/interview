@@ -5,6 +5,7 @@ import type {
 import type { CheckpointGuardAdjustment } from '../types/checkpoint-guard-adjustment.types';
 import type { CheckpointStateStatus } from '../types/checkpoint-state-status.type';
 import type { EvaluationEvidenceSource } from '../types/evaluation-evidence-source.type';
+import type { EvaluationMode } from '../types/evaluation-mode.type';
 import type {
   PerTurnCheckpointEvaluationAiResponse,
   PerTurnCheckpointEvaluationStatus,
@@ -42,6 +43,10 @@ import {
   inferExpectedCheckpointKey,
 } from './topic-mismatch.util';
 import {
+  appendMetaTurnFrozenRationale,
+  shouldFreezeCheckpointOnMetaTurn,
+} from './resolve-evaluation-mode.util';
+import {
   appendProbePendingRationale,
   deriveProbeStatus,
   getMissingMustConcepts,
@@ -61,22 +66,26 @@ export function applyCheckpointScoreFloors(
   evaluation: PerTurnCheckpointEvaluationAiResponse,
   context: AdaptiveInterviewContextPacket,
   options: {
+    evaluationMode?: EvaluationMode;
     evidenceSource?: EvaluationEvidenceSource;
     candidateTurnKind?: CandidateTurnKind | null;
     candidateDispositionFromClassifier?: PerTurnCheckpointEvaluationAiResponse['candidateDisposition'] | null;
   } = {},
 ): ApplyCheckpointScoreFloorsResult {
-  const fullCandidateText = collectFullCandidateText(context);
-  const latestCandidateText = collectLatestCandidateText(context);
-  const badExamples = context.badAnswerExamples ?? [];
-  const promptVersion = getPerTurnCheckpointEvaluationPromptVersion();
-  const adjustments: CheckpointGuardAdjustment[] = [];
   const expectedCheckpointKey =
     inferExpectedCheckpointKey({
       checkpoints: context.checkpoints,
       targetCheckpointKey: context.targetCheckpointKey,
       questionText: context.questionText,
     }) ?? context.targetCheckpointKey;
+  const evaluationMode = options.evaluationMode ?? 'full';
+  const metaTurnTargetKey =
+    context.targetCheckpointKey ?? expectedCheckpointKey ?? null;
+  const fullCandidateText = collectFullCandidateText(context);
+  const latestCandidateText = collectLatestCandidateText(context);
+  const badExamples = context.badAnswerExamples ?? [];
+  const promptVersion = getPerTurnCheckpointEvaluationPromptVersion();
+  const adjustments: CheckpointGuardAdjustment[] = [];
 
   type GuardDraft = {
     original: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number];
@@ -105,6 +114,19 @@ export function applyCheckpointScoreFloors(
       return { kind: 'passthrough' as const, result };
     }
 
+    if (
+      shouldFreezeCheckpointOnMetaTurn(
+        evaluationMode,
+        result.checkpointKey,
+        metaTurnTargetKey,
+      )
+    ) {
+      return {
+        kind: 'frozen' as const,
+        frozenResult: buildMetaTurnFrozenCheckpointResult(result, priorState),
+      };
+    }
+
     const effectiveMaxScore = priorState?.maxScore ?? checkpoint.score;
     const checkpointEvidenceText = collectCheckpointEvidenceText(
       context,
@@ -127,29 +149,16 @@ export function applyCheckpointScoreFloors(
       scoreAwarded: result.scoreAwarded,
     };
 
-    let guardedResult = enforceStatusScoreAlignment(
-      applyRationaleScoreAlignment(
-        applyShallowAcceptFloor(
-          applyPositiveEvidenceFloor(
+    const isTargetRefusalMetaTurn =
+      evaluationMode === 'target_refusal' &&
+      metaTurnTargetKey !== null &&
+      result.checkpointKey === metaTurnTargetKey;
+
+    let guardedResult = isTargetRefusalMetaTurn
+      ? enforceStatusScoreAlignment(
+          applyShallowAcceptFloor(
             applyExplicitRefusalCap(
-              applyBadExampleOverlapCap(
-                applySemanticContradictionCap(
-                  applyRationaleContradictionCap(result, effectiveMaxScore),
-                  evaluationText,
-                  checkpoint,
-                  effectiveMaxScore,
-                ),
-                evaluationText,
-                checkpointEvidenceText,
-                [
-                  ...badExamples,
-                  ...(checkpoint.badExamples ?? []),
-                  ...(checkpoint.questionBadExamples ?? []),
-                ],
-                checkpoint.evaluationHints?.neutralMetaphors,
-                effectiveMaxScore,
-                checkpoint,
-              ),
+              result,
               latestTurnText,
               checkpoint,
               priorState,
@@ -157,45 +166,87 @@ export function applyCheckpointScoreFloors(
               isTargetedFollowUp,
               options.candidateTurnKind,
             ),
-            latestTurnText,
-            floorFullText,
-            checkpoint,
-            effectiveMaxScore,
-            isTargetedFollowUp,
-            options.candidateTurnKind,
+            {
+              checkpoint,
+              priorState,
+              checkpointEvidenceText,
+              latestTurnText,
+              questionMaxScore: context.maxScore,
+            },
           ),
-          {
-            checkpoint,
-            priorState,
-            checkpointEvidenceText,
-            latestTurnText,
-            questionMaxScore: context.maxScore,
-          },
-        ),
-        effectiveMaxScore,
-      ),
-      effectiveMaxScore,
-    );
+          effectiveMaxScore,
+        )
+      : enforceStatusScoreAlignment(
+          applyRationaleScoreAlignment(
+            applyShallowAcceptFloor(
+              applyPositiveEvidenceFloor(
+                applyExplicitRefusalCap(
+                  applyBadExampleOverlapCap(
+                    applySemanticContradictionCap(
+                      applyRationaleContradictionCap(result, effectiveMaxScore),
+                      evaluationText,
+                      checkpoint,
+                      effectiveMaxScore,
+                    ),
+                    evaluationText,
+                    checkpointEvidenceText,
+                    [
+                      ...badExamples,
+                      ...(checkpoint.badExamples ?? []),
+                      ...(checkpoint.questionBadExamples ?? []),
+                    ],
+                    checkpoint.evaluationHints?.neutralMetaphors,
+                    effectiveMaxScore,
+                    checkpoint,
+                  ),
+                  latestTurnText,
+                  checkpoint,
+                  priorState,
+                  context.maxScore,
+                  isTargetedFollowUp,
+                  options.candidateTurnKind,
+                ),
+                latestTurnText,
+                floorFullText,
+                checkpoint,
+                effectiveMaxScore,
+                isTargetedFollowUp,
+                options.candidateTurnKind,
+              ),
+              {
+                checkpoint,
+                priorState,
+                checkpointEvidenceText,
+                latestTurnText,
+                questionMaxScore: context.maxScore,
+              },
+            ),
+            effectiveMaxScore,
+          ),
+          effectiveMaxScore,
+        );
 
-    guardedResult = applyTopicMismatchProvisionalGuard({
-      result: guardedResult,
-      checkpointKey: result.checkpointKey,
-      expectedCheckpointKey,
-      candidateDisposition: evaluation.candidateDisposition,
-      priorScoreAwarded: priorState?.scoreAwarded ?? 0,
-    });
+    if (!isTargetRefusalMetaTurn) {
+      guardedResult = applyTopicMismatchProvisionalGuard({
+        result: guardedResult,
+        checkpointKey: result.checkpointKey,
+        expectedCheckpointKey,
+        candidateDisposition: evaluation.candidateDisposition,
+        priorScoreAwarded: priorState?.scoreAwarded ?? 0,
+      });
 
-    const effectiveDisposition =
-      options.candidateDispositionFromClassifier ??
-      evaluation.candidateDisposition;
-    guardedResult = applyScopeClarificationScoreFreeze({
-      result: guardedResult,
-      checkpointKey: result.checkpointKey,
-      targetCheckpointKey: context.targetCheckpointKey,
-      candidateDisposition: effectiveDisposition,
-      priorScoreAwarded: priorState?.scoreAwarded ?? 0,
-      isTargetedFollowUp,
-    });
+      const effectiveDisposition =
+        options.candidateDispositionFromClassifier ??
+        evaluation.candidateDisposition;
+      guardedResult = applyScopeClarificationScoreFreeze({
+        result: guardedResult,
+        checkpointKey: result.checkpointKey,
+        targetCheckpointKey: context.targetCheckpointKey,
+        candidateDisposition: effectiveDisposition,
+        priorScoreAwarded: priorState?.scoreAwarded ?? 0,
+        isTargetedFollowUp,
+      });
+    }
 
     if (
       guardedResult.status !== aiSnapshot.status ||
@@ -261,6 +312,10 @@ export function applyCheckpointScoreFloors(
       return item.result;
     }
 
+    if (item.kind === 'frozen') {
+      return item.frozenResult;
+    }
+
     const transitiveApplication = transitiveOutcome.applications.find(
       (application) =>
         application.checkpointKey === item.guardedWithQuote.checkpointKey,
@@ -300,6 +355,11 @@ export function applyCheckpointScoreFloors(
       maxScore: item.effectiveMaxScore,
       evidenceSource: options.evidenceSource,
       relaxFollowUpWeight: item.isTargetedFollowUp,
+      lockPriorScore: shouldFreezeCheckpointOnMetaTurn(
+        evaluationMode,
+        item.guardedWithQuote.checkpointKey,
+        metaTurnTargetKey,
+      ),
       incomingAllowsScoreDecrease: resolveIncomingAllowsScoreDecrease(
         context,
         item.checkpoint,
@@ -321,12 +381,13 @@ export function applyCheckpointScoreFloors(
     const scopeClarificationTurn =
       item.isTargetedFollowUp &&
       context.targetCheckpointKey === item.guardedWithQuote.checkpointKey &&
-      isScopeClarificationTurn({
-        candidateTurnKind: options.candidateTurnKind,
-        aiDisposition:
-          options.candidateDispositionFromClassifier ??
-          evaluation.candidateDisposition,
-      });
+      (evaluationMode === 'clarification' ||
+        isScopeClarificationTurn({
+          candidateTurnKind: options.candidateTurnKind,
+          aiDisposition:
+            options.candidateDispositionFromClassifier ??
+            evaluation.candidateDisposition,
+        }));
 
     if (scopeClarificationTurn) {
       const frozenScore = item.priorState?.scoreAwarded ?? 0;
@@ -1172,6 +1233,54 @@ function resolveIncomingAllowsScoreDecrease(
   }
 
   return true;
+}
+
+function buildMetaTurnFrozenCheckpointResult(
+  original: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
+  priorState?: AdaptiveInterviewContextPacket['checkpointStates'][number],
+): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
+  const frozenScore = priorState?.scoreAwarded ?? 0;
+  const maxScore = priorState?.maxScore ?? original.scoreAwarded;
+  const frozenStatus = normalizeFrozenCheckpointStatus(
+    priorState?.status ?? original.status,
+    frozenScore,
+    maxScore,
+  );
+
+  return {
+    ...original,
+    scoreAwarded: frozenScore,
+    status: frozenStatus,
+    evidenceSummary: null,
+    rationale: appendMetaTurnFrozenRationale(
+      priorState?.rationale ?? original.rationale,
+    ),
+  };
+}
+
+function normalizeFrozenCheckpointStatus(
+  status: string,
+  scoreAwarded: number,
+  maxScore: number,
+): PerTurnCheckpointEvaluationStatus {
+  if (scoreAwarded <= 0) {
+    return status === 'unclear' ? 'unclear' : 'missed';
+  }
+
+  if (maxScore > 0 && scoreAwarded >= maxScore) {
+    return 'covered';
+  }
+
+  if (
+    status === 'covered' ||
+    status === 'partial' ||
+    status === 'missed' ||
+    status === 'unclear'
+  ) {
+    return status;
+  }
+
+  return 'partial';
 }
 
 export { getContradictionScoreCap } from './hint-driven-evidence.util';

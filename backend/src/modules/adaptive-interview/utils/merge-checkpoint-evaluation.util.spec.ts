@@ -97,4 +97,23 @@ describe('mergeCheckpointEvaluation', () => {
     expect(merged.scoreAwarded).toBeGreaterThanOrEqual(0.75);
     expect(merged.scoreAwarded).toBeLessThanOrEqual(1);
   });
+
+  it('does not decrease cumulative score for meta_turn frozen non-target', () => {
+    const merged = mergeCheckpointEvaluation({
+      currentScoreAwarded: 1,
+      currentStatus: 'covered',
+      currentEvidenceSummary: 'Fiber core covered',
+      currentRationale: 'depth=understands',
+      incomingScoreAwarded: 0,
+      incomingStatus: 'missed',
+      incomingEvidenceSummary: null,
+      incomingRationale: 'meta_turn_frozen',
+      maxScore: 1,
+      evidenceSource: 'meta_turn',
+      lockPriorScore: true,
+    });
+
+    expect(merged.scoreAwarded).toBe(1);
+    expect(merged.status).toBe('covered');
+  });
 });

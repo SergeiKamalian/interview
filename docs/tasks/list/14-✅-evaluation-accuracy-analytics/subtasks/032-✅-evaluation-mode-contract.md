@@ -1,6 +1,6 @@
 # TASK-14.32 — Evaluation mode contract
 
-Status: [ ] todo
+Status: [x] done
 
 ## Контекст (прочитать перед работой)
 
@@ -52,18 +52,30 @@ Status: [ ] todo
 
 ## Acceptance criteria
 
-- [ ] Unit tests: все `turn_kind` из classifier schema → ожидаемый mode
-- [ ] Unknown/null → `full` (documented default)
-- [ ] `pnpm test -- resolveEvaluationMode evaluation-mode` pass
-- [ ] `pnpm build` backend pass
-- [ ] Нет изменений в runtime behavior submit (только новые файлы + exports)
+- [x] Unit tests: все `turn_kind` из classifier schema → ожидаемый mode
+- [x] Unknown/null → `full` (documented default)
+- [x] `pnpm test -- resolveEvaluationMode evaluation-mode` pass
+- [x] `pnpm build` backend pass
+- [x] Нет изменений в runtime behavior submit (только новые файлы + exports)
 
 ## Completion Notes
 
-_(заполнить агентом: команды, expected/got)_
+**Проверка:**
 
-## Changed files (ожидаемо)
+```bash
+cd backend
+pnpm test -- resolveEvaluationMode evaluation-mode
+# → 1 suite, 26 passed
+pnpm build
+# → ok
+```
 
-- `types/evaluation-mode.type.ts` (new)
-- `utils/resolve-evaluation-mode.util.ts` (new)
-- `utils/resolve-evaluation-mode.util.spec.ts` (new)
+**Ожидал:** type `EvaluationMode`, resolver по таблице §14.1, helpers, unit tests на все 8 `turn_kind` + null/undefined/unknown → `full`; submit/guards/policy без изменений.
+
+**Получил:** три новых файла в `adaptive-interview`; 26 тестов green; build ok; runtime behavior не изменён.
+
+## Changed files
+
+- `backend/src/modules/adaptive-interview/types/evaluation-mode.type.ts` (new)
+- `backend/src/modules/adaptive-interview/utils/resolve-evaluation-mode.util.ts` (new)
+- `backend/src/modules/adaptive-interview/utils/resolve-evaluation-mode.util.spec.ts` (new)

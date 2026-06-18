@@ -1,6 +1,6 @@
 # TASK-14.35 — Policy target refusal branch
 
-Status: [ ] todo
+Status: [x] done
 
 ## Prerequisite
 
@@ -62,22 +62,37 @@ Input как attempt #91 turn 6:
 
 ## Acceptance criteria
 
-- [ ] `decline_scoped` не re-probe тот же checkpoint
-- [ ] Topic mismatch не срабатывает на decline_scoped turn
-- [ ] `decline_whole` path не затронут
-- [ ] `scope_clarification` path не затронут (14.27 specs green)
-- [ ] `pnpm test -- follow-up-policy topic-mismatch` pass
-- [ ] `pnpm build` pass
+- [x] `decline_scoped` не re-probe тот же checkpoint
+- [x] Topic mismatch не срабатывает на decline_scoped turn
+- [x] `decline_whole` path не затронут
+- [x] `scope_clarification` path не затронут (14.27 specs green)
+- [x] `pnpm test -- follow-up-policy topic-mismatch` pass
+- [x] `pnpm build` pass
 
 ## Completion Notes
 
-_(заполнить агентом)_
+**Проверка:**
 
-## Changed files (ожидаемо)
+```bash
+cd backend
+pnpm test -- follow-up-policy topic-mismatch
+# → 6 suites, 39 passed
+pnpm build
+# → ok
+```
+
+**Ожидал:** после `decline_scoped` policy закрывает probe на refused CP, не делает topic mismatch redirect, pivot на CP из ответа (lanes/commit_phase); `decline_whole` и `scope_clarification` без регрессии.
+
+**Получил:** `resolveTargetRefusalFollowUpDecision` после clarification branch; `isMetaTurnSuppressingTopicMismatch` в topic-mismatch; `evaluationMode` проброшен submit → planner → policy; attempt #91 regression green.
+
+## Changed files
 
 - `utils/follow-up-policy.util.ts`
 - `utils/follow-up-policy.target-refusal.spec.ts` (new)
 - `utils/topic-mismatch.util.ts`
 - `utils/topic-mismatch.util.spec.ts`
+- `utils/resolve-evaluation-mode.util.ts`
 - `services/follow-up-policy.service.ts`
-- `types/follow-up-planner.types.ts` (если нужен evaluationMode в input)
+- `services/follow-up-planner.service.ts`
+- `services/adaptive-interview-submit.service.ts`
+- `types/follow-up-planner.types.ts`

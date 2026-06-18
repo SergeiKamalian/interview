@@ -41,7 +41,10 @@ import { AdaptiveOpenAiResponseStateService } from './adaptive-openai-response-s
 import { CheckpointStateService } from './checkpoint-state.service';
 import { PerTurnEvaluationValidatorService } from './per-turn-evaluation-validator.service';
 import type { EvaluationEvidenceSource } from '../types/evaluation-evidence-source.type';
+import type { EvaluationMode } from '../types/evaluation-mode.type';
 import { applyCheckpointScoreFloors } from '../utils/apply-checkpoint-score-floors.util';
+import { buildMetaTurnEvaluation } from '../utils/build-meta-turn-checkpoint-evaluation.util';
+import { allowsFullCheckpointScoring } from '../utils/resolve-evaluation-mode.util';
 import { parseSuggestedFollowUpFromJson } from '../utils/parse-suggested-follow-up.util';
 import {
   logAdaptiveAiDebug,
@@ -106,6 +109,7 @@ export class PerTurnCheckpointEvaluatorService {
     interviewQuestionId: number,
     context: AdaptiveInterviewContextPacket,
     options: {
+      evaluationMode?: EvaluationMode;
       evidenceSource?: EvaluationEvidenceSource;
       candidateTurnKind?: CandidateTurnKind | null;
       candidateDispositionFromClassifier?: CandidateAnswerDisposition | null;
@@ -164,6 +168,7 @@ export class PerTurnCheckpointEvaluatorService {
     context: AdaptiveInterviewContextPacket,
     combinedTurn: boolean,
     evaluateOptions: {
+      evaluationMode?: EvaluationMode;
       evidenceSource?: EvaluationEvidenceSource;
       candidateTurnKind?: CandidateTurnKind | null;
       candidateDispositionFromClassifier?: CandidateAnswerDisposition | null;
@@ -251,6 +256,7 @@ export class PerTurnCheckpointEvaluatorService {
     context: AdaptiveInterviewContextPacket,
     combinedTurn: boolean,
     evaluateOptions: {
+      evaluationMode?: EvaluationMode;
       evidenceSource?: EvaluationEvidenceSource;
       candidateTurnKind?: CandidateTurnKind | null;
       candidateDispositionFromClassifier?: CandidateAnswerDisposition | null;
@@ -336,6 +342,7 @@ export class PerTurnCheckpointEvaluatorService {
       attemptId: number;
       interviewQuestionId: number;
       operationType: string;
+      evaluationMode?: EvaluationMode;
       evidenceSource?: EvaluationEvidenceSource;
       candidateTurnKind?: CandidateTurnKind | null;
       candidateDispositionFromClassifier?: CandidateAnswerDisposition | null;
@@ -362,6 +369,7 @@ export class PerTurnCheckpointEvaluatorService {
       userPrompt,
       attemptLabel: 'initial',
       evidenceSource: debugMeta.evidenceSource,
+      evaluationMode: debugMeta.evaluationMode,
       candidateTurnKind: debugMeta.candidateTurnKind,
       candidateDispositionFromClassifier:
         debugMeta.candidateDispositionFromClassifier,
@@ -374,6 +382,7 @@ export class PerTurnCheckpointEvaluatorService {
     context: AdaptiveInterviewContextPacket;
     combinedTurn: boolean;
     debugMeta: Record<string, unknown>;
+    evaluationMode?: EvaluationMode;
     evidenceSource?: EvaluationEvidenceSource;
     candidateTurnKind?: CandidateTurnKind | null;
     candidateDispositionFromClassifier?: CandidateAnswerDisposition | null;
@@ -517,6 +526,7 @@ export class PerTurnCheckpointEvaluatorService {
 
       const { evaluation: flooredEvaluation, adjustments } =
         applyCheckpointScoreFloors(validation.data, context, {
+          evaluationMode: input.evaluationMode,
           evidenceSource: input.evidenceSource,
           candidateTurnKind: input.candidateTurnKind,
           candidateDispositionFromClassifier:
@@ -819,6 +829,7 @@ export class PerTurnCheckpointEvaluatorService {
     interviewQuestionId: number;
     context?: AdaptiveInterviewContextPacket;
     skipEnsureStates?: boolean;
+    evaluationMode?: EvaluationMode;
     evidenceSource?: EvaluationEvidenceSource;
     candidateTurnKind?: CandidateTurnKind | null;
     candidateDispositionFromClassifier?: CandidateAnswerDisposition | null;
@@ -871,22 +882,34 @@ export class PerTurnCheckpointEvaluatorService {
       };
     }
 
+    const evaluationMode = input.evaluationMode ?? 'full';
+
     const aiTimer = startAdaptiveAiPhaseTimer(
       this.logger,
       'evaluate_turn.ai_total',
       debugMeta,
     );
-    const evaluation = await this.evaluateTurn(
-      input.attemptId,
-      input.interviewQuestionId,
-      context,
-      {
-        evidenceSource: input.evidenceSource,
-        candidateTurnKind: input.candidateTurnKind,
-        candidateDispositionFromClassifier:
-          input.candidateDispositionFromClassifier,
-      },
-    );
+    const evaluation = allowsFullCheckpointScoring(evaluationMode)
+      ? await this.evaluateTurn(
+          input.attemptId,
+          input.interviewQuestionId,
+          context,
+          {
+            evaluationMode: input.evaluationMode,
+            evidenceSource: input.evidenceSource,
+            candidateTurnKind: input.candidateTurnKind,
+            candidateDispositionFromClassifier:
+              input.candidateDispositionFromClassifier,
+          },
+        )
+      : this.evaluateMetaTurn(context, {
+          evaluationMode,
+          evidenceSource:
+            input.evidenceSource === 'meta_turn' ? 'meta_turn' : undefined,
+          candidateTurnKind: input.candidateTurnKind,
+          candidateDispositionFromClassifier:
+            input.candidateDispositionFromClassifier,
+        });
     aiTimer.finish({ status: evaluation.status });
 
     if (evaluation.status === 'provider_error') {
@@ -955,6 +978,50 @@ export class PerTurnCheckpointEvaluatorService {
       candidateDisposition: validEvaluation.candidateDisposition,
       suggestedFollowUp: validEvaluation.suggestedFollowUp ?? null,
       states,
+    };
+  }
+
+  private evaluateMetaTurn(
+    context: AdaptiveInterviewContextPacket,
+    input: {
+      evaluationMode: EvaluationMode;
+      evidenceSource?: 'meta_turn';
+      candidateTurnKind?: CandidateTurnKind | null;
+      candidateDispositionFromClassifier?: CandidateAnswerDisposition | null;
+    },
+  ): Extract<PerTurnCheckpointEvaluatorRunResult, { status: 'valid' }> {
+    const metaEvaluation = buildMetaTurnEvaluation({
+      context,
+      evaluationMode: input.evaluationMode,
+      candidateTurnKind: input.candidateTurnKind,
+      candidateDispositionFromClassifier:
+        input.candidateDispositionFromClassifier,
+      evidenceSource: input.evidenceSource,
+    });
+
+    logAdaptiveAiDebug(this.logger, 'evaluate_turn.meta_turn', {
+      attemptId: context.attemptId,
+      interviewQuestionId: context.interviewQuestionId,
+      evaluationMode: input.evaluationMode,
+      turnKind: input.candidateTurnKind,
+      targetCheckpointKeys: metaEvaluation.checkpointResults.map(
+        (result) => result.checkpointKey,
+      ),
+    });
+
+    return {
+      status: 'valid',
+      repairAttempted: false,
+      candidateDisposition: metaEvaluation.candidateDisposition,
+      checkpointResults: metaEvaluation.checkpointResults,
+      suggestedFollowUp: null,
+      model: 'meta_turn',
+      latencyMs: 0,
+      usage: {
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+      },
     };
   }
 }

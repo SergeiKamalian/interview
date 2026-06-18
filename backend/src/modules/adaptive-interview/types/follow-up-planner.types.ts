@@ -31,6 +31,7 @@ export type FollowUpPolicyCheckpointCandidate = {
 
 import type { CandidateAnswerDisposition } from '../types/candidate-answer-disposition.type';
 import type { CandidateTurnKind } from '../types/candidate-turn-classifier.types';
+import type { EvaluationMode } from '../types/evaluation-mode.type';
 
 export type FollowUpPolicyInput = {
   questionMaxScore: number;
@@ -59,6 +60,7 @@ export type FollowUpPolicyInput = {
   checkpointEvidenceTextByKey?: Record<string, string>;
   candidateDispositionFromAi?: CandidateAnswerDisposition | null;
   candidateTurnKind?: CandidateTurnKind | null;
+  evaluationMode?: EvaluationMode;
   stickyTargetCheckpointKey?: string | null;
   latestCheckpointResults?: Array<{
     checkpointKey: string;
@@ -93,6 +95,7 @@ export type FollowUpPlannerOptions = {
   suggestedFollowUp?: AdaptiveAiSuggestedFollowUp | null;
   candidateDispositionFromAi?: CandidateAnswerDisposition | null;
   candidateTurnKind?: CandidateTurnKind | null;
+  evaluationMode?: EvaluationMode;
   followUpsUsedForQuestion?: number;
   avoidLlmFallback?: boolean;
   recentScoreDeltas?: number[];

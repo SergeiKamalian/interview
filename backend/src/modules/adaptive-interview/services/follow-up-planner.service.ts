@@ -121,6 +121,7 @@ export class FollowUpPlannerService {
       options.recentScoreDeltas,
       options.latestCheckpointResults,
       options.candidateTurnKind,
+      options.evaluationMode,
     );
     policyTimer.finish({
       shouldAskFollowUp: policy.shouldAskFollowUp,
@@ -185,6 +186,7 @@ export class FollowUpPlannerService {
       latestCandidateAnswer: context.latestCandidateAnswer,
       previousFollowUpQuestions,
       followUpKind: policy.followUpKind,
+      candidateTurnKind: options.candidateTurnKind,
       missingMustConcepts: policy.missingMustConcepts,
       answerTone,
       followUpBudgetBlock: buildFollowUpBudgetPromptBlock(
@@ -215,11 +217,8 @@ export class FollowUpPlannerService {
     let followUpQuestion = templateQuestion;
     let plannerReason = policy.reason;
     const avoidLlmFallback = options.avoidLlmFallback === true;
-    const forceClarificationTemplate =
-      policy.followUpKind === 'clarification_redirect';
 
     const combinedSuggested =
-      !forceClarificationTemplate &&
       isAdaptiveAiCombinedTurnEnabled() &&
       isSuggestedFollowUpUsable(
         options.suggestedFollowUp,
@@ -250,11 +249,9 @@ export class FollowUpPlannerService {
       }
     }
 
-    if (!combinedSuggested && (avoidLlmFallback || forceClarificationTemplate)) {
+    if (!combinedSuggested && avoidLlmFallback) {
       usedTemplate = true;
-      plannerReason = forceClarificationTemplate
-        ? 'clarification_redirect_template'
-        : 'combined_turn_template_fallback';
+      plannerReason = 'combined_turn_template_fallback';
       logAdaptiveAiDebug(this.logger, 'plan_follow_up.combined_turn_template', {
         ...aiDebugMeta,
         checkpointKey: policy.targetCheckpointKey,
@@ -280,7 +277,6 @@ export class FollowUpPlannerService {
     if (
       !combinedSuggested &&
       !avoidLlmFallback &&
-      !forceClarificationTemplate &&
       isFollowUpLlmEnabled() &&
       this.aiMessageStreamService.isEnabled()
     ) {
@@ -310,7 +306,6 @@ export class FollowUpPlannerService {
     } else if (
       !combinedSuggested &&
       !avoidLlmFallback &&
-      !forceClarificationTemplate &&
       isFollowUpLlmEnabled()
     ) {
       try {

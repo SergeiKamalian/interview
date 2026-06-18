@@ -1,5 +1,6 @@
 import { evaluateFollowUpPolicy } from './follow-up-policy.util';
 import { hooksCheckpoint } from './hooks-evaluation-hints.fixture';
+import { fiberCheckpoint } from './fiber-evaluation-hints.fixture';
 import {
   buildTopicRedirectFollowUpQuestion,
   detectTopicMismatch,
@@ -215,6 +216,40 @@ describe('topic mismatch vs scope clarification', () => {
 
     expect(detection.isMismatch).toBe(false);
     expect(detection.reason).toBe('scope_clarification_meta_turn');
+  });
+
+  it('does not treat decline_scoped as topic mismatch when answer mentions other Fiber topics', () => {
+    const detection = detectTopicMismatch({
+      expectedCheckpointKey: 'fiber_pointers',
+      latestCandidateAnswer:
+        'С child/sibling/return не углублюсь, лучше расскажу про lanes или commit phase',
+      candidateTurnKind: 'decline_scoped',
+      evaluationMode: 'target_refusal',
+      checkpoints: [
+        fiberCheckpoint('fiber_pointers', { sortOrder: 2 }),
+        fiberCheckpoint('fiber_definition', { sortOrder: 0 }),
+        fiberCheckpoint('commit_phase', { sortOrder: 4 }),
+        fiberCheckpoint('lanes_priority', { sortOrder: 5 }),
+      ],
+      checkpointResults: [
+        {
+          checkpointKey: 'fiber_pointers',
+          status: 'missed',
+          scoreAwarded: 0,
+          rationale: 'coverage=none accuracy=none',
+        },
+        {
+          checkpointKey: 'fiber_definition',
+          status: 'covered',
+          scoreAwarded: 1,
+          rationale: 'coverage=high accuracy=full depth=understands',
+        },
+      ],
+      isTargetedFollowUp: true,
+    });
+
+    expect(detection.isMismatch).toBe(false);
+    expect(detection.reason).toBe('meta_turn_suppressed');
   });
 
   it('humanizes rubric checkpoint titles for redirect copy', () => {

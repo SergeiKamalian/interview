@@ -2,6 +2,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview-context.types';
 import type { CandidateTurnKind } from '../types/candidate-turn-classifier.types';
+import type { EvaluationMode } from '../types/evaluation-mode.type';
+import type { EvaluationEvidenceSource } from '../types/evaluation-evidence-source.type';
 import type { PerTurnCheckpointEvaluationAiResponse } from '../types/per-turn-evaluation.types';
 import { applyCheckpointScoreFloors } from '../utils/apply-checkpoint-score-floors.util';
 import { fiberCheckpoint } from '../utils/fiber-evaluation-hints.fixture';
@@ -43,7 +45,8 @@ function buildFiberContext(
   const candidateTurns = caseData.turns.filter((turn) => turn.role === 'candidate');
   const useLatestTurnOnly =
     caseData.id === 'react-fiber-attempt42-paraphrase' ||
-    caseData.id === 'react-fiber-scheduling-after-probe-decline';
+    caseData.id === 'react-fiber-scheduling-after-probe-decline' ||
+    caseData.id === 'react-fiber-attempt91-decline-scoped';
   const isFollowUpAnswer = useLatestTurnOnly && candidateTurns.length > 1;
   const candidateText = useLatestTurnOnly
     ? (candidateTurns[candidateTurns.length - 1]?.content ?? '')
@@ -62,12 +65,70 @@ function buildFiberContext(
               'depth=partial_knowledge, probe=pending coverage=medium accuracy=partial',
           },
         ]
-      : [];
+      : caseData.id === 'react-fiber-attempt91-decline-scoped'
+        ? [
+            {
+              checkpointKey: 'fiber_definition',
+              status: 'covered',
+              scoreAwarded: 1,
+              maxScore: 1,
+              followUpCount: 0,
+              rationale: 'depth=understands coverage=high accuracy=full',
+            },
+            {
+              checkpointKey: 'stack_vs_fiber',
+              status: 'covered',
+              scoreAwarded: 1,
+              maxScore: 1,
+              followUpCount: 0,
+              rationale: 'depth=understands coverage=high accuracy=full',
+            },
+            {
+              checkpointKey: 'render_phase',
+              status: 'partial',
+              scoreAwarded: 0.75,
+              maxScore: 1,
+              followUpCount: 1,
+              rationale: 'depth=partial_knowledge probe=pending',
+            },
+            {
+              checkpointKey: 'commit_phase',
+              status: 'partial',
+              scoreAwarded: 0.65,
+              maxScore: 1,
+              followUpCount: 1,
+              rationale: 'depth=partial_knowledge probe=pending',
+            },
+            {
+              checkpointKey: 'scheduling',
+              status: 'partial',
+              scoreAwarded: 0.5,
+              maxScore: 2.5,
+              followUpCount: 1,
+              rationale: 'depth=partial_knowledge probe=pending',
+            },
+            {
+              checkpointKey: 'fiber_pointers',
+              status: 'partial',
+              scoreAwarded: 0.5,
+              maxScore: 1,
+              followUpCount: 1,
+              rationale: 'depth=partial_knowledge probe=pending',
+            },
+          ]
+        : [];
+
+  const targetCheckpointKey =
+    caseData.id === 'react-fiber-attempt91-decline-scoped'
+      ? 'fiber_pointers'
+      : isFollowUpAnswer
+        ? 'scheduling'
+        : null;
 
   return {
     companyId: 1,
     interviewId: 4,
-    attemptId: 34,
+    attemptId: caseData.id === 'react-fiber-attempt91-decline-scoped' ? 91 : 34,
     interviewQuestionId: 7,
     questionText: 'Как работает React Fiber и процесс обновления Virtual DOM?',
     referenceAnswer: 'Fiber reconciliation engine',
@@ -82,7 +143,7 @@ function buildFiberContext(
     latestCandidateAnswer: candidateText,
     latestCandidateMessageId: 99,
     latestAnswerMessageKind: isFollowUpAnswer ? 'follow_up_answer' : null,
-    targetCheckpointKey: isFollowUpAnswer ? 'scheduling' : null,
+    targetCheckpointKey,
     checkpoints: FIBER_CHECKPOINTS.map((key, index) =>
       fiberCheckpoint(key, {
         sortOrder: index,
@@ -124,11 +185,40 @@ function toAiResponse(
 function resolveGoldenCaseTurnKind(
   caseData: GoldenCalibrationCase,
 ): CandidateTurnKind | undefined {
-  if (caseData.id === 'react-fiber-scheduling-after-probe-decline') {
+  if (
+    caseData.id === 'react-fiber-scheduling-after-probe-decline' ||
+    caseData.id === 'react-fiber-attempt91-decline-scoped'
+  ) {
     return 'decline_scoped';
   }
 
   return undefined;
+}
+
+function resolveGoldenCaseFloorOptions(caseData: GoldenCalibrationCase): {
+  evaluationMode?: EvaluationMode;
+  evidenceSource?: EvaluationEvidenceSource;
+  candidateTurnKind?: CandidateTurnKind;
+  candidateDispositionFromClassifier?: PerTurnCheckpointEvaluationAiResponse['candidateDisposition'];
+} {
+  if (caseData.id === 'react-fiber-attempt91-decline-scoped') {
+    return {
+      evaluationMode: 'target_refusal',
+      evidenceSource: 'meta_turn',
+      candidateTurnKind: 'decline_scoped',
+      candidateDispositionFromClassifier: 'declined',
+    };
+  }
+
+  const turnKind = resolveGoldenCaseTurnKind(caseData);
+  if (!turnKind) {
+    return {};
+  }
+
+  return {
+    candidateTurnKind: turnKind,
+    candidateDispositionFromClassifier: 'declined',
+  };
 }
 
 describe('golden calibration (mocked AI)', () => {
@@ -139,10 +229,18 @@ describe('golden calibration (mocked AI)', () => {
     (_id, caseData) => {
       const context = buildFiberContext(caseData);
       const aiResponse = toAiResponse(caseData);
+      const floorOptions = resolveGoldenCaseFloorOptions(caseData);
       const { evaluation } = applyCheckpointScoreFloors(aiResponse, context, {
-        evidenceSource: context.latestAnswerMessageKind ?? undefined,
-        candidateTurnKind: resolveGoldenCaseTurnKind(caseData),
-        candidateDispositionFromClassifier: aiResponse.candidateDisposition,
+        evidenceSource:
+          floorOptions.evidenceSource ??
+          (context.latestAnswerMessageKind === 'follow_up_answer'
+            ? 'follow_up_answer'
+            : undefined),
+        evaluationMode: floorOptions.evaluationMode,
+        candidateTurnKind: floorOptions.candidateTurnKind,
+        candidateDispositionFromClassifier:
+          floorOptions.candidateDispositionFromClassifier ??
+          aiResponse.candidateDisposition,
       });
 
       const total = evaluation.checkpointResults.reduce(
