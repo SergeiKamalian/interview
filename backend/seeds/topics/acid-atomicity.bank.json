@@ -1,0 +1,617 @@
+{
+  "topic": {
+    "code": "acid_atomicity",
+    "name": "ACID — атомарность",
+    "skillCode": "architecture",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое атомарность (atomicity) в ACID и как она обеспечивается в транзакциях базы данных?",
+    "shortAnswer": "Атомарность ACID означает, что транзакция выполняется по принципу «всё или ничего»: либо все операции внутри неё фиксируются, либо ни одна не применяется. Обёртка в BEGIN/COMMIT делает несколько SQL-шагов единым логическим действием с автоматическим ROLLBACK при любой ошибке.",
+    "idealAnswer": "Атомарность (atomicity) — первое свойство ACID: транзакция рассматривается как единый неразделимый блок — либо полностью завершается, либо полностью откатывается. Аналогия: конверт с деньгами — либо доходит целиком, либо не доходит вообще; частичного состояния быть не должно. Без транзакции два отдельных UPDATE — две независимые операции: один может успеть, второй упасть, балансы станут некорректными. BEGIN/COMMIT заставляет СУБД трактовать их как один шаг с автоматическим откатом при любой ошибке между границами. Классический пример — банковский перевод: списание с Alice и зачисление Bob в одной транзакции; если второй UPDATE падает (constraint, несуществующий id), движок делает ROLLBACK — Alice остаётся с $1000, Bob с $1000, суммарный баланс сохранён. Внутри PostgreSQL атомарность обеспечивается WAL (Write-Ahead Logging): до изменения data page операция пишется в лог с границами транзакции; при COMMIT лог сбрасывается на диск. После crash WAL воспроизводит только committed транзакции; незавершённые откатываются через undo log (before-images строк). MVCC даёт снимки для согласованного вида параллельным транзакциям. Когда нужна транзакция: взаимозависимые изменения в нескольких таблицах, переводы, создание заказа со списанием склада. Когда не нужна: одиночные идемпотентные INSERT, read-only запросы (лишние блокировки). В распределённых системах одна DB-транзакция не пересекает микросервисы — используют 2PC (prepare/commit, XA) или saga с компенсирующими шагами и outbox/Kafka. Типичные ошибки: вложенный BEGIN без SAVEPOINT — внутренний ROLLBACK откатывает всю внешнюю транзакцию; забытый client.release() в Node.js — исчерпание пула; длинные транзакции держат locks на всех затронутых строках (batch job с BEGIN на 10 минут блокирует writers); ожидание, что crash приложения откатит всё — COMMIT, записанный в WAL, переживает падение процесса. SAVEPOINT/ROLLBACK TO sp1 — для частичного отката. Атомарность ≠ идемпотентность: POST /transfer с unique transfer ID может быть идемпотентным на уровне API, а DB-транзакция внутри — атомарной. Deadlock (40P01 в PostgreSQL) — следствие atomicity + isolation: транзакции держат locks до commit; фикс — одинаковый порядок блокировки строк во всех transfer-операциях. Реальные системы: PostgreSQL WAL+2PC в банках; MySQL InnoDB binlog+undo (Shopify orders); MongoDB multi-doc transactions с v4.0; микросервисы — saga/outbox вместо cross-service ACID.",
+    "maxScore": 10,
+    "skills": [
+      "architecture"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "atomicity_definition",
+      "title": "Понимает определение атомарности",
+      "expected": "Кандидат объясняет: транзакция — единый неразделимый блок; либо все операции применяются, либо ни одна; частичного состояния после ошибки быть не должно.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро ACID — all-or-nothing из ITLead TL;DR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "atomicity_definition",
+            "oftenConfusedWith": [
+              "transaction_boundary",
+              "atomicity_vs_idempotency"
+            ],
+            "anchorTermsExpected": [
+              "атомар",
+              "atomicity",
+              "всё или ничего",
+              "all-or-nothing",
+              "транзакц",
+              "неразделим",
+              "частичн",
+              "rollback",
+              "откат"
+            ],
+            "anchorTermsWrongTopic": [
+              "атомарность это изоляция",
+              "ACID atomicity про NoSQL только",
+              "атомарность гарантирует консистентность данных между сервисами"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "атомар",
+              "atomicity",
+              "ACID"
+            ],
+            "ask": "что значит «всё или ничего» для транзакции и почему частичное состояние недопустимо"
+          }
+        ],
+        "mustConcepts": [
+          "атомар",
+          "atomicity",
+          "ACID",
+          "транзакц",
+          "всё или ничего",
+          "all-or-nothing",
+          "неразделим",
+          "единый блок",
+          "частичн",
+          "не примен",
+          "полностью",
+          "rollback",
+          "откат",
+          "COMMIT",
+          "BEGIN",
+          "ошибк",
+          "сбой"
+        ],
+        "falseClaims": [
+          "атомарность означает, что операции выполняются параллельно быстрее",
+          "атомарность — это то же самое, что изоляция транзакций",
+          "без BEGIN/COMMIT СУБД всё равно гарантирует all-or-nothing для нескольких UPDATE",
+          "атомарность относится только к одной строке таблицы",
+          "частичный commit допустим при non-critical ошибках"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "transaction_boundary",
+      "title": "Отличает транзакцию от отдельных SQL-операций",
+      "expected": "Кандидат сравнивает: два UPDATE без транзакции — независимые шаги, возможен частичный успех; BEGIN/COMMIT объединяет их в один логический шаг с автоматическим ROLLBACK.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевая разница из ITLead Key difference",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "atomicity_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "transaction_boundary",
+            "oftenConfusedWith": [
+              "begin_commit_rollback"
+            ],
+            "anchorTermsExpected": [
+              "BEGIN",
+              "COMMIT",
+              "отдельн",
+              "независим",
+              "два UPDATE",
+              "обёртк",
+              "границ"
+            ],
+            "anchorTermsWrongTopic": [
+              "один UPDATE уже атомарен на уровне двух таблиц",
+              "autocommit делает multi-statement атомарным"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "BEGIN",
+          "COMMIT",
+          "ROLLBACK",
+          "отдельн",
+          "независим",
+          "два UPDATE",
+          "два запрос",
+          "без транзакц",
+          "частичн",
+          "несогласован",
+          "баланс",
+          "логическ",
+          "единый шаг",
+          "autocommit",
+          "обёртк"
+        ],
+        "falseClaims": [
+          "два последовательных UPDATE в autocommit — одна атомарная операция",
+          "BEGIN нужен только для SELECT",
+          "ROLLBACK срабатывает только при явном вызове разработчиком, не при constraint violation",
+          "транзакция нужна для каждого одиночного INSERT"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "begin_commit_rollback",
+      "title": "Знает flow BEGIN/COMMIT/ROLLBACK",
+      "expected": "Кандидат описывает банковский перевод: BEGIN → UPDATE debit → UPDATE credit → COMMIT; при ошибке между BEGIN и COMMIT — автоматический ROLLBACK, инвариант суммарного баланса сохранён.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый механизм из ITLead quick example",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "BEGIN",
+              "COMMIT",
+              "перевод",
+              "transfer"
+            ],
+            "ask": "что происходит при переводе Alice→Bob если второй UPDATE падает"
+          }
+        ],
+        "mustConcepts": [
+          "BEGIN",
+          "COMMIT",
+          "ROLLBACK",
+          "UPDATE",
+          "перевод",
+          "Alice",
+          "Bob",
+          "баланс",
+          "debit",
+          "credit",
+          "constraint",
+          "автоматич",
+          "откат",
+          "инвариант",
+          "суммарн"
+        ],
+        "falseClaims": [
+          "первый UPDATE остаётся после падения второго внутри транзакции",
+          "COMMIT можно вызвать частично — зафиксировать только debit",
+          "ROLLBACK откатывает только последний statement, не всю транзакцию",
+          "ошибка constraint не вызывает автоматический rollback транзакции"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "wal_undo_internal",
+      "title": "Понимает внутренний механизм (WAL, undo)",
+      "expected": "Кандидат упоминает WAL: запись в лог до изменения страниц; flush при COMMIT; после crash — replay committed; незавершённые откатываются через undo log / before-images; может упомянуть MVCC.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "How atomicity works internally — senior depth из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "WAL",
+              "undo",
+              "лог"
+            ],
+            "ask": "как rollback работает под капотом: undo log, before-images, WAL replay"
+          },
+          {
+            "match": [
+              "crash",
+              "recovery",
+              "восстанов"
+            ],
+            "ask": "что происходит с незавершённой транзакцией после падения процесса/сервера"
+          }
+        ],
+        "mustConcepts": [
+          "WAL",
+          "Write-Ahead",
+          "undo",
+          "undo log",
+          "before-image",
+          "до-образ",
+          "лог",
+          "COMMIT",
+          "flush",
+          "crash",
+          "recovery",
+          "восстанов",
+          "replay",
+          "откат",
+          "MVCC",
+          "snapshot",
+          "data page",
+          "страниц"
+        ],
+        "falseClaims": [
+          "rollback просто удаляет строки из таблицы заново",
+          "WAL пишется только после COMMIT, не до изменения данных",
+          "после crash все незавершённые транзакции автоматически commit-ятся",
+          "undo log не нужен если есть WAL",
+          "MVCC заменяет необходимость rollback"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с транзакциями",
+      "expected": "Кандидат называет: вложенный BEGIN без SAVEPOINT; забытый client.release(); длинные транзакции и locks; COMMIT переживает crash приложения; deadlock при разном порядке блокировок — фикс единый порядок.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes + deadlock — production pitfalls из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "begin_commit_rollback",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "SAVEPOINT",
+              "вложен",
+              "nested"
+            ],
+            "ask": "почему внутренний ROLLBACK без SAVEPOINT откатывает всю внешнюю транзакцию"
+          },
+          {
+            "match": [
+              "client.release",
+              "pool",
+              "finally"
+            ],
+            "ask": "что случится с connection pool если забыть release после BEGIN"
+          },
+          {
+            "match": [
+              "deadlock",
+              "40P01",
+              "порядок блок"
+            ],
+            "ask": "как избежать deadlock при параллельных переводах между двумя счетами"
+          }
+        ],
+        "mustConcepts": [
+          "SAVEPOINT",
+          "ROLLBACK TO",
+          "вложен",
+          "nested BEGIN",
+          "client.release",
+          "finally",
+          "pool",
+          "утечк",
+          "длинн",
+          "lock",
+          "блокиров",
+          "statement timeout",
+          "READ ONLY",
+          "crash",
+          "COMMIT",
+          "pg_stat_activity",
+          "deadlock",
+          "40P01",
+          "порядок блок",
+          "NOWAIT",
+          "SKIP LOCKED"
+        ],
+        "falseClaims": [
+          "в PostgreSQL вложенный BEGIN создаёт независимую подтранзакцию с отдельным rollback",
+          "client.release() опционален если был COMMIT",
+          "длинная read-only транзакция не держит locks",
+          "crash приложения всегда откатывает незавершённую транзакцию на стороне БД",
+          "deadlock означает нарушение атомарности — данные частично применены"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда нужна транзакция",
+      "expected": "Кандидат называет: multi-table зависимые изменения, переводы, заказ+склад; не нужна — одиночный idempotent INSERT, read-heavy без лишних locks; в микросервисах — не одна DB tx.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "When to use таблица из ITLead",
+        "mustConcepts": [
+          "multi-table",
+          "нескольк таблиц",
+          "перевод",
+          "заказ",
+          "inventory",
+          "склад",
+          "idempotent",
+          "read-only",
+          "чтени",
+          "блокиров",
+          "микросервис",
+          "распредел",
+          "saga",
+          "2PC",
+          "outbox"
+        ],
+        "falseClaims": [
+          "транзакция нужна для каждого SQL-запроса",
+          "read-only SELECT всегда требует BEGIN",
+          "одна PostgreSQL-транзакция может атомарно обновить две базы в разных микросервисах",
+          "single-row INSERT всегда требует явной транзакции"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "distributed_atomicity",
+      "title": "Знает атомарность в распределённых системах",
+      "expected": "Кандидат объясняет: одна DB-транзакция не span'ит два сервиса; 2PC prepare/commit или saga с compensating transactions; отличает atomicity от idempotency на уровне API.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Follow-up microservices + idempotency — senior bonus из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "saga",
+              "2PC",
+              "микросервис"
+            ],
+            "ask": "как обеспечить all-or-nothing при переводе через два микросервиса с разными БД"
+          },
+          {
+            "match": [
+              "идемпотент",
+              "idempotent",
+              "transfer ID"
+            ],
+            "ask": "чем атомарность транзакции отличается от идемпотентности HTTP endpoint"
+          }
+        ],
+        "mustConcepts": [
+          "микросервис",
+          "распредел",
+          "2PC",
+          "prepare",
+          "commit",
+          "XA",
+          "saga",
+          "компенс",
+          "compensating",
+          "outbox",
+          "Kafka",
+          "идемпотент",
+          "idempotent",
+          "transfer ID",
+          "два сервис",
+          "две баз"
+        ],
+        "falseClaims": [
+          "distributed transaction через REST между двумя сервисами — стандартный паттерн как BEGIN/COMMIT",
+          "идемпотентность API заменяет необходимость DB-транзакций",
+          "2PC не имеет проблем с availability при partition",
+          "saga гарантирует ACID atomicity как одна SQL-транзакция"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Атомарность — транзакция либо полностью commit, либо полный rollback. Перевод: BEGIN, списать Alice, зачислить Bob, COMMIT. Если второй UPDATE упал — автоматический ROLLBACK, частичного списания нет. WAL пишет операции до изменения страниц; после crash replay только committed.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для заказа в Node.js: pool.connect, BEGIN, списать inventory, INSERT orders, COMMIT в try, ROLLBACK в catch, client.release в finally. Без транзакции inventory мог бы списаться, а order не создаться. В микросервисах — saga с compensating refund, не одна DB tx на два сервиса.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Два UPDATE без BEGIN — независимы, баланс может сломаться. С BEGIN/COMMIT — один логический шаг. Deadlock при переводах: всегда lock id=1 перед id=2. Вложенный ROLLBACK без SAVEPOINT откатывает всё — для частичного отката SAVEPOINT sp1.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Атомарность — это когда каждый UPDATE сам по себе атомарен, поэтому BEGIN не нужен для перевода между двумя счетами.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Если приложение упало до COMMIT — транзакция точно откатилась. Если упало после COMMIT но до ответа клиенту — на БД транзакции не было. client.release можно не вызывать после успешного COMMIT.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В микросервисах делаю один BEGIN на PostgreSQL и один на MongoDB — distributed ACID как в монолите. Идемпотентность и атомарность — одно и то же.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "atomicity_definition",
+      "exampleType": "good",
+      "exampleText": "Atomicity ACID: all-or-nothing — либо все операции транзакции применены, либо ни одна; частичного состояния после ошибки быть не должно.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "atomicity_definition",
+      "exampleType": "good",
+      "exampleText": "ну атомарность — как конверт с деньгами, либо всё дошло либо ничего, половинку не оставишь",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "atomicity_definition",
+      "exampleType": "bad",
+      "exampleText": "Атомарность — это когда транзакция выполняется быстрее за счёт batching нескольких INSERT.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "transaction_boundary",
+      "exampleType": "good",
+      "exampleText": "Без BEGIN два UPDATE — два шага, первый может закоммититься, второй упасть. Обёртка BEGIN/COMMIT делает их одним логическим действием с auto rollback.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "transaction_boundary",
+      "exampleType": "good",
+      "exampleText": "autocommit не спасает multi-statement перевод — нужен явный BEGIN/COMMIT",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "transaction_boundary",
+      "exampleType": "bad",
+      "exampleText": "PostgreSQL автоматически группирует все запросы в одной сессии в одну транзакцию без BEGIN.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "begin_commit_rollback",
+      "exampleType": "good",
+      "exampleText": "BEGIN; UPDATE Alice -100; UPDATE Bob +100; COMMIT — оба или ни одного. UPDATE на id=999 → constraint → ROLLBACK всей tx, Alice остаётся $1000.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "begin_commit_rollback",
+      "exampleType": "good",
+      "exampleText": "перевод в одной транзакции — сумма всех балансов инвариант, после fail та же что до BEGIN",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "begin_commit_rollback",
+      "exampleType": "bad",
+      "exampleText": "Если второй UPDATE упал, первый всё равно остаётся — rollback только последнего statement.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "wal_undo_internal",
+      "exampleType": "good",
+      "exampleText": "WAL: сначала запись в лог, потом data page. COMMIT flush на диск. Crash → replay committed; incomplete откат через undo log before-images в обратном порядке.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "wal_undo_internal",
+      "exampleType": "good",
+      "exampleText": "MVCC snapshots параллельным tx пока идёт commit/rollback по WAL+undo",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "wal_undo_internal",
+      "exampleType": "bad",
+      "exampleText": "Rollback просто DELETE строк которые добавили в транзакции, WAL не участвует.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "SAVEPOINT sp1; UPDATE Bob; ROLLBACK TO sp1 — откат только второго шага, первый UPDATE Alice сохраняется до COMMIT.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "finally { client.release() } — иначе pool exhaust. Длинный BEGIN+SELECT на 10 минут блокирует writers. Deadlock 40P01 — одинаковый порядок lock row id.",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "COMMIT записанный в WAL переживает crash app — проверяю pg_stat_activity после падения",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "В PostgreSQL второй BEGIN внутри первого создаёт savepoint автоматически, ROLLBACK откатывает только inner block.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Заказ+e-commerce inventory, банковский перевод — всегда транзакция. Один idempotent INSERT или read-only analytics — без лишней tx и locks.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "микросервисы — saga/outbox, не одна sql tx на order+payment сервисы",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Любой SELECT должен быть в BEGIN READ COMMITTED для атомарности чтения.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "distributed_atomicity",
+      "exampleType": "good",
+      "exampleText": "Order service + Payment service: saga — charge, если ship fail → compensating refund. 2PC prepare/commit для XA banking. API idempotent по transferId ≠ DB atomicity, но дополняют друг друга.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "distributed_atomicity",
+      "exampleType": "good",
+      "exampleText": "одна postgres tx не span два сервиса — kafka outbox + compensating steps",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "distributed_atomicity",
+      "exampleType": "bad",
+      "exampleText": "REST вызов между сервисами внутри SQL BEGIN/COMMIT даёт distributed atomicity как в монолите.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "acid-atomicity",
+    "apiUrl": "https://api.itlead.org/api/questions/acid-atomicity",
+    "pageUrl": "https://itlead.org/interview-questions/general/acid-atomicity",
+    "difficulty": "SENIOR",
+    "titleEn": "ACID - atomicity",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

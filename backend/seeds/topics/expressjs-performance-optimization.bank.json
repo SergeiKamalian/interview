@@ -1,0 +1,535 @@
+{
+  "topic": {
+    "code": "expressjs_performance_optimization",
+    "name": "Оптимизация производительности Express.js",
+    "skillCode": "expressjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как оптимизировать производительность Express.js приложения?",
+    "shortAnswer": "Оптимизация Express.js — снижение latency и рост throughput на production Node.js сервере: NODE_ENV=production, compression (gzip level 6), async вместо sync I/O, исправление N+1 и медленных запросов к БД, Redis-кеш, cluster по числу CPU cores, connection pooling и streaming для больших экспортов.",
+    "idealAnswer": "Большинство проблем производительности Express идут не от самого фреймворка, а от БД и синхронного I/O — сначала профилируют (clinic.js, autocannon) и чинят запросы, потом инфраструктуру. NODE_ENV=production даёт 2–5× ускорение: Express кеширует view-шаблоны, не перекомпилирует их на каждый запрос, подавляет verbose stack traces; middleware вроде morgan отключает debug-форматирование. compression({ level: 6, threshold: 1024 }) сжимает JSON на 70–80% при ~5–15% overhead CPU; middleware compression регистрируют до роутеров — иначе ответ уже отправлен до gzip. Async handlers освобождают event loop: sync db.query или fs.readFileSync блокируют единственный JS-поток и все остальные запросы ждут в очереди; независимые запросы параллелят через Promise.all (~30ms вместо 90ms для трёх последовательных await). Cluster module: cluster.fork() по одному worker на CPU core — round-robin распределение TCP-соединений; с Node 10.16+ SO_REUSEPORT; обязательно cluster.fork() в cluster.on('exit') или PM2 `-i max`. Redis cache-aside: GET → redis.get → miss → DB → redis.setEx с TTL; повторный запрос 50ms DB → sub-1ms; cache stampede при истечении TTL лечат probabilistic early expiry или mutex на refresh. N+1 — eager loading через Sequelize/Prisma include. Connection pool (pg.Pool): max ≈ workers × connections per worker; без pool — connection storm. Streaming больших экспортов через cursor/read chunks — постоянная память вместо буфера миллиона строк в RAM. Статику >10KB отдают через Nginx (sendfile, epoll) — ~10× быстрее Express. Типичные ошибки: express.json({ limit: '50mb' }) глобально — sync parse блокирует event loop; readFileSync в handler; compression после router; последовательные await вместо Promise.all; cluster без restart упавших workers. Real-world: Netflix — Nginx + Express cluster + Redis; Slack — статика через Nginx, динамика в Express с pooling.",
+    "maxScore": 10,
+    "skills": ["expressjs", "javascript", "nodejs"]
+  },
+  "checkpoints": [
+    {
+      "key": "db_bottleneck_first",
+      "title": "Понимает: узкое место чаще БД, не Express",
+      "expected": "Кандидат: сначала профилируют (clinic.js, autocannon), чинят медленные запросы и N+1 (eager loading include); не сразу cluster без диагностики.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — DB first, profile before scaling",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": ["профил", "clinic", "autocannon", "N+1", "запрос"],
+            "ask": "с чего начнёшь при p95 150ms — cluster или профилирование и запросы к БД"
+          }
+        ],
+        "mustConcepts": [
+          "база данных",
+          "БД",
+          "запрос",
+          "N+1",
+          "eager loading",
+          "include",
+          "профил",
+          "clinic",
+          "autocannon",
+          "bottleneck",
+          "узкое место",
+          "сначала",
+          "не Express",
+          "медленн",
+          "throughput"
+        ],
+        "falseClaims": [
+          "Express сам по себе главная причина медленных API",
+          "cluster решает любую проблему производительности без профилирования",
+          "N+1 не влияет на latency",
+          "сначала масштабируют инфраструктуру, потом смотрят запросы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "production_compression",
+      "title": "Production mode и compression middleware",
+      "expected": "Кандидат: app.set('env','production') / NODE_ENV=production — кеш view, без verbose errors; compression level 6, threshold 1024, до роутеров; 70–80% меньше JSON.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Basic ITLead example + production vs dev",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.35
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "production_compression",
+            "oftenConfusedWith": ["cluster_scaling"],
+            "anchorTermsExpected": [
+              "production",
+              "NODE_ENV",
+              "compression",
+              "gzip",
+              "level 6",
+              "threshold",
+              "до роут"
+            ],
+            "anchorTermsWrongTopic": [
+              "cluster fork",
+              "Redis TTL",
+              "connection pool"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["compression", "gzip", "level"],
+            "ask": "куда ставить compression и какой level/threshold для JSON API"
+          }
+        ],
+        "mustConcepts": [
+          "production",
+          "NODE_ENV",
+          "app.set",
+          "env",
+          "compression",
+          "gzip",
+          "level 6",
+          "threshold",
+          "1024",
+          "view cache",
+          "шаблон",
+          "до роут",
+          "middleware order",
+          "порядок",
+          "70",
+          "80",
+          "JSON"
+        ],
+        "falseClaims": [
+          "production ускоряет V8 JIT в разы без других изменений",
+          "compression после router работает так же",
+          "gzip level 9 всегда лучше level 6",
+          "compression полезен для уже сжатых jpeg/png"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "cluster_scaling",
+      "title": "Масштабирует через cluster / PM2",
+      "expected": "Кандидат: cluster.fork по числу CPU cores; master распределяет TCP round-robin; restart в cluster.on('exit'); PM2 -i max; не in-memory cache без shared store.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Intermediate cluster + OS load balancing ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": ["cluster", "worker", "fork", "PM2"],
+            "ask": "как cluster распределяет соединения и что делать при падении worker"
+          },
+          {
+            "match": ["SO_REUSEPORT", "round-robin", "master"],
+            "ask": "round-robin master vs SO_REUSEPORT на уровне ОС"
+          }
+        ],
+        "mustConcepts": [
+          "cluster",
+          "fork",
+          "worker",
+          "CPU",
+          "ядр",
+          "PM2",
+          "master",
+          "round-robin",
+          "SO_REUSEPORT",
+          "restart",
+          "exit",
+          "process",
+          "throughput",
+          "event loop",
+          "in-memory",
+          "Redis",
+          "shared"
+        ],
+        "falseClaims": [
+          "один Node process автоматически использует все CPU cores",
+          "workers разделяют in-memory Map cache",
+          "cluster.on exit достаточно console.log без fork",
+          "cluster полностью заменяет load balancer и Nginx"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "redis_caching",
+      "title": "Применяет Redis-кеширование",
+      "expected": "Кандидат: cache-aside GET → redis.get → miss → DB → setEx TTL; invalidate on write; cache stampede / thundering herd и mutex или early expiry.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Intermediate Redis profile API ITLead",
+        "probeConceptGroups": [
+          {
+            "match": ["Redis", "кеш", "TTL", "stampede"],
+            "ask": "cache-aside для GET /user/:id и что происходит при mass TTL expiry"
+          }
+        ],
+        "mustConcepts": [
+          "Redis",
+          "кеш",
+          "cache-aside",
+          "TTL",
+          "setEx",
+          "get",
+          "miss",
+          "hit",
+          "invalidate",
+          "stampede",
+          "thundering herd",
+          "mutex",
+          "early expiry",
+          "профиль",
+          "300",
+          "секунд"
+        ],
+        "falseClaims": [
+          "Redis cache не нужно инвалидировать при update",
+          "TTL expiry никогда не создаёт лавину запросов к БД",
+          "Redis заменяет connection pool",
+          "кеш в памяти worker достаточен при cluster"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "async_nonblocking",
+      "title": "Не блокирует event loop",
+      "expected": "Кандидат: async handlers вместо sync I/O; Promise.all для независимых запросов; libuv thread pool; избегать readFileSync/sync query в hot path.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "before/after async + Promise.all mistakes ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["Promise.all", "параллел", "await"],
+            "ask": "три независимых запроса — sequential await vs Promise.all по latency"
+          },
+          {
+            "match": ["readFileSync", "sync", "event loop"],
+            "ask": "почему sync fs в handler блокирует все запросы"
+          }
+        ],
+        "mustConcepts": [
+          "async",
+          "await",
+          "event loop",
+          "sync",
+          "readFileSync",
+          "блокир",
+          "Promise.all",
+          "параллел",
+          "libuv",
+          "thread pool",
+          "очеред",
+          "non-blocking",
+          "hot path"
+        ],
+        "falseClaims": [
+          "readFileSync в handler не влияет на другие запросы",
+          "последовательные await для независимых запросов — оптимально",
+          "Node.js многопоточный для всего JavaScript",
+          "sync db.query безопасен под нагрузкой"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "streaming_pool_nginx",
+      "title": "Streaming, connection pool и Nginx для статики",
+      "expected": "Кандидат: cursor/stream chunks для больших export — не buffer в RAM; pg.Pool max × workers; Nginx sendfile/epoll для static >10KB.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Advanced streaming + pool + nginx ITLead",
+        "mustConcepts": [
+          "stream",
+          "streaming",
+          "cursor",
+          "chunk",
+          "export",
+          "pool",
+          "pg.Pool",
+          "connection",
+          "release",
+          "Nginx",
+          "sendfile",
+          "epoll",
+          "статик",
+          "10KB",
+          "память",
+          "buffer"
+        ],
+        "falseClaims": [
+          "res.json массива из миллиона строк — норма для export",
+          "new connection per request быстрее pool",
+          "Express быстрее Nginx для больших static files",
+          "pool.connect без release в finally — безопасно"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки оптимизации",
+      "expected": "Кандидат называет: 50mb body limit глобально; readFileSync в handler; compression после router; sequential await; cluster без restart; compression на images.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "5 common mistakes секция ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": ["50mb", "body", "limit"],
+            "ask": "почему express.json limit 50mb глобально — DoS и блокировка event loop"
+          },
+          {
+            "match": ["compression", "router", "порядок"],
+            "ask": "compression после app.use('/api', router) — что пойдёт не так"
+          }
+        ],
+        "mustConcepts": [
+          "50mb",
+          "body limit",
+          "express.json",
+          "readFileSync",
+          "compression",
+          "после router",
+          "порядок middleware",
+          "Promise.all",
+          "последовательн",
+          "cluster.on",
+          "fork",
+          "restart",
+          "DoS",
+          "sync parse"
+        ],
+        "falseClaims": [
+          "50mb express.json globally — best practice",
+          "compression order не важен",
+          "worker crash без restart — capacity не падает",
+          "только compression нужен для всех perf проблем"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Сначала clinic.js и slow query log — N+1 на /orders. Потом NODE_ENV=production, compression level 6 до routes, async handlers, Redis cache-aside профилей TTL 300s, cluster fork по CPU с restart в on exit, pg.Pool max 5 на worker.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "p95 150ms → 8ms: production + gzip JSON, await db.query вместо sync, Promise.all для users/products/orders. Экспорт миллиона строк — cursor read 100 rows + res.write, не res.json всего массива. Статику отдаёт Nginx, Express только API.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Не лезу сразу в cluster — autocannon показал event loop delay из-за readFileSync в /config. Починил async + in-memory cache config. Compression threshold 1024 — мелкие ответы не сжимаем зря.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Express медленный — сразу 16 workers cluster без профилирования. express.json 50mb на всё приложение. compression после router — главное что есть.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Sync db.query в handler — Node многопоточный, блокировки нет. In-memory Map cache в cluster — все workers видят одни данные. Cache stampede — миф, TTL просто обновится.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Export 1M orders: собираю массив в память, res.json. Connection per request — pool только overhead. Static files через express.static быстрее Nginx всегда.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "db_bottleneck_first",
+      "exampleType": "good",
+      "exampleText": "autocannon 1k rps — bottleneck в Sequelize N+1, include fixes queries; cluster бы масштабировал ту же медленную БД.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "db_bottleneck_first",
+      "exampleType": "good",
+      "exampleText": "сначала clinic flame, потом индексы и eager loading — не сразу redis",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "db_bottleneck_first",
+      "exampleType": "bad",
+      "exampleText": "Express тормозит — значит нужен только gzip и PM2, БД не трогаем.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "production_compression",
+      "exampleType": "good",
+      "exampleText": "NODE_ENV=production pm2 start app.js; app.use(compression({ level: 6, threshold: 1024 })) первым middleware.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "production_compression",
+      "exampleType": "good",
+      "exampleText": "dev ~200ms endpoint, production ~40ms — view cache и без debug stack в ответе",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "production_compression",
+      "exampleType": "bad",
+      "exampleText": "compression level 9 на png avatars — максимальная экономия bandwidth.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "cluster_scaling",
+      "exampleType": "good",
+      "exampleText": "4 cores — 4 fork; cluster.on('exit') → cluster.fork(); ~5k rps vs ~1.2k single process.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "cluster_scaling",
+      "exampleType": "good",
+      "exampleText": "pm2 start app.js -i max — restart workers автоматически",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "cluster_scaling",
+      "exampleType": "bad",
+      "exampleText": "workers делят один in-memory LRU — cache hit на всех cores.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "redis_caching",
+      "exampleType": "good",
+      "exampleText": "GET user:42 — redis hit sub-1ms; miss → DB → setEx 300; PATCH → del user:42.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "redis_caching",
+      "exampleType": "good",
+      "exampleText": "stampede при TTL — mutex один refresh, остальные ждут тот же результат",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "redis_caching",
+      "exampleType": "bad",
+      "exampleText": "Redis TTL бесконечный — invalidation не нужна, данные сами свежие.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "async_nonblocking",
+      "exampleType": "good",
+      "exampleText": "const [u,p,o] = await Promise.all([getUsers(), getProducts(), getOrders()]) — ~30ms не 90ms.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "async_nonblocking",
+      "exampleType": "good",
+      "exampleText": "await fs.promises.readFile + кеш config — не readFileSync на каждый request",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "async_nonblocking",
+      "exampleType": "bad",
+      "exampleText": "readFileSync в /config — файл маленький, event loop не страдает.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "streaming_pool_nginx",
+      "exampleType": "good",
+      "exampleText": "pg cursor read 100 rows, res.write JSON chunks; finally client.release(). Pool max 5 × 4 workers = 20 DB conn.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "streaming_pool_nginx",
+      "exampleType": "good",
+      "exampleText": "assets nginx sendfile; express только /api — 10x на файлах >10KB",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "streaming_pool_nginx",
+      "exampleType": "bad",
+      "exampleText": "SELECT * million rows → JSON.stringify в buffer → res.send — OK на 512MB RAM.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "express.json limit 1mb global; multer только /upload; compression до app.use('/api', router).",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "worker died — fork новый; иначе load на оставшихся workers",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "app.use('/api', router); app.use(compression()) — порядок не важен, gzip всё равно сработает.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "expressjs-performance-optimization",
+    "apiUrl": "https://api.itlead.org/api/questions/expressjs-performance-optimization",
+    "pageUrl": "https://itlead.org/interview-questions/expressjs/expressjs-performance-optimization",
+    "difficulty": "SENIOR",
+    "titleEn": "How to optimize Express.js application performance?",
+    "categorySlug": "expressjs",
+    "syncedAt": "2026-06-18T16:30:00.000Z"
+  }
+}

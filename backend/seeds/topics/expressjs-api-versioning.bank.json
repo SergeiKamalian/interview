@@ -1,0 +1,194 @@
+{
+  "topic": {
+    "code": "expressjs_api_versioning",
+    "name": "Версионирование API в Express.js",
+    "skillCode": "expressjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как реализовать версионирование API в Express.js?",
+    "shortAnswer": "API versioning — несколько версий API на одном Express-сервере, чтобы breaking changes не ломали старых клиентов. URL path (`/api/v1`, `/api/v2`) — самый частый для public API. Бизнес-логику держать в shared `services/`, версионировать routes/controllers. При sunset — `Deprecation` и `Sunset` headers.",
+    "idealAnswer": "Versioning позволяет ship breaking changes параллельно: v1 flat {name}, v2 {firstName, lastName}. Стратегии: URL path (/api/v1) — cache-friendly, testable in browser (Stripe, Twilio); header Accept-Version/Api-Version — clean URLs, нужен Vary для CDN (GitHub); query ?version=2 — только prototypes. Production structure: routes/v1, routes/v2, controllers per version, services/ shared без версий. Re-export v1 router если endpoint не изменился. Header semver: middleware + semver.satisfies. Deprecation: Deprecation true, Sunset RFC 8594, Link successor-version; 12-18 months parallel. Ошибки: один handler на обе версии ломает v1; нет Sunset; version non-breaking optional field; забыть Vary с header versioning. Scale 10+ versions: dynamic v* loader, max 2 active, OpenAPI per version. Express: separate Router per version, first match Layer wins.",
+    "maxScore": 10,
+    "skills": ["expressjs", "javascript", "nodejs"]
+  },
+  "checkpoints": [
+    {
+      "key": "versioning_need",
+      "title": "Понимает зачем versioning",
+      "expected": "Кандидат: breaking changes без disruption; parallel versions; clients migrate on schedule.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR — why versioning exists",
+        "mustConcepts": ["versioning", "breaking change", "parallel", "клиент", "legacy", "v1", "v2", "совместим", "migrate"],
+        "falseClaims": ["новая версия всегда заменяет старую сразу", "optional field требует новую major version всегда"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "url_path_versioning",
+      "title": "Реализует URL path versioning",
+      "expected": "Кандидат: app.use('/api/v1', v1Router); отдельные routers; cache-friendly; public API default.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Most common strategy — URL path",
+        "impliesCheckpointFloors": [{ "checkpointKey": "versioning_need", "floorFraction": 0.45 }],
+        "mustConcepts": ["/api/v1", "/api/v2", "app.use", "Router", "URL path", "public API", "cache", "Stripe", "explicit"],
+        "falseClaims": ["URL versioning нельзя кэшировать CDN", "v1 и v2 должны share один router handler"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "header_versioning",
+      "title": "Знает header и query strategies",
+      "expected": "Кандидат: Accept-Version header; Vary header для cache; query only prototype; tradeoffs.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Header vs URL tradeoffs",
+        "probeConceptGroups": [
+          { "match": ["Vary", "Accept-Version", "CDN"], "ask": "зачем Vary при header versioning" },
+          { "match": ["query", "?version"], "ask": "почему query param versioning не для production public API" }
+        ],
+        "mustConcepts": ["Accept-Version", "Api-Version", "header", "Vary", "CDN", "query param", "mobile", "internal", "tradeoff"],
+        "falseClaims": ["header versioning cache-friendly без Vary", "query ?version=2 рекомендуется для Stripe-style public API"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "shared_services_layer",
+      "title": "Разделяет services и versioned routes",
+      "expected": "Кандидат: services/ без версий; version routes/controllers only; re-export unchanged v1; no duplicate DB logic.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Production structure — biggest team mistake",
+        "mustConcepts": ["services", "shared", "routes/v1", "routes/v2", "controllers", "re-export", "interface", "не дублир", "serializer", "domain logic"],
+        "falseClaims": ["каждая версия дублирует весь service layer", "v2 controller должен вызывать v1 controller напрямую"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "deprecation_headers",
+      "title": "Применяет deprecation headers",
+      "expected": "Кандидат: Deprecation, Sunset RFC 8594, Link successor; 12-18 months; metrics on v1 traffic.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Deprecation — senior production practice",
+        "impliesCheckpointFloors": [{ "checkpointKey": "url_path_versioning", "floorFraction": 0.4 }],
+        "mustConcepts": ["Deprecation", "Sunset", "RFC 8594", "Link", "successor-version", "phasing out", "metrics", "Prometheus", "12 months"],
+        "falseClaims": ["можно выключить v1 без предупреждения если мало клиентов", "Deprecation header необязателен для internal API"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "semver_middleware",
+      "title": "Обрабатывает semver ranges",
+      "expected": "Кандидат: semver.satisfies в middleware; ^1.2.0 routing; invalid version 400.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "advanced",
+        "weightRationale": "Header semver — senior pattern",
+        "probeConceptGroups": [{ "match": ["semver", "satisfies", "^"], "ask": "как роутить Accept-Version: ^1.2.0 без string compare" }],
+        "mustConcepts": ["semver", "satisfies", "range", "^1.2.0", "middleware", "Accept-Version", "400", "major bump"],
+        "falseClaims": ["строковое сравнение version >= '2.0' работает для semver", "patch version всегда требует новый router file"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки versioning",
+      "expected": "Кандидат: shared handler breaks v1; version non-breaking changes; no Vary; no sunset plan.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Common mistakes ITLead",
+        "confusionPairs": [
+          { "claim": "optional response field требует v2", "correction": "optional field не breaking — версию не поднимаем" },
+          { "claim": "один getUsers handler на v1 и v2", "correction": "разные serializers или fork handler под формат клиента" }
+        ],
+        "mustConcepts": ["shared handler", "breaking", "optional field", "Vary", "Sunset", "rename field", "removed field"],
+        "falseClaims": ["добавить optional field — всегда новая API version", "v1 и v2 могут безопасно share один response shape после rename"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "scale_many_versions",
+      "title": "Масштабирует на много версий",
+      "expected": "Кандидат: dynamic v* loader; max 2 active; OpenAPI per version; aggressive deprecation.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "expert",
+        "weightRationale": "Senior follow-up — 10+ versions",
+        "probePolicy": { "minProbes": 1, "allowGenericProbe": false },
+        "mustConcepts": ["dynamic loader", "routes/v*", "две active", "OpenAPI", "deprecate", "serializer per version", "CI lifecycle"],
+        "falseClaims": ["поддерживать 10 версий параллельно без overhead — норма", "каждый patch требует новую папку routes"],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    { "exampleType": "good", "exampleText": "app.use('/api/v1', v1Router); app.use('/api/v2', v2Router). Services shared. v1 {name}, v2 {firstName,lastName}. Sunset + Deprecation на v1.", "sortOrder": 0 },
+    { "exampleType": "good", "exampleText": "Header versioning: Accept-Version + Vary. semver.satisfies в middleware. Не versionить optional fields.", "sortOrder": 1 },
+    { "exampleType": "good", "exampleText": "routes/v2/products re-export v1 если без изменений. transformer v2→v1 shape при миграции", "sortOrder": 2 },
+    { "exampleType": "bad", "exampleText": "Один getUsers на v1 и v2 — clients ok. Query ?version для public Stripe API. Optional field → v3.", "sortOrder": 0 },
+    { "exampleType": "bad", "exampleText": "Header versioning без Vary — CDN ok. v1 выключаем без Sunset когда надоело.", "sortOrder": 1 },
+    { "exampleType": "bad", "exampleText": "Дублирую всю DB логику в каждой версии, services не shared.", "sortOrder": 2 },
+    { "checkpointKey": "versioning_need", "exampleType": "good", "exampleText": "Breaking rename firstName — v2 parallel, v1 живёт пока клиенты мигрируют.", "sortOrder": 10 },
+    { "checkpointKey": "versioning_need", "exampleType": "good", "exampleText": "версионируем interface не domain", "sortOrder": 11 },
+    { "checkpointKey": "versioning_need", "exampleType": "bad", "exampleText": "Любое изменение API — сразу удаляем v1.", "sortOrder": 30 },
+    { "checkpointKey": "url_path_versioning", "exampleType": "good", "exampleText": "GET /api/v1/users и /api/v2/users — отдельные routers, CDN cache по path.", "sortOrder": 12 },
+    { "checkpointKey": "url_path_versioning", "exampleType": "good", "exampleText": "public REST — URL path как Stripe /v1/charges", "sortOrder": 13 },
+    { "checkpointKey": "url_path_versioning", "exampleType": "bad", "exampleText": "v1 и v2 обязаны один URL с middleware только.", "sortOrder": 31 },
+    { "checkpointKey": "header_versioning", "exampleType": "good", "exampleText": "Accept-Version: 2.0.0 + res.set('Vary','Accept-Version') для CDN.", "sortOrder": 14 },
+    { "checkpointKey": "header_versioning", "exampleType": "good", "exampleText": "?version=2 только prototype, не prod public", "sortOrder": 15 },
+    { "checkpointKey": "header_versioning", "exampleType": "bad", "exampleText": "Header versioning cache-friendly без Vary всегда.", "sortOrder": 32 },
+    { "checkpointKey": "shared_services_layer", "exampleType": "good", "exampleText": "usersService.findById — shared; v1/v2 controllers разный JSON shape.", "sortOrder": 16 },
+    { "checkpointKey": "shared_services_layer", "exampleType": "good", "exampleText": "module.exports = require('../v1/products.routes') если без изменений", "sortOrder": 17 },
+    { "checkpointKey": "shared_services_layer", "exampleType": "bad", "exampleText": "v2 route вызывает v1 controller напрямую для response.", "sortOrder": 33 },
+    { "checkpointKey": "deprecation_headers", "exampleType": "good", "exampleText": "res.set Deprecation, Sunset Jun 2026, Link /api/v2 successor. Metrics v1 RPS.", "sortOrder": 18 },
+    { "checkpointKey": "deprecation_headers", "exampleType": "good", "exampleText": "12-18 months parallel before v1 shutdown", "sortOrder": 19 },
+    { "checkpointKey": "deprecation_headers", "exampleType": "bad", "exampleText": "Sunset не нужен если v1 мало трафика — выключаем в пятницу.", "sortOrder": 34 },
+    { "checkpointKey": "semver_middleware", "exampleType": "good", "exampleText": "semver.satisfies('2.0.0', version) → v2Handler; invalid → 400.", "sortOrder": 20 },
+    { "checkpointKey": "semver_middleware", "exampleType": "good", "exampleText": "^1.2.0 матчит 1.x router, major bump — новая ветка", "sortOrder": 21 },
+    { "checkpointKey": "semver_middleware", "exampleType": "bad", "exampleText": "if (version >= '2.0') — надёжный semver compare.", "sortOrder": 35 },
+    { "checkpointKey": "common_mistakes", "exampleType": "good", "exampleText": "Не versionить optional email field. Fork handler если shape разный.", "sortOrder": 22 },
+    { "checkpointKey": "common_mistakes", "exampleType": "good", "exampleText": "v1 80% traffic два года — нет Sunset headers виноваты", "sortOrder": 23 },
+    { "checkpointKey": "common_mistakes", "exampleType": "bad", "exampleText": "Shared handler с firstName ломает v1 {name} — норм clients adapt.", "sortOrder": 36 },
+    { "checkpointKey": "scale_many_versions", "exampleType": "good", "exampleText": "Scan routes/v* at startup; max 2 active; OpenAPI per version in CI.", "sortOrder": 24 },
+    { "checkpointKey": "scale_many_versions", "exampleType": "good", "exampleText": "serializer attach per model class per version", "sortOrder": 25 },
+    { "checkpointKey": "scale_many_versions", "exampleType": "bad", "exampleText": "Держать v1-v10 параллельно без deprecation policy — best practice.", "sortOrder": 37 }
+  ],
+  "itlead": {
+    "slug": "expressjs-api-versioning",
+    "apiUrl": "https://api.itlead.org/api/questions/expressjs-api-versioning",
+    "pageUrl": "https://itlead.org/interview-questions/expressjs/expressjs-api-versioning",
+    "difficulty": "SENIOR",
+    "titleEn": "How to implement API versioning in Express.js?",
+    "categorySlug": "expressjs",
+    "syncedAt": "2026-06-18T22:00:00.000Z"
+  }
+}

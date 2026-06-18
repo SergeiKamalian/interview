@@ -1,0 +1,667 @@
+{
+  "topic": {
+    "code": "docker_daemon_client",
+    "name": "Docker daemon и Docker client",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как взаимодействуют Docker daemon и Docker client?",
+    "shortAnswer": "Docker daemon (`dockerd`) — фоновый сервис, который владеет всем состоянием: образы, контейнеры, сети, volumes. Docker client (`docker` CLI) — тонкий stateless frontend: переводит команды в REST-вызовы Engine API и отправляет их на daemon через Unix-socket `/var/run/docker.sock` или TCP (`DOCKER_HOST`).",
+    "idealAnswer": "Docker daemon и Docker client — классическая client-server пара. Daemon (`dockerd`) — долгоживущий root-процесс (обычно systemd): управляет образами (pull/build через BuildKit, хранение в `/var/lib/docker/`), жизненным циклом контейнеров (делегирует containerd/runc, но владеет user-facing API), сетями (bridge, iptables), volumes и слушает Engine API на socket. Конфигурация — `/etc/docker/daemon.json` и флаги (`data-root`, `storage-driver`, `log-driver`, `live-restore`). Client (`docker` CLI) — один бинарник без собственного daemon и state: парсит аргументы, выбирает активный context, строит HTTP-запрос с версией API и JSON, шлёт через socket, форматирует ответ (таблица, JSON, `--format`). Протокол — HTTP + JSON; `docker ps` = `GET /v1.46/containers/json` через curl на `/var/run/docker.sock`. CLI настолько тонкий, что любую операцию можно повторить curl или Go SDK (`github.com/docker/docker/client`). Транспорт по умолчанию — Unix socket `/var/run/docker.sock` (mode 660, группа `docker`); для remote — TCP с обязательным TLS и client cert auth (`tcp://0.0.0.0:2376` с tlsverify). Незащищённый `tcp://0.0.0.0:2375` — удалённый root shell: API может запустить `--privileged` контейнер с bind-mount `/`. `DOCKER_HOST=tcp://host:2376` перенаправляет CLI. Docker contexts — один CLI на несколько daemon: `docker context create staging --docker \"host=ssh://user@host\"`, `docker context use staging`, `docker --context prod-us ps` для one-off. Файлы в `~/.docker/contexts/`. Engine API версионирован: клиент шлёт `/v1.46/...`, daemon принимает или возвращает «client version too new» — fix: upgrade daemon или `DOCKER_API_VERSION=1.45`. Несколько клиентов могут параллельно работать с одним daemon. Типичные ошибки: группа `docker` = эквивалент root (socket access → privileged container → host root); TCP без TLS в интернет; путать «CLI сломан» с «daemon недоступен» (`Cannot connect to the Docker daemon` — daemon stopped, нет socket, нет прав); `systemctl restart docker` без `live-restore` раньше убивал контейнеры — с `live-restore: true` containerd-shim держит их при рестарте dockerd; если daemon умер, контейнеры с live-restore продолжают работать, CLI недоступен до reattach. Docker Desktop на Mac/Windows: dockerd внутри Linux VM, CLI на хосте через forwarded socket. CI: свой dockerd на runner; DinD — privileged container с dockerd внутри, tradeoff по безопасности. Монтирование `/var/run/docker.sock` в контейнер даёт полный контроль над host daemon — CI-инструменты (Portainer, Jenkins) используют это осознанно; злоумышленный образ с socket access эскалирует до root хоста — mitigations: rootless Docker, sysbox, per-runner dockerd. `DOCKER_DEBUG=true docker ps` показывает сырой HTTP GET/JSON — подтверждение wire protocol. Зависание `docker ps` — почти всегда daemon: overload, storage driver deadlock, hung containerd; смотреть `journalctl -u docker` и `journalctl -u containerd`.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "client_server_split",
+      "title": "Понимает client-server модель",
+      "expected": "Кандидат объясняет: dockerd — долгоживущий сервис, владеет всем state; docker CLI — stateless frontend, переводит команды в REST; daemon и то, чем он управляет, всегда вместе; client можно направить на remote daemon.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — разделение state и REST frontend",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "client_server_split",
+            "oftenConfusedWith": [
+              "client_cli_flow",
+              "daemon_responsibilities"
+            ],
+            "anchorTermsExpected": [
+              "daemon",
+              "dockerd",
+              "CLI",
+              "stateless",
+              "REST",
+              "state",
+              "client-server"
+            ],
+            "anchorTermsWrongTopic": [
+              "CLI хранит контейнеры",
+              "daemon это CLI",
+              "containerd это client"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "dockerd",
+              "CLI",
+              "stateless"
+            ],
+            "ask": "кто хранит состояние контейнеров и образов — client или daemon"
+          }
+        ],
+        "mustConcepts": [
+          "daemon",
+          "dockerd",
+          "client",
+          "CLI",
+          "client-server",
+          "stateless",
+          "без состоян",
+          "REST",
+          "Engine API",
+          "владеет",
+          "state",
+          "состоян",
+          "frontend",
+          "фронтенд",
+          "долгоживущ",
+          "background",
+          "remote",
+          "удалён"
+        ],
+        "falseClaims": [
+          "docker CLI хранит список контейнеров локально",
+          "daemon и client — один процесс",
+          "client может работать без daemon и управлять контейнерами сам",
+          "state образов хранится в CLI конфиге",
+          "daemon — это только REST proxy без собственного state"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "daemon_responsibilities",
+      "title": "Знает зоны ответственности dockerd",
+      "expected": "Кандидат перечисляет: images (pull/build/registry), container lifecycle API, networks, volumes, API endpoint; конфиг daemon.json; делегирует runtime containerd, но владеет user-facing API.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "что делает dockerd как сервер — images/networks/volumes/API",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "client_server_split",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "daemon_responsibilities",
+            "oftenConfusedWith": [
+              "client_server_split"
+            ],
+            "anchorTermsExpected": [
+              "dockerd",
+              "образ",
+              "сеть",
+              "volume",
+              "daemon.json",
+              "var/lib/docker"
+            ],
+            "anchorTermsWrongTopic": [
+              "CLI парсит Dockerfile",
+              "registry это daemon"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "dockerd",
+              "образ",
+              "volume"
+            ],
+            "ask": "за что отвечает dockerd и где хранятся образы по умолчанию"
+          }
+        ],
+        "mustConcepts": [
+          "dockerd",
+          "daemon",
+          "образ",
+          "image",
+          "pull",
+          "build",
+          "BuildKit",
+          "контейнер",
+          "lifecycle",
+          "сеть",
+          "network",
+          "bridge",
+          "volume",
+          "API endpoint",
+          "daemon.json",
+          "var/lib/docker",
+          "data-root",
+          "storage-driver",
+          "containerd",
+          "делегир",
+          "systemd",
+          "root"
+        ],
+        "falseClaims": [
+          "dockerd не управляет сетями и volumes",
+          "CLI сам pull образы без daemon",
+          "образы хранятся только в registry, не на хосте",
+          "dockerd напрямую exec процесс без containerd всегда",
+          "daemon.json настраивает только CLI"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "client_cli_flow",
+      "title": "Знает flow Docker CLI",
+      "expected": "Кандидат описывает шаги: parse args → active context → HTTP JSON request → socket → format response; docker ps = GET containers/json; можно заменить curl.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "quick example ITLead — docker ps как GET через socket",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "docker ps",
+              "curl",
+              "GET"
+            ],
+            "ask": "что CLI делает под капотом при docker ps"
+          },
+          {
+            "match": [
+              "context",
+              "format",
+              "JSON"
+            ],
+            "ask": "как CLI выбирает daemon и форматирует ответ"
+          }
+        ],
+        "mustConcepts": [
+          "parse",
+          "аргумент",
+          "context",
+          "контекст",
+          "HTTP",
+          "JSON",
+          "GET",
+          "POST",
+          "Content-Type",
+          "socket",
+          "format",
+          "таблиц",
+          "docker ps",
+          "containers/json",
+          "curl",
+          "замен",
+          "тонк",
+          "бинарник",
+          "User-Agent"
+        ],
+        "falseClaims": [
+          "docker ps выполняет shell команды внутри контейнеров напрямую",
+          "CLI не использует HTTP протокол",
+          "docker ps обходит daemon и читает /proc напрямую",
+          "curl не может вызвать Docker API",
+          "CLI добавляет event listeners на сервере"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "transport_sockets",
+      "title": "Понимает транспорт Unix vs TCP",
+      "expected": "Кандидат объясняет: default Unix `/var/run/docker.sock`, permissions 660/docker group; remote через TCP с TLS+client cert; DOCKER_HOST; незащищённый TCP 2375 = remote root.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "transport + TLS — production security middle+",
+        "falseClaimCapFraction": 0,
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "security_pitfalls",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "docker.sock",
+              "Unix",
+              "TCP"
+            ],
+            "ask": "чем отличается Unix socket от TCP для Docker API и когда нужен TLS"
+          },
+          {
+            "match": [
+              "DOCKER_HOST",
+              "2375",
+              "2376"
+            ],
+            "ask": "как CLI подключается к удалённому daemon и почему 2375 опасен"
+          }
+        ],
+        "mustConcepts": [
+          "Unix socket",
+          "docker.sock",
+          "var/run/docker.sock",
+          "TCP",
+          "DOCKER_HOST",
+          "TLS",
+          "tlsverify",
+          "client cert",
+          "2375",
+          "2376",
+          "permissions",
+          "660",
+          "docker group",
+          "remote",
+          "удалён",
+          "hosts",
+          "daemon.json",
+          "без sudo",
+          "privileged",
+          "root shell"
+        ],
+        "falseClaims": [
+          "TCP Docker API без TLS безопасен за firewall",
+          "Unix socket доступен любому пользователю по умолчанию",
+          "DOCKER_HOST работает только с Unix socket",
+          "порт 2375 шифрует трафик TLS",
+          "remote daemon не требует аутентификации клиента"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "docker_contexts",
+      "title": "Знает Docker contexts",
+      "expected": "Кандидат объясняет: один CLI — несколько daemon; docker context create/use; SSH host без DOCKER_HOST env; `docker --context name ps` для one-off; routing в ~/.docker/contexts/.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "contexts из ITLead — one-to-many CLI→daemon",
+        "mustConcepts": [
+          "context",
+          "контекст",
+          "docker context",
+          "context create",
+          "context use",
+          "context ls",
+          "один CLI",
+          "несколько daemon",
+          "SSH",
+          "ssh://",
+          "DOCKER_ENDPOINT",
+          "default",
+          "staging",
+          "prod",
+          "one-off",
+          "docker --context",
+          "routing",
+          "env",
+          "DOCKER_HOST"
+        ],
+        "falseClaims": [
+          "нужен отдельный docker CLI бинарник для каждого remote host",
+          "contexts заменяют daemon и хранят контейнеры локально",
+          "docker context use меняет daemon на remote машине физически",
+          "без contexts нельзя подключиться к remote daemon",
+          "contexts работают только с TCP без SSH"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "api_versioning",
+      "title": "Понимает версионирование Engine API",
+      "expected": "Кандидат объясняет: версионированный путь `/v1.46/...`; negotiation client/daemon; ошибка «client version too new»; fix upgrade daemon или DOCKER_API_VERSION; DOCKER_DEBUG показывает raw HTTP.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "API versioning и debug trace из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "v1.46",
+              "API version",
+              "too new"
+            ],
+            "ask": "что означает ошибка client version too new и как исправить"
+          }
+        ],
+        "mustConcepts": [
+          "Engine API",
+          "верси",
+          "v1.46",
+          "negotiat",
+          "договор",
+          "client version",
+          "too new",
+          "Maximum supported",
+          "DOCKER_API_VERSION",
+          "upgrade",
+          "апгрейд",
+          "downgrade",
+          "Api-Version",
+          "header",
+          "DOCKER_DEBUG",
+          "GET",
+          "HTTP/1.1",
+          "forward compat"
+        ],
+        "falseClaims": [
+          "Docker API не версионируется, всегда один endpoint",
+          "новый client никогда не работает со старым daemon",
+          "DOCKER_API_VERSION меняет версию daemon а не client",
+          "version mismatch игнорируется в production",
+          "DOCKER_DEBUG отключает REST и использует gRPC"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "security_pitfalls",
+      "title": "Знает security-ловушки и отладку",
+      "expected": "Кандидат называет: docker group = root; TCP без TLS; socket mount в контейнер = host control; live-restore при restart dockerd; Cannot connect → daemon не CLI; hang docker ps → journalctl docker/containerd; Docker Desktop VM.",
+      "score": 2,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes ITLead — security и troubleshooting",
+        "falseClaimCapFraction": 0,
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "security_pitfalls",
+            "oftenConfusedWith": [
+              "transport_sockets",
+              "client_server_split"
+            ],
+            "anchorTermsExpected": [
+              "docker group",
+              "root",
+              "socket mount",
+              "live-restore",
+              "Cannot connect",
+              "journalctl"
+            ],
+            "anchorTermsWrongTopic": [
+              "CLI сломан нужно переустановить docker",
+              "restart docker всегда безопасен для контейнеров без настроек"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "docker group",
+              "root",
+              "sudo"
+            ],
+            "ask": "почему добавление в группу docker опасно на multi-user сервере"
+          },
+          {
+            "match": [
+              "docker.sock",
+              "mount",
+              "privileged"
+            ],
+            "ask": "какой риск монтирования /var/run/docker.sock в CI контейнер"
+          },
+          {
+            "match": [
+              "live-restore",
+              "restart",
+              "hang"
+            ],
+            "ask": "что с контейнерами при systemctl restart docker и почему docker ps висит"
+          }
+        ],
+        "mustConcepts": [
+          "docker group",
+          "root",
+          "эквивалент",
+          "TCP без TLS",
+          "2375",
+          "socket mount",
+          "docker.sock",
+          "privileged",
+          "bind-mount",
+          "live-restore",
+          "restart docker",
+          "container жив",
+          "Cannot connect",
+          "CLI",
+          "daemon running",
+          "permissions",
+          "journalctl",
+          "containerd",
+          "hang",
+          "висит",
+          "overload",
+          "Docker Desktop",
+          "VM",
+          "rootless",
+          "sysbox",
+          "DinD"
+        ],
+        "falseClaims": [
+          "группа docker даёт только право pull без root",
+          "монтирование docker.sock в контейнер безопасно для production CI",
+          "systemctl restart docker всегда убивает все контейнеры в modern Docker без исключений",
+          "Cannot connect означает что CLI бинарник повреждён",
+          "docker ps hang — проблема сети клиента а не daemon"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "dockerd — сервер, владеет образами и контейнерами; docker CLI — тонкий REST-клиент без state. docker ps = GET /v1.46/containers/json через /var/run/docker.sock. Remote — DOCKER_HOST или docker context over SSH с TLS на TCP. Группа docker = root; socket в CI контейнер — полный контроль хоста.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На Mac dockerd в Linux VM, CLI на хосте через forwarded socket. Context staging через ssh:// — docker context use staging и ps смотрит remote. live-restore: restart dockerd не убивает контейнеры, shim держит. Версия API: client 1.47 vs daemon 1.45 — DOCKER_API_VERSION=1.45 или upgrade daemon.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "curl --unix-socket /var/run/docker.sock http://docker/v1.46/containers/json — то же что docker ps. DOCKER_DEBUG=true показывает сырой HTTP. Зависание ps — journalctl -u docker, часто daemon overloaded или containerd hung.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Docker client и daemon — один процесс; CLI хранит state контейнеров локально в ~/.docker/containers.db.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Открываю tcp://0.0.0.0:2375 в интернет — удобно для remote без сертификатов. Добавил себя в docker group на prod сервере — просто чтобы не sudo.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Cannot connect to docker daemon — переустанавливаю docker CLI. Монтирую docker.sock в любой контейнер — это стандартная практика без рисков. restart docker всегда убивает все контейнеры.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "client_server_split",
+      "exampleType": "good",
+      "exampleText": "dockerd долгоживущий, весь state; CLI stateless REST frontend — команды только API вызовы.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "client_server_split",
+      "exampleType": "good",
+      "exampleText": "ну daemon сервер, cli клиент, state только у dockerd, client можно на remote направить",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "client_server_split",
+      "exampleType": "bad",
+      "exampleText": "CLI и daemon одно и то же, docker ps работает offline без daemon используя локальный кэш.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "daemon_responsibilities",
+      "exampleType": "good",
+      "exampleText": "dockerd: images в /var/lib/docker, networks/volumes, Engine API; lifecycle делегирует containerd, конфиг daemon.json.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "daemon_responsibilities",
+      "exampleType": "good",
+      "exampleText": "daemon pull/build через BuildKit, bridge iptables, слушает socket — cli только шлёт REST",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "daemon_responsibilities",
+      "exampleType": "bad",
+      "exampleText": "dockerd только проксирует запросы в registry, образы не хранит локально.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "client_cli_flow",
+      "exampleType": "good",
+      "exampleText": "docker ps: parse → context → GET containers/json → JSON → таблица; curl на docker.sock эквивалент.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "client_cli_flow",
+      "exampleType": "good",
+      "exampleText": "cli парсит docker run -p, строит POST create/start с JSON body, форматирует вывод",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "client_cli_flow",
+      "exampleType": "bad",
+      "exampleText": "docker CLI напрямую fork exec контейнера без HTTP к daemon.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "transport_sockets",
+      "exampleType": "good",
+      "exampleText": "default unix:///var/run/docker.sock mode 660; remote DOCKER_HOST=tcp://host:2376 с TLS и client cert; 2375 без TLS = remote root.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "transport_sockets",
+      "exampleType": "good",
+      "exampleText": "usermod -aG docker — доступ к socket без sudo, но на shared server это root эквивалент",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "transport_sockets",
+      "exampleType": "bad",
+      "exampleText": "TCP 2375 с tlsverify false на 0.0.0.0 — норм для staging в интернете.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "docker_contexts",
+      "exampleType": "good",
+      "exampleText": "docker context create prod-eu --docker host=ssh://ops@host; context use prod-eu; --context prod-us ps one-off.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "docker_contexts",
+      "exampleType": "good",
+      "exampleText": "один cli три daemon local eu us, routing в ~/.docker/contexts/, без DOCKER_HOST env",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "docker_contexts",
+      "exampleType": "bad",
+      "exampleText": "для каждого remote host нужен отдельный docker binary и свой dockerd на ноутбуке.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "api_versioning",
+      "exampleType": "good",
+      "exampleText": "client version 1.47 too new, max 1.45 — upgrade dockerd или DOCKER_API_VERSION=1.45.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "api_versioning",
+      "exampleType": "good",
+      "exampleText": "DOCKER_DEBUG=true docker ps — GET /v1.46/containers/json HTTP/1.1, Api-Version в headers",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "api_versioning",
+      "exampleType": "bad",
+      "exampleText": "Engine API не версионируется, /containers/json без префикса v1 всегда работает одинаково.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "security_pitfalls",
+      "exampleType": "good",
+      "exampleText": "socket mount в CI — контейнер запускает privileged с bind /; mitigations rootless, per-runner dockerd, sysbox.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "security_pitfalls",
+      "exampleType": "good",
+      "exampleText": "live-restore true — restart dockerd контейнеры живут; hang ps — journalctl docker containerd, не переустанавливать cli",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "security_pitfalls",
+      "exampleType": "bad",
+      "exampleText": "docker group безопасна на multi-user prod; Cannot connect — баг CLI; socket mount read-only безопасен от escalation.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-daemon-and-client",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-daemon-and-client",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-daemon-and-client",
+    "difficulty": "MIDDLE",
+    "titleEn": "Docker daemon and Docker client: how do they interact?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T21:00:00.000Z"
+  }
+}

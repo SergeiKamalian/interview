@@ -1,0 +1,630 @@
+{
+  "topic": {
+    "code": "http2_vs_http3_protocol_evolution",
+    "name": "HTTP/2 vs HTTP/3: эволюция протокола",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Чем HTTP/2 отличается от HTTP/3 и когда какой протокол выбирать?",
+    "shortAnswer": "HTTP/2 мультиплексирует потоки поверх одного TCP-соединения, но потерянный TCP-пакет блокирует все потоки (HOL blocking на уровне пакетов). HTTP/3 использует QUIC поверх UDP — каждый stream восстанавливается независимо. На стабильной сети разница мала; при packet loss выше 1% HTTP/3 держит throughput, HTTP/2 проседает.",
+    "idealAnswer": "HTTP/2 решает проблемы HTTP/1.1: один TCP, много параллельных streams, сжатие заголовков HPACK, negotiation через ALPN (h2). Но TCP гарантирует строгий порядок байтов — при потере одного пакета все streams на соединении ждут retransmit (TCP packet-level head-of-line blocking). HTTP/3 переносит multiplexing в QUIC поверх UDP: потери восстанавливаются per-stream, обязательный TLS 1.3 встроен в QUIC, заголовки сжимает QPACK (per-stream таблицы, не shared HPACK). Handshake: TCP+TLS = 2–3 RTT; QUIC = 1 RTT, 0-RTT при resume (риск replay на state-changing запросах). Connection migration: QUIC использует Connection ID — при смене WiFi→4G сессия продолжается без нового handshake; TCP привязан к IP+port. Сервер рекламирует h3 через Alt-Svc. Когда HTTP/2: стабильный LAN/intranet, API с малыми payload, HPACK даёт выигрыш, QUIC добавляет ~20% CPU на ARM без gain. Когда HTTP/3: mobile, video streaming, lossy сети, CDN edge (Cloudflare, YouTube, Netflix). Типичные ошибки: h3 без открытого UDP 443 (тихий fallback на h2); путать HPACK и QPACK; считать QUIC всегда быстрее; игнорировать 0-RTT replay; load test только на h3 без h2 fallback (~8% пользователей). При 5% packet loss HTTP/2 теряет ~40% throughput, HTTP/3 держит >90%. Проверка: curl --http2/--http3, DevTools колонка Protocol (h2/h3).",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "http2_multiplexing",
+      "title": "Понимает HTTP/2 и multiplexing",
+      "expected": "Кандидат объясняет: HTTP/2 мультиплексирует streams на одном TCP, HPACK сжимает заголовки, ALPN выбирает h2; решает connection limit HTTP/1.1, но не убирает TCP packet-level HOL.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "базовая модель HTTP/2 из TL;DR ITLead",
+        "confusionPairs": [
+          {
+            "checkpointKey": "http2_multiplexing",
+            "oftenConfusedWith": [
+              "hol_blocking"
+            ],
+            "anchorTermsExpected": [
+              "multiplex",
+              "stream",
+              "TCP",
+              "HPACK",
+              "ALPN",
+              "h2"
+            ],
+            "anchorTermsWrongTopic": [
+              "QUIC",
+              "UDP",
+              "QPACK",
+              "HOL полностью решён"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "HTTP/2",
+              "multiplex",
+              "HPACK"
+            ],
+            "ask": "как HTTP/2 решает проблему множества соединений HTTP/1.1 и что остаётся нерешённым"
+          }
+        ],
+        "mustConcepts": [
+          "HTTP/2",
+          "h2",
+          "multiplex",
+          "мультиплекс",
+          "stream",
+          "поток",
+          "TCP",
+          "один connection",
+          "одно соединение",
+          "HPACK",
+          "header compression",
+          "сжатие заголов",
+          "ALPN",
+          "TLS handshake",
+          "frames",
+          "HEADERS",
+          "DATA",
+          "HTTP/1.1",
+          "connection limit",
+          "HTTP/1.1 connection limit",
+          "stream ID",
+          "single TCP connection",
+          "server push optional"
+        ],
+        "falseClaims": [
+          "HTTP/2 работает поверх UDP",
+          "HTTP/2 полностью убирает head-of-line blocking",
+          "в HTTP/2 каждый запрос открывает новый TCP",
+          "HPACK в HTTP/2 не сжимает заголовки",
+          "ALPN не участвует в выборе h2",
+          "HTTP/2 без TCP",
+          "h2 на UDP"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "http3_quic",
+      "title": "Понимает HTTP/3 и QUIC",
+      "expected": "Кандидат объясняет: HTTP/3 = HTTP semantics + QUIC over UDP; независимые streams, обязательный TLS 1.3, QPACK, Connection ID для migration, Alt-Svc рекламирует h3.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро HTTP/3 — транспорт QUIC вместо TCP",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "http2_multiplexing",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "http3_quic",
+            "oftenConfusedWith": [
+              "http2_multiplexing"
+            ],
+            "anchorTermsExpected": [
+              "QUIC",
+              "UDP",
+              "QPACK",
+              "TLS 1.3",
+              "Connection ID",
+              "h3"
+            ],
+            "anchorTermsWrongTopic": [
+              "TCP",
+              "HPACK",
+              "optional TLS"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "QUIC",
+              "UDP",
+              "HTTP/3"
+            ],
+            "ask": "чем QUIC отличается от TCP как транспорт для HTTP"
+          }
+        ],
+        "mustConcepts": [
+          "HTTP/3",
+          "h3",
+          "QUIC",
+          "UDP",
+          "QPACK",
+          "TLS 1.3",
+          "обязательн шифр",
+          "Connection ID",
+          "connection migration",
+          "миграция",
+          "Alt-Svc",
+          "независим",
+          "per-stream",
+          "datagram",
+          "UDP 443",
+          "selective ACK"
+        ],
+        "falseClaims": [
+          "HTTP/3 работает поверх TCP",
+          "QUIC не требует шифрования",
+          "HTTP/3 использует HPACK как HTTP/2",
+          "Connection ID привязан к IP и порту как TCP",
+          "Alt-Svc не нужен для h3"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "hol_blocking",
+      "title": "Объясняет HOL blocking: TCP vs QUIC",
+      "expected": "Кандидат различает: HTTP/2 решил stream-level HOL HTTP/1.1, но TCP packet loss блокирует все streams; HTTP/3 восстанавливает потери per-stream; при 5% loss h2 ~−40% throughput, h3 >90%.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевое отличие h2/h3 из ITLead Key difference",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "http2_multiplexing",
+            "floorFraction": 0.4
+          },
+          {
+            "checkpointKey": "http3_quic",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "HOL",
+              "head-of-line",
+              "blocking"
+            ],
+            "ask": "что такое head-of-line blocking в HTTP/2 vs HTTP/3"
+          },
+          {
+            "match": [
+              "packet loss",
+              "retransmit",
+              "throughput"
+            ],
+            "ask": "при 5% packet loss — количественная разница throughput h2 и h3"
+          }
+        ],
+        "mustConcepts": [
+          "HOL",
+          "head-of-line",
+          "blocking",
+          "блокиров",
+          "packet loss",
+          "потеря пакет",
+          "TCP",
+          "retransmit",
+          "перепередач",
+          "throughput",
+          "пропускн",
+          "stream",
+          "QUIC",
+          "per-stream recovery",
+          "5%",
+          "40%",
+          "90%",
+          "tail-loss",
+          "все потоки ждут",
+          "независим восстанов"
+        ],
+        "falseClaims": [
+          "HTTP/2 полностью устранил head-of-line blocking",
+          "потеря TCP-пакета не влияет на другие streams в h2",
+          "UDP всегда медленнее TCP при любых условиях",
+          "HTTP/3 не решает проблему HOL на уровне пакетов",
+          "на 0% packet loss h3 всегда в 2 раза быстрее h2"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use_protocol",
+      "title": "Выбирает HTTP/2 vs HTTP/3",
+      "expected": "Кандидат называет: stable LAN/intranet → h2; mobile, video, lossy networks → h3; small API payloads → h2 (HPACK, меньше CPU); CDN often h3; corporate firewall блокирует UDP → h2 fallback.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "decision rule из таблицы When to use ITLead",
+        "mustConcepts": [
+          "stable",
+          "стабильн",
+          "LAN",
+          "intranet",
+          "mobile",
+          "мобильн",
+          "streaming",
+          "video",
+          "lossy",
+          "втрат пакет",
+          "CDN",
+          "Cloudflare",
+          "small payload",
+          "API",
+          "UDP 443",
+          "firewall",
+          "fallback",
+          "h2",
+          "h3",
+          "CPU overhead",
+          "ARM"
+        ],
+        "falseClaims": [
+          "HTTP/3 всегда лучше HTTP/2 на datacenter LAN",
+          "HTTP/2 устарел и не нужен",
+          "если UDP заблокирован, h3 всё равно работает",
+          "small API на ARM всегда выигрывает от QUIC",
+          "CDN не поддерживает h3"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки h2/h3",
+      "expected": "Кандидат называет: h3 без UDP 443 на firewall (тихий fallback); путать HPACK/QPACK; миф «QUIC всегда быстрее»; 0-RTT replay на POST; load test только h3 без h2 fallback (~8% users).",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "UDP 443",
+              "firewall"
+            ],
+            "ask": "почему h3 не появляется в DevTools после включения http3 on"
+          },
+          {
+            "match": [
+              "HPACK",
+              "QPACK"
+            ],
+            "ask": "чем опасно использовать HPACK-логику на h3 сервере"
+          },
+          {
+            "match": [
+              "0-RTT",
+              "replay"
+            ],
+            "ask": "риски 0-RTT и почему Cloudflare ограничивает GET"
+          }
+        ],
+        "mustConcepts": [
+          "UDP 443",
+          "firewall",
+          "iptables",
+          "fallback",
+          "HPACK",
+          "QPACK",
+          "shared table",
+          "per-stream table",
+          "http3_qpack_blocks",
+          "0-RTT",
+          "replay",
+          "POST",
+          "GET",
+          "benchmark",
+          "CPU overhead",
+          "load test",
+          "8%",
+          "nginx",
+          "DevTools",
+          "Wireshark",
+          "quic filter",
+          "iptables UDP 443",
+          "Wireshark quic filter",
+          "load test h2 fallback",
+          "Cloudflare 0-RTT GET"
+        ],
+        "falseClaims": [
+          "HPACK и QPACK взаимозаменяемы на h3",
+          "0-RTT безопасен для POST и PUT без ограничений",
+          "QUIC всегда быстрее даже на чистой LAN",
+          "браузер покажет ошибку если UDP 443 заблокирован",
+          "load test только на h3 достаточен для capacity planning",
+          "QUIC всегда быстрее на LAN",
+          "HPACK на h3 сервере ок"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "handshake_negotiation",
+      "title": "Знает handshake и negotiation",
+      "expected": "Кандидат описывает: ALPN выбирает h2/h3 при TLS; TCP+TLS 2–3 RTT vs QUIC 1 RTT и 0-RTT resume; Alt-Svc header; nginx http2 on + http3 on.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "How it works internally — ALPN, RTT, Alt-Svc",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ALPN",
+              "handshake",
+              "RTT"
+            ],
+            "ask": "как QUIC handshake быстрее TCP + TLS и что такое 0-RTT"
+          }
+        ],
+        "mustConcepts": [
+          "ALPN",
+          "negotiation",
+          "согласован",
+          "handshake",
+          "RTT",
+          "0-RTT",
+          "resume",
+          "TCP",
+          "TLS",
+          "QUIC",
+          "1 RTT",
+          "2-3 RTT",
+          "Alt-Svc",
+          "ma=86400",
+          "nginx",
+          "http2 on",
+          "http3 on",
+          "DevTools",
+          "Protocol column",
+          "curl --http2",
+          "curl --http3"
+        ],
+        "falseClaims": [
+          "h3 negotiation происходит без TLS",
+          "0-RTT не имеет рисков replay",
+          "Alt-Svc не влияет на выбор протокола браузером",
+          "QUIC требует отдельный TLS handshake после transport handshake",
+          "ALPN поддерживает только h2"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "connection_migration",
+      "title": "Понимает connection migration в QUIC",
+      "expected": "Кандидат объясняет: TCP привязан к IP+port — смена сети = новый handshake; QUIC использует Connection ID — сессия переживает WiFi→4G; важно для mobile/video; auth middleware может реагировать на смену IP.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Connection migration — бонус middle, важен для mobile",
+        "mustConcepts": [
+          "connection migration",
+          "миграция",
+          "Connection ID",
+          "IP",
+          "port",
+          "WiFi",
+          "4G",
+          "TCP",
+          "handshake",
+          "500ms",
+          "mobile",
+          "video",
+          "сессия",
+          "auth middleware",
+          "смена IP",
+          "QUIC",
+          "не прерыва",
+          "воспроизвед"
+        ],
+        "falseClaims": [
+          "HTTP/2 поддерживает connection migration как QUIC",
+          "Connection ID меняется при каждом пакете",
+          "смена IP всегда безопасна для auth без проверки middleware",
+          "TCP автоматически продолжает сессию при смене сети",
+          "connection migration не влияет на streaming"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "HTTP/2 — один TCP, много streams, HPACK. Но lost TCP packet стопорит все streams. HTTP/3 — QUIC over UDP, recovery per stream. На mobile с packet loss h3 держит throughput, h2 падает на ~40%. Stable intranet API — h2; video streaming — h3.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ALPN выбирает h2 или h3 при TLS. Alt-Svc рекламирует h3. Включил http3 on в nginx — но без UDP 443 на firewall браузер тихо остаётся на h2. QPACK per-stream, не HPACK. 0-RTT только для idempotent GET, не для POST.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "При WiFi→4G TCP рвётся — новый handshake ~500ms. QUIC с Connection ID продолжает сессию, видео не буферизуется. DevTools Protocol column: h2 или h3. curl --http3 проверяет доступность QUIC.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "HTTP/3 — это HTTP/2 поверх UDP без других изменений. Head-of-line blocking в h2 полностью решён multiplexing.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "QUIC всегда быстрее на datacenter LAN. На h3 сервере можно использовать HPACK — это то же самое что QPACK.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Включил HTTP/3, UDP закрыт — браузер покажет ошибку. 0-RTT безопасен для POST с изменением состояния. Load test только Chrome h3 — достаточно для prod capacity.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "http2_multiplexing",
+      "exampleType": "good",
+      "exampleText": "HTTP/2: один TCP, параллельные streams, HPACK сжимает заголовки, ALPN договаривается о h2.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "http2_multiplexing",
+      "exampleType": "good",
+      "exampleText": "ну h2 — много запросов по одному tcp, не как в http/1.1 шесть соединений, hpack экономит заголовки",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "http2_multiplexing",
+      "exampleType": "bad",
+      "exampleText": "HTTP/2 открывает новый TCP на каждый fetch и полностью убирает любой head-of-line blocking.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "http3_quic",
+      "exampleType": "good",
+      "exampleText": "HTTP/3 = QUIC over UDP, TLS 1.3 обязателен, QPACK per-stream, Alt-Svc: h3=\":443\".",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "http3_quic",
+      "exampleType": "good",
+      "exampleText": "quic даёт независимые streams, connection id переживает смену сети",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "http3_quic",
+      "exampleType": "bad",
+      "exampleText": "HTTP/3 работает на TCP 443, шифрование опционально как в HTTP/2.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "hol_blocking",
+      "exampleType": "good",
+      "exampleText": "В h2 потеря TCP-пакета блокирует все streams до retransmit. В h3 QUIC восстанавливает только пострадавший stream.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "hol_blocking",
+      "exampleType": "good",
+      "exampleText": "при 5% loss h2 теряет ~40% throughput, h3 держит >90% — tcp блокирует всё соединение, quic — локально в stream",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "hol_blocking",
+      "exampleType": "bad",
+      "exampleText": "Multiplexing в HTTP/2 убрал HOL на уровне TCP-пакетов. UDP не влияет на параллельную загрузку.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use_protocol",
+      "exampleType": "good",
+      "exampleText": "Intranet REST API на стабильной сети — h2, HPACK и меньше CPU. Mobile feed и video — h3, QUIC переживает loss.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use_protocol",
+      "exampleType": "good",
+      "exampleText": "за cloudflare h3 уже есть; корпоративный firewall режет udp — будет fallback на h2, это норм",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use_protocol",
+      "exampleType": "bad",
+      "exampleText": "Всегда включаем h3 везде, h2 deprecated. Small JSON API на ARM всегда быстрее с QUIC.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "http3 on без iptables udp 443 — в DevTools только h2, ошибок нет. Явно http3_qpack_blocks в nginx, не HPACK.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "0-RTT replay: cloudflare только GET. Бенчмарк перед h3 на LAN — quic добавляет cpu без gain.",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "HPACK на h3 сервере ок. 0-RTT для POST create user безопасен. Load test только h3 покрывает 100% пользователей.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "handshake_negotiation",
+      "exampleType": "good",
+      "exampleText": "ALPN в TLS: браузер предлагает h2/h3, сервер выбирает. QUIC 1 RTT vs TCP+TLS 2-3 RTT. 0-RTT при повторном визите.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "handshake_negotiation",
+      "exampleType": "good",
+      "exampleText": "alt-svc h3 ma=86400 — браузер попробует quic на следующих запросах",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "handshake_negotiation",
+      "exampleType": "bad",
+      "exampleText": "h3 negotiation идёт отдельно от TLS, ALPN не нужен. 0-RTT без рисков для любых методов.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "connection_migration",
+      "exampleType": "good",
+      "exampleText": "WiFi→4G: TCP connection умирает, новый handshake. QUIC Connection ID — та же сессия, видео не стопорится.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "connection_migration",
+      "exampleType": "good",
+      "exampleText": "на мобилке quic migration важнее чем кажется — auth middleware может ругаться на новый ip при том же connection id",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "connection_migration",
+      "exampleType": "bad",
+      "exampleText": "HTTP/2 TCP автоматически мигрирует при смене IP как QUIC. Connection ID привязан к IP+port.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "http2-vs-http3-protocol-evolution",
+    "apiUrl": "https://api.itlead.org/api/questions/http2-vs-http3-protocol-evolution",
+    "pageUrl": "https://itlead.org/interview-questions/general/http2-vs-http3-protocol-evolution",
+    "difficulty": "MIDDLE",
+    "titleEn": "HTTP/2 vs HTTP/3: protocol evolution",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

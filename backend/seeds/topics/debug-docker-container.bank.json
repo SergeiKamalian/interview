@@ -1,0 +1,550 @@
+{
+  "topic": {
+    "code": "debug_docker_container",
+    "name": "Отладка Docker-контейнера",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как отлаживать проблемы в Docker-контейнере?",
+    "shortAnswer": "Отладка Docker — это чеклист: сначала логи, затем exit code и inspect, exec внутрь если контейнер running, override entrypoint если падает сразу. Четыре команды закрывают ~90% кейсов: docker logs, docker inspect, docker exec -it sh, docker run --entrypoint sh. Exit code — главный сигнал: 137 = SIGKILL/OOM, 143 = SIGTERM, 1 = ошибка приложения, 139 = segfault.",
+    "idealAnswer": "Отладка Docker-контейнера — flowchart от общего к частному: правильный порядок экономит часы. Шаг 1: docker ps -a — статус контейнера (Exited, exit code, когда упал). Шаг 2: docker logs --tail 200, -f для live, --since и -t с timestamps; docker logs читает stdout/stderr процесса PID 1 — если приложение пишет в файл внутри контейнера, logs пустой (12-factor: логировать в stdout). Шаг 3: docker inspect — полный JSON состояния; через --format вытаскивают Status, ExitCode, OOMKilled, Error, Mounts, Networks, State.Health. Квартет статуса: exited (137) OOM=true → OOM killer; exit 1 → ошибка приложения; exit 139 → segfault. Шаг 4: docker exec -it name sh (или bash) — если running: ls файлов, env | grep, wget/curl connectivity, ps aux. Всегда -it для интерактивного shell (нужен -t для TTY). Шаг 5: если контейнер падает слишком быстро — docker run -it --rm --entrypoint sh image с теми же -e и -v; --entrypoint подменяет entrypoint образа. Шаг 6: тактические override: -u root для диагностики прав, --cap-add=SYS_PTRACE + strace -p 1, --restart=no чтобы failed state не исчезал, --health-cmd=NONE против restart loop, --dns для DNS. Distroless без shell — :debug вариант с busybox или --entrypoint /busybox/sh. Специализированные tools: dive/history для слоёв, tcpdump/ss для сети, docker stats для ресурсов, docker diff для writable layer. Exit codes: 125 — ошибка daemon до старта (bad mount, port conflict → journalctl -u docker); 126 — команда найдена, но не executable; 127 — command not found. 137 часто SIGKILL (OOM или docker kill), 143 — SIGTERM от docker stop. Типичные ошибки: искать логи в /var/log внутри контейнера вместо docker logs; exec без -t; путать docker-proxy «port already in use» с ошибкой приложения (lsof -i :port); логи обрезаются если app умерла mid-cleanup при docker stop — увеличить --time или trap SIGTERM. Compose: docker compose logs/exec/run — те же команды с project context. Real-world: «сразу выходит» → exit code → logs → --entrypoint sh проверить бинарь; «works locally not CI» → inspect env/mounts/network; unhealthy → inspect State.Health последние 5 попыток; OOM → OOMKilled + docker stats; «can't reach sibling» → exec, ping по service name, общая network. Логи удалённого контейнера после docker rm недоступны — remote log driver или backup перед rm.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "debug_flowchart",
+      "title": "Знает порядок отладки (flowchart)",
+      "expected": "Кандидат описывает последовательность: docker ps -a → logs → inspect → exec (если running) → run --entrypoint sh (если crash-fast) → тактические override и спец. tools.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — правильный порядок команд как ядро темы",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "debug_flowchart",
+            "oftenConfusedWith": [
+              "docker_logs",
+              "exec_entrypoint"
+            ],
+            "anchorTermsExpected": [
+              "ps -a",
+              "logs",
+              "inspect",
+              "exec",
+              "entrypoint",
+              "порядок",
+              "flowchart",
+              "чеклист"
+            ],
+            "anchorTermsWrongTopic": [
+              "сразу rebuild image",
+              "только kubectl",
+              "restart решает всё"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "logs",
+              "inspect",
+              "exec",
+              "entrypoint"
+            ],
+            "ask": "с какой команды начнёте и в каком порядке пойдёте при упавшем контейнере"
+          }
+        ],
+        "mustConcepts": [
+          "docker ps -a",
+          "статус",
+          "logs",
+          "inspect",
+          "exec",
+          "entrypoint",
+          "порядок",
+          "flowchart",
+          "чеклист",
+          "exit code",
+          "сначала",
+          "общий сигнал",
+          "сузить",
+          "override",
+          "running",
+          "crash",
+          "быстро пада"
+        ],
+        "falseClaims": [
+          "достаточно только docker logs без inspect и ps",
+          "exec работает на остановленном контейнере",
+          "порядок команд не важен",
+          "сразу пересобирать image без диагностики",
+          "restart container решает любую проблему без анализа"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "docker_logs",
+      "title": "Умеет работать с docker logs",
+      "expected": "Кандидат знает docker logs --tail, -f, --since, -t; понимает что logs = stdout/stderr PID 1; если app пишет в файл — logs пустой, нужен stdout (12-factor).",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "логи — первый и самый частый шаг из ITLead step 2",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "debug_flowchart",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "logs",
+              "stdout",
+              "PID 1",
+              "tail"
+            ],
+            "ask": "docker logs пустой, но приложение «логирует» — что проверите"
+          },
+          {
+            "match": [
+              "-f",
+              "--since",
+              "--tail"
+            ],
+            "ask": "как смотреть live tail и последние N строк с timestamps"
+          }
+        ],
+        "mustConcepts": [
+          "docker logs",
+          "--tail",
+          "-f",
+          "follow",
+          "--since",
+          "-t",
+          "timestamp",
+          "stdout",
+          "stderr",
+          "PID 1",
+          "12-factor",
+          "файл",
+          "пустой",
+          "live",
+          "tail 200",
+          "app.log"
+        ],
+        "falseClaims": [
+          "docker logs читает любые файлы внутри контейнера",
+          "логи в /var/log всегда видны через docker logs",
+          "PID 1 не важен для docker logs",
+          "docker logs работает после docker rm контейнера"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "docker_inspect",
+      "title": "Использует docker inspect для диагностики",
+      "expected": "Кандидат объясняет inspect: ExitCode, OOMKilled, Error, Mounts, Networks, State.Health; умеет --format для status quartet и health log.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "inspect triangulates exit/OOM/mounts/health — step 3 ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "debug_flowchart",
+            "floorFraction": 0.45
+          },
+          {
+            "checkpointKey": "exit_codes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "inspect",
+              "OOMKilled",
+              "ExitCode"
+            ],
+            "ask": "как через inspect понять OOM vs segfault vs app error"
+          },
+          {
+            "match": [
+              "Health",
+              "unhealthy",
+              "healthcheck"
+            ],
+            "ask": "контейнер unhealthy — где смотреть последние попытки healthcheck"
+          }
+        ],
+        "mustConcepts": [
+          "docker inspect",
+          "--format",
+          "ExitCode",
+          "OOMKilled",
+          "OOM",
+          "State.Status",
+          "Error",
+          "Mounts",
+          "Networks",
+          "IPAddress",
+          "State.Health",
+          "healthcheck",
+          "unhealthy",
+          "Memory",
+          "HostConfig",
+          "JSON",
+          "status quartet",
+          "137",
+          "139"
+        ],
+        "falseClaims": [
+          "inspect показывает только имя образа",
+          "OOMKilled=true всегда означает exit 137 от приложения",
+          "healthcheck логи только в docker logs приложения",
+          "inspect нельзя фильтровать через --format"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "exec_entrypoint",
+      "title": "exec внутрь и override entrypoint",
+      "expected": "Кандидат знает docker exec -it sh для running; docker run --entrypoint sh если crash-fast; distroless :debug; -u root, strace с SYS_PTRACE.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "exec + entrypoint override — steps 4–6 ITLead, crash-fast сценарий",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "docker_logs",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "exec",
+              "-it",
+              "entrypoint"
+            ],
+            "ask": "контейнер падает за 0.1 сек — как зайти внутрь и проверить бинарь"
+          },
+          {
+            "match": [
+              "distroless",
+              "debug",
+              "busybox"
+            ],
+            "ask": "как дебажить distroless image без shell"
+          }
+        ],
+        "mustConcepts": [
+          "docker exec",
+          "-it",
+          "sh",
+          "bash",
+          "TTY",
+          "entrypoint",
+          "--entrypoint",
+          "docker run",
+          "crash",
+          "быстро",
+          "override",
+          "distroless",
+          ":debug",
+          "busybox",
+          "-u root",
+          "SYS_PTRACE",
+          "strace",
+          "env",
+          "ps aux",
+          "wget",
+          "connectivity"
+        ],
+        "falseClaims": [
+          "exec работает на exited контейнере",
+          "entrypoint нельзя переопределить при docker run",
+          "distroless всегда имеет bash внутри",
+          "docker exec sh достаточно без -i и -t всегда",
+          "--entrypoint sh ломает image навсегда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "exit_codes",
+      "title": "Интерпретирует exit codes",
+      "expected": "Кандидат объясняет: 137 SIGKILL/OOM, 143 SIGTERM, 1 app error, 139 segfault; 125 daemon error, 126 not executable, 127 not found.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "exit codes как primary signal — shortAnswer и follow-up ITLead",
+        "mustConcepts": [
+          "exit code",
+          "137",
+          "143",
+          "139",
+          "125",
+          "126",
+          "127",
+          "SIGKILL",
+          "SIGTERM",
+          "OOM",
+          "segfault",
+          "daemon",
+          "not executable",
+          "not found",
+          "port conflict",
+          "journalctl"
+        ],
+        "falseClaims": [
+          "exit 137 всегда только OOM, никогда SIGKILL",
+          "exit 125 — ошибка приложения внутри контейнера",
+          "126 и 127 означают одно и то же",
+          "exit code не связан с docker inspect"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки отладки",
+      "expected": "Кандидат называет: логи в файл vs stdout; exec без -t; docker stop обрезает logs (143/137); docker-proxy port conflict ≠ app error; compose wrappers.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — частые ловушки middle",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "docker_logs",
+            "floorFraction": 0.4
+          }
+        ],
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "port",
+              "proxy",
+              "already in use"
+            ],
+            "ask": "Error starting userland proxy bind address already in use — это app или Docker"
+          },
+          {
+            "match": [
+              "compose",
+              "docker compose"
+            ],
+            "ask": "как те же команды отладки работают в Compose"
+          }
+        ],
+        "mustConcepts": [
+          "/var/log",
+          "файл",
+          "stdout",
+          "12-factor",
+          "-t",
+          "TTY",
+          "docker stop",
+          "SIGTERM",
+          "143",
+          "truncated",
+          "userland proxy",
+          "port already in use",
+          "lsof",
+          "docker compose",
+          "compose logs",
+          "compose exec",
+          "volume",
+          "mount"
+        ],
+        "falseClaims": [
+          "docker-proxy ошибка порта — это баг приложения в контейнере",
+          "cat /var/log/myapp.log заменяет docker logs для 12-factor app",
+          "exec sh без -t всегда работает нормально",
+          "docker compose требует другой набор команд без logs/exec"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Сначала docker ps -a — вижу Exited (137). docker logs --tail 100 — ECONNREFUSED к db. docker inspect — OOMKilled false, exit 137. Логи db показывают shutdown — api убили каскадом. Фикс: depends_on с healthcheck в compose.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Чеклист: ps → logs → inspect → exec если живой → run --entrypoint sh если падает мгновенно. Exit 139 — segfault, не OOM. Для distroless беру :debug tag с busybox.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну смотрю logs -f, потом inspect exit code, если running — exec -it sh, env grep DATABASE, wget до соседа. logs пустой — значит пишут в файл, надо stdout",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "При любой проблеме делаю docker restart и rebuild --no-cache. Логи смотрю только cat /var/log внутри контейнера.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Exit 137 — это всегда баг в коде приложения, inspect не нужен. exec работает на stopped container.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Port already in use в docker-proxy — значит nginx в контейнере слушает не тот порт. docker logs после rm сохраняются автоматически.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "debug_flowchart",
+      "exampleType": "good",
+      "exampleText": "Порядок: ps -a → logs → inspect → exec или run --entrypoint sh → dive/tcpdump если застрял.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "debug_flowchart",
+      "exampleType": "good",
+      "exampleText": "сначала статус и exit code, потом что написал в stdout, потом уже лезу внутрь",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "debug_flowchart",
+      "exampleType": "bad",
+      "exampleText": "Сразу docker run --entrypoint sh, ps и logs не нужны.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "docker_logs",
+      "exampleType": "good",
+      "exampleText": "docker logs -f --tail 50 -t api; logs = stdout/stderr PID 1. Если пусто — app пишет в файл, переконфиг под 12-factor.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "docker_logs",
+      "exampleType": "good",
+      "exampleText": "tail 200 и --since 10m для инцидента, сохраняю docker logs api > backup.log перед rm",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "docker_logs",
+      "exampleType": "bad",
+      "exampleText": "docker logs читает /var/log/myapp.log автоматически, stdout не важен.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "docker_inspect",
+      "exampleType": "good",
+      "exampleText": "inspect --format Status, ExitCode, OOMKilled, Error; unhealthy — json .State.Health последние 5 попыток.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "docker_inspect",
+      "exampleType": "good",
+      "exampleText": "смотрю mounts и network IP — locally works, в CI другой env или volume path",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "docker_inspect",
+      "exampleType": "bad",
+      "exampleText": "inspect только для имени image, exit code смотрю в docker ps без -a.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "exec_entrypoint",
+      "exampleType": "good",
+      "exampleText": "Running: docker exec -it api sh, env, ps aux. Crash-fast: docker run -it --rm --entrypoint sh myimg — проверяю which myapp и segfault вручную.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "exec_entrypoint",
+      "exampleType": "good",
+      "exampleText": "distroless — gcr.io/.../base:debug с busybox/sh, для strace --cap-add SYS_PTRACE",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "exec_entrypoint",
+      "exampleType": "bad",
+      "exampleText": "exec -it на exited контейнере, entrypoint override невозможен при docker run.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "exit_codes",
+      "exampleType": "good",
+      "exampleText": "137 — SIGKILL/OOM, 143 — SIGTERM от stop, 139 — segfault, 125 — daemon/config до старта, 126/127 — binary permissions или not found.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "exit_codes",
+      "exampleType": "good",
+      "exampleText": "exit 125 — смотрю journalctl docker, часто bad mount или port bind",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "exit_codes",
+      "exampleType": "bad",
+      "exampleText": "126 и 127 — оба значат command not found, 137 всегда app bug.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Не путаю userland proxy port conflict с app — lsof на host. exec всегда -it. docker stop может обрезать logs — trap SIGTERM или больше --time.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "в compose те же команды: compose logs api, compose exec api sh, compose run --rm api sh",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Логи только из writable layer файлов, compose требует kubectl debug.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "debug-docker-container",
+    "apiUrl": "https://api.itlead.org/api/questions/debug-docker-container",
+    "pageUrl": "https://itlead.org/interview-questions/docker/debug-docker-container",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to debug problems in a Docker container?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

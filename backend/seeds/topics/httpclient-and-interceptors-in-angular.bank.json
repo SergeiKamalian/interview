@@ -1,0 +1,528 @@
+{
+  "topic": {
+    "code": "httpclient_interceptors_angular",
+    "name": "HttpClient и interceptors в Angular",
+    "skillCode": "angular",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работают HttpClient и interceptors в Angular?",
+    "shortAnswer": "HttpClient — типизированный HTTP-сервис Angular, каждый запрос возвращает RxJS Observable с автоматической JSON-сериализацией. Interceptors — middleware, которые глобально трансформируют запросы и ответы: auth-токены, логирование, обработка ошибок — без дублирования в каждом сервисе.",
+    "idealAnswer": "HttpClient — типизированный HTTP API Angular на RxJS Observables: .get(), .post(), .put() возвращают Observable; JSON сериализуется/десериализуется автоматически; дженерики дают типовую безопасность (http.get<User[]>). Interceptors — middleware перед каждым запросом и после каждого ответа для cross-cutting concerns: auth JWT, глобальные 401/403, логирование, кэш GET, retry. HttpClient делает конкретный вызов; interceptor модифицирует все вызовы глобально. При http.get() Angular создаёт HttpRequest и проходит цепочку interceptors в порядке регистрации; каждый может clone() и вызвать next(cloned); последний отправляет в сеть; ответ идёт обратно по той же цепочке в reverse order. Interceptor может не вызвать next() — short-circuit (кэш возвращает of(HttpResponse) без сети). HttpRequest immutable — изменения только через req.clone({ setHeaders, setParams }). Modern Angular (v15+): функциональные HttpInterceptorFn + provideHttpClient(withInterceptors([auth, logging, error])). Class-based HttpInterceptor + HTTP_INTERCEPTORS multi: true работает, но не рекомендуется; регистрация в lazy module может дублировать interceptor на каждый запрос. Типичные ошибки: не return next(cloned) — запрос не уходит; req.headers.set() без clone — no-op; catchError(() => of(null)) без throwError — компонент не видит ошибку; retry(3) на 401 без refresh — бесконечный цикл; дублирование class interceptor в SharedModule. Правильно: return next(cloned); catchError с redirect на login и throwError(() => error); retry с count/delay и исключением auth-ошибок; auth и error interceptors раздельно. Observable vs Promise: unsubscribe отменяет in-flight запрос; операторы retry, debounceTime, shareReplay. Пропуск interceptor: кастомный заголовок X-Skip-Auth и проверка в interceptor. Модификация body ответа: map после next(), event instanceof HttpResponse, event.clone({ body }). Реальные кейсы: NgRx loading/success/error actions; Firebase ID token refresh; base URL /v2 prefix; Sentry HTTP errors; snake_case → camelCase нормализация.",
+    "maxScore": 10,
+    "skills": [
+      "angular",
+      "typescript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "httpclient_basics",
+      "title": "Понимает HttpClient и Observable",
+      "expected": "Кандидат объясняет: HttpClient — typed API на RxJS Observables; .get/.post возвращают Observable; автоматическая JSON serialization; дженерики для типа ответа; unsubscribe отменяет запрос.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — HttpClient как Observable API из ITLead TL;DR",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Observable",
+              "Promise",
+              "отмен",
+              "unsubscribe"
+            ],
+            "ask": "почему HttpClient возвращает Observable, а не Promise"
+          }
+        ],
+        "mustConcepts": [
+          "HttpClient",
+          "Observable",
+          "RxJS",
+          "get",
+          "post",
+          "put",
+          "JSON",
+          "сериализ",
+          "десериализ",
+          "дженерик",
+          "типиз",
+          "User[]",
+          "unsubscribe",
+          "отмен",
+          "in-flight",
+          "inject(HttpClient)"
+        ],
+        "falseClaims": [
+          "HttpClient возвращает Promise по умолчанию",
+          "JSON нужно парсить вручную после каждого get",
+          "unsubscribe не отменяет HTTP-запрос",
+          "HttpClient работает без RxJS"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "interceptor_role",
+      "title": "Отличает HttpClient от interceptor",
+      "expected": "Кандидат сравнивает: HttpClient — один конкретный вызов в сервисе; interceptor — глобальная трансформация всех запросов/ответов; auth, logging, errors, caching, retry без повторения в сервисах.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевое различие request maker vs global middleware",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "interceptor",
+              "middleware",
+              "глобал",
+              "auth"
+            ],
+            "ask": "когда interceptor, когда достаточно HttpClient в сервисе"
+          }
+        ],
+        "mustConcepts": [
+          "interceptor",
+          "перехват",
+          "middleware",
+          "HttpClient",
+          "глобал",
+          "cross-cutting",
+          "auth",
+          "токен",
+          "JWT",
+          "логирован",
+          "ошибк",
+          "401",
+          "кэш",
+          "retry",
+          "сервис",
+          "один запрос",
+          "все запросы"
+        ],
+        "falseClaims": [
+          "interceptor заменяет HttpClient и делает вызовы сам",
+          "auth-токен нужно добавлять в каждый метод сервиса, interceptor не нужен",
+          "interceptor работает только на POST",
+          "HttpClient и interceptor — одно и то же"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "interceptor_chain",
+      "title": "Знает цепочку interceptors",
+      "expected": "Кандидат описывает: регистрация в порядке; каждый вызывает next(cloned); последний шлёт в сеть; ответ обратно в reverse order; без next() — short-circuit (кэш).",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "механизм chain из ITLead — частая middle-ошибка",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "next",
+              "цепочк",
+              "chain",
+              "порядок"
+            ],
+            "ask": "как запрос проходит через несколько interceptors и как возвращается ответ"
+          },
+          {
+            "match": [
+              "short-circuit",
+              "кэш",
+              "без next",
+              "of(HttpResponse)"
+            ],
+            "ask": "как cache interceptor возвращает данные без сетевого запроса"
+          }
+        ],
+        "mustConcepts": [
+          "цепочк",
+          "chain",
+          "next",
+          "next(",
+          "порядок регистрац",
+          "registration order",
+          "reverse",
+          "обратн",
+          "short-circuit",
+          "кэш",
+          "cache",
+          "HttpResponse",
+          "of(",
+          "не вызывает next",
+          "сеть",
+          "network",
+          "последний handler"
+        ],
+        "falseClaims": [
+          "ответ проходит interceptors в том же порядке что запрос",
+          "interceptor не может остановить chain без next()",
+          "все interceptors всегда шлют запрос в сеть",
+          "порядок регистрации interceptors не важен"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "immutable_clone",
+      "title": "Знает immutable HttpRequest и clone()",
+      "expected": "Кандидат объясняет: HttpRequest immutable; req.headers.set() без clone — no-op; правильно req.clone({ setHeaders, setParams }).",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый механизм из ITLead Common mistakes",
+        "mustConcepts": [
+          "immutable",
+          "неизменя",
+          "HttpRequest",
+          "clone",
+          "clone(",
+          "setHeaders",
+          "setParams",
+          "Authorization",
+          "Bearer",
+          "headers.set",
+          "no-op",
+          "новый запрос",
+          "копия"
+        ],
+        "falseClaims": [
+          "HttpRequest можно мутировать через headers.set",
+          "clone() необязателен для добавления заголовка",
+          "next(req) с мутированным req применит изменения",
+          "setHeaders работает без clone на оригинальном req"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "functional_interceptors",
+      "title": "Знает функциональные interceptors",
+      "expected": "Кандидат упоминает HttpInterceptorFn, provideHttpClient, withInterceptors; регистрация один раз в bootstrapApplication; class-based HTTP_INTERCEPTORS — legacy.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "modern Angular v15+ pattern из ITLead",
+        "mustConcepts": [
+          "HttpInterceptorFn",
+          "functional",
+          "функциональн",
+          "provideHttpClient",
+          "withInterceptors",
+          "bootstrapApplication",
+          "main.ts",
+          "inject",
+          "HTTP_INTERCEPTORS",
+          "useClass",
+          "multi",
+          "class-based",
+          "legacy",
+          "Angular 15",
+          "v15"
+        ],
+        "falseClaims": [
+          "class-based interceptors — единственный способ в modern Angular",
+          "withInterceptors регистрируется в каждом lazy module",
+          "HttpInterceptorFn не поддерживает inject()",
+          "provideHttpClient не нужен для interceptors"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки interceptors",
+      "expected": "Кандидат называет: не return next(); мутирование без clone; catchError без throwError; дублирование в SharedModule; retry на 401 без refresh.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production pitfalls",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "return next",
+              "не return",
+              "забыл return"
+            ],
+            "ask": "что происходит если interceptor клонирует запрос но не return next(cloned)"
+          },
+          {
+            "match": [
+              "catchError",
+              "of(null)",
+              "throwError",
+              "проглот"
+            ],
+            "ask": "почему catchError(() => of(null)) без re-throw — плохая идея"
+          },
+          {
+            "match": [
+              "retry",
+              "401",
+              "refresh",
+              "зацикл"
+            ],
+            "ask": "почему retry(3) на 401 без refresh токена опасен"
+          }
+        ],
+        "mustConcepts": [
+          "return next",
+          "забыл return",
+          "не forward",
+          "headers.set",
+          "без clone",
+          "catchError",
+          "of(null)",
+          "throwError",
+          "проглот",
+          "re-throw",
+          "SharedModule",
+          "дублир",
+          "multi",
+          "retry",
+          "401",
+          "refresh",
+          "зацикл",
+          "infinite"
+        ],
+        "falseClaims": [
+          "без return next() запрос всё равно отправится",
+          "catchError(() => of(null)) — нормальный глобальный error handler",
+          "retry на 401 безусловно безопасен",
+          "interceptor в SharedModule всегда регистрируется один раз"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда использовать interceptors",
+      "expected": "Кандидат называет: auth JWT, error 401 redirect, logging timing, GET cache TTL, retry с delay; auth и error interceptors раздельно; skip через X-Skip-Auth header.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use таблица и real-world из ITLead",
+        "mustConcepts": [
+          "auth",
+          "JWT",
+          "Bearer",
+          "error",
+          "401",
+          "redirect",
+          "login",
+          "логирован",
+          "timing",
+          "кэш",
+          "GET",
+          "TTL",
+          "retry",
+          "delay",
+          "NgRx",
+          "Firebase",
+          "base URL",
+          "Sentry",
+          "snake_case",
+          "camelCase",
+          "X-Skip-Auth",
+          "пропуск",
+          "раздельно"
+        ],
+        "falseClaims": [
+          "один interceptor должен делать auth, cache и logging вместе",
+          "interceptors только для auth, остальное в сервисах",
+          "нельзя пропустить interceptor для конкретного запроса",
+          "кэш interceptor должен вызывать next() даже при hit"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "HttpClient.get<User[]> возвращает Observable — unsubscribe отменяет запрос. Auth interceptor через clone setHeaders Bearer и return next(cloned). Error interceptor последний в chain — catchError 401 → login и throwError. Cache GET без next() — of(HttpResponse) из TTL Map.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "provideHttpClient(withInterceptors([auth, logging, error])) один раз в main.ts. Сервис только http.get — токен не дублирую. HttpRequest immutable — только clone. 401: refreshToken switchMap и один retry, не blind retry(3).",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "запрос: auth → logging → error → сеть. ответ обратно error → logging → auth. login url skip auth. map на HttpResponse для snake→camel в response interceptor.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "HttpClient возвращает Promise, interceptor заменяет HttpClient. req.headers.set Authorization без clone — заголовок добавится. catchError of null — компонент узнает об ошибке.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "interceptor клонирует запрос но не return next — Angular сам отправит оригинал. retry(3) на 401 без refresh — ок. SharedModule HTTP_INTERCEPTORS в каждом feature — один раз на запрос.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "ответ проходит interceptors в том же порядке что запрос. кэш interceptor всегда вызывает next даже при hit. withInterceptors в lazy module — modern best practice.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "httpclient_basics",
+      "exampleType": "good",
+      "exampleText": "this.http.get<User[]>('/api/users') — Observable, JSON auto, generic тип ответа.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "httpclient_basics",
+      "exampleType": "good",
+      "exampleText": "unsubscribe отменяет in-flight — Promise так не может, плюс retry debounceTime в pipe",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "httpclient_basics",
+      "exampleType": "bad",
+      "exampleText": "HttpClient.get возвращает Promise, JSON.parse вручную после каждого запроса.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "interceptor_role",
+      "exampleType": "good",
+      "exampleText": "HttpClient — конкретный API call в UserService; auth interceptor — Bearer на все запросы без копипасты в сервисах.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "interceptor_role",
+      "exampleType": "good",
+      "exampleText": "error interceptor глобально 403→forbidden page, logging — timing всех HTTP",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "interceptor_role",
+      "exampleType": "bad",
+      "exampleText": "JWT в каждый метод сервиса — interceptor не нужен для cross-cutting.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "interceptor_chain",
+      "exampleType": "good",
+      "exampleText": "auth first, error last — запрос вперёд по порядку, ответ назад reverse. cache hit: return of(HttpResponse) без next.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "interceptor_chain",
+      "exampleType": "good",
+      "exampleText": "без return next(cloned) chain останавливается, запрос не уходит в сеть",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "interceptor_chain",
+      "exampleType": "bad",
+      "exampleText": "ответ идёт auth → logging → error в том же порядке что запрос.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "immutable_clone",
+      "exampleType": "good",
+      "exampleText": "const cloned = req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }); return next(cloned);",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "immutable_clone",
+      "exampleType": "good",
+      "exampleText": "req.headers.set без clone — no-op, immutable HttpRequest",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "immutable_clone",
+      "exampleType": "bad",
+      "exampleText": "req.headers.set('Authorization', token) и next(req) — заголовок применится.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "functional_interceptors",
+      "exampleType": "good",
+      "exampleText": "export const authInterceptor: HttpInterceptorFn = (req, next) => { ... }; provideHttpClient(withInterceptors([authInterceptor]))",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "functional_interceptors",
+      "exampleType": "good",
+      "exampleText": "inject(AuthService) внутри HttpInterceptorFn — ok в bootstrap context",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "functional_interceptors",
+      "exampleType": "bad",
+      "exampleText": "HTTP_INTERCEPTORS useClass в SharedModule — recommended modern pattern.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "catchError: if 401 navigate login; return throwError(() => error) — компонент видит fail.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "401: refreshToken pipe switchMap retried clone, не retry(3) blind",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "catchError(() => of(null)) — глобальный handler, компонент получит null как успех.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "auth interceptor + error interceptor раздельно — легче тестить. GET cache 5min TTL. X-Skip-Auth для /auth/login.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "NgRx: interceptor dispatch loading/success/error. base URL /v2 в interceptor, не в каждом сервисе",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "один mega-interceptor auth+cache+logging+retry — best practice.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "httpclient-and-interceptors-in-angular",
+    "apiUrl": "https://api.itlead.org/api/questions/httpclient-and-interceptors-in-angular",
+    "pageUrl": "https://itlead.org/interview-questions/angular/httpclient-and-interceptors-in-angular",
+    "difficulty": "MIDDLE",
+    "titleEn": "HttpClient and interceptors in Angular",
+    "categorySlug": "angular",
+    "syncedAt": "2026-06-18T21:00:00.000Z"
+  }
+}

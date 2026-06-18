@@ -54,11 +54,31 @@ pnpm seed:topic -- --all
 
 Legacy темы (Fiber, lazy) пока в `.seed.sql` — в manifest помечены `legacy-sql`.
 
+## React Fiber — не перегенерировать с нуля
+
+Slug `react-fiber-and-virtual-dom-update-process` → `legacy-sql`, **не** создавать новый `*.bank.json` с нуля.
+
+**Эталон качества для senior React** (hints + examples):
+
+| Файл | Что брать |
+|------|-----------|
+| `backend/seeds/question-bank.seed.sql` | checkpoints, `idealAnswer`, базовые examples |
+| `backend/seeds/fiber-evaluation-hints.seed.sql` | `evaluation_hints`: `mustConcepts`, `falseClaims`, `probeConceptGroups`, `impliesCheckpointFloors`, `confusionPairs`, `requiredConceptGroups`, per-checkpoint **good/bad examples** |
+
+При миграции Fiber в JSON или при генерации **похожих senior-тем** (reconciliation, render/commit, concurrent):
+
+1. Прочитай оба SQL-файла целиком — там уже откалиброванные кейсы.
+2. Переноси hints и examples **оттуда**, не придумывай заново с ITLead markdown.
+3. Checkpoint keys сохраняй как в seed: `fiber_definition`, `stack_vs_fiber`, `fiber_pointers`, `render_phase`, …
+4. Целевой файл (когда дойдём до миграции): `topics/react-fiber.bank.json` → `pnpm seed:topic -- react_fiber`.
+
+Design doc: [docs/question-bank/topics/react-fiber.md](../../docs/question-bank/topics/react-fiber.md).
+
 ## Образец
 
 См. `react-hydration-ssr.bank.json` — **senior**-тема с hints, probe groups и per-checkpoint examples.
 
-Для **senior** тем уровня Fiber расширяй:
+Для **senior** React-тем уровня Fiber — сначала сверься с `fiber-evaluation-hints.seed.sql` (см. выше), затем расширяй:
 
 - `probeConceptGroups`, `impliesCheckpointFloors`
 - больше `examples` с `checkpointKey` (good formal + good casual + bad)

@@ -1,0 +1,511 @@
+{
+  "topic": {
+    "code": "expressjs_request_validation",
+    "name": "Валидация запросов в Express.js",
+    "skillCode": "expressjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как валидировать данные запроса в Express.js?",
+    "shortAnswer": "Валидация в Express.js — проверка req.body, req.params и req.query по схеме до любой бизнес-логики. Для TypeScript — Zod (infer типов), для plain JS — Joi; для быстрых проверок params/query — express-validator. Схема оборачивается в middleware и ставится перед handler: при ошибке — 400 с деталями по полям, при успехе — next().",
+    "idealAnswer": "Никогда не доверяйте клиентскому вводу — валидация и санитизация body, params и query до любой бизнес-логики. Подход: определить схему (Zod, Joi или express-validator), обернуть в middleware validate(schema) и подключить к маршруту до handler. Schema-based валидация лучше ручных if-checks: правила в одном объекте, автоматическое coercion типов, структурированные ошибки по полям. Zod в TypeScript выводит типы через z.infer — req.body типизирован без отдельных интерфейсов. Выбор библиотеки: Zod — новые TS-проекты; Joi — plain JS, legacy; express-validator — минимальная настройка для params/query; class-validator — NestJS с декораторами на DTO. Middleware pattern: const validate = (schema) => (req, res, next) => { const result = schema.safeParse(req.body); if (!result.success) return res.status(400).json({ errors: result.error.errors }); req.body = result.data; next(); }. parse() бросает ZodError — для try/catch; safeParse() возвращает { success, data, error } и не бросает — удобнее в middleware. Порядок stack: express.json({ limit: '10kb' }) парсит raw body в req.body → validation middleware → auth → business handler. Валидация ДО async операций (DB, внешние API) — иначе дорогие вызовы на невалидный input. req.query значения всегда строки: ?page=2 даёт \"2\", нужен .transform(Number) или z.coerce.number(). Одна схема может покрывать body и query: safeParse({ body: req.body, query: req.query }). Вложенные структуры: z.array(z.object({...})).min(1).transform() обогащает данные после проверки. Типичные ошибки: валидация внутри handler после await db.connect(); без express.json() req.body undefined; .optional() на обязательных полях; query как z.string() без transform чисел. Zod 3.22+ удаляет __proto__ — защита от prototype pollution; .strict() отклоняет неизвестные поля. Файлы: Multer парсит multipart, затем Zod на req.body и req.file.mimetype.",
+    "maxScore": 10,
+    "skills": ["expressjs", "javascript", "nodejs"]
+  },
+  "checkpoints": [
+    {
+      "key": "validation_principles",
+      "title": "Понимает принципы валидации",
+      "expected": "Кандидат: не доверять клиенту; проверять body, params и query; схема в middleware до handler; при ошибке — 400 с деталями по полям, не generic bad request.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — trust boundary и schema middleware",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "validation_principles",
+            "oftenConfusedWith": ["validation_middleware"],
+            "anchorTermsExpected": [
+              "не доверя",
+              "клиент",
+              "req.body",
+              "req.params",
+              "req.query",
+              "схема",
+              "middleware",
+              "до handler"
+            ],
+            "anchorTermsWrongTopic": [
+              "Express сам валидирует JSON",
+              "валидация после DB нормально"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["не доверя", "клиент", "body", "params", "query"],
+            "ask": "что именно валидировать и почему не доверять только frontend"
+          }
+        ],
+        "mustConcepts": [
+          "не доверя",
+          "клиент",
+          "ввод",
+          "req.body",
+          "req.params",
+          "req.query",
+          "схема",
+          "middleware",
+          "до handler",
+          "до бизнес-логик",
+          "400",
+          "поле",
+          "field-level",
+          "sanitiz",
+          "санитизац",
+          "security",
+          "безопасност"
+        ],
+        "falseClaims": [
+          "Express автоматически валидирует body по схеме",
+          "frontend validation достаточно для API",
+          "валидация только body — params и query безопасны",
+          "generic 400 без деталей — best practice для API"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "schema_vs_manual",
+      "title": "Отличает schema-based от ручной валидации",
+      "expected": "Кандидат: схема централизует правила, coercion типов, структурированные ошибки; ручные if ломаются при росте полей и edge cases.",
+      "score": 1.0,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "schema-based vs manual — базовый trade-off ITLead",
+        "mustConcepts": [
+          "схема",
+          "schema",
+          "ручн",
+          "if",
+          "централиз",
+          "coercion",
+          "приведен",
+          "тип",
+          "structured",
+          "структурирован",
+          "ошибк",
+          "поле",
+          "дублир",
+          "edge case",
+          "prototype pollution"
+        ],
+        "falseClaims": [
+          "ручные if-checks лучше схемы в production API",
+          "схемы не дают coercion типов",
+          "для двух полей схема не нужна никогда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "library_choice",
+      "title": "Выбирает Zod, Joi или express-validator",
+      "expected": "Кандидат: Zod — TypeScript и infer типов; Joi — plain JS, legacy; express-validator — быстрые params/query; class-validator — NestJS DTO.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "comparison table ITLead — когда какую библиотеку",
+        "probeConceptGroups": [
+          {
+            "match": ["Zod", "Joi", "express-validator"],
+            "ask": "когда Zod vs Joi vs express-validator в Express API"
+          }
+        ],
+        "mustConcepts": [
+          "Zod",
+          "Joi",
+          "express-validator",
+          "class-validator",
+          "TypeScript",
+          "infer",
+          "plain JS",
+          "legacy",
+          "NestJS",
+          "DTO",
+          "декоратор",
+          "params",
+          "query",
+          "минимальн",
+          "throughput"
+        ],
+        "falseClaims": [
+          "Zod работает только на frontend",
+          "Joi только для MongoDB",
+          "express-validator заменяет полную схему для сложного body"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "validation_middleware",
+      "title": "Создаёт validation middleware",
+      "expected": "Кандидат: factory validate(schema); safeParse или parse в try/catch; 400 + errors; req.body = result.data; next() при успехе; handler не выполняется при fail.",
+      "score": 2.0,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Quick example — reusable middleware pattern",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "validation_principles",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "validation_middleware",
+            "oftenConfusedWith": ["parse_vs_safeparse"],
+            "anchorTermsExpected": [
+              "validate",
+              "middleware",
+              "safeParse",
+              "400",
+              "next()",
+              "req.body"
+            ],
+            "anchorTermsWrongTopic": [
+              "валидация inline в handler",
+              "handler выполняется при ошибке схемы"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["validate", "middleware", "safeParse"],
+            "ask": "как validation middleware встраивается в chain и что делает при ошибке"
+          }
+        ],
+        "mustConcepts": [
+          "middleware",
+          "validate",
+          "factory",
+          "safeParse",
+          "parse",
+          "ZodError",
+          "400",
+          "errors",
+          "next()",
+          "req.body",
+          "result.data",
+          "coerced",
+          "приведен",
+          "handler",
+          "не выполня",
+          "return res"
+        ],
+        "falseClaims": [
+          "validation только inline в каждом handler",
+          "next() не нужен после успешной валидации",
+          "safeParse бросает exception при ошибке",
+          "parse() никогда не бросает — только safeParse"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "stack_order",
+      "title": "Соблюдает порядок middleware stack",
+      "expected": "Кандидат: express.json с limit до routes; validation до async DB и handler; без json() req.body undefined.",
+      "score": 2.0,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "common mistakes — validate after async, forget express.json",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "validation_middleware",
+            "floorFraction": 0.4
+          }
+        ],
+        "mustConcepts": [
+          "express.json",
+          "limit",
+          "парсер",
+          "body parser",
+          "порядок",
+          "stack",
+          "до DB",
+          "async",
+          "await",
+          "expensive",
+          "undefined",
+          "req.body",
+          "auth",
+          "handler",
+          "IncomingMessage"
+        ],
+        "falseClaims": [
+          "можно await db.connect() перед validation",
+          "express.json не нужен если body приходит как JSON",
+          "порядок validation и auth всегда неважен"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "body_params_query",
+      "title": "Валидирует body, params и query",
+      "expected": "Кандидат: одна схема на body+query или отдельные; query всегда строки — transform/coerce для чисел; field path body.password в ошибках.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Intermediate signup example — body и query вместе",
+        "mustConcepts": [
+          "body",
+          "params",
+          "query",
+          "строка",
+          "string",
+          "transform",
+          "coerce",
+          "Number",
+          "page",
+          "referral",
+          "optional",
+          "path",
+          "field",
+          "signup",
+          "password",
+          "email"
+        ],
+        "falseClaims": [
+          "query params автоматически числа без transform",
+          "достаточно валидировать только body",
+          "params :id Express сам проверяет как UUID"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки валидации",
+      "expected": "Кандидат: validate после async; без express.json(); .optional() на required; query без transform; Zod strip __proto__ / .strict().",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Common mistakes ITLead — бонусный антипаттерн checkpoint",
+        "mustConcepts": [
+          "после async",
+          "после DB",
+          "express.json",
+          "optional",
+          "обязательн",
+          "min(1)",
+          "transform",
+          "query",
+          "число",
+          "__proto__",
+          "prototype pollution",
+          "strict",
+          "strip",
+          "неизвестн пол"
+        ],
+        "falseClaims": [
+          "manual if email.includes('@') достаточно для production",
+          ".optional() подходит для обязательного name",
+          "валидация после DB экономит ресурсы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "const validate = schema => (req, res, next) => { const r = schema.safeParse(req.body); if (!r.success) return res.status(400).json({ errors: r.error.errors }); req.body = r.data; next(); }. Zod для TS с infer типов, Joi для plain Node. Middleware на маршруте до handler — bad input не доходит к DB.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Stack: app.use(express.json({ limit: '10kb' })) → validate(createUserSchema) → handler. Одна Zod-схема на body и query: safeParse({ body: req.body, query: req.query }). Для ?page=2 — z.string().transform(Number) или z.coerce.number().",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Ну валидация как вышибала на входе: схема в middleware, не доверяю клиенту. safeParse не кидает — 400 с ошибками по полям. Вложенный order: z.array(z.object({ productId, quantity })).transform добавляет totalItems.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Сначала await db.connect(), потом schema.parse(req.body) — validation после expensive ops. Frontend уже проверил email, backend validation не нужен.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Express.json сам валидирует JSON schema и типы полей. query ?page=2 уже number в req.query без transform.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "name: z.string().optional() для обязательного поля — пустая строка и null проходят, это нормально. Валидацию пишу inline в каждом handler без middleware.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "validation_principles",
+      "exampleType": "good",
+      "exampleText": "Не доверяю клиенту — body, params, query проверяю по схеме до любой бизнес-логики, 400 с деталями по полям.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "validation_principles",
+      "exampleType": "good",
+      "exampleText": "ну как вышибала: схема в middleware, невалидный запрос не доходит к handler",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "validation_principles",
+      "exampleType": "bad",
+      "exampleText": "Express автоматически валидирует req.body после express.json().",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "schema_vs_manual",
+      "exampleType": "good",
+      "exampleText": "Схема централизует правила, coercion типов и structured errors — ручные if дублируются и пропускают edge cases.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "schema_vs_manual",
+      "exampleType": "good",
+      "exampleText": "Zod infer типы из схемы — не нужен отдельный interface для req.body.",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "schema_vs_manual",
+      "exampleType": "bad",
+      "exampleText": "Для production API ручные if-checks надёжнее schema libraries.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "library_choice",
+      "exampleType": "good",
+      "exampleText": "TypeScript проект — Zod с infer; legacy plain JS — Joi; быстрая проверка :id в params — express-validator.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "library_choice",
+      "exampleType": "good",
+      "exampleText": "NestJS — class-validator на DTO; Strapi plugins — Joi; Next API routes — Zod в шаблонах Vercel.",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "library_choice",
+      "exampleType": "bad",
+      "exampleText": "Zod только для React frontend, на Express backend только Joi или manual if.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "validation_middleware",
+      "exampleType": "good",
+      "exampleText": "validate(schema) factory — reusable: app.post('/users', validate(userSchema), createUser). При fail handler не выполняется.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "validation_middleware",
+      "exampleType": "good",
+      "exampleText": "req.body = result.data — handler получает coerced validated data, не сырой input.",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "validation_middleware",
+      "exampleType": "bad",
+      "exampleText": "safeParse бросает ZodError — нужен только parse в middleware.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "stack_order",
+      "exampleType": "good",
+      "exampleText": "express.json({ limit: '10kb' }) перед routes → validate → auth → handler. Bad input rejected до await db.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "stack_order",
+      "exampleType": "good",
+      "exampleText": "Без express.json req.body undefined — schema.parse(undefined) даёт запутанную ошибку вместо чистого 400.",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "stack_order",
+      "exampleType": "bad",
+      "exampleText": "await db.connect() перед validation — нормально, DB pool уже готов для любого запроса.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "body_params_query",
+      "exampleType": "good",
+      "exampleText": "Signup: body schema email/password + query referral optional. Ошибки с path body.password — клиент понимает что сломано.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "body_params_query",
+      "exampleType": "good",
+      "exampleText": "?page=abc проходит z.string() но ломает логику — transform(Number).refine(n => n > 0).",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "body_params_query",
+      "exampleType": "bad",
+      "exampleText": "req.query.page уже number 2 без coerce — Express парсит query как typed numbers.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "name: z.string().min(1) вместо optional — пустые строки не проходят. Zod 3.22 strip __proto__ — prototype pollution.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Валидация внутри handler после await — антипаттерн; DB constraint error далеко от реального бага.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": ".optional() на required name — DB сама отловит constraint, валидация не нужна.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "expressjs-request-validation",
+    "apiUrl": "https://api.itlead.org/api/questions/expressjs-request-validation",
+    "pageUrl": "https://itlead.org/interview-questions/expressjs/expressjs-request-validation",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to validate request data in Express.js?",
+    "categorySlug": "expressjs",
+    "syncedAt": "2026-06-18T16:30:00.000Z"
+  }
+}

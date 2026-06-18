@@ -1,0 +1,147 @@
+{
+  "topic": {
+    "code": "where_docker_volumes_stored",
+    "name": "Где хранятся Docker volumes",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Где на хосте хранятся Docker volumes?",
+    "shortAnswer": "На Linux: `/var/lib/docker/volumes/<name>/_data/`. На macOS/Windows тот же путь внутри Linux VM Docker Desktop — с хоста напрямую не виден. Точный путь: `docker volume inspect --format '{{.Mountpoint}}'`. Менять через `data-root` в daemon.json. Не редактировать файлы напрямую при running container.",
+    "idealAnswer": "Named Docker volumes хранятся под data-root Docker (default `/var/lib/docker/volumes/<name>/_data/`). Linux: root-owned, sudo ls. Mac/Win: path внутри Docker Desktop VM (Docker.raw / WSL ext4.vhdx), не в Finder/Explorer. `docker volume inspect` → Mountpoint — источник правды на всех OS. Анатомия: metadata.db + `<name>/_data/` actual data; anonymous volumes — UUID имена. data-root в /etc/docker/daemon.json переносит images/containers/volumes. Volume vs bind: volumes Docker-managed; bind — ваш host path. Ошибки: vi файлов volume при running Postgres; ls /var/lib/docker на Mac host; rm -rf volume dir вместо docker volume rm; backup копией live files без quiesce. Backup pattern: docker run --rm -v vol:/data tar czf. Migration: tar на old host, restore на new. DB — pg_dump предпочтительнее file copy.",
+    "maxScore": 10,
+    "skills": ["docker"]
+  },
+  "checkpoints": [
+    {
+      "key": "linux_path",
+      "title": "Знает путь на Linux",
+      "expected": "Кандидат: /var/lib/docker/volumes/<name>/_data; root-owned; sudo для просмотра.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR Linux path",
+        "mustConcepts": ["/var/lib/docker", "volumes", "_data", "Mountpoint", "Linux", "root-owned", "sudo", "data-root"],
+        "falseClaims": ["volumes хранятся в writable layer контейнера", "путь volumes одинаково виден на Mac host как на Linux", "volume data в image layers"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "mac_windows_vm",
+      "title": "Понимает Mac/Windows VM",
+      "expected": "Кандидат: Docker Desktop Linux VM; path внутри VM; читать через temp container; Docker.raw.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Mac/Windows hide path — частая путаница",
+        "probeConceptGroups": [{ "match": ["Docker Desktop", "VM", "Mac"], "ask": "почему ls /var/lib/docker на Mac host не работает" }],
+        "mustConcepts": ["Docker Desktop", "Linux VM", "Docker.raw", "WSL", "ext4.vhdx", "не виден", "Finder", "temp container", "alpine cat"],
+        "falseClaims": ["на Mac volumes лежат в ~/Documents", "Mountpoint на Mac указывает на host path в Finder"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "volume_inspect",
+      "title": "Использует docker volume inspect",
+      "expected": "Кандидат: inspect Mountpoint; driver local; cross-platform read via container mount.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Find specific volume path",
+        "mustConcepts": ["docker volume inspect", "Mountpoint", "--format", "Driver local", "metadata", "CreatedAt", "Scope local"],
+        "falseClaims": ["inspect не показывает Mountpoint", "driver local хранит данные в cloud"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "data_root_config",
+      "title": "Знает data-root и анатомию",
+      "expected": "Кандидат: daemon.json data-root; metadata.db; _data wrapper; anonymous UUID volumes.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Changing storage location + anatomy",
+        "mustConcepts": ["data-root", "daemon.json", "metadata.db", "_data", "anonymous", "UUID", "dangling", "миграц", "systemctl restart docker"],
+        "falseClaims": ["два dockerd могут share один data-root", "data-root меняет только images не volumes"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "backup_restore",
+      "title": "Знает backup и migration",
+      "expected": "Кандидат: tar через container cross-platform; pg_dump для DB; migrate host-to-host.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Real-world backup patterns",
+        "mustConcepts": ["backup", "tar czf", "docker run --rm", "restore", "migration", "pg_dump", "cross-platform", "quiescent"],
+        "falseClaims": ["копировать /var/lib/docker/volumes при running DB безопасно", "backup только через sudo cp на Linux"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат: edit live volume; rm -rf bypass metadata; ls on Mac host; volume vs bind location.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — corruption, wrong path",
+        "mustConcepts": ["редактир", "running container", "rm -rf", "docker volume rm", "bind mount", "corrupt", "postgres.conf", "не напрямую"],
+        "falseClaims": ["можно безопасно sudo vi volume files при running postgres", "rm -rf volume dir эквивалентен docker volume rm"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    { "exampleType": "good", "exampleText": "Linux: /var/lib/docker/volumes/pgdata/_data. Mac — внутри VM, читаю docker run --rm -v pgdata:/data alpine ls. inspect Mountpoint — правда.", "sortOrder": 0 },
+    { "exampleType": "good", "exampleText": "Backup: tar через container. data-root в daemon.json для большого диска. Не редактировать volume при running DB.", "sortOrder": 1 },
+    { "exampleType": "good", "exampleText": "ну на маке путь в vm, с хоста не увидишь. volume inspect всегда первый шаг", "sortOrder": 2 },
+    { "exampleType": "bad", "exampleText": "Volumes в writable layer контейнера. На Mac /var/lib/docker виден в Finder.", "sortOrder": 0 },
+    { "exampleType": "bad", "exampleText": "sudo rm -rf /var/lib/docker/volumes/myvol — правильный способ удалить volume.", "sortOrder": 1 },
+    { "exampleType": "bad", "exampleText": "Два Docker daemon могут использовать один data-root для HA.", "sortOrder": 2 },
+    { "checkpointKey": "linux_path", "exampleType": "good", "exampleText": "/var/lib/docker/volumes/demo/_data, root-owned, sudo cat для проверки на Linux.", "sortOrder": 10 },
+    { "checkpointKey": "linux_path", "exampleType": "good", "exampleText": "du -sh /var/lib/docker/volumes/*/_data — кто ест диск", "sortOrder": 11 },
+    { "checkpointKey": "linux_path", "exampleType": "bad", "exampleText": "Volume data хранится в container upperdir overlay.", "sortOrder": 30 },
+    { "checkpointKey": "mac_windows_vm", "exampleType": "good", "exampleText": "Docker Desktop VM — Mountpoint внутри VM. docker run alpine cat /data/note.txt с любой OS.", "sortOrder": 12 },
+    { "checkpointKey": "mac_windows_vm", "exampleType": "good", "exampleText": "dev workflow — bind mount если нужен edit с host", "sortOrder": 13 },
+    { "checkpointKey": "mac_windows_vm", "exampleType": "bad", "exampleText": "На Windows volumes в C:\\ProgramData\\Docker напрямую как папки проекта.", "sortOrder": 31 },
+    { "checkpointKey": "volume_inspect", "exampleType": "good", "exampleText": "docker volume inspect pgdata --format '{{.Mountpoint}}' — точный путь.", "sortOrder": 14 },
+    { "checkpointKey": "volume_inspect", "exampleType": "good", "exampleText": "Driver local = directory under data-root", "sortOrder": 15 },
+    { "checkpointKey": "volume_inspect", "exampleType": "bad", "exampleText": "inspect показывает только имя, не путь на диске.", "sortOrder": 32 },
+    { "checkpointKey": "data_root_config", "exampleType": "good", "exampleText": "daemon.json data-root /mnt/big-disk/docker — всё images/volumes туда. stop, copy, restart.", "sortOrder": 16 },
+    { "checkpointKey": "data_root_config", "exampleType": "good", "exampleText": "anonymous volume UUID в ls -f dangling=true", "sortOrder": 17 },
+    { "checkpointKey": "data_root_config", "exampleType": "bad", "exampleText": "Смена data-root автоматически копирует данные без миграции.", "sortOrder": 33 },
+    { "checkpointKey": "backup_restore", "exampleType": "good", "exampleText": "docker run --rm -v pgdata:/data -v $PWD:/backup alpine tar czf /backup/pgdata.tar.gz -C /data .", "sortOrder": 18 },
+    { "checkpointKey": "backup_restore", "exampleType": "good", "exampleText": "Postgres — pg_dump, file copy риск corruption live", "sortOrder": 19 },
+    { "checkpointKey": "backup_restore", "exampleType": "bad", "exampleText": "Backup volume — только sudo cp на Linux, container tar не нужен.", "sortOrder": 34 },
+    { "checkpointKey": "common_mistakes", "exampleType": "good", "exampleText": "Не vi postgresql.conf в _data при running container — stop или docker exec.", "sortOrder": 20 },
+    { "checkpointKey": "common_mistakes", "exampleType": "good", "exampleText": "docker volume rm, не rm -rf — metadata.db синхрон", "sortOrder": 21 },
+    { "checkpointKey": "common_mistakes", "exampleType": "bad", "exampleText": "Редактировать _data напрямую при open files — безопасно для Postgres.", "sortOrder": 35 }
+  ],
+  "itlead": {
+    "slug": "where-docker-volumes-stored",
+    "apiUrl": "https://api.itlead.org/api/questions/where-docker-volumes-stored",
+    "pageUrl": "https://itlead.org/interview-questions/docker/where-docker-volumes-stored",
+    "difficulty": "MIDDLE",
+    "titleEn": "Where are Docker volumes stored on the host?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T22:00:00.000Z"
+  }
+}

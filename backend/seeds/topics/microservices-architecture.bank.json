@@ -1,0 +1,633 @@
+{
+  "topic": {
+    "code": "microservices_architecture",
+    "name": "Микросервисная архитектура",
+    "skillCode": "architecture",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое микросервисная архитектура и когда её имеет смысл применять?",
+    "shortAnswer": "Микросервисная архитектура — это подход, при котором приложение разбивается на небольшие независимо деплоящиеся сервисы, каждый со своей базой данных и коммуникацией через API или очереди сообщений. Главный компромисс: изоляция сбоев и независимые релизы команд против сложности распределённой системы. Ключевое правило: один сервис — одна база данных.",
+    "idealAnswer": "Микросервисная архитектура — паттерн, где система состоит из небольших сервисов с чёткой бизнес-ответственностью, каждый деплоится отдельно и владеет своей базой данных. Сервисы общаются через HTTP/REST, gRPC или асинхронные очереди (Kafka, RabbitMQ, SQS). Order Service пишет только в свою PostgreSQL и публикует order.created — Inventory Service реагирует на событие, а не через прямой доступ к чужой БД. Монолит держит users, orders, payments в одном процессе и деплоится целиком; падение payment-модуля или баг одной команды блокирует всех. Микросервисы дают изоляцию сбоев, независимое масштабирование и деплой, но добавляют сетевые hop'ы, distributed tracing, eventual consistency вместо локальных вызовов функций. Синхронная коммуникация (REST, gRPC) проста, но если downstream недоступен — caller зависает; gRPC быстрее REST внутри кластера (бинарный протокол, HTTP/2). Асинхронные события устойчивее, но результат downstream не подтверждается сразу. Database per service — не рекомендация, а правило: shared DB = скрытая связность, миграции одного сервиса ломают другой, масштабирование и смена СУБД невозможны по-настоящему независимо. Межсервисных ACID-транзакций нет — для rollback используют Saga: локальные транзакции + события + compensating transactions при сбое. API Gateway — единая точка входа (auth, rate limit, routing); Service Discovery (Consul, Kubernetes) — поиск сервисов по имени без hardcoded IP; Circuit Breaker (Hystrix, Resilience4j, opossum) — при серии сбоев открывает circuit и отдаёт fallback вместо таймаутов. Микросервисы редко стартуют с нуля — успешные системы чаще вырезаются из работающего монолита. Окупаются при нескольких командах с независимыми релизами, разном масштабировании частей (auth vs video transcoding), разных стеках (Python ML + Go API). Не стоит при маленькой команде, незрелом продукте или отсутствии опыта с distributed systems — операционные затраты (CI/CD на сервис, tracing, consistency) выше выгоды. Conway's Law: границы сервисов повторяют оргструктуру. Типичные ошибки: общая БД между сервисами; длинные синхронные цепочки A→B→C→D; API без версионирования (/v1 vs /v2); отсутствие distributed tracing (Jaeger, Zipkin, Datadog). Auth: Gateway проверяет JWT один раз и передаёт identity в headers downstream. Примеры: Netflix (700+ сервисов, Hystrix), Amazon mandate API-only (рождение AWS), Uber (monolith→microservices→domain-oriented), Kubernetes+Docker как стандарт деплоя.",
+    "maxScore": 10,
+    "skills": [
+      "architecture"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "microservices_definition",
+      "title": "Понимает определение микросервисов",
+      "expected": "Кандидат объясняет: небольшие независимо деплоящиеся сервисы по бизнес-границам, каждый со своей БД; decoupling через API/очереди, а не прямой доступ к чужим данным.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — определение и правило one service one database из ITLead TL;DR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "microservices_definition",
+            "oftenConfusedWith": [
+              "monolith_vs_microservices",
+              "infrastructure_patterns"
+            ],
+            "anchorTermsExpected": [
+              "независим",
+              "деплой",
+              "своя база",
+              "database per service",
+              "бизнес-функц",
+              "decoupling",
+              "событ",
+              "очеред"
+            ],
+            "anchorTermsWrongTopic": [
+              "Kubernetes это микросервисы",
+              "REST обязателен",
+              "микросервисы это SOA с ESB"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "микросервис",
+              "сервис",
+              "независим"
+            ],
+            "ask": "чем микросервис отличается от модуля внутри монолита"
+          }
+        ],
+        "mustConcepts": [
+          "микросервис",
+          "независим",
+          "деплой",
+          "бизнес-функц",
+          "своя база",
+          "database per service",
+          "один сервис",
+          "одна база",
+          "API",
+          "очеред",
+          "Kafka",
+          "decoupling",
+          "декомпоз",
+          "изол",
+          "Order Service",
+          "Inventory"
+        ],
+        "falseClaims": [
+          "микросервисы — это просто много контейнеров одного приложения",
+          "можно делить только по техническим слоям controller/service/repository",
+          "общая БД между сервисами — нормальная практика",
+          "микросервис и модуль монолита — одно и то же",
+          "размер сервиса не важен, главное много репозиториев"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "monolith_vs_microservices",
+      "title": "Сравнивает монолит и микросервисы",
+      "expected": "Кандидат сравнивает: монолит — один процесс, общий деплой, локальные вызовы; микросервисы — изоляция сбоев, независимые релизы и масштабирование, но сетевая сложность и eventual consistency.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевой trade-off из ITLead Monolith vs Microservices",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "microservices_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "monolith_vs_microservices",
+            "oftenConfusedWith": [
+              "when_to_use"
+            ],
+            "anchorTermsExpected": [
+              "монолит",
+              "изоляц",
+              "независим деплой",
+              "сетева",
+              "eventual consistency",
+              "distributed"
+            ],
+            "anchorTermsWrongTopic": [
+              "микросервисы всегда быстрее",
+              "монолит не масштабируется никогда"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "монолит",
+          "один процесс",
+          "общий деплой",
+          "локальн",
+          "вызов функц",
+          "изоляц",
+          "сбой",
+          "независим релиз",
+          "масштабир",
+          "сетева",
+          "сложност",
+          "eventual consistency",
+          "distributed tracing",
+          "network hop",
+          "Payment Service",
+          "Orders"
+        ],
+        "falseClaims": [
+          "монолит всегда хуже микросервисов",
+          "микросервисы убирают все проблемы масштабирования",
+          "в микросервисах нет межсервисной задержки",
+          "падение одного сервиса всегда роняет всю систему",
+          "монолит нельзя масштабировать горизонтально"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "service_communication",
+      "title": "Знает модели коммуникации сервисов",
+      "expected": "Кандидат различает синхронную (REST, gRPC — caller ждёт) и асинхронную (Kafka, RabbitMQ — publish и eventual consistency); может упомянуть gRPC для internal calls.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "sync vs async и resilience — центральный блок ITLead Service Communication",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "REST",
+              "gRPC",
+              "синхрон"
+            ],
+            "ask": "что происходит с caller, если downstream сервис недоступен при синхронном вызове"
+          },
+          {
+            "match": [
+              "Kafka",
+              "RabbitMQ",
+              "асинхрон",
+              "событ"
+            ],
+            "ask": "чем асинхронные события устойчивее длинной цепочки HTTP-вызовов"
+          }
+        ],
+        "mustConcepts": [
+          "синхрон",
+          "асинхрон",
+          "REST",
+          "gRPC",
+          "HTTP/2",
+          "Kafka",
+          "RabbitMQ",
+          "SQS",
+          "событ",
+          "publish",
+          "eventual consistency",
+          "downstream",
+          "caller",
+          "ожида",
+          "ответ",
+          "очеред",
+          "message queue"
+        ],
+        "falseClaims": [
+          "асинхронная коммуникация даёт мгновенную консистентность",
+          "REST быстрее gRPC для internal service-to-service",
+          "Kafka заменяет необходимость API Gateway",
+          "синхронные цепочки не накапливают latency",
+          "при async вызове caller всегда знает результат сразу"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "database_per_service_saga",
+      "title": "Понимает database per service и Saga",
+      "expected": "Кандидат объясняет: shared DB — antipattern; нет распределённых ACID; Saga — локальные транзакции + события + compensating transactions при откате.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "database per service + Saga — senior-блок из ITLead и follow-up Q&A",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "service_communication",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "database_per_service_saga",
+            "oftenConfusedWith": [
+              "service_communication"
+            ],
+            "anchorTermsExpected": [
+              "database per service",
+              "Saga",
+              "compensat",
+              "ACID",
+              "локальн транзак",
+              "shared DB"
+            ],
+            "anchorTermsWrongTopic": [
+              "two-phase commit всегда",
+              "распределённый lock на все сервисы"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Saga",
+              "компенс",
+              "compensat"
+            ],
+            "ask": "как откатить заказ, если payment упал после резервирования inventory"
+          },
+          {
+            "match": [
+              "shared",
+              "общая база",
+              "orders table"
+            ],
+            "ask": "почему UserService не должен читать таблицу orders напрямую"
+          }
+        ],
+        "mustConcepts": [
+          "database per service",
+          "своя база",
+          "shared database",
+          "общая база",
+          "antipattern",
+          "схем",
+          "миграц",
+          "ACID",
+          "распредел",
+          "Saga",
+          "локальн транзак",
+          "компенс",
+          "compensating",
+          "откат",
+          "rollback",
+          "inventory.reserve",
+          "order.cancelled",
+          "two-phase commit"
+        ],
+        "falseClaims": [
+          "можно делать ACID-транзакцию на несколько сервисов через один SQL",
+          "общая PostgreSQL для простоты — нормальный microservices паттерн",
+          "Saga — это двухфазный commit с общим координатором",
+          "schema change в одном сервисе не влияет на другой при shared DB",
+          "Saga не нужна если использовать Kafka"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "infrastructure_patterns",
+      "title": "Знает API Gateway, discovery и circuit breaker",
+      "expected": "Кандидат называет: API Gateway (auth, routing, rate limit); Service Discovery (Consul, K8s); Circuit Breaker с fallback при серии сбоев downstream.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "инфраструктурный минимум из ITLead Key Infrastructure Patterns",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Circuit Breaker",
+              "circuit",
+              "fallback"
+            ],
+            "ask": "что делает circuit breaker когда Payment Service постоянно падает"
+          }
+        ],
+        "mustConcepts": [
+          "API Gateway",
+          "Gateway",
+          "Service Discovery",
+          "Consul",
+          "Kubernetes",
+          "Circuit Breaker",
+          "fallback",
+          "rate limit",
+          "routing",
+          "JWT",
+          "Hystrix",
+          "Resilience4j",
+          "opossum",
+          "Kong",
+          "NGINX"
+        ],
+        "falseClaims": [
+          "Circuit Breaker ускоряет медленный сервис",
+          "Service Discovery требует hardcoded IP каждого pod",
+          "API Gateway должен содержать всю бизнес-логику",
+          "Circuit Breaker и retry — одно и то же",
+          "без Kubernetes микросервисы невозможны"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда микросервисы оправданы",
+      "expected": "Кандидат называет: не с нуля; несколько команд; разное масштабирование; разные стеки; монолит стал bottleneck; маленькая команда — оставить монолит; Conway's Law.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "When Microservices Make Sense + follow-up про 5 разработчиков",
+        "mustConcepts": [
+          "не с нуля",
+          "монолит сначала",
+          "extract",
+          "выреза",
+          "несколько команд",
+          "независим релиз",
+          "масштабир",
+          "разный стек",
+          "Python",
+          "Go",
+          "Conway",
+          "организац",
+          "маленькая команда",
+          "5 разработчик",
+          "operational cost",
+          "CI/CD"
+        ],
+        "falseClaims": [
+          "микросервисы нужны каждому новому продукту с первого дня",
+          "монолит никогда не подходит для больших компаний",
+          "Conway's Law не влияет на границы сервисов",
+          "команда из 5 человек обязана мигрировать на microservices",
+          "микросервисы снижают операционные затраты автоматически"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки микросервисов",
+      "expected": "Кандидат называет: shared DB; длинные sync chains; отсутствие API versioning; нет distributed tracing; может упомянуть fan-out через очереди вместо цепочек.",
+      "score": 2,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common Mistakes — 4 антипаттерна из ITLead с кодом",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "database_per_service_saga",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "sync",
+              "цепоч",
+              "A calls B"
+            ],
+            "ask": "почему цепочка user→product→pricing по 100ms опасна"
+          },
+          {
+            "match": [
+              "tracing",
+              "Jaeger",
+              "Zipkin"
+            ],
+            "ask": "как отладить медленный запрос через 10 сервисов без tracing"
+          }
+        ],
+        "mustConcepts": [
+          "shared database",
+          "общая база",
+          "sync chain",
+          "синхронн цепоч",
+          "latency",
+          "API versioning",
+          "/v1",
+          "/v2",
+          "distributed tracing",
+          "Jaeger",
+          "Zipkin",
+          "Datadog",
+          "UserService",
+          "orders table",
+          "fan-out",
+          "очеред"
+        ],
+        "falseClaims": [
+          "длинная цепочка sync HTTP-вызовов — нормальный паттерн",
+          "версионирование API не нужно внутри компании",
+          "tracing можно добавить только после первого инцидента без боли",
+          "UserService может SELECT из orders для простоты",
+          "300ms latency в happy path — не проблема для checkout"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Микросервисы — небольшие сервисы по бизнес-границам, каждый со своей БД и независимым деплоем. Order Service пишет в свою PostgreSQL и шлёт order.created в Kafka — Inventory сам декрементирует stock. Монолит проще операционно, но баг в payments блокирует весь релиз. Saga нужна для checkout через несколько сервисов — compensating cancel если payment упал.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На прошлом месте начали с монолита, через два года вырезали billing — отдельный деплой и scale. Sync REST между сервисами только где нужен immediate ответ; inventory через events. Gateway проверяет JWT, circuit breaker на payment с fallback pending. Tracing через Jaeger с первого дня — без него дебаг 12 сервисов ад.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Database per service — жёсткое правило: UserService не лезет в orders table. gRPC внутри кластера, REST наружу. Микросервисы не брали бы при команде 5 человек — operational overhead не окупился бы.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Микросервисы — это когда каждый endpoint в отдельном репозитории, но все читают одну MySQL. Главное Docker и Kubernetes, архитектура сама сложится.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Синхронно вызываем user, product, pricing, inventory, payment подряд — так проще отлаживать. Версионирование API лишнее, все деплоятся одновременно.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Новый стартап с двумя разработчиками сразу на 15 микросервисов — иначе не масштабируется. Shared PostgreSQL между сервисами экономит время.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "microservices_definition",
+      "exampleType": "good",
+      "exampleText": "Каждый сервис — одна бизнес-область, свой деплой и своя БД; общение через API или Kafka, не через чужие таблицы.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "microservices_definition",
+      "exampleType": "good",
+      "exampleText": "ну микросервис — маленький сервис который сам деплоится, своя база, order шлёт event inventory не лезет в его postgres",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "microservices_definition",
+      "exampleType": "bad",
+      "exampleText": "Микросервис — любой npm-пакет в monorepo с отдельным Dockerfile, БД общая для простоты.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "monolith_vs_microservices",
+      "exampleType": "good",
+      "exampleText": "Монолит — локальные вызовы и один деплой; микросервисы — изоляция падений Payment от Orders, но network latency и eventual consistency на каждом шаге.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "monolith_vs_microservices",
+      "exampleType": "good",
+      "exampleText": "монолит ок пока одна команда; когда три команды блокируют друг друга релизами — режем по bounded context",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "monolith_vs_microservices",
+      "exampleType": "bad",
+      "exampleText": "Микросервисы всегда быстрее монолита потому что параллельно работают все сервисы.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "service_communication",
+      "exampleType": "good",
+      "exampleText": "REST/gRPC — sync, caller ждёт; если pricing down — order падает. Kafka order.created — async, inventory обработает когда сможет, но статус не instant.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "service_communication",
+      "exampleType": "good",
+      "exampleText": "gRPC между internal сервисами быстрее REST, наружу через API Gateway оставляем REST",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "service_communication",
+      "exampleType": "bad",
+      "exampleText": "Асинхронные очереди дают strong consistency как SQL-транзакция между сервисами.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "database_per_service_saga",
+      "exampleType": "good",
+      "exampleText": "Order и Inventory — разные PostgreSQL. Checkout: reserve inventory → charge payment; если charge failed — compensating release inventory и cancel order (Saga).",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "database_per_service_saga",
+      "exampleType": "good",
+      "exampleText": "shared db убивает независимость — миграция orders ломает UserService который читал orders напрямую",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "database_per_service_saga",
+      "exampleType": "bad",
+      "exampleText": "Для атомарного заказа делаем distributed two-phase commit на все три базы — так надёжнее Saga.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "infrastructure_patterns",
+      "exampleType": "good",
+      "exampleText": "API Gateway — auth и routing; K8s service discovery по DNS; opossum circuit breaker на payment — после 50% ошибок fallback pending.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "infrastructure_patterns",
+      "exampleType": "good",
+      "exampleText": "gateway один раз jwt проверил, в headers user id передал — сервисы не дублируют auth",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "infrastructure_patterns",
+      "exampleType": "bad",
+      "exampleText": "Circuit breaker — это кэш который ускоряет медленный payment service.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Микросервисы когда несколько команд, разный scale auth vs transcoding, монолит стал тяжело менять — не на greenfield из 3 человек.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Conway's law — границы сервисов повторят структуру команд, планируем осознанно",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Любой продукт с REST API обязан быть микросервисным с первого спринта.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Антипаттерны: общая БД; цепочка getUser→getProduct→getPrice sync; API без /v1 /v2; production без Jaeger/Zipkin.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "вместо a→b→c→d лучше publish event и fan-out — pricing down не валит весь order sync",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "UserService SELECT * FROM orders WHERE user_id — нормально, это просто read-only join.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "microservices-architecture",
+    "apiUrl": "https://api.itlead.org/api/questions/microservices-architecture",
+    "pageUrl": "https://itlead.org/interview-questions/architecture/microservices-architecture",
+    "difficulty": "SENIOR",
+    "titleEn": "What is Microservices architecture?",
+    "categorySlug": "architecture",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

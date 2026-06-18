@@ -1,0 +1,674 @@
+{
+  "topic": {
+    "code": "resource_loading_strategies_preload_prefetch_modulepreload",
+    "name": "Стратегии загрузки ресурсов: preload, prefetch, modulepreload",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Чем отличаются preload, prefetch и modulepreload и когда их использовать?",
+    "shortAnswer": "Preload, prefetch и modulepreload — подсказки `<link rel>` для управления приоритетом и временем загрузки ресурсов. Preload запускается с высоким приоритетом сразу при discovery (LCP-изображение, шрифты, критический CSS). Prefetch ставит ресурсы в очередь с низшим приоритетом в idle (навигация на следующую страницу). Modulepreload загружает ES-модули и весь граф import заранее, без выполнения кода. Важно: для preload всегда указывать `as`, для preload шрифтов — `crossorigin`.",
+    "idealAnswer": "Стратегии загрузки ресурсов — `<link rel>` hints, которые сообщают браузеру, когда и как загружать файлы до того, как парсер их обнаружит в обычном потоке. Preload — высокоприоритетный fetch при парсинге `<head>`: тот же слот, что parser-inserted CSS в Chromium (MEDIUM/HIGH). Используется для LCP hero image (`as=\"image\"` + `fetchpriority=\"high\"`), критических шрифтов (`as=\"font\"` + `type` + `crossorigin`), blocking JS/CSS above the fold. Атрибут `as` обязателен — без него Chrome игнорирует hint и пишет «Did not assign resource type». Prefetch — спекулятивная загрузка с приоритетом LOWEST, только когда браузер idle и нет более важных задач. Подходит для ресурсов следующей страницы: cart.js на product page, dashboard bundle на login. Не для критического CSS текущей страницы — получит FOUC. Modulepreload — только для ES modules: fetch entry module, рекурсивный resolve import graph, parallel download всех зависимостей; V8 не парсит и не выполняет код до `<script type=\"module\">`. Устраняет serial module waterfall (3 уровня import = 3 round trips без hint). Vite в production автоматически генерирует modulepreload для чанков. Сравнение: preload — критический путь сейчас; prefetch — будущая навигация; modulepreload — SPA/ESM apps. Дополнительно: preconnect (DNS+TCP+TLS) и dns-prefetch (только DNS) для third-party origins; `fetchpriority` (Chrome 101+) внутри bucket приоритета; cap preload 4–5 на страницу — конкурируют в одной high-priority очереди. Типичные ошибки: preload без `as`; font preload без `crossorigin` (разные cache keys → double fetch); prefetch для critical CSS; modulepreload на classic script; слишком много preload. Service worker перехватывает preload/prefetch как обычный fetch. Safari 16.4 — частичная поддержка modulepreload без recursive imports; полная с Safari 17. Реальное использование: Next.js Image `priority` → preload+fetchpriority; Lighthouse «Preload key requests»; React 18 streaming SSR вставляет modulepreload для hydration deps.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "preload_basics",
+      "title": "Понимает preload",
+      "expected": "Кандидат объясняет: высокий приоритет при discovery в `<head>`; `as` обязателен; LCP image, critical font, blocking script/CSS; `fetchpriority=\"high\"` для hero; font preload с `crossorigin`; не выполняет код; лимит 4–5 preload на страницу.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — preload для критического пути сейчас",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "preload_basics",
+            "oftenConfusedWith": [
+              "prefetch_basics",
+              "comparison_when_use"
+            ],
+            "anchorTermsExpected": [
+              "preload",
+              "высокий приоритет",
+              "discovery",
+              "as=",
+              "LCP",
+              "критическ"
+            ],
+            "anchorTermsWrongTopic": [
+              "idle",
+              "следующая страница",
+              "LOWEST",
+              "import graph"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "preload",
+              "as"
+            ],
+            "ask": "зачем атрибут as в preload и что делает Chrome без него"
+          },
+          {
+            "match": [
+              "font",
+              "шрифт",
+              "crossorigin"
+            ],
+            "ask": "почему font preload без crossorigin даёт double fetch"
+          }
+        ],
+        "mustConcepts": [
+          "preload",
+          "rel=preload",
+          "as=",
+          "высокий приоритет",
+          "discovery",
+          "парсинг head",
+          "LCP",
+          "hero image",
+          "шрифт",
+          "font",
+          "crossorigin",
+          "fetchpriority",
+          "критический",
+          "critical CSS",
+          "не выполняет",
+          "4-5",
+          "лимит preload",
+          "as обязателен",
+          "Chrome игнорир"
+        ],
+        "falseClaims": [
+          "preload без as работает нормально",
+          "font preload не нужен crossorigin",
+          "preload выполняет JavaScript",
+          "preload блокирует парсинг HTML",
+          "можно preload 10+ ресурсов без вреда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "prefetch_basics",
+      "title": "Понимает prefetch",
+      "expected": "Кандидат объясняет: низший приоритет (LOWEST), загрузка только в idle; спекулятивная загрузка для будущей навигации; не для критического пути текущей страницы; service worker может перехватить prefetch.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "prefetch — отдельная стратегия для следующей страницы",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "comparison_when_use",
+            "floorFraction": 0.35
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "prefetch_basics",
+            "oftenConfusedWith": [
+              "preload_basics"
+            ],
+            "anchorTermsExpected": [
+              "prefetch",
+              "idle",
+              "низший",
+              "LOWEST",
+              "следующ",
+              "навигац"
+            ],
+            "anchorTermsWrongTopic": [
+              "высокий приоритет",
+              "LCP",
+              "fetchpriority high",
+              "критический путь"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "prefetch",
+              "idle"
+            ],
+            "ask": "когда браузер реально запускает prefetch и какой у него приоритет"
+          },
+          {
+            "match": [
+              "cart",
+              "следующ",
+              "навигац"
+            ],
+            "ask": "пример prefetch на product page — что и зачем prefetch"
+          }
+        ],
+        "mustConcepts": [
+          "prefetch",
+          "rel=prefetch",
+          "idle",
+          "простой",
+          "низший приоритет",
+          "LOWEST",
+          "следующая страница",
+          "навигация",
+          "спекулятив",
+          "background",
+          "фон",
+          "cart.js",
+          "checkout",
+          "не критический",
+          "не блокирует рендер",
+          "service worker",
+          "перехват",
+          "будущ",
+          "idle browser time",
+          "low network priority",
+          "next navigation guess",
+          "product to cart prefetch",
+          "service worker intercept prefetch"
+        ],
+        "falseClaims": [
+          "prefetch блокирует рендер текущей страницы",
+          "prefetch имеет тот же приоритет что preload",
+          "prefetch подходит для critical CSS above the fold",
+          "prefetch выполняет код при загрузке",
+          "prefetch всегда идёт в сеть, SW не влияет",
+          "prefetch blocks LCP hero",
+          "prefetch high priority same as preload"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "modulepreload_basics",
+      "title": "Понимает modulepreload",
+      "expected": "Кандидат объясняет: только для ES modules (`type=\"module\"`); ранний parallel fetch entry + import graph; V8 не парсит и не eval до script tag; устраняет serial module waterfall; Vite генерирует в production; Safari 17+ full recursive.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "modulepreload — ключ для ESM SPA и Vite",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "modulepreload",
+              "waterfall",
+              "каскад"
+            ],
+            "ask": "как modulepreload ломает serial import waterfall на 3G"
+          },
+          {
+            "match": [
+              "Vite",
+              "chunk",
+              "чанк"
+            ],
+            "ask": "что Vite делает с modulepreload в production build"
+          }
+        ],
+        "mustConcepts": [
+          "modulepreload",
+          "rel=modulepreload",
+          "ES module",
+          "type=module",
+          "import graph",
+          "граф импорт",
+          "parallel",
+          "параллель",
+          "waterfall",
+          "каскад",
+          "round trip",
+          "не выполняет",
+          "V8",
+          "не парсит",
+          "не eval",
+          "entry module",
+          "Vite",
+          "chunk",
+          "чанк",
+          "ModuleGraph",
+          "рекурсив",
+          "import statement graph",
+          "V8 skip eval stage",
+          "recursive deps Safari 17",
+          "dynamic import waterfall",
+          "entry module early fetch"
+        ],
+        "falseClaims": [
+          "modulepreload выполняет код до script tag",
+          "modulepreload работает для classic script без type=module",
+          "modulepreload то же что prefetch",
+          "modulepreload только для CSS",
+          "без modulepreload import graph всегда parallel",
+          "modulepreload executes module code",
+          "only for CSS modules"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "comparison_when_use",
+      "title": "Сравнивает три стратегии",
+      "expected": "Кандидат сравнивает priority/timing/use case: preload — критический путь сейчас (LCP, font, critical CSS); prefetch — следующая страница idle; modulepreload — ESM/SPA; может упомянуть preconnect/dns-prefetch и fetchpriority; cap 4–5 preload.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "comparison table и decision rule из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "preload_basics",
+            "floorFraction": 0.4
+          },
+          {
+            "checkpointKey": "prefetch_basics",
+            "floorFraction": 0.4
+          },
+          {
+            "checkpointKey": "modulepreload_basics",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "comparison_when_use",
+            "oftenConfusedWith": [
+              "preload_basics",
+              "prefetch_basics"
+            ],
+            "anchorTermsExpected": [
+              "preload сейчас",
+              "prefetch будущ",
+              "modulepreload модули",
+              "приоритет",
+              "когда использовать"
+            ],
+            "anchorTermsWrongTopic": [
+              "все три одинаковый приоритет",
+              "prefetch для LCP"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "preload",
+              "prefetch"
+            ],
+            "ask": "разница приоритета preload vs prefetch в Chromium scheduler"
+          },
+          {
+            "match": [
+              "preconnect",
+              "dns-prefetch"
+            ],
+            "ask": "чем preconnect отличается от dns-prefetch и когда что брать"
+          },
+          {
+            "match": [
+              "fetchpriority"
+            ],
+            "ask": "как fetchpriority дополняет preload для LCP image"
+          }
+        ],
+        "mustConcepts": [
+          "сравнение",
+          "comparison",
+          "приоритет",
+          "priority",
+          "preload сейчас",
+          "критический путь",
+          "prefetch будущ",
+          "следующая страница",
+          "modulepreload SPA",
+          "ESM",
+          "preconnect",
+          "dns-prefetch",
+          "fetchpriority",
+          "LCP image",
+          "4-5 cap",
+          "лимит preload",
+          "decision rule",
+          "когда использовать",
+          "timing",
+          "не блокирует рендер",
+          "hero image preload now",
+          "checkout prefetch next",
+          "SPA modulepreload graph",
+          "third party preconnect",
+          "cap preload count four"
+        ],
+        "falseClaims": [
+          "prefetch подходит для LCP hero image",
+          "preload только для следующей страницы",
+          "modulepreload и dns-prefetch одно и то же",
+          "preconnect можно ставить на 10 origins без ограничений",
+          "fetchpriority заменяет preload",
+          "prefetch for LCP image",
+          "preload for next page only"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки hints",
+      "expected": "Кандидат называет: preload без `as` (Chrome ignores); font preload без `crossorigin` (double fetch, cache key mismatch); prefetch для critical CSS (FOUC); modulepreload на classic script; слишком много preload конкурируют; SW cache-first на prefetch URL.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — частые production-баги middle",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "as",
+              "игнорир",
+              "Chrome"
+            ],
+            "ask": "что происходит с preload без as в Chrome DevTools"
+          },
+          {
+            "match": [
+              "crossorigin",
+              "double fetch",
+              "дважды"
+            ],
+            "ask": "почему font preload и реальный font request используют разные cache keys"
+          },
+          {
+            "match": [
+              "FOUC",
+              "prefetch",
+              "critical CSS"
+            ],
+            "ask": "почему prefetch critical.css даёт FOUC в production"
+          }
+        ],
+        "mustConcepts": [
+          "as attribute",
+          "без as",
+          "Chrome игнорир",
+          "Did not assign",
+          "crossorigin font",
+          "шрифт crossorigin",
+          "double fetch",
+          "дважды загруж",
+          "cache key",
+          "ключ кеша",
+          "too many preload",
+          "забагато preload",
+          "8-10 preload",
+          "конкурир",
+          "prefetch critical CSS",
+          "FOUC",
+          "modulepreload classic",
+          "bundle.js",
+          "service worker",
+          "cache-first",
+          "Safari 16",
+          "Safari 17",
+          "рекурсив import",
+          "404",
+          "error event",
+          "iptables UDP 443",
+          "Wireshark quic filter",
+          "load test h2 fallback",
+          "Cloudflare 0-RTT GET"
+        ],
+        "falseClaims": [
+          "preload без as всё равно попадает в cache",
+          "crossorigin для font preload опционален",
+          "prefetch critical CSS — нормальная практика",
+          "modulepreload работает на обычный script без type=module",
+          "много preload не влияет на bandwidth",
+          "QUIC всегда быстрее на LAN",
+          "HPACK на h3 сервере ок"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "internals_priority",
+      "title": "Понимает приоритеты браузера",
+      "expected": "Кандидат описывает: Chromium LoadingScheduler — preload MEDIUM/HIGH (как parser CSS), prefetch LOWEST idle; modulepreload через ModuleGraph — parallel fetch import deps без V8 parse/eval; preload не блокирует HTML parsing.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "how browser handles internally — follow-up depth",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "LoadingScheduler",
+              "Chromium",
+              "MEDIUM",
+              "HIGH"
+            ],
+            "ask": "какой priority slot preload vs prefetch в Chromium LoadingScheduler"
+          },
+          {
+            "match": [
+              "ModuleGraph",
+              "parallel"
+            ],
+            "ask": "как ModuleGraph загружает import dependencies при modulepreload"
+          }
+        ],
+        "mustConcepts": [
+          "LoadingScheduler",
+          "Chromium",
+          "MEDIUM",
+          "HIGH",
+          "LOWEST",
+          "priority queue",
+          "очередь приоритет",
+          "parser CSS",
+          "CSS парсер",
+          "ModuleGraph",
+          "parallel fetch",
+          "параллельный fetch",
+          "не блокирует парсинг",
+          "HTML parsing",
+          "V8 skip",
+          "не парсит",
+          "не eval",
+          "Network tab",
+          "Priority column",
+          "High",
+          "Low",
+          "idle only",
+          "MEDIUM HIGH scheduler",
+          "parser inserted CSS queue",
+          "ModuleGraph fetch parallel",
+          "Chromium priority slot",
+          "bandwidth competition preload"
+        ],
+        "falseClaims": [
+          "браузер обрабатывает все link rel с одинаковым приоритетом",
+          "preload блокирует HTML parsing автоматически",
+          "modulepreload только DNS lookup без контента",
+          "prefetch выполняется до preload в очереди",
+          "Safari и Chrome идентичны для modulepreload с 2018",
+          "all link rel equal priority",
+          "prefetch blocks critical path"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Preload — высокий приоритет при парсинге head: hero image с as=image и fetchpriority=high, шрифт с as=font и crossorigin. Prefetch — idle, низший приоритет, для cart.js на product page. Modulepreload — parallel fetch app.mjs и всего import graph без выполнения до type=module script. as обязателен, без него Chrome игнорирует preload.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну preload — сейчас нужное, hero и шрифт. prefetch — когда юзер скорее всего на checkout уйдёт, в фоне. modulepreload — для ESM, Vite сам вставляет. шрифт без crossorigin дважды тянется — классическая ошибка. не больше 4-5 preload, они в одной high очереди.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для максимального LCP: preload + fetchpriority=high + loading=eager на LCP image. preconnect на fonts.googleapis.com, dns-prefetch на analytics. Next.js Image priority делает preload автоматически. Lighthouse «Preload key requests» ловит непрелоаденный LCP ресурс.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Preload и prefetch — одно и то же, просто разные названия. Font preload без crossorigin норм. Modulepreload выполняет JS сразу при discovery. Prefetch hero image для LCP — правильный паттерн.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "as в preload не нужен, браузер сам определит тип. Prefetch critical.css — ок, он в фоне. Modulepreload на bundle.js без type=module ускорит загрузку.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Можно preload 15 ресурсов — bandwidth не проблема. Preload блокирует парсинг HTML до завершения fetch. dns-prefetch и modulepreload загружают одинаковый объём данных.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "preload_basics",
+      "exampleType": "good",
+      "exampleText": "Preload с as=image и fetchpriority=high для LCP hero — fetch стартует при парсинге head, до тега img. Шрифт: as=font, type=font/woff2, crossorigin — без crossorigin cache key не совпадёт.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "preload_basics",
+      "exampleType": "good",
+      "exampleText": "preload — высокий приоритет, критический путь сейчас. as обязателен, Chrome без as молча игнорит. держу 4-5 preload max.",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "preload_basics",
+      "exampleType": "bad",
+      "exampleText": "Preload без as работает, Chrome кеширует. Font preload crossorigin не нужен для woff2.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "prefetch_basics",
+      "exampleType": "good",
+      "exampleText": "Prefetch cart.js на product page — LOWEST priority, только когда браузер idle, не конкурирует с текущей страницей. Ресурс в cache для мгновенного checkout.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "prefetch_basics",
+      "exampleType": "good",
+      "exampleText": "prefetch — для следующей навигации, фон, idle. не для hero image и не для critical css.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "prefetch_basics",
+      "exampleType": "bad",
+      "exampleText": "Prefetch hero.avif для LCP — правильно, он в фоне не мешает. Prefetch same priority as preload.",
+      "sortOrder": 40
+    },
+    {
+      "checkpointKey": "modulepreload_basics",
+      "exampleType": "good",
+      "exampleText": "Modulepreload app.mjs — браузер parallel fetch entry + utils.mjs + api.mjs, V8 не eval до script type=module. На 3G 200ms vs 600ms serial waterfall.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "modulepreload_basics",
+      "exampleType": "good",
+      "exampleText": "Vite в prod сам генерит modulepreload на каждый chunk в графе — waterfall схлопывается в один burst.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "modulepreload_basics",
+      "exampleType": "bad",
+      "exampleText": "Modulepreload на bundle.js без type=module ускорит classic script. Modulepreload выполняет import() при head parse.",
+      "sortOrder": 50
+    },
+    {
+      "checkpointKey": "comparison_when_use",
+      "exampleType": "good",
+      "exampleText": "LCP image и critical font → preload. Следующий route dashboard.js → prefetch idle. SPA entry app.mjs → modulepreload. preconnect fonts origin, fetchpriority high на hero.",
+      "sortOrder": 40
+    },
+    {
+      "checkpointKey": "comparison_when_use",
+      "exampleType": "good",
+      "exampleText": "preload HIGH как CSS, prefetch LOWEST idle, modulepreload только ESM. не путать prefetch с preload для LCP.",
+      "sortOrder": 41
+    },
+    {
+      "checkpointKey": "comparison_when_use",
+      "exampleType": "bad",
+      "exampleText": "Все три hints — один приоритет и одно время firing. Prefetch для LCP, preload для next page.",
+      "sortOrder": 60
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Preload script.js без as — Chrome «Did not assign resource type», fetch ignored. Font preload без crossorigin — double fetch, разные cache keys. Prefetch critical.css → FOUC.",
+      "sortOrder": 50
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "8 preload в head — все в high queue, конкурируют с render-blocking CSS. SW cache-first может дать prefetch из SW cache, не сеть.",
+      "sortOrder": 51
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Crossorigin на font preload опционален. Prefetch critical CSS — best practice. 404 на preload отравляет cache forever.",
+      "sortOrder": 70
+    },
+    {
+      "checkpointKey": "internals_priority",
+      "exampleType": "good",
+      "exampleText": "Chromium: preload MEDIUM/HIGH в LoadingScheduler, как parser-inserted CSS. Prefetch LOWEST, только когда очередь пуста. Modulepreload — ModuleGraph parallel fetch deps, V8 skip parse/eval.",
+      "sortOrder": 60
+    },
+    {
+      "checkpointKey": "internals_priority",
+      "exampleType": "good",
+      "exampleText": "preload не блокирует HTML parsing — fetch parallel. DevTools Network Priority: High для preload, Low для prefetch.",
+      "sortOrder": 61
+    },
+    {
+      "checkpointKey": "internals_priority",
+      "exampleType": "bad",
+      "exampleText": "Все link rel в одной priority queue. Preload автоматически блокирует parser до onload.",
+      "sortOrder": 80
+    }
+  ],
+  "itlead": {
+    "slug": "resource-loading-strategies-preload-prefetch-modulepreload",
+    "apiUrl": "https://api.itlead.org/api/questions/resource-loading-strategies-preload-prefetch-modulepreload",
+    "pageUrl": "https://itlead.org/interview-questions/general/resource-loading-strategies-preload-prefetch-modulepreload",
+    "difficulty": "MIDDLE",
+    "titleEn": "Resource loading strategies - preload, prefetch, modulepreload",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

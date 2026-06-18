@@ -1,0 +1,657 @@
+{
+  "topic": {
+    "code": "jwt_json_web_tokens_explained",
+    "name": "JWT (JSON Web Tokens)",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое JWT и как работает аутентификация на JSON Web Tokens?",
+    "shortAnswer": "JWT — компактный подписанный токен из трёх Base64Url-частей (header.payload.signature), который несёт claims о пользователе в JSON. Сервер проверяет подпись криптографически без обращения к БД — stateless auth. Payload читаем любым, кто получил токен; подпись доказывает целостность, но не шифрует данные.",
+    "idealAnswer": "JWT (JSON Web Token) — компактный самодостаточный токен: JSON-claims кодируются в Base64Url, подписываются криптографически, сервер проверяет личность без lookup в БД. Структура: header.payload.signature — три сегмента через точку. Header: alg (HS256/RS256), typ JWT. Payload: стандартные claims sub, iss, aud, exp, iat, nbf плюс кастомные поля (role, userId). Signature: HMACSHA256(base64Url(header) + \".\" + base64Url(payload), secret) или RS256 с приватным ключом. Base64Url — URL-safe вариант Base64 без +/= для HTTP-заголовков. JWT подписан, но не зашифрован — payload можно прочитать на jwt.io; подпись только доказывает, что данные не менялись после выдачи. jwt.sign создаёт токен; jwt.verify пересчитывает HMAC constant-time и сверяет с третьим сегментом; если exp в прошлом — verify падает. Flow: login → server sign payload → client хранит token → каждый запрос Authorization: Bearer <token> → middleware verify → claims в handler. vs Sessions: session хранит state на сервере (memory/Redis/DB), каждый запрос — lookup; JWT stateless — любой инстанс verify по shared secret, горизонтальное масштабирование проще. Trade-off: JWT нельзя мгновенно отозвать до exp — logout требует refresh token в Redis, blacklist jti или короткий expiresIn. Когда JWT: API-only backend, microservices, mobile/SPA (Bearer в header), OAuth2/OIDC (Auth0, Okta, Cognito). Когда sessions: один сервер, нужен instant revoke, проще модель. Типичные ошибки: чувствительные данные в payload (Base64 ≠ encryption); нет exp или слабый secret ('secret'); jwt.verify без algorithms: ['HS256'] — атака alg:none; JWT в localStorage — XSS крадёт токен → httpOnly cookie или короткий access + refresh; blacklist в памяти процесса теряется при deploy. HS256 — симметричный (один secret sign+verify, быстро); RS256 — асимметричный (private sign, public verify, JWKS для multi-service). Revocation production: access 5–15 мин + refresh в Redis с TTL, rotation при refresh (старый delete), logout удаляет refresh. Express passport-jwt, Next.js axios interceptor, GraphQL context decode JWT.",
+    "maxScore": 10,
+    "skills": [
+      "javascript",
+      "architecture"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "jwt_structure",
+      "title": "Знает структуру JWT",
+      "expected": "Кандидат объясняет: три части header.payload.signature через точку; Base64Url-кодирование; header alg/typ; payload claims sub exp iat iss aud nbf; JWT подписан, но не зашифрован — payload читаем.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — три сегмента и claims",
+        "confusionPairs": [
+          {
+            "checkpointKey": "jwt_structure",
+            "oftenConfusedWith": [
+              "signature_verify"
+            ],
+            "anchorTermsExpected": [
+              "header",
+              "payload",
+              "signature",
+              "Base64Url",
+              "claims",
+              "sub",
+              "exp"
+            ],
+            "anchorTermsWrongTopic": [
+              "HMAC пересчёт",
+              "Redis refresh",
+              "httpOnly cookie"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "header",
+              "payload",
+              "signature",
+              "три част"
+            ],
+            "ask": "из каких частей состоит JWT и что в каждой"
+          },
+          {
+            "match": [
+              "Base64Url",
+              "Base64"
+            ],
+            "ask": "зачем Base64Url вместо обычного Base64 в HTTP-заголовках"
+          }
+        ],
+        "mustConcepts": [
+          "JWT",
+          "header",
+          "payload",
+          "signature",
+          "Base64Url",
+          "три част",
+          "три сегмент",
+          "точк",
+          "claims",
+          "sub",
+          "exp",
+          "iat",
+          "iss",
+          "aud",
+          "nbf",
+          "alg",
+          "typ",
+          "подписан",
+          "не зашифр",
+          "jwt.io",
+          "читаем",
+          "JSON"
+        ],
+        "falseClaims": [
+          "JWT по умолчанию шифрует payload",
+          "подпись скрывает содержимое payload",
+          "JWT состоит из четырёх частей",
+          "Base64 — это шифрование",
+          "payload нельзя декодировать без secret"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "signature_verify",
+      "title": "Понимает подпись и verify",
+      "expected": "Кандидат описывает: jwt.sign — HMAC-SHA256 или RS256; jwt.verify пересчитывает signature constant-time; изменение payload ломает подпись; проверка exp; явный whitelist algorithms: ['HS256'] против alg:none.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "криптографическое ядро безопасности JWT",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "jwt_structure",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "sign",
+              "verify",
+              "HMAC",
+              "подпис"
+            ],
+            "ask": "что делает jwt.sign и jwt.verify по шагам"
+          },
+          {
+            "match": [
+              "alg",
+              "none",
+              "algorithms"
+            ],
+            "ask": "почему verify без whitelist algorithms опасен"
+          }
+        ],
+        "mustConcepts": [
+          "sign",
+          "verify",
+          "HMAC",
+          "SHA256",
+          "HMACSHA256",
+          "secret",
+          "подпис",
+          "пересчит",
+          "constant-time",
+          "timing",
+          "tamper",
+          "поддел",
+          "измен",
+          "payload",
+          "expiresIn",
+          "exp",
+          "algorithms",
+          "HS256",
+          "alg none",
+          "whitelist",
+          "jsonwebtoken"
+        ],
+        "falseClaims": [
+          "verify можно без secret если payload правильный",
+          "alg none допустим в production",
+          "exp необязателен для безопасности",
+          "изменение одного символа в payload не влияет на verify",
+          "verify только декодирует Base64 без проверки подписи"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "jwt_vs_sessions",
+      "title": "Сравнивает JWT и сессии",
+      "expected": "Кандидат сравнивает: JWT stateless — сервер не хранит state, verify — чистая crypto; sessions — state в memory/DB, lookup на каждый запрос, instant revoke; JWT масштабируется горизонтально, но токен валиден до exp после logout.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевой trade-off stateless vs revocation",
+        "confusionPairs": [
+          {
+            "checkpointKey": "jwt_vs_sessions",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "stateless",
+              "session",
+              "revoke",
+              "logout",
+              "horizontal",
+              "DB lookup"
+            ],
+            "anchorTermsWrongTopic": [
+              "localStorage XSS",
+              "alg none",
+              "JWKS rotation"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "stateless",
+              "session",
+              "revoke"
+            ],
+            "ask": "чем JWT отличается от session-cookie auth при logout"
+          }
+        ],
+        "mustConcepts": [
+          "stateless",
+          "session",
+          "сесс",
+          "server state",
+          "состоян",
+          "сервер",
+          "revoke",
+          "отзыв",
+          "logout",
+          "логаут",
+          "horizontal",
+          "масштаб",
+          "инстанс",
+          "DB lookup",
+          "база",
+          "cookie",
+          "refresh token",
+          "blacklist",
+          "до exp",
+          "валиден"
+        ],
+        "falseClaims": [
+          "JWT можно мгновенно отозвать без дополнительной инфраструктуры",
+          "sessions никогда не масштабируются горизонтально",
+          "JWT полностью заменяет cookies во всех сценариях",
+          "после logout access JWT сразу недействителен без refresh/blacklist"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "auth_flow",
+      "title": "Описывает flow login → API",
+      "expected": "Кандидат описывает: credentials → server jwt.sign → client получает token → Authorization: Bearer на каждый запрос → middleware jwt.verify → decoded claims в handler.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый flow из ITLead login example",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Bearer",
+              "Authorization",
+              "middleware"
+            ],
+            "ask": "как токен попадает из login в защищённый /profile"
+          }
+        ],
+        "mustConcepts": [
+          "login",
+          "sign",
+          "Bearer",
+          "Authorization",
+          "header",
+          "middleware",
+          "verify",
+          "decoded",
+          "claims",
+          "401",
+          "Unauthorized",
+          "protected",
+          "credentials",
+          "passport-jwt"
+        ],
+        "falseClaims": [
+          "токен передаётся в теле каждого GET без заголовка",
+          "verify выполняется только при login один раз",
+          "Bearer token и cookie session — одно и то же механически",
+          "middleware не нужен если клиент уже получил token"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use_jwt",
+      "title": "Выбирает когда JWT уместен",
+      "expected": "Кандидат называет: API/microservices (stateless verify), mobile/SPA (Bearer header), OAuth2/OIDC; sessions — один сервер, простой instant revoke; короткий access + refresh при длинных сессиях.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use из таблицы ITLead",
+        "mustConcepts": [
+          "API",
+          "microservice",
+          "микросервис",
+          "SPA",
+          "mobile",
+          "OAuth",
+          "OIDC",
+          "Auth0",
+          "Okta",
+          "Cognito",
+          "stateless",
+          "Bearer",
+          "session store",
+          "refresh",
+          "коротк",
+          "access token",
+          "Bearer Authorization",
+          "passport-jwt",
+          "GraphQL context",
+          "Cognito JWKS",
+          "mobile header token"
+        ],
+        "falseClaims": [
+          "JWT нужен для любого сайта включая статику",
+          "sessions никогда не используют в production",
+          "JWT всегда лучше sessions для e-commerce logout",
+          "OAuth2 не использует JWT",
+          "JWT для static HTML only",
+          "session never for API"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки JWT",
+      "expected": "Кандидат называет: чувствительные данные в payload; localStorage + XSS → httpOnly cookie; нет exp / слабый secret; verify без algorithms whitelist; отзыв только через короткий access + refresh в Redis.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "signature_verify",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "localStorage",
+              "httpOnly",
+              "XSS"
+            ],
+            "ask": "где безопаснее хранить JWT на SPA и почему"
+          },
+          {
+            "match": [
+              "creditCard",
+              "password",
+              "PII",
+              "чувствит"
+            ],
+            "ask": "можно ли класть номер карты или email в payload"
+          },
+          {
+            "match": [
+              "refresh",
+              "Redis",
+              "rotation"
+            ],
+            "ask": "как реализовать logout и отзыв при stateless JWT"
+          }
+        ],
+        "mustConcepts": [
+          "localStorage",
+          "httpOnly",
+          "cookie",
+          "XSS",
+          "чувствит",
+          "PII",
+          "creditCard",
+          "password",
+          "expiresIn",
+          "randomBytes",
+          "256-bit",
+          "слабый secret",
+          "alg none",
+          "algorithms",
+          "refresh",
+          "Redis",
+          "rotation",
+          "jti",
+          "blacklist",
+          "15m",
+          "logout",
+          "iptables UDP 443",
+          "Wireshark quic filter",
+          "load test h2 fallback",
+          "Cloudflare 0-RTT GET"
+        ],
+        "falseClaims": [
+          "можно хранить пароль или карту в JWT payload",
+          "localStorage защищён от XSS",
+          "токен без expiration безопасен с сильным secret",
+          "jwt.verify(token, secret) без options достаточно в production",
+          "blacklist в памяти Node процесса надёжен после deploy",
+          "QUIC всегда быстрее на LAN",
+          "HPACK на h3 сервере ок"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "hs256_vs_rs256",
+      "title": "Отличает HS256 и RS256",
+      "expected": "Кандидат объясняет: HS256 симметричный — один shared secret для sign и verify; RS256 асимметричный — private key подписывает, public key verify; JWKS для multi-service без shared secret.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up HS256 vs RS256 из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "HS256",
+              "RS256",
+              "symmetric",
+              "asymmetric"
+            ],
+            "ask": "когда выбрать RS256 вместо HS256 в microservices"
+          }
+        ],
+        "mustConcepts": [
+          "HS256",
+          "RS256",
+          "symmetric",
+          "asymmetric",
+          "симметри",
+          "асимметри",
+          "shared secret",
+          "общий секрет",
+          "private key",
+          "public key",
+          "приватн",
+          "публичн",
+          "JWKS",
+          "multi-service",
+          "несколько сервис",
+          "verify",
+          "sign",
+          "private key sign",
+          "public key verify",
+          "JWKS endpoint",
+          "multi-service verify",
+          "shared secret risk"
+        ],
+        "falseClaims": [
+          "HS256 требует публичный ключ для verify",
+          "RS256 использует один и тот же secret для sign и verify",
+          "JWKS нужен только для HS256",
+          "RS256 медленнее и поэтому не используют в API",
+          "RS256 one shared secret",
+          "HS256 needs public key file"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "JWT — header.payload.signature в Base64Url. Payload с sub и role читаем на jwt.io, но подпись HMAC доказывает, что данные не менялись. После login клиент шлёт Authorization: Bearer; middleware verify с algorithms: ['HS256']. Stateless — без lookup в БД, но logout через удаление refresh в Redis.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для API между микросервисами беру JWT: любой инстанс verify по secret или JWKS. Access 15 минут, refresh в Redis с rotation — украли refresh, используют один раз, при следующем refresh старый уже invalid. В payload только userId и role, PII из БД после verify. Не localStorage — httpOnly cookie или memory + короткий TTL.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну jwt — три куска через точку, подписан не зашифрован, exp обязателен, alg none блокируем whitelistом",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "JWT шифрует данные — payload секретный. Храню в localStorage, verify без options норм, logout мгновенно инвалидирует токен без refresh.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Кладу creditCard и password в payload — JWT же защищён. Токен без expiration с secret 'password123'. alg:none принимаю если signature пустая.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "JWT и session одно и то же — сервер всегда хранит state в Redis для каждого access token. HS256 нужен public key от Auth0.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "jwt_structure",
+      "exampleType": "good",
+      "exampleText": "Три части: header alg typ, payload claims sub exp iat, signature HMAC. Base64Url — без + и = для HTTP headers.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "jwt_structure",
+      "exampleType": "good",
+      "exampleText": "подписан но не зашифрован — jwt.io покажет payload любому",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "jwt_structure",
+      "exampleType": "bad",
+      "exampleText": "JWT состоит из четырёх частей и payload зашифрован secret-ключом.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "signature_verify",
+      "exampleType": "good",
+      "exampleText": "jwt.verify пересчитывает HMAC-SHA256 над header.payload и сравнивает constant-time; если exp прошёл — 401 даже при верной подписи.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "signature_verify",
+      "exampleType": "good",
+      "exampleText": "изменил role в payload — signature не совпадёт, verify упадёт",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "signature_verify",
+      "exampleType": "bad",
+      "exampleText": "verify(token, secret) без algorithms — alg none ок если attacker убрал signature.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "jwt_vs_sessions",
+      "exampleType": "good",
+      "exampleText": "Session: server хранит userId в Redis, delete session = instant logout. JWT: stateless verify, но access жив до exp — нужен refresh blacklist.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "jwt_vs_sessions",
+      "exampleType": "good",
+      "exampleText": "stateless — десять pod'ов verify без shared session store, только shared secret",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "jwt_vs_sessions",
+      "exampleType": "bad",
+      "exampleText": "JWT отзывается мгновенно при logout без Redis и refresh tokens.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "auth_flow",
+      "exampleType": "good",
+      "exampleText": "POST /login → jwt.sign({ id, email }, secret, { expiresIn: '15m' }) → client Bearer на GET /profile → middleware verify → res.json({ user: decoded }).",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "auth_flow",
+      "exampleType": "good",
+      "exampleText": "axios interceptor добавляет Authorization: Bearer token на каждый API call",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "auth_flow",
+      "exampleType": "bad",
+      "exampleText": "Verify делаю только на login, дальше доверяю decoded payload из localStorage без проверки подписи.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use_jwt",
+      "exampleType": "good",
+      "exampleText": "Mobile app + REST API — JWT в Authorization header. Monolith с session store и instant ban — classic session cookie проще.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_use_jwt",
+      "exampleType": "good",
+      "exampleText": "OAuth через Auth0 — JWT с стандартными claims, verify через JWKS endpoint",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use_jwt",
+      "exampleType": "bad",
+      "exampleText": "Для статического лендинга без API всегда JWT вместо отсутствия auth.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Wrong: jwt.sign({ creditCard: '4111...' }). Fix: только sub и role, карту из БД после verify. expiresIn 15m, secret из crypto.randomBytes(32).",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "refresh rotation: старый refresh delete из Redis, новая пара access+refresh — украденный refresh одноразовый",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "не localStorage — xss украдёт; httpOnly secure cookie или короткий access в memory",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Blacklist access tokens в Map() на Node — переживёт deploy и масштабирование.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "hs256_vs_rs256",
+      "exampleType": "good",
+      "exampleText": "HS256 — один JWT_SECRET на sign и verify, ok для monolith. RS256 — auth service подписывает private key, API gateway verify public key из JWKS без shared secret.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "hs256_vs_rs256",
+      "exampleType": "good",
+      "exampleText": "rs256 — приватный подписывает публичный проверяет, удобно когда много сервисов-verifier",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "hs256_vs_rs256",
+      "exampleType": "bad",
+      "exampleText": "RS256 — тот же shared secret что и для HS256, просто другое имя алгоритма.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "jwt-json-web-tokens-explained",
+    "apiUrl": "https://api.itlead.org/api/questions/jwt-json-web-tokens-explained",
+    "pageUrl": "https://itlead.org/interview-questions/general/jwt-json-web-tokens-explained",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is JWT and how does it work?",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

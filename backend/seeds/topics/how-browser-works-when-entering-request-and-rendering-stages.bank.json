@@ -1,0 +1,599 @@
+{
+  "topic": {
+    "code": "how_browser_works_when_entering_request_rendering_stages",
+    "name": "Как работает браузер: запрос и рендеринг",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работает браузер при вводе URL в адресную строку или переходе по ссылке — от сетевой фазы до появления пикселей на экране?",
+    "shortAnswer": "Пайплайн рендеринга браузера — полная цепочка от ввода URL до пикселей. Сетевая фаза: DNS → TCP → TLS (HTTPS) → HTTP-запрос и ответ. Фаза рендеринга: парсинг HTML → DOM, CSS → CSSOM, выполнение JS, render tree, layout, paint, composite. JS без async/defer блокирует парсинг. Анимации transform работают на compositor thread и не запускают layout и paint.",
+    "idealAnswer": "При вводе URL или клике по ссылке браузер проходит две фазы: сеть и рендеринг. Сеть: DNS lookup (кэш браузера → hosts → кэш ОС → рекурсивный DNS, warm <1ms, cold 20–120ms) → TCP handshake (SYN, SYN-ACK, ACK) → TLS для HTTPS (сертификат, cipher suite, session keys; HTTP/2 мультиплексирует запросы, HTTP/3 QUIC объединяет TCP+TLS) → HTTP GET с Host, User-Agent, Accept-Encoding, cookies → ответ сервера (200 — HTML, 301/302 перезапускает процесс с новым URL; chunked encoding позволяет парсить HTML до полной загрузки). Рендеринг: HTML парсится инкрементально — токенизация и построение DOM по мере чтения; CSSOM должен быть полностью построен до использования (каскад, поздние правила перекрывают ранние) — большой CSS блокирует render tree. `<script>` без атрибутов останавливает парсер (document.write, модификация DOM); async качает параллельно, но выполнение паузит парсер без гарантии порядка; defer — параллельная загрузка и выполнение после полного парсинга HTML в порядке документа. Render tree = видимые DOM-узлы + computed styles из CSSOM; `<head>`, `<script>`, `display: none` исключены; `visibility: hidden` остаётся и влияет на layout. Layout (reflow) вычисляет позицию, размер, margins, padding относительно viewport; изменение ширины родителя пересчитывает детей; чтение layout-свойства (offsetHeight, getBoundingClientRect) сразу после записи стиля форсирует синхронный layout — layout thrashing. Paint растеризует слои (цвета, текст, тени) back-to-front; composite на GPU объединяет compositor layers (transform, opacity, will-change, position: fixed) — анимация transform/opacity только composite, без layout и paint. Critical rendering path: DOM → CSSOM → render tree → layout → paint; оптимизация — меньше render-blocking ресурсов и байт. Reflow vs repaint: reflow меняет геометрию и всегда вызывает repaint; repaint — только пиксели без геометрии. Типичные ошибки: script в head без defer, layout thrashing в цикле, анимация width/left вместо transform, analytics без defer. DevTools: Network Timing (DNS, TCP, SSL, TTFB), Performance — жёлтый JS, фиолетовый layout, зелёный paint, тонкие полоски composite; Lighthouse «Eliminate render-blocking resources». layout thrashing в requestAnimationFrame: offsetWidth read → style.width write на каждом кадре — forced layout каждый frame.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "network_phase",
+      "title": "Знает сетевую фазу: DNS, TCP, TLS, HTTP",
+      "expected": "Кандидат описывает порядок: DNS lookup (кэш → hosts → рекурсивный DNS) → TCP (SYN/SYN-ACK/ACK) → TLS для HTTPS → HTTP GET и ответ; может упомянуть HTTP/2 multiplexing и HTTP/3 QUIC.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "сетевая фаза — ядро пайплайна из TL;DR",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "DNS",
+              "TCP",
+              "TLS",
+              "handshake"
+            ],
+            "ask": "в каком порядке идут DNS, TCP и TLS при открытии HTTPS-страницы"
+          },
+          {
+            "match": [
+              "HTTP/2",
+              "HTTP/3",
+              "QUIC",
+              "multiplex"
+            ],
+            "ask": "чем HTTP/2 и HTTP/3 меняют сетевую фазу по сравнению с HTTP/1.1"
+          }
+        ],
+        "mustConcepts": [
+          "DNS",
+          "lookup",
+          "кэш",
+          "hosts",
+          "рекурсивн",
+          "IP",
+          "TCP",
+          "SYN",
+          "SYN-ACK",
+          "ACK",
+          "handshake",
+          "TLS",
+          "HTTPS",
+          "сертификат",
+          "cipher",
+          "HTTP GET",
+          "Host",
+          "User-Agent",
+          "cookies",
+          "301",
+          "302",
+          "redirect",
+          "chunked",
+          "HTTP/2",
+          "multiplex",
+          "QUIC",
+          "HTTP/3"
+        ],
+        "falseClaims": [
+          "браузер сразу шлёт HTTP без DNS и TCP",
+          "TLS не нужен для HTTPS",
+          "301/302 не перезапускают загрузку с новым URL",
+          "DNS всегда идёт только на публичный 8.8.8.8 без кэша"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "dom_cssom_parsing",
+      "title": "Понимает парсинг DOM и CSSOM",
+      "expected": "Кандидат объясняет: HTML парсится инкрементально, DOM строится по мере чтения; CSSOM должен быть полностью готов до использования; большой CSS блокирует формирование render tree.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "разница incremental DOM vs полный CSSOM — ключ ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "render_tree",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "dom_cssom_parsing",
+            "oftenConfusedWith": [
+              "render_tree"
+            ],
+            "anchorTermsExpected": [
+              "DOM",
+              "CSSOM",
+              "инкремент",
+              "полност",
+              "каскад"
+            ],
+            "anchorTermsWrongTopic": [
+              "DOM это render tree",
+              "CSS парсится инкрементально как HTML"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "DOM",
+              "инкремент",
+              "incremental"
+            ],
+            "ask": "чем парсинг HTML отличается от парсинга CSS"
+          }
+        ],
+        "mustConcepts": [
+          "DOM",
+          "CSSOM",
+          "парсинг",
+          "инкремент",
+          "токен",
+          "узел",
+          "дерево",
+          "полност",
+          "каскад",
+          "override",
+          "render tree",
+          "блокир",
+          "stylesheet",
+          "media query",
+          "некритичн",
+          "chunked HTML"
+        ],
+        "falseClaims": [
+          "браузер ждёт весь HTML перед началом парсинга",
+          "CSSOM можно использовать до полной загрузки CSS",
+          "DOM и CSSOM строятся одинаково инкрементально",
+          "поздние CSS-правила не влияют на уже построенный CSSOM"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "script_blocking",
+      "title": "Знает блокировку парсера скриптами",
+      "expected": "Кандидат объясняет: script без атрибутов блокирует парсинг; async — параллельная загрузка, выполнение без гарантии порядка; defer — после полного парсинга HTML в порядке документа; document.write как причина блокировки.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "async/defer — частая production-ошибка middle",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "async",
+              "defer",
+              "script"
+            ],
+            "ask": "чем defer отличается от async и когда что выбирать"
+          },
+          {
+            "match": [
+              "document.write",
+              "блокир",
+              "парсер"
+            ],
+            "ask": "почему script без атрибутов останавливает HTML parser"
+          }
+        ],
+        "mustConcepts": [
+          "script",
+          "async",
+          "defer",
+          "блокир",
+          "парсер",
+          "parser",
+          "document.write",
+          "fetch",
+          "execute",
+          "порядок",
+          "head",
+          "render-blocking",
+          "analytics",
+          "third-party",
+          "Time to Interactive",
+          "TTI"
+        ],
+        "falseClaims": [
+          "async гарантирует порядок выполнения скриптов",
+          "defer выполняется до завершения парсинга HTML",
+          "script в head без defer не блокирует парсинг",
+          "analytics в head без defer не влияет на FCP"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "render_tree",
+      "title": "Понимает render tree",
+      "expected": "Кандидат объясняет: render tree = видимые DOM-узлы + computed styles; display:none исключён; visibility:hidden остаётся и влияет на layout; head и script не в render tree.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "render tree vs DOM — базовый блок ITLead",
+        "confusionPairs": [
+          {
+            "checkpointKey": "render_tree",
+            "oftenConfusedWith": [
+              "dom_cssom_parsing"
+            ],
+            "anchorTermsExpected": [
+              "render tree",
+              "display: none",
+              "visibility: hidden",
+              "видим"
+            ],
+            "anchorTermsWrongTopic": [
+              "render tree это копия DOM",
+              "visibility hidden убирает из layout"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "render tree",
+          "DOM",
+          "CSSOM",
+          "computed style",
+          "display: none",
+          "visibility: hidden",
+          "head",
+          "script",
+          "видим",
+          "исключ",
+          "занимает место",
+          "layout impact"
+        ],
+        "falseClaims": [
+          "render tree идентичен DOM",
+          "visibility: hidden убирает элемент из layout",
+          "display: none и visibility: hidden ведут себя одинаково в layout",
+          "элементы в head участвуют в render tree"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "layout_reflow",
+      "title": "Понимает layout и layout thrashing",
+      "expected": "Кандидат объясняет: layout вычисляет геометрию; изменение родителя пересчитывает детей; read layout после write style — синхронный forced layout; batch reads/writes; reflow vs repaint.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "layout thrashing — типичная perf-ошибка",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "offsetHeight",
+              "getBoundingClientRect",
+              "thrashing"
+            ],
+            "ask": "что такое layout thrashing и как его избежать в цикле"
+          },
+          {
+            "match": [
+              "reflow",
+              "repaint",
+              "геометр"
+            ],
+            "ask": "чем reflow отличается от repaint"
+          },
+          {
+            "match": [
+              "requestAnimationFrame",
+              "offsetWidth"
+            ],
+            "ask": "почему read offsetWidth и write style.width в rAF на каждом кадре убивает FPS"
+          }
+        ],
+        "mustConcepts": [
+          "layout",
+          "reflow",
+          "repaint",
+          "геометр",
+          "position",
+          "width",
+          "height",
+          "margin",
+          "padding",
+          "viewport",
+          "box model",
+          "offsetHeight",
+          "offsetWidth",
+          "getBoundingClientRect",
+          "layout thrashing",
+          "forced layout",
+          "synchronous",
+          "batch read",
+          "batch write",
+          "dirty"
+        ],
+        "falseClaims": [
+          "чтение offsetHeight не форсирует layout",
+          "repaint всегда вызывает reflow",
+          "reflow не влияет на дочерние элементы",
+          "layout thrashing в rAF безопасен если чередовать read/write"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "paint_composite",
+      "title": "Знает paint и composite",
+      "expected": "Кандидат объясняет: paint растеризует слои; composite на GPU объединяет layers; transform/opacity анимации только composite; will-change продвигает на compositor layer.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "compositor path — ключ к 60fps анимациям",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "transform",
+              "compositor",
+              "GPU"
+            ],
+            "ask": "почему анимация transform не вызывает layout и paint"
+          }
+        ],
+        "mustConcepts": [
+          "paint",
+          "composite",
+          "compositor",
+          "GPU",
+          "layer",
+          "шар",
+          "raster",
+          "transform",
+          "opacity",
+          "will-change",
+          "position: fixed",
+          "painter",
+          "back to front",
+          "60fps",
+          "compositor thread",
+          "main thread"
+        ],
+        "falseClaims": [
+          "анимация width работает только на compositor без layout",
+          "paint и composite — одно и то же",
+          "will-change всегда ускоряет любую анимацию без оверхеда",
+          "transform анимация всё равно триггерит reflow каждый кадр"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки и critical path",
+      "expected": "Кандидат называет: script в head без defer, layout thrashing, анимация geometry вместо transform, analytics без defer; critical rendering path; DevTools/Lighthouse для диагностики.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "critical path + real-world tooling — бонус middle",
+        "mustConcepts": [
+          "critical rendering path",
+          "render-blocking",
+          "Lighthouse",
+          "DevTools",
+          "Performance",
+          "Network Timing",
+          "FCP",
+          "TTI",
+          "defer",
+          "analytics",
+          "chat widget",
+          "width animation",
+          "left animation"
+        ],
+        "falseClaims": [
+          "critical path не включает CSSOM",
+          "Lighthouse не ловит render-blocking scripts",
+          "React обходит layout и paint полностью",
+          "оптимизация critical path — только уменьшить JS"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Ввёл URL: DNS нашёл IP, TCP+TLS, GET /index.html. HTML парсится инкрементально в DOM, CSS строит полный CSSOM. defer-скрипты после парсинга. Render tree без display:none. Layout считает боксы, paint — пиксели, GPU composite. Анимацию двигаю через transform, не left — только compositor.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Сетевая фаза: кэш DNS → SYN/ACK → TLS cert → HTTP 200 chunked. Рендер: DOM+CSSOM → render tree → layout/paint/composite. Script без defer в head блокирует парсер — ставлю defer для app.js, async только для analytics. В цикле сначала читаю все offsetHeight, потом пишу height — без thrashing.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В DevTools Network вижу DNS/TCP/SSL/TTFB. Performance: фиолетовый layout после изменения width, зелёный paint. visibility:hidden остаётся в layout, display:none — нет. HTTP/2 мультиплексирует CSS и JS по одному соединению.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Браузер сразу рисует страницу без DNS и TCP. DOM и render tree — одно и то же. async гарантирует порядок app.js и components.js. visibility:hidden убирает элемент из layout как display:none.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "CSSOM строится инкрементально как HTML — можно рендерить после первых 10 правил. Анимация width на compositor без reflow. offsetHeight в цикле после style.height — норм, браузер не делает forced layout.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "repaint всегда вызывает reflow. defer выполняется до парсинга HTML. critical rendering path — только скачать меньше картинок, скрипты в head без атрибутов не блокируют FCP.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "network_phase",
+      "exampleType": "good",
+      "exampleText": "DNS: browser cache → hosts → OS cache → recursive DNS. Потом TCP SYN/SYN-ACK/ACK, TLS handshake, GET с Host и cookies. 301 — новый URL, весь цикл заново.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "network_phase",
+      "exampleType": "good",
+      "exampleText": "ну сначала dns ip, tcp рукопожатие, tls если https, потом get и html байты chunked",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "network_phase",
+      "exampleType": "bad",
+      "exampleText": "HTTP идёт до DNS, TLS не нужен для https://. Редирект 302 не перезагружает страницу с новым адресом.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "dom_cssom_parsing",
+      "exampleType": "good",
+      "exampleText": "HTML токенизируется и DOM растёт по мере чтения — не ждём весь файл. CSSOM должен быть complete: поздние селекторы перекрывают ранние, поэтому render tree ждёт CSS.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "dom_cssom_parsing",
+      "exampleType": "good",
+      "exampleText": "большой css в head блокирует render — режу по media query, откладываю некритичные стили",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "dom_cssom_parsing",
+      "exampleType": "bad",
+      "exampleText": "CSS парсится кусками как HTML, render tree строится после первого stylesheet rule.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "script_blocking",
+      "exampleType": "good",
+      "exampleText": "`<script src=app.js>` без атрибутов — parser stop, fetch, execute, resume. defer: parallel download, run after parse in order. async: run when ready, order not guaranteed — только для независимых трекеров.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "script_blocking",
+      "exampleType": "good",
+      "exampleText": "analytics и chat widget в head — только defer или async, иначе +сотни ms к TTI на 3G",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "script_blocking",
+      "exampleType": "bad",
+      "exampleText": "Поставил async на jQuery и плагин — порядок гарантирован. defer выполняется до DOMContentLoaded во время парсинга body.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "render_tree",
+      "exampleType": "good",
+      "exampleText": "Render tree: видимые узлы DOM + computed styles. head/script/display:none out. visibility:hidden in — место в layout остаётся.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "render_tree",
+      "exampleType": "good",
+      "exampleText": "display none выпиливает из render tree, hidden только прячет пиксели но layout как будто элемент на месте",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "render_tree",
+      "exampleType": "bad",
+      "exampleText": "Render tree = полная копия DOM включая head и script tags. visibility:hidden не влияет на соседние элементы.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "layout_reflow",
+      "exampleType": "good",
+      "exampleText": "Layout считает box каждого узла. offsetHeight после style.height в цикле — forced sync layout каждую итерацию. Фикс: map heights, потом forEach write.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "layout_reflow",
+      "exampleType": "good",
+      "exampleText": "reflow — геометрия, repaint — цвет без геометрии. reflow всегда тянет repaint, обратно нет",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "layout_reflow",
+      "exampleType": "bad",
+      "exampleText": "getBoundingClientRect не форсирует layout если до этого менял style. repaint меняет width родителя без reflow.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "paint_composite",
+      "exampleType": "good",
+      "exampleText": "Paint растеризует слои back-to-front. transform translateX в rAF — только composite на GPU, layout/paint skip. will-change: transform до анимации — свой compositor layer.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "paint_composite",
+      "exampleType": "good",
+      "exampleText": "анимирую opacity и transform, не width/left — compositor thread, 60fps",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "paint_composite",
+      "exampleType": "bad",
+      "exampleText": "style.left в rAF так же дёшево как transform — оба только composite. paint и composite всегда на main thread.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Critical path: минимум render-blocking CSS/JS, defer на app, async на analytics. Lighthouse flag render-blocking. Performance tab: жёлтый JS, фиолетовый layout.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "не ставлю heavy script в head без defer, не анимирую width, батчу layout reads",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "React Virtual DOM обходит layout paint composite — браузерные стадии не нужны. critical path оптимизируется только CDN для картинок.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "how-browser-works-when-entering-request-and-rendering-stages",
+    "apiUrl": "https://api.itlead.org/api/questions/how-browser-works-when-entering-request-and-rendering-stages",
+    "pageUrl": "https://itlead.org/interview-questions/general/how-browser-works-when-entering-request-and-rendering-stages",
+    "difficulty": "MIDDLE",
+    "titleEn": "How browser works when entering request and rendering stages",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

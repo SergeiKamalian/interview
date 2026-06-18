@@ -1,0 +1,567 @@
+{
+  "topic": {
+    "code": "server_sent_events_polling_and_long_polling_what_they_are_and_when_to_use",
+    "name": "SSE, polling и long polling",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Чем отличаются polling, long polling и Server-Sent Events и когда что использовать?",
+    "shortAnswer": "Polling — периодический fetch по таймеру, даже если данных нет. Long polling — один запрос держится открытым до появления данных или timeout, затем клиент сразу открывает новый. SSE — одно HTTP-соединение с Content-Type text/event-stream; сервер пушит события через data: строки; EventSource автоматически переподключается. Для двусторонней связи — WebSockets.",
+    "idealAnswer": "Polling, long polling и SSE — три HTTP-паттерна доставки обновлений с сервера в браузер без ручного запроса пользователем. Polling: setInterval + fetch каждые N секунд — просто, но много пустых ответов и высокая latency (в среднем половина интервала). Long polling: клиент делает fetch, сервер держит res открытым до события или timeout (~30s), затем res.end и клиент сразу стартует новый цикл — latency ниже, но много удерживаемых соединений. SSE: одно постоянное HTTP/1.1 соединение с chunked transfer и text/event-stream; сервер пишет data: ...\\n\\n; браузерный EventSource парсит поток и auto-reconnect через ~3s при обрыве. Сравнение: polling — высокая нагрузка, плохая масштабируемость, latency = интервал/2; long poll — средняя нагрузка, плохо при 10k одновременных таймеров в Node event loop; SSE — одно соединение на клиента, хорошо до ~10k conn/server, push <50ms после установки. Когда что: редкие обновления дашборда (30s+) — polling; legacy chat без WebSocket/SSE — long poll; live notifications, stock tickers, log streams — SSE; игры и collaborative editors — WebSockets (bidirectional). Internals: long poll в Express — res в памяти до data/timeout; SSE — flushHeaders() в Node 18+ иначе буферизация; HTTP/2 снимает лимит 6 conn/domain для SSE. Типичные ошибки: EventSource без onerror (после 3 retry UI зависает); long poll без AbortController timeout; polling каждую 1s (86400 req/day); SSE для отправки данных клиентом; забытый req.on('close') на сервере. Real-world: GitHub/Twitter SSE notifications; Socket.io fallback на long poll; React Query/SWR polling для cache invalidation.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "three_patterns",
+      "title": "Описывает три паттерна",
+      "expected": "Кандидат объясняет: polling — периодический запрос по таймеру; long polling — запрос держится до data/timeout и сразу перезапускается; SSE — одно постоянное соединение, сервер пушит события через EventSource.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — три HTTP-паттерна real-time",
+        "confusionPairs": [
+          {
+            "checkpointKey": "three_patterns",
+            "oftenConfusedWith": [
+              "sse_internals",
+              "comparison_tradeoffs"
+            ],
+            "anchorTermsExpected": [
+              "polling",
+              "long polling",
+              "SSE",
+              "EventSource",
+              "interval",
+              "hold",
+              "persistent",
+              "push"
+            ],
+            "anchorTermsWrongTopic": [
+              "WebSocket upgrade",
+              "chunked только для long poll",
+              "SSE bidirectional"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "polling",
+              "long poll",
+              "SSE"
+            ],
+            "ask": "чем polling отличается от long polling и SSE на уровне HTTP-запросов"
+          }
+        ],
+        "mustConcepts": [
+          "polling",
+          "long polling",
+          "SSE",
+          "Server-Sent Events",
+          "EventSource",
+          "setInterval",
+          "interval",
+          "таймер",
+          "hold request",
+          "удержива",
+          "persistent",
+          "постоянн",
+          "push",
+          "пуш",
+          "text/event-stream",
+          "перезапуск",
+          "restart",
+          "timeout"
+        ],
+        "falseClaims": [
+          "SSE двусторонний по протоколу",
+          "polling всегда даёт минимальную latency",
+          "long polling — один запрос навсегда без перезапуска",
+          "SSE и WebSocket одно и то же",
+          "long polling не использует обычный HTTP fetch"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "comparison_tradeoffs",
+      "title": "Сравнивает latency, нагрузку и масштабируемость",
+      "expected": "Кандидат сравнивает по таблице: polling — много коротких запросов, высокая latency, пустые ответы; long poll — удерживаемые соединения, latency ниже; SSE — одно соединение, низкая нагрузка, push мгновенный; WebSocket — bidirectional.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "comparison table — ключевой trade-off middle",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "three_patterns",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "latency",
+              "нагрузк",
+              "load"
+            ],
+            "ask": "trade-off polling vs long polling vs SSE по latency и server load"
+          },
+          {
+            "match": [
+              "10k",
+              "масштаб",
+              "scalab"
+            ],
+            "ask": "почему 10 000 long poll клиентов перегружают Node event loop"
+          }
+        ],
+        "mustConcepts": [
+          "latency",
+          "задержк",
+          "server load",
+          "нагрузк",
+          "scalability",
+          "масштаб",
+          "empty responses",
+          "пустые ответ",
+          "held connections",
+          "удерживаем",
+          "connection",
+          "соединен",
+          "WebSocket",
+          "bidirectional",
+          "двусторон",
+          "interval/2",
+          "половин интервал",
+          "50ms",
+          "100ms overhead",
+          "empty polling responses",
+          "held connection long poll",
+          "one SSE socket",
+          "WebSocket full duplex",
+          "battery drain mobile keepalive"
+        ],
+        "falseClaims": [
+          "SSE всегда хуже масштабируется чем polling",
+          "polling лучше для live feeds и stock tickers",
+          "long polling не создаёт нагрузку на сервер",
+          "latency polling равна нулю при частом интервале",
+          "SSE worst scalability always",
+          "polling best live ticker latency"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Выбирает паттерн для сценария",
+      "expected": "Кандидат называет: редкий dashboard refresh 30s+ — polling; legacy chat без WS/SSE — long poll; notifications/logs/tickers — SSE; игры и collaborative editors — WebSocket; mobile/battery — осторожно с long poll и SSE.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use — decision rule из ITLead",
+        "confusionPairs": [
+          {
+            "checkpointKey": "when_to_use",
+            "oftenConfusedWith": [
+              "comparison_tradeoffs"
+            ],
+            "anchorTermsExpected": [
+              "dashboard",
+              "notifications",
+              "WebSocket",
+              "chat",
+              "stock ticker"
+            ],
+            "anchorTermsWrongTopic": [
+              "SSE для multiplayer game",
+              "polling каждую секунду для ticker"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "dashboard",
+          "дашборд",
+          "30 seconds",
+          "30 секунд",
+          "notifications",
+          "сповещен",
+          "stock ticker",
+          "тикер",
+          "log stream",
+          "лог",
+          "chat",
+          "чат",
+          "WebSocket",
+          "collaborative",
+          "редактор",
+          "игр",
+          "mobile",
+          "battery",
+          "батаре",
+          "legacy",
+          "firewall",
+          "proxy",
+          "cron style dashboard 30s",
+          "GitHub live notification SSE",
+          "Socket.io long poll fallback",
+          "Firebase legacy poll",
+          "React Query refetch interval"
+        ],
+        "falseClaims": [
+          "SSE подходит для multiplayer game state",
+          "polling каждую 1s нормален для stock ticker",
+          "WebSocket нужен для односторонних notifications",
+          "SSE заменяет polling везде всегда",
+          "SSE for multiplayer game state",
+          "1s poll fine production always"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "sse_internals",
+      "title": "Знает внутреннее устройство SSE",
+      "expected": "Кандидат объясняет: Content-Type text/event-stream; chunked transfer; формат data: + \\n\\n; EventSource auto-reconnect ~3s; onerror; flushHeaders в Node 18+; HTTP/2 multiplex снимает лимит 6 conn.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "how it works internally — EventSource и Node SSE",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "EventSource",
+              "text/event-stream",
+              "data:"
+            ],
+            "ask": "как браузер парсит SSE-поток и что происходит при обрыве"
+          },
+          {
+            "match": [
+              "flushHeaders",
+              "buffer",
+              "Node"
+            ],
+            "ask": "почему без flushHeaders клиент не видит события в Node 18+"
+          }
+        ],
+        "mustConcepts": [
+          "text/event-stream",
+          "Content-Type",
+          "data:",
+          "chunked",
+          "transfer encoding",
+          "EventSource",
+          "onmessage",
+          "onerror",
+          "reconnect",
+          "переподключ",
+          "3 seconds",
+          "3 секунд",
+          "flushHeaders",
+          "буфериза",
+          "buffer",
+          "HTTP/2",
+          "multiplex",
+          "6 connections",
+          "6 соединен",
+          "keep-alive",
+          "Cache-Control no-cache",
+          "double newline event delimiter",
+          "default reconnect 3 seconds",
+          "Node buffer until flushHeaders",
+          "HTTP/2 stream multiplex SSE",
+          "onerror stop after retries"
+        ],
+        "falseClaims": [
+          "SSE использует WebSocket протокол",
+          "EventSource никогда не переподключается",
+          "flushHeaders не нужен в Node",
+          "SSE работает только через HTTP/2",
+          "SSE WebSocket subprotocol",
+          "EventSource never reconnects"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: EventSource без onerror; long poll без AbortController/timeout; агрессивный polling 1s; SSE для client→server; забытый flushHeaders; query params в SSE stream.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "common mistakes — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "onerror",
+              "EventSource"
+            ],
+            "ask": "что случится с UI если EventSource без onerror и retry исчерпаны"
+          },
+          {
+            "match": [
+              "AbortController",
+              "timeout",
+              "long poll"
+            ],
+            "ask": "зачем AbortController 35s при server timeout 30s"
+          }
+        ],
+        "mustConcepts": [
+          "onerror",
+          "AbortController",
+          "timeout",
+          "таймаут",
+          "1 second poll",
+          "1 секунд",
+          "86400",
+          "backoff",
+          "exponential",
+          "flushHeaders",
+          "bidirectional SSE",
+          "query param",
+          "buffer",
+          "буфер",
+          "3 retry",
+          "3 попыт",
+          "UI freeze",
+          "завис",
+          "aggressive polling",
+          "iptables UDP 443",
+          "Wireshark quic filter",
+          "load test h2 fallback",
+          "Cloudflare 0-RTT GET"
+        ],
+        "falseClaims": [
+          "EventSource retry бесконечно и UI всегда знает о проблеме",
+          "long poll не нужен client-side timeout если сервер упал",
+          "polling каждую секунду безопасен при любом числе клиентов",
+          "можно слать client data через SSE query params без проблем",
+          "QUIC всегда быстрее на LAN",
+          "HPACK на h3 сервере ок"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "implementation_notes",
+      "title": "Знает практику реализации",
+      "expected": "Кандидат упоминает: Express SSE headers + req.on('close'); React EventSource в useEffect с cleanup; Socket.io long poll fallback; React Query/SWR polling; Redis pub/sub при 10k long poll.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "real-world usage и production patterns",
+        "mustConcepts": [
+          "Express",
+          "writeHead",
+          "req.on close",
+          "cleanup",
+          "useEffect",
+          "es.close",
+          "Socket.io",
+          "fallback",
+          "React Query",
+          "SWR",
+          "GitHub",
+          "Twitter",
+          "Firebase",
+          "Redis pub/sub",
+          "publish",
+          "cache invalidation",
+          "инвалидац",
+          "robustLongPoll",
+          "exponential backoff",
+          "Express res.write data",
+          "useEffect close EventSource",
+          "Socket.io transport upgrade",
+          "SWR polling five minutes",
+          "cleanup on unmount SSE"
+        ],
+        "falseClaims": [
+          "SSE работает нативно в IE11 без polyfill",
+          "Socket.io всегда использует только WebSocket",
+          "req.on('close') не нужен для SSE interval cleanup",
+          "Redis pub/sub нужен только для WebSockets",
+          "SSE native IE11",
+          "long poll no server timeout needed"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Polling — setInterval fetch каждые 30s для дашборда: просто, но половина запросов пустые. Long poll — сервер держит res до события, клиент сразу открывает новый. SSE — EventSource на /events, сервер пишет data: JSON\\n\\n, push почти мгновенный. Для чата с двусторонней связью — WebSocket, не SSE.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На notifications в веб-приложении беру SSE: одно соединение, GitHub так делает. EventSource с onerror — после 3 auto-retry UI показывает «переподключение». На сервере Express: text/event-stream, flushHeaders, req.on('close') чистит interval. Long poll только как fallback Socket.io.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "React Query polling раз в 5 минут для фоновой инвалидации кеша — ок. Stock ticker — SSE, не polling каждую секунду: 86400 запросов в день с клиента. Long poll с AbortController 35s при server hold 30s.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "SSE — двусторонний протокол для чата, polling даёт минимальную latency для live feeds, long poll не перезапускает запрос после ответа.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "EventSource без onerror — браузер сам всё починит бесконечно. Long poll без timeout нормален, сервер никогда не падает. Polling каждую 1s для 1000 пользователей — лёгкая нагрузка.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В Node SSE можно не вызывать flushHeaders — события всё равно стримятся сразу. SSE через query params отправляю сообщения клиента на сервер — это штатный паттерн.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "three_patterns",
+      "exampleType": "good",
+      "exampleText": "Polling — fetch по таймеру независимо от данных. Long poll — один запрос блокируется до data/timeout, потом сразу новый. SSE — одно HTTP-соединение, сервер пушит через data: строки.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "three_patterns",
+      "exampleType": "good",
+      "exampleText": "ну polling как почтовый ящик каждые 5 мин, long poll ждёшь у ящика, sse — одна открытая линия и курьер звонит когда есть письмо",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "three_patterns",
+      "exampleType": "bad",
+      "exampleText": "Все три — это WebSocket с разными именами. Long polling держит один запрос навсегда без перезапуска.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "comparison_tradeoffs",
+      "exampleType": "good",
+      "exampleText": "Polling latency ≈ половина интервала, много пустых ответов. Long poll — latency ниже, но 10k удерживаемых res грузят event loop. SSE — одно conn на клиента, push <50ms, до ~10k conn/server.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "comparison_tradeoffs",
+      "exampleType": "good",
+      "exampleText": "для bidirectional — websocket, sse односторонний server→client, polling самый простой но самый шумный по запросам",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "comparison_tradeoffs",
+      "exampleType": "bad",
+      "exampleText": "Polling масштабируется лучше SSE потому что короткие запросы. Long polling не создаёт held connections.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Cron-style dashboard раз в 30s — polling. Live notifications и log stream — SSE. Legacy chat без WS — long poll. Multiplayer/collab editor — WebSocket.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "на мобилке с батареей long poll и sse осторожно — постоянное соединение жрёт энергию; редкий polling иногда лучше",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Stock ticker на polling каждую секунду — best practice. SSE для collaborative editor с двусторонней синхронизацией.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "sse_internals",
+      "exampleType": "good",
+      "exampleText": "text/event-stream + chunked; браузер читает data: ...\\n\\n; EventSource auto-reconnect ~3s; onerror для UI. Node 18+: res.flushHeaders() иначе буфер до закрытия conn.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "sse_internals",
+      "exampleType": "good",
+      "exampleText": "http/2 мультиплексирует потоки — лимит 6 conn на домен для sse почти не актуален",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "sse_internals",
+      "exampleType": "bad",
+      "exampleText": "SSE делает HTTP upgrade как WebSocket. flushHeaders в Node не нужен — write сразу виден клиенту всегда.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "EventSource: onerror + индикатор reconnect — после 3 auto-retry браузер останавливается, UI не должен молчать. Long poll: AbortController 35s при server timeout 30s.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "не poll stocks каждую 1s — exponential backoff; sse не для client send через query string; flushHeaders на express sse route",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Long poll без client timeout — если сервер упал, fetch висит вечно и это нормально. EventSource retry infinite без onerror.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "implementation_notes",
+      "exampleType": "good",
+      "exampleText": "Express /events: writeHead text/event-stream, flushHeaders, setInterval res.write data, req.on('close') clearInterval. React: useEffect EventSource, return () => es.close().",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "implementation_notes",
+      "exampleType": "good",
+      "exampleText": "10k long poll — redis pub/sub вместо 10k таймеров в node; socket.io fallback long poll; react query refetchInterval для фонового polling",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "implementation_notes",
+      "exampleType": "bad",
+      "exampleText": "SSE в IE11 работает нативно. Забыть req.on('close') — interval сам остановится при disconnect клиента.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "server-sent-events-polling-and-long-polling-what-they-are-and-when-to-use",
+    "apiUrl": "https://api.itlead.org/api/questions/server-sent-events-polling-and-long-polling-what-they-are-and-when-to-use",
+    "pageUrl": "https://itlead.org/interview-questions/general/server-sent-events-polling-and-long-polling-what-they-are-and-when-to-use",
+    "difficulty": "MIDDLE",
+    "titleEn": "Server-sent events, polling and long polling: what they are and when to use",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

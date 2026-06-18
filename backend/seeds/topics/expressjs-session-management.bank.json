@@ -1,0 +1,609 @@
+{
+  "topic": {
+    "code": "expressjs_session_management",
+    "name": "Управление сессиями в Express.js",
+    "skillCode": "expressjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работает управление сессиями (session management) в Express.js?",
+    "shortAnswer": "express-session хранит данные пользователя на сервере и отдаёт клиенту только подписанный cookie с session ID. На каждом запросе middleware проверяет ID и загружает запись из store; req.session — объект для чтения и записи. В production нужен shared store (Redis), secret из env, cookie с httpOnly/sameSite и regenerate после логина.",
+    "idealAnswer": "HTTP stateless — сессии добавляют состояние: данные на сервере, клиент получает только подписанный cookie с ID (аналогия «гардероб: отдаёшь пальто — получаешь номерок»). express-session на каждом запросе читает connect.sid, проверяет HMAC-SHA256 подпись secret, загружает объект из store и прикрепляет req.session; в конце цикла сохраняет изменения. В cookie только ID, не сами данные — это защищает от XSS и утечки payload. Базовая конфигурация: secret: process.env.SESSION_SECRET; resave: false (не писать в store без изменений — экономия 50–70% записей); saveUninitialized: false (не создавать сессию для анонимов и ботов); cookie: { httpOnly: true, sameSite: 'lax', secure в production, maxAge }. MemoryStore — только dev: утечка памяти, теряется при рестарте, в кластере каждый worker держит свой store — логин на worker 1 не виден на worker 2. Production: connect-redis, connect-pg-simple или connect-mongo. Sessions vs JWT: сессии — server-side state, мгновенный revoke (удалить запись), хороши для SSR/admin; JWT — stateless, масштабируется без shared store, но revoke сложнее (blacklist/короткий TTL), лучше для SPA/API. Session fixation: атакующий подставляет известный connect.sid до логина жертвы — после входа обе стороны делят сессию; fix — req.session.regenerate() сразу после успешной аутентификации. Типичные ошибки: hardcoded secret в git; saveUninitialized: true; MemoryStore за load balancer; secure: true на localhost HTTP; logout без destroy; sensitive data в cookie вместо store. Revoke на всех устройствах: Set session ID в Redis per userId, logout-all удаляет все записи. sameSite: 'lax' + CSRF-токен на mutating endpoints — типичный баланс; 'strict' блокирует cookie даже при переходе по ссылке.",
+    "maxScore": 10,
+    "skills": [
+      "expressjs",
+      "javascript",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "session_concept",
+      "title": "Понимает модель сессий",
+      "expected": "Кандидат объясняет: HTTP stateless; данные на сервере; cookie содержит только подписанный session ID; req.session — объект для read/write на каждом запросе; connect.sid.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — server store + signed cookie ID",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "session_concept",
+            "oftenConfusedWith": [
+              "sessions_vs_jwt"
+            ],
+            "anchorTermsExpected": [
+              "server-side",
+              "cookie",
+              "session ID",
+              "req.session",
+              "connect.sid",
+              "stateless"
+            ],
+            "anchorTermsWrongTopic": [
+              "JWT в cookie вместо ID",
+              "данные целиком в cookie",
+              "HTTP уже stateful"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "req.session",
+              "connect.sid",
+              "cookie"
+            ],
+            "ask": "что хранится в cookie, а что на сервере, и как middleware связывает их на каждом запросе"
+          }
+        ],
+        "mustConcepts": [
+          "session",
+          "сесс",
+          "stateless",
+          "безстан",
+          "HTTP",
+          "server-side",
+          "на сервере",
+          "cookie",
+          "session ID",
+          "connect.sid",
+          "signed",
+          "подпис",
+          "req.session",
+          "store",
+          "состоян",
+          "state",
+          "middleware",
+          "ID только",
+          "не данные в cookie"
+        ],
+        "falseClaims": [
+          "session data хранится целиком в cookie",
+          "HTTP уже stateful без сессий",
+          "req.session доступен без express-session middleware",
+          "connect.sid содержит userId в открытом виде",
+          "cookie и session store — одно и то же"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "session_storage_flow",
+      "title": "Знает как работает store и подпись",
+      "expected": "Кандидат описывает flow: чтение connect.sid → проверка HMAC подписи secret → fetch из store → attach req.session → save в конце запроса; async I/O не блокирует event loop.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "How session storage actually works — ключевой механизм ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "session_concept",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "HMAC",
+              "secret",
+              "подпис"
+            ],
+            "ask": "зачем secret и что произойдёт при подделке session cookie без знания secret"
+          },
+          {
+            "match": [
+              "store",
+              "fetch",
+              "save"
+            ],
+            "ask": "когда express-session пишет изменения обратно в store"
+          }
+        ],
+        "mustConcepts": [
+          "HMAC",
+          "SHA256",
+          "secret",
+          "подпис",
+          "verify",
+          "проверк",
+          "store",
+          "fetch",
+          "save",
+          "connect.sid",
+          "async",
+          "event loop",
+          "не блокир",
+          "конец запроса",
+          "цикл запроса",
+          "lookup",
+          "загруз"
+        ],
+        "falseClaims": [
+          "store не нужен — достаточно unsigned cookie",
+          "express-session синхронно блокирует Node на каждый Redis read",
+          "подпись cookie не проверяется если secret совпадает с dev",
+          "изменения req.session сохраняются только при resave: true всегда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "express_session_config",
+      "title": "Настраивает express-session",
+      "expected": "Кандидат называет: secret из process.env; resave: false; saveUninitialized: false; cookie httpOnly, sameSite, secure в prod, maxAge; объясняет зачем каждый флаг.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Quick example config — центральный практический блок ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "resave",
+              "saveUninitialized"
+            ],
+            "ask": "чем отличаются resave: false и saveUninitialized: false и зачем оба false"
+          },
+          {
+            "match": [
+              "httpOnly",
+              "sameSite",
+              "secure"
+            ],
+            "ask": "настройки cookie для XSS и CSRF: httpOnly, sameSite, secure"
+          }
+        ],
+        "mustConcepts": [
+          "express-session",
+          "secret",
+          "SESSION_SECRET",
+          "process.env",
+          "resave",
+          "saveUninitialized",
+          "httpOnly",
+          "secure",
+          "sameSite",
+          "lax",
+          "maxAge",
+          "cookie",
+          "false",
+          "не hardcode",
+          "аноним",
+          "бот"
+        ],
+        "falseClaims": [
+          "secret 'keyboard cat' безопасен в коде",
+          "saveUninitialized: true — рекомендуемый дефолт",
+          "secure: true на localhost HTTP работает нормально",
+          "resave: true всегда быстрее и безопаснее",
+          "httpOnly не влияет на XSS"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "session_stores",
+      "title": "Выбирает session store",
+      "expected": "Кандидат сравнивает MemoryStore (dev only) vs Redis/Postgres/Mongo; объясняет проблему кластера без shared store; connect-redis для production.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Session stores table — частая production-ошибка",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "MemoryStore",
+              "Redis",
+              "cluster"
+            ],
+            "ask": "почему MemoryStore ломается в pm2 cluster или Docker с несколькими репликами"
+          },
+          {
+            "match": [
+              "connect-redis",
+              "connect-pg-simple"
+            ],
+            "ask": "когда выбрать Redis store vs Postgres store"
+          }
+        ],
+        "mustConcepts": [
+          "MemoryStore",
+          "Redis",
+          "connect-redis",
+          "connect-pg-simple",
+          "connect-mongo",
+          "PostgreSQL",
+          "MongoDB",
+          "production",
+          "dev",
+          "кластер",
+          "cluster",
+          "worker",
+          "shared store",
+          "общий store",
+          "рестарт",
+          "утечк",
+          "OOM",
+          "TTL",
+          "load balancer"
+        ],
+        "falseClaims": [
+          "MemoryStore подходит для production за load balancer",
+          "sticky sessions полностью заменяют shared store",
+          "session store не нужен — cookie достаточно",
+          "каждый Node process видит одни и те же MemoryStore сессии",
+          "Redis store теряет все сессии при каждом redeploy приложения"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "login_logout_flow",
+      "title": "Реализует login, logout и защиту от fixation",
+      "expected": "Кандидат описывает: req.session.userId после auth; req.session.regenerate после login; req.session.destroy + clearCookie на logout; middleware requireAuth для protected routes.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Basic login example + session fixation — критичная security-практика",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "regenerate",
+              "fixation"
+            ],
+            "ask": "что такое session fixation и зачем regenerate сразу после login"
+          },
+          {
+            "match": [
+              "destroy",
+              "logout",
+              "clearCookie"
+            ],
+            "ask": "чем отличается req.session.destroy от простого res.clearCookie"
+          }
+        ],
+        "mustConcepts": [
+          "login",
+          "logout",
+          "req.session.userId",
+          "destroy",
+          "regenerate",
+          "session fixation",
+          "фиксац",
+          "requireAuth",
+          "middleware",
+          "protected route",
+          "401",
+          "clearCookie",
+          "connect.sid",
+          "новый ID",
+          "аутентиф"
+        ],
+        "falseClaims": [
+          "logout достаточно clearCookie без session.destroy",
+          "regenerate после login не нужен — ID и так уникален",
+          "session fixation не актуален для Express",
+          "можно писать userId в cookie без regenerate — безопасно",
+          "destroy на logout необязателен если maxAge короткий"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "sessions_vs_jwt",
+      "title": "Сравнивает sessions и JWT",
+      "expected": "Кандидат сравнивает: server-side vs client-side storage; instant revoke vs stateless scale; SSR/admin vs SPA/API; trade-offs по размеру cookie и blacklist.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Sessions vs JWT table ITLead",
+        "confusionPairs": [
+          {
+            "checkpointKey": "sessions_vs_jwt",
+            "oftenConfusedWith": [
+              "session_concept"
+            ],
+            "anchorTermsExpected": [
+              "JWT",
+              "stateless",
+              "revoke",
+              "server-side",
+              "SPA",
+              "API"
+            ],
+            "anchorTermsWrongTopic": [
+              "JWT хранит state на сервере",
+              "sessions нельзя отозвать",
+              "JWT всегда лучше для admin panel"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "JWT",
+          "stateless",
+          "revoke",
+          "отзыв",
+          "мгновен",
+          "scale",
+          "масштаб",
+          "shared store",
+          "traditional web",
+          "SSR",
+          "admin",
+          "SPA",
+          "API",
+          "microservice",
+          "blacklist",
+          "trade-off",
+          "размер cookie",
+          "payload"
+        ],
+        "falseClaims": [
+          "JWT всегда лучше sessions для любого приложения",
+          "sessions нельзя отозвать мгновенно",
+          "JWT не требует secret для подписи",
+          "sessions подходят для stateless microservices без store",
+          "JWT в httpOnly cookie полностью заменяет server sessions без trade-offs"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки и production-паттерны",
+      "expected": "Кандидат называет: hardcoded secret; saveUninitialized:true; MemoryStore в кластере; secure:true на dev; reusable auth middleware; revoke all devices через Redis Set; resave:false экономит записи.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Common mistakes + revoke-all-devices follow-up ITLead",
+        "mustConcepts": [
+          "hardcoded",
+          "keyboard cat",
+          "saveUninitialized",
+          "MemoryStore prod",
+          "secure dev",
+          "localhost",
+          "revoke all",
+          "все устройства",
+          "Redis Set",
+          "auth middleware",
+          "Passport",
+          "Socket.io",
+          "resave false",
+          "50-70%"
+        ],
+        "falseClaims": [
+          "можно хранить password в req.session для удобства",
+          "logout-all достаточно clearCookie на одном устройстве",
+          "secure: true на http://localhost — норм для dev",
+          "saveUninitialized:true не создаёт лишних записей"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "express-session: secret из env, resave и saveUninitialized false, Redis store в prod. Login через regenerate — новый session ID против fixation, потом req.session.userId. Logout — session.destroy и clearCookie. Cookie httpOnly, sameSite lax, secure только в production.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "HTTP stateless — данные на сервере, клиент получает только подписанный connect.sid. MemoryStore только для dev; за load balancer connect-redis. Sessions — мгновенный revoke для admin; JWT — для stateless API без shared store.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На каждом запросе middleware проверяет HMAC подпись cookie, тянет сессию из Redis, вешает req.session. resave:false — не пишем в Redis если handler ничего не менял. Logout-all — Set session ID per user в Redis, удаляем все sess: ключи.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "secret: 'keyboard cat' в коде — private repo безопасен. MemoryStore в production cluster со sticky sessions. saveUninitialized: true чтобы всегда был session ID.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Вся session data в unsigned JSON cookie — проще чем store. JWT и sessions одно и то же, revoke не нужен.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Logout — res.clearCookie без session.destroy. Login без regenerate — session fixation не проблема в 2026.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "session_concept",
+      "exampleType": "good",
+      "exampleText": "Cookie только signed session ID; userId и roles лежат на сервере в store; req.session — обычный объект для read/write.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "session_concept",
+      "exampleType": "good",
+      "exampleText": "ну сессия как номерок в гардеробе — connect.sid в cookie, пальто на сервере",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "session_concept",
+      "exampleType": "bad",
+      "exampleText": "Session хранит весь user object в client cookie plaintext — так быстрее без Redis.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "session_storage_flow",
+      "exampleType": "good",
+      "exampleText": "При запросе: read connect.sid → verify HMAC secret → get из Redis → req.session; в конце цикла save если были изменения.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "session_storage_flow",
+      "exampleType": "good",
+      "exampleText": "без valid подписи middleware не доверяет cookie — иначе можно подделать чужой session ID",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "session_storage_flow",
+      "exampleType": "bad",
+      "exampleText": "Store read синхронно блокирует весь Node process на каждый HTTP запрос.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "express_session_config",
+      "exampleType": "good",
+      "exampleText": "resave:false — skip write если session не менялась; saveUninitialized:false — не создаём пустые сессии для ботов.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "express_session_config",
+      "exampleType": "good",
+      "exampleText": "cookie httpOnly + sameSite lax + secure только NODE_ENV production — иначе localhost http не получит cookie",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "express_session_config",
+      "exampleType": "bad",
+      "exampleText": "SESSION_SECRET в git — один коммит и можно forge любой connect.sid.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "session_stores",
+      "exampleType": "good",
+      "exampleText": "connect-redis — shared store для pm2 cluster; login на worker 1 виден на worker 2.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "session_stores",
+      "exampleType": "good",
+      "exampleText": "MemoryStore — dev only, OOM при saveUninitialized true и бот-трафике",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "session_stores",
+      "exampleType": "bad",
+      "exampleText": "Production за nginx — MemoryStore OK, sticky IP решает всё.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "login_logout_flow",
+      "exampleType": "good",
+      "exampleText": "req.session.regenerate перед записью userId — новый ID, данные копируются, fixation закрыта.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "login_logout_flow",
+      "exampleType": "good",
+      "exampleText": "logout: destroy(err => { clearCookie('connect.sid'); res.json({ok:true}) })",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "login_logout_flow",
+      "exampleType": "bad",
+      "exampleText": "После login просто req.session.userId = id — regenerate лишний overhead.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "sessions_vs_jwt",
+      "exampleType": "good",
+      "exampleText": "Admin panel SSR — sessions, ban user = delete Redis key; mobile API — JWT stateless.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "sessions_vs_jwt",
+      "exampleType": "good",
+      "exampleText": "sessions revoke instant; jwt revoke — blacklist или короткий TTL",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "sessions_vs_jwt",
+      "exampleType": "bad",
+      "exampleText": "JWT всегда заменяет sessions — store никогда не нужен.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "logout-all: sMembers user:sessions → del каждый sess: id → del set",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "requireAuth middleware вместо if (!req.session.userId) в 40 routes",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "secure:true на http://localhost — cookie не ставится, это баг express-session.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "expressjs-session-management",
+    "apiUrl": "https://api.itlead.org/api/questions/expressjs-session-management",
+    "pageUrl": "https://itlead.org/interview-questions/expressjs/expressjs-session-management",
+    "difficulty": "MIDDLE",
+    "titleEn": "How does session management work in Express.js?",
+    "categorySlug": "expressjs",
+    "syncedAt": "2026-06-18T16:30:00.000Z"
+  }
+}

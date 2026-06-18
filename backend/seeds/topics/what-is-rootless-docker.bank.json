@@ -1,0 +1,614 @@
+{
+  "topic": {
+    "code": "what_is_rootless_docker",
+    "name": "Rootless Docker",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое rootless Docker и когда его использовать?",
+    "shortAnswer": "Rootless Docker запускает `dockerd` как обычный пользователь через Linux user namespaces — весь стек (демон и контейнеры) работает без root на хосте. При container escape атакующий получает права непривилегированного пользователя, а не root. Установка: `curl -fsSL https://get.docker.com/rootless | sh`, `DOCKER_HOST=unix://$XDG_RUNTIME_DIR/docker.sock`. Плюсы: нет root-демона, изоляция per-user, нет риска группы docker. Минусы: нет `--privileged`, порты <1024 по умолчанию, медленнее сеть (slirp4netns) и ~20% I/O. Подходит для CI, HPC, multi-tenant и regulated-сред; не подходит для privileged-нагрузок и высокого I/O.",
+    "idealAnswer": "Rootless Docker — режим, в котором весь Docker-стек (dockerd, контейнеры) работает от имени непривилегированного пользователя через Linux user namespaces. В классическом Docker `dockerd` работает как root; контейнеры ограничены, но сам демон — привилегированная цель. В rootless `dockerd` запускается обычным пользователем; UID 0 внутри контейнера — локальная конструкция user namespace, которая снаружи мапится на subuid (например 100000–165535). Container escape из rootless = компрометация пользователя, не host root — критично для shared infrastructure. Механизм: user namespaces перемапливают UID; демон использует subuids из /etc/subuid, контейнеры получают UIDs из этого диапазона. Установка без sudo для самого rootless-install: `curl -fsSL https://get.docker.com/rootless | sh`, затем `export PATH=$HOME/bin:$PATH`, `export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/docker.sock`, `systemctl --user start docker` (или `dockerd-rootless.sh`). Сокет отдельный от системного `/var/run/docker.sock`. Trade-offs — что теряем: `--privileged` и расширенные capabilities сверх лимитов пользователя; bind портов <1024 без setcap (workaround: 8080 или `setcap cap_net_bind_service=ep` на rootlesskit); медленнее сеть через slirp4netns (userspace TCP/IP, ~половина throughput bridge); медленнее storage (~20% I/O, часто fuse-overlayfs вместо overlay2); нет `docker run --network host`. Что получаем: нет root-демона для атаки; per-user изоляция — два пользователя на хосте не видят контейнеры друг друга; нет классического риска «добавь в группу docker = root»; проще audit — «Docker может то, что может его пользователь». Сравнение с Podman: Podman daemonless и rootless по умолчанию; rootless Docker сохраняет per-user dockerd и совместимость с docker compose. Podman — путь на RHEL/Fedora; rootless Docker — для mixed Docker/legacy. Когда использовать: CI runners (GitHub Actions self-hosted), HPC на shared nodes, per-tenant container hosts, regulated (finance, healthcare). Когда пропустить: нужны privileged-контейнеры, kernel modules, device pass-through, raw sockets/eBPF, nested virtualization, I/O-bound где 20% overhead неприемлем — тогда rootful + hardening (seccomp, AppArmor, userns-remap). Типичные ошибки: одновременно rootful и rootless — команды идут к тому, на что указывает DOCKER_HOST; `--privileged` даёт непонятные ошибки mount; забывают про медленную сеть; bind mount показывает «чужие» UID/nobody из-за remapping. На macOS/Windows Docker Desktop уже изолирует daemon в Linux VM — функционально похожая security. Production-ready с ~2020 (GitHub, HPC). slirp4netns — userspace TCP/IP для unprivileged; альтернативы pasta (быстрее), vpnkit (Desktop). Rootless и rootful могут coexist на одном хосте с разными сокетами.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "rootless_definition",
+      "title": "Понимает что такое rootless Docker",
+      "expected": "Кандидат объясняет: dockerd и контейнеры работают без root на хосте через user namespaces; escape даёт права пользователя, не host root; contrast с классическим rootful dockerd.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — TL;DR и security model из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "rootless_definition",
+            "oftenConfusedWith": [
+              "user_namespaces_mechanism",
+              "security_benefits"
+            ],
+            "anchorTermsExpected": [
+              "rootless",
+              "dockerd",
+              "непривилегирован",
+              "user namespace",
+              "escape",
+              "не root"
+            ],
+            "anchorTermsWrongTopic": [
+              "rootless это только non-root USER в Dockerfile",
+              "Podman и rootless Docker одно и то же",
+              "rootless убирает необходимость в kernel"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "rootless",
+              "rootful",
+              "dockerd"
+            ],
+            "ask": "чем rootless Docker отличается от обычного Docker по правам dockerd на хосте"
+          }
+        ],
+        "mustConcepts": [
+          "rootless",
+          "rootful",
+          "dockerd",
+          "непривилегирован",
+          "unprivileged",
+          "user namespace",
+          "user namespaces",
+          "без root",
+          "не root",
+          "escape",
+          "container escape",
+          "права пользователя",
+          "host root",
+          "классическ",
+          "обычный Docker",
+          "стек",
+          "демон",
+          "контейнер"
+        ],
+        "falseClaims": [
+          "rootless Docker — это только запуск контейнера с USER non-root в Dockerfile",
+          "rootless означает что dockerd всё равно работает как root на хосте",
+          "container escape из rootless даёт host root",
+          "rootless Docker не использует user namespaces",
+          "rootless и rootful dockerd — один и тот же процесс с разными флагами"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "user_namespaces_mechanism",
+      "title": "Знает механизм user namespaces и UID mapping",
+      "expected": "Кандидат описывает: UID 0 внутри контейнера мапится на subuid снаружи (100000+); dockerd работает как обычный user; escape = доступ к subuid, не host root.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "How it works — ключевая диаграмма UID remapping из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "rootless_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "subuid",
+              "UID",
+              "remap",
+              "100000"
+            ],
+            "ask": "как UID 0 внутри rootless-контейнера соотносится с UID на хосте"
+          },
+          {
+            "match": [
+              "user namespace",
+              "namespace"
+            ],
+            "ask": "зачем kernel user namespace нужен rootless Docker"
+          }
+        ],
+        "mustConcepts": [
+          "user namespace",
+          "user namespaces",
+          "UID",
+          "remap",
+          "remapping",
+          "subuid",
+          "subuids",
+          "100000",
+          "165535",
+          "root внутри",
+          "UID 0",
+          "host UID",
+          "мап",
+          "mapping",
+          "unprivileged UID",
+          "непривилегирован UID",
+          "dockerd",
+          "обычный пользователь",
+          "escape",
+          "100000-165535"
+        ],
+        "falseClaims": [
+          "root внутри rootless-контейнера — это реальный host root",
+          "user namespaces не участвуют в rootless Docker",
+          "subuid не нужен для rootless install",
+          "все контейнеры rootless работают с host UID 1000",
+          "escape из rootless контейнера автоматически даёт sudo"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "security_benefits",
+      "title": "Знает преимущества безопасности",
+      "expected": "Кандидат называет: нет root-демона для атаки; per-user изоляция стеков; нет риска группы docker; проще audit story («что может user — то может Docker»).",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "What rootless gains — блок ITLead TL;DR",
+        "mustConcepts": [
+          "root daemon",
+          "root-демон",
+          "privilege escalation",
+          "privilege-escalation",
+          "per-user",
+          "изоляц",
+          "отдельный стек",
+          "docker group",
+          "группа docker",
+          "audit",
+          "blast radius",
+          "attack surface",
+          "поверхность атаки",
+          "shared infrastructure",
+          "multi-tenant",
+          "hardening"
+        ],
+        "falseClaims": [
+          "rootless Docker полностью устраняет риск container escape",
+          "группа docker даёт root и в rootless режиме",
+          "два пользователя rootless видят контейнеры друг друга",
+          "rootless не улучшает security по сравнению с rootful",
+          "audit story rootless сложнее чем rootful"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "tradeoffs_limitations",
+      "title": "Понимает trade-offs и ограничения",
+      "expected": "Кандидат перечисляет: нет `--privileged`; порты <1024 без setcap; slirp4netns медленнее; ~20% I/O overhead; нет `--network host`; когда rootless не подходит (kernel features, high I/O).",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Trade-offs — центральный блок ITLead для middle",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "when_to_use",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "privileged",
+              "--privileged"
+            ],
+            "ask": "почему docker run --privileged не работает в rootless"
+          },
+          {
+            "match": [
+              "slirp4netns",
+              "network",
+              "медлен"
+            ],
+            "ask": "чем rootless-сеть отличается от bridge и почему медленнее"
+          },
+          {
+            "match": [
+              "80",
+              "1024",
+              "port",
+              "порт"
+            ],
+            "ask": "почему -p 80:80 падает по умолчанию и как обойти"
+          }
+        ],
+        "mustConcepts": [
+          "privileged",
+          "--privileged",
+          "порт",
+          "1024",
+          "CAP_NET_BIND_SERVICE",
+          "setcap",
+          "rootlesskit",
+          "slirp4netns",
+          "userspace",
+          "TCP/IP",
+          "throughput",
+          "bridge",
+          "I/O",
+          "20%",
+          "fuse-overlayfs",
+          "overlay2",
+          "network host",
+          "--network host",
+          "kernel module",
+          "device pass-through",
+          "eBPF",
+          "raw socket",
+          "nested virtualization",
+          "userns-remap"
+        ],
+        "falseClaims": [
+          "rootless Docker поддерживает --privileged как rootful",
+          "slirp4netns быстрее kernel bridge networking",
+          "rootless не имеет overhead на storage I/O",
+          "--network host работает в rootless без ограничений",
+          "порты ниже 1024 всегда доступны без дополнительной настройки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "installation_setup",
+      "title": "Знает установку и настройку",
+      "expected": "Кандидат описывает: curl rootless installer; PATH и DOCKER_HOST на user socket; systemctl --user start docker; loginctl enable-linger для CI; отдельный сокет от system Docker.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Installing rootless и CI runner setup из ITLead Examples",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "DOCKER_HOST",
+              "XDG_RUNTIME_DIR",
+              "docker.sock"
+            ],
+            "ask": "куда указывает DOCKER_HOST и чем сокет отличается от /var/run/docker.sock"
+          }
+        ],
+        "mustConcepts": [
+          "get.docker.com/rootless",
+          "curl",
+          "installer",
+          "DOCKER_HOST",
+          "XDG_RUNTIME_DIR",
+          "docker.sock",
+          "/var/run/docker.sock",
+          "systemctl --user",
+          "dockerd-rootless",
+          "PATH",
+          "HOME/bin",
+          "loginctl",
+          "enable-linger",
+          "hello-world",
+          "user socket",
+          "отдельный сокет"
+        ],
+        "falseClaims": [
+          "rootless install всегда требует sudo для dockerd",
+          "DOCKER_HOST не нужен — rootless использует тот же /var/run/docker.sock",
+          "systemctl start docker без --user запускает rootless daemon",
+          "rootless installer заменяет системный Docker автоматически без конфликтов",
+          "enable-linger не нужен для CI runner между SSH-сессиями"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: смешение rootless и rootful (DOCKER_HOST); --privileged с непонятными ошибками; забытая медленная сеть; UID/nobody на bind mount из-за remapping.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — mixing daemons, privileged, network, filesystem",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "rootful",
+              "rootless",
+              "DOCKER_HOST",
+              "оба"
+            ],
+            "ask": "что будет если на хосте одновременно rootful и rootless daemon"
+          },
+          {
+            "match": [
+              "nobody",
+              "bind mount",
+              "ownership",
+              "UID"
+            ],
+            "ask": "почему файлы на -v bind mount могут показывать nobody внутри rootless"
+          }
+        ],
+        "mustConcepts": [
+          "rootful",
+          "rootless",
+          "DOCKER_HOST",
+          "оба daemon",
+          "systemctl status docker",
+          "systemctl --user",
+          "privileged",
+          "mount",
+          "/proc/sys",
+          "slirp4netns",
+          "медленн",
+          "benchmark",
+          "bind mount",
+          "nobody",
+          "ownership",
+          "UID mapping",
+          "permission denied",
+          "permission",
+          "confus",
+          "пута"
+        ],
+        "falseClaims": [
+          "можно безопасно смешивать rootful и rootless без следить за DOCKER_HOST",
+          "--privileged в rootless работает с предупреждением но mount успешен",
+          "bind mount ownership в rootless всегда совпадает с хостом",
+          "slirp4netns не влияет на throughput high-throughput сервисов",
+          "docker info не показывает rootless режим"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда использовать и когда нет",
+      "expected": "Кандидат называет use cases: CI runners, HPC, multi-tenant, regulated; skip: privileged, kernel modules, extreme I/O; может упомянуть Podman vs rootless Docker и Docker Desktop на Mac/Windows.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Use when / Skip when и real-world usage из ITLead",
+        "mustConcepts": [
+          "CI",
+          "CI runner",
+          "GitHub Actions",
+          "HPC",
+          "multi-tenant",
+          "regulated",
+          "finance",
+          "healthcare",
+          "security-sensitive",
+          "Podman",
+          "daemonless",
+          "RHEL",
+          "Fedora",
+          "Docker Desktop",
+          "macOS",
+          "Windows",
+          "Linux VM",
+          "production-ready",
+          "2020",
+          "pasta",
+          "vpnkit",
+          "skip",
+          "не подходит",
+          "kernel features"
+        ],
+        "falseClaims": [
+          "rootless Docker не production-ready",
+          "rootless нужен на macOS host напрямую как на Linux",
+          "Podman и rootless Docker несовместимы с OCI images",
+          "CI runners никогда не используют rootless",
+          "regulated environments всегда требуют rootful Docker"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Rootless Docker — dockerd крутится как обычный user через user namespaces. UID 0 в контейнере мапится на subuid 100000+, escape не даёт host root. Ставлю curl get.docker.com/rootless, DOCKER_HOST на $XDG_RUNTIME_DIR/docker.sock. Плюс — нет root-демона; минус — нет --privileged, slirp4netns медленнее, порты <1024 нужен setcap на rootlesskit.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На self-hosted CI runner — rootless: каждый user свой dockerd, loginctl enable-linger, systemctl --user enable docker. Для regulated multi-tenant — audit простой: Docker ограничен правами user. Если нужен --privileged или device pass-through — rootful + seccomp/AppArmor/userns-remap, rootless не наш случай.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Rootful: dockerd root, escape = host root. Rootless: dockerd runner, escape = UID 100000. docker info показывает rootless. На Mac Desktop уже VM — там rootless термин для Linux-host. Podman daemonless по умолчанию; rootless Docker — если нужен docker compose и legacy tooling.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Rootless Docker — это когда в Dockerfile ставишь USER 1000. dockerd всё равно root, но контейнер non-root. --privileged и --network host работают как обычно.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Rootless медленнее только из-за overlay2, сеть такая же как bridge. Container escape из rootless даёт sudo на хосте. DOCKER_HOST не нужен — всегда /var/run/docker.sock.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Rootless не production-ready, только для dev. Podman использует другой формат образов не OCI. На CI всегда rootful потому что rootless не поддерживает compose.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "rootless_definition",
+      "exampleType": "good",
+      "exampleText": "Rootless — весь стек unprivileged: dockerd без root, escape = права user, не host root.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "rootless_definition",
+      "exampleType": "good",
+      "exampleText": "ну rootless это когда daemon не root, а контейнерный escape не превращается в root на машине",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "rootless_definition",
+      "exampleType": "bad",
+      "exampleText": "Rootless Docker — синоним distroless образов без shell.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "user_namespaces_mechanism",
+      "exampleType": "good",
+      "exampleText": "User namespace: root внутри контейнера = subuid 100000 на хосте. dockerd использует /etc/subuid диапазон, escape попадает в unprivileged UID.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "user_namespaces_mechanism",
+      "exampleType": "good",
+      "exampleText": "UID remapping — kernel даёт локальный UID 0, снаружи это 100000+, не настоящий root",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "user_namespaces_mechanism",
+      "exampleType": "bad",
+      "exampleText": "В rootless контейнере root — это реальный UID 0 хоста, namespaces не участвуют.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "security_benefits",
+      "exampleType": "good",
+      "exampleText": "Нет root-демона — главная attack surface классического Docker убрана. Per-user стеки изолированы, docker group root-trick не работает.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "security_benefits",
+      "exampleType": "good",
+      "exampleText": "auditor спрашивает что может docker — ответ: что может этот unix-user, проще чем rootful",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "security_benefits",
+      "exampleType": "bad",
+      "exampleText": "Rootless полностью исключает container escape, поэтому seccomp не нужен.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "tradeoffs_limitations",
+      "exampleType": "good",
+      "exampleText": "--privileged падает, -p 80:80 permission denied без setcap на rootlesskit, сеть slirp4netns ~половина bridge, I/O ~20% медленнее fuse-overlayfs.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "tradeoffs_limitations",
+      "exampleType": "good",
+      "exampleText": "High I/O или eBPF/raw sockets — rootless не подходит, берём rootful hardened или userns-remap на daemon",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "tradeoffs_limitations",
+      "exampleType": "bad",
+      "exampleText": "Rootless поддерживает --network host и --privileged с minor warnings.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "installation_setup",
+      "exampleType": "good",
+      "exampleText": "curl -fsSL get.docker.com/rootless | sh, export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/docker.sock, systemctl --user start docker, docker run hello-world.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "installation_setup",
+      "exampleType": "good",
+      "exampleText": "CI: enable-linger runner, user enable docker — сокет не /var/run/docker.sock а runtime dir user",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "installation_setup",
+      "exampleType": "bad",
+      "exampleText": "Rootless install: sudo apt install docker.io и dockerd автоматически rootless.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "На машине оба daemon — команды идут куда указывает DOCKER_HOST, легко перепутать. --privileged mount /proc/sys — типичная ошибка, rootless не grant.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "bind -v /home/me/data — внутри nobody из-за UID map, планируй ownership. High throughput — benchmark slirp4netns до commit.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Можно держать rootful и rootless — docker CLI сам выберет правильный daemon без DOCKER_HOST.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "GitHub self-hosted runner, HPC shared node, healthcare audit — rootless default. Nested virt с --privileged — rootful + hardening.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "RHEL — Podman проще; mixed docker compose legacy — rootless Docker. Mac Desktop — VM isolation, rootless термин для Linux host.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Rootless только для laptops, в production всегда rootful без исключений.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "what-is-rootless-docker",
+    "apiUrl": "https://api.itlead.org/api/questions/what-is-rootless-docker",
+    "pageUrl": "https://itlead.org/interview-questions/docker/what-is-rootless-docker",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is rootless Docker and when to use it?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

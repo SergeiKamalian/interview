@@ -1,0 +1,171 @@
+{
+  "topic": {
+    "code": "v8_architecture_from_code_machine_instructions",
+    "name": "Архитектура V8: от кода до машинных инструкций",
+    "skillCode": "javascript",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как устроена архитектура V8 и как JavaScript-код превращается в машинные инструкции?",
+    "shortAnswer": "V8 компилирует JS через pipeline: Parser → AST, Ignition → bytecode + type feedback, Sparkplug → baseline machine code, TurboFan → optimized machine code. При нарушении type assumptions — deoptimization обратно в bytecode. Стабильные типы на call site держат TurboFan активным.",
+    "idealAnswer": "V8 pipeline: Parser строит AST из source без runtime types. Ignition компилирует AST в compact bytecode и сразу исполняет, записывая type feedback на каждой инструкции (Add saw two Smi). Sparkplug (V8 9.1+) — 1:1 bytecode→machine, ~2x Ignition, без speculation. TurboFan после ~1000-2000 calls с consistent feedback: type specialization, inlining, loop unrolling, ~10x vs interpret; ставка на стабильность типов — mismatch → deopt через OSR back to bytecode, deopt map persists. Hidden Classes (Maps): объекты с same property order share class, IC caches offset. IC states: monomorphic (1 class, best), polymorphic (2-4), megamorphic (5+, generic lookup every call). GC: Young Scavenge 1-2ms, promote after 2 cycles; Old Mark-Sweep-Compact 50-100ms pause. Ошибки: mixed types in hot serialize(); try/catch around hot loop kills inlining; delete obj.prop new Hidden Class; dynamic property add after {}. Profile: node --trace-deopt, --trace-opt. React reconciliation hot in TurboFan; useMemo stabilizes shapes. TensorFlow.js typed arrays bypass object overhead.",
+    "maxScore": 10,
+    "skills": ["javascript"]
+  },
+  "checkpoints": [
+    {
+      "key": "v8_pipeline_stages",
+      "title": "Описывает pipeline Parser → Ignition → Sparkplug → TurboFan",
+      "expected": "Кандидат: Parser AST; Ignition bytecode+feedback; Sparkplug baseline; TurboFan optimized from feedback; deopt on type break.",
+      "score": 2.0,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR 4-stage pipeline",
+        "probePolicy": { "requireProbeBeforeFinalPartial": true, "minScoreAfterShallowAccept": 0.55 },
+        "probeConceptGroups": [{ "match": ["TurboFan", "Ignition", "bytecode"], "ask": "опиши путь функции от JS source до native code без кода" }],
+        "confusionPairs": [{ "checkpointKey": "v8_pipeline_stages", "oftenConfusedWith": ["deoptimization"], "anchorTermsExpected": ["Parser", "AST", "Ignition", "TurboFan", "bytecode"], "anchorTermsWrongTopic": ["V8 interprets forever never compiles", "Sparkplug full optimizer like TurboFan"] }],
+        "mustConcepts": ["Parser", "AST", "Ignition", "bytecode", "Sparkplug", "TurboFan", "type feedback", "baseline", "optimized", "machine code", "native", "pipeline", "deoptimization", "deopt", "1000", "calls"],
+        "falseClaims": ["V8 только интерпретирует JS без компиляции", "TurboFan запускается на первом вызове функции", "Sparkplug делает speculative optimization как TurboFan", "Parser выполняет код напрямую без AST", "bytecode и machine code — одно и то же"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "hidden_classes_ic",
+      "title": "Понимает Hidden Classes и Inline Caching",
+      "expected": "Кандидат: Maps/Shapes; same property order share class; IC caches property offset; getX(point.x) monomorphic fast.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Hidden Classes and IC section",
+        "impliesCheckpointFloors": [{ "checkpointKey": "v8_pipeline_stages", "floorFraction": 0.45 }],
+        "mustConcepts": ["Hidden Class", "Map", "Shape", "transition", "offset", "Inline Caching", "IC", "monomorphic", "property order", "Point", "constructor", "cache hit", "lookup"],
+        "falseClaims": ["property metadata stored directly on each object always", "different property order same Hidden Class", "IC works without Hidden Classes", "adding property never changes Hidden Class"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "ic_morphic_states",
+      "title": "Различает monomorphic, polymorphic, megamorphic",
+      "expected": "Кандидат: mono 1 class full inline best; poly 2-4 dispatch table; mega 5+ generic lookup; 10x diff in hot loops.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "IC states performance difference",
+        "probeConceptGroups": [{ "match": ["megamorphic", "polymorphic", "monomorphic"], "ask": "что происходит когда call site получает 5+ разных форм объектов" }],
+        "mustConcepts": ["monomorphic", "polymorphic", "megamorphic", "dispatch table", "generic lookup", "call site", "10x", "hot loop", "utility function", "consistent shape", "inline"],
+        "falseClaims": ["megamorphic fastest because generic", "polymorphic and monomorphic same speed", "IC state does not affect TurboFan", "more object shapes always better for IC"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "deoptimization",
+      "title": "Объясняет deoptimization и type mismatch",
+      "expected": "Кандидат: TurboFan assumptions break → OSR deopt to bytecode; add(1,2) then add('x','y'); --trace-deopt; deopt map lingers.",
+      "score": 2.0,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Deoptimization section",
+        "impliesCheckpointFloors": [{ "checkpointKey": "v8_pipeline_stages", "floorFraction": 0.4 }],
+        "mustConcepts": ["deoptimization", "deopt", "type mismatch", "assumption", "OSR", "On-Stack Replacement", "bytecode", "Smi", "trace-deopt", "deopt map", "lingers", "re-optimize", "counter", "string"],
+        "falseClaims": ["deoptimization never happens after TurboFan", "one string call does not affect future int optimization ever", "deopt is free with no performance cost", "TurboFan never speculates on types"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "generational_gc",
+      "title": "Знает generational garbage collection V8",
+      "expected": "Кандидат: Young Scavenge 1-2ms short-lived; promote Old; Mark-Sweep-Compact 50-100ms; temp objects die in Young.",
+      "score": 1.0,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Generational GC section",
+        "mustConcepts": ["Young Generation", "Old Generation", "Scavenge", "Mark-Sweep-Compact", "promote", "heap", "short-lived", "pause", "1-2ms", "50-100ms", "To-Space", "GC"],
+        "falseClaims": ["all objects go directly to Old Generation", "Scavenge pause same as full GC always", "GC never causes latency in Node", "long-lived temp objects have no GC cost"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "v8_optimization_mistakes",
+      "title": "Знает антипаттерны для V8 optimization",
+      "expected": "Кандидат: mixed arg types hot fn; try/catch hot loop; delete property; dynamic add after {}; separate call sites per type.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes",
+        "mustConcepts": ["mixed types", "serialize", "try/catch", "inlining", "delete", "undefined", "dynamic property", "config {}", "formatUser", "role null", "separate call sites", "processInt", "hot loop"],
+        "falseClaims": ["try/catch around loop does not affect inlining", "delete obj.prop keeps same Hidden Class", "mixed types in hot function harmless", "dynamic property add same as literal object init"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "osr_senior_async",
+      "title": "Понимает OSR и deopt в async/generators",
+      "expected": "Кандидат: OSR swaps optimized frame on stack without full unwind; critical for suspended generator/async partial frames.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "advanced",
+        "weightRationale": "Senior follow-up OSR async",
+        "probeConceptGroups": [{ "match": ["OSR", "async", "generator"], "ask": "зачем OSR важен для deopt suspended async function" }],
+        "mustConcepts": ["OSR", "On-Stack Replacement", "stack", "frame", "async", "generator", "suspended", "unwind", "call stack", "deoptimize", "long-running"],
+        "falseClaims": ["deopt always requires full stack unwind", "async functions never optimized by TurboFan", "OSR unrelated to deoptimization", "generators never hit TurboFan"],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    { "exampleType": "good", "exampleText": "Parser→AST, Ignition bytecode+feedback, Sparkplug baseline, TurboFan after 1k calls. add(1,2) loop then add('x','y') deopt. Hidden Class stable formatUser role:null always. node --trace-deopt.", "sortOrder": 0 },
+    { "exampleType": "good", "exampleText": "monomorphic IC на getX — один shape Point. megamorphic utility — refactor callers. не delete prop — undefined. Young GC для temp в processItem", "sortOrder": 1 },
+    { "exampleType": "good", "exampleText": "TurboFan ставка на типы: processInt и processFloat отдельные call sites. React useMemo стабилизирует props shape между renders.", "sortOrder": 2 },
+    { "exampleType": "bad", "exampleText": "V8 только interpreter. TurboFan call 1. delete keeps Hidden Class. megamorphic fastest.", "sortOrder": 0 },
+    { "exampleType": "bad", "exampleText": "try/catch hot loop ok for inlining. deopt free. Sparkplug = TurboFan.", "sortOrder": 1 },
+    { "exampleType": "bad", "exampleText": "IC не связан с Hidden Classes. All objects Old Generation immediately.", "sortOrder": 2 },
+    { "checkpointKey": "v8_pipeline_stages", "exampleType": "good", "exampleText": "Ignition collects feedback; TurboFan speculates consistent Add Smi+Smi.", "sortOrder": 10 },
+    { "checkpointKey": "v8_pipeline_stages", "exampleType": "good", "exampleText": "parser ast, потом bytecode, потом turbo", "sortOrder": 11 },
+    { "checkpointKey": "v8_pipeline_stages", "exampleType": "bad", "exampleText": "V8 never compiles to machine code.", "sortOrder": 30 },
+    { "checkpointKey": "hidden_classes_ic", "exampleType": "good", "exampleText": "Point x,y same order — shared Hidden Class C2, x at offset 0.", "sortOrder": 12 },
+    { "checkpointKey": "hidden_classes_ic", "exampleType": "good", "exampleText": "ic кеширует offset для класса", "sortOrder": 13 },
+    { "checkpointKey": "hidden_classes_ic", "exampleType": "bad", "exampleText": "Property order irrelevant for V8.", "sortOrder": 31 },
+    { "checkpointKey": "ic_morphic_states", "exampleType": "good", "exampleText": "Monomorphic inline; megamorphic generic lookup every call — 10x slower loop.", "sortOrder": 14 },
+    { "checkpointKey": "ic_morphic_states", "exampleType": "good", "exampleText": "5+ shapes на call site — megamorphic", "sortOrder": 15 },
+    { "checkpointKey": "ic_morphic_states", "exampleType": "bad", "exampleText": "Megamorphic best for performance.", "sortOrder": 32 },
+    { "checkpointKey": "deoptimization", "exampleType": "good", "exampleText": "counter(i) optimized then counter('a') DEOPT; map lingers.", "sortOrder": 16 },
+    { "checkpointKey": "deoptimization", "exampleType": "good", "exampleText": "trace-deopt показывает not a Smi", "sortOrder": 17 },
+    { "checkpointKey": "deoptimization", "exampleType": "bad", "exampleText": "One deopt never affects re-optimization.", "sortOrder": 33 },
+    { "checkpointKey": "generational_gc", "exampleType": "good", "exampleText": "temp in processItem Scavenge; appCache Map → Old.", "sortOrder": 18 },
+    { "checkpointKey": "generational_gc", "exampleType": "good", "exampleText": "young scavenge быстрый, old pause длиннее", "sortOrder": 19 },
+    { "checkpointKey": "generational_gc", "exampleType": "bad", "exampleText": "All objects allocated in Old Generation.", "sortOrder": 34 },
+    { "checkpointKey": "v8_optimization_mistakes", "exampleType": "good", "exampleText": "formatUser always {role: isAdmin?'admin':null} — one Hidden Class.", "sortOrder": 20 },
+    { "checkpointKey": "v8_optimization_mistakes", "exampleType": "good", "exampleText": "не try/catch вокруг hot loop", "sortOrder": 21 },
+    { "checkpointKey": "v8_optimization_mistakes", "exampleType": "bad", "exampleText": "delete obj.y keeps IC monomorphic.", "sortOrder": 35 },
+    { "checkpointKey": "osr_senior_async", "exampleType": "good", "exampleText": "OSR swap frame on stack — critical for suspended generator deopt.", "sortOrder": 22 },
+    { "checkpointKey": "osr_senior_async", "exampleType": "good", "exampleText": "osr без полного unwind стека", "sortOrder": 23 },
+    { "checkpointKey": "osr_senior_async", "exampleType": "bad", "exampleText": "Deopt always tears down entire async context.", "sortOrder": 36 }
+  ],
+  "itlead": {
+    "slug": "v8-architecture-from-code-to-machine-instructions",
+    "apiUrl": "https://api.itlead.org/api/questions/v8-architecture-from-code-to-machine-instructions",
+    "pageUrl": "https://itlead.org/interview-questions/general/v8-architecture-from-code-to-machine-instructions",
+    "difficulty": "SENIOR",
+    "titleEn": "V8 architecture: from code to machine instructions",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

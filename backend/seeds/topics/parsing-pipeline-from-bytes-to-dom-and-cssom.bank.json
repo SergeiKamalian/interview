@@ -1,0 +1,569 @@
+{
+  "topic": {
+    "code": "parsing_pipeline_from_bytes_to_dom_and_cssom",
+    "name": "Parsing pipeline: от байтов до DOM и CSSOM",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как устроен parsing pipeline браузера — от сырых байтов HTML/CSS до DOM и CSSOM?",
+    "shortAnswer": "Parsing pipeline — многостадийный процесс браузера: Bytes → Characters (декодирование charset) → Tokens (StartTag, EndTag, Character) → Tree (DOM из HTML, CSSOM из CSS). Парсинг инкрементальный — браузер начинает строить дерево до получения всего документа. CSS блокирует рендеринг до готовности CSSOM; `<script>` без async/defer останавливает HTML-парсер. Preload scanner параллельно подгружает ресурсы, пока парсер заблокирован.",
+    "idealAnswer": "Parsing pipeline превращает сырые байты HTML и CSS в DOM и CSSOM — структуры данных, с которыми работают рендеринг и JavaScript. Четыре стадии: (1) Bytes → Characters — браузер определяет кодировку: BOM, HTTP Content-Type, `<meta charset>` в первых 1024 байтах, затем автоопределение; при неверной кодировке парсер перезапускается; (2) Tokenization — state machine HTML-спека эмитит StartTag, EndTag, Character, Comment; (3) Tree construction — tree builder создаёт DOM-узлы, исправляет malformed HTML (auto-close, вставка `<tbody>`), DOM live — JS видит уже созданные узлы; (4) CSS идёт параллельным путём: свой tokenizer → CSSOM; невалидный CSS пропускается без остановки. Рендеринг блокируется, пока не готовы и DOM, и CSSOM — поэтому CSS в `<head>`. Парсинг инкрементальный (~14KB чанки) — above-the-fold рендерится до конца загрузки. `<script>` без defer/async блокирует парсер до загрузки и выполнения; defer качает параллельно, выполняет после парсинга в порядке документа; async — сразу по готовности, порядок не гарантирован. Preload scanner — второй поток читает HTML вперёд и ставит в очередь `<link>`, `<script src>`, `<img>`, `<link rel=preload>`; document.write() ломает scanner. DOM mutable — JS читает/пишет; CSSOM read-only — getComputedStyle() только читает, element.style создаёт inline на DOM-узле с высшей специфичностью. Типичные ошибки: querySelector до парсинга узла (script выше h1 → null); CSS в body → FOUC/задержка paint; запись в getComputedStyle(); async для зависимых скриптов; charset meta позже 1024 байт. DOMContentLoaded — после построения DOM, defer-скрипты выполняются до него. React SSR/Next streaming используют тот же pipeline; критический CSS inline в head убирает блокирующий network для first paint.",
+    "maxScore": 10,
+    "skills": [
+      "javascript",
+      "css"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "four_stages",
+      "title": "Знает четыре стадии pipeline",
+      "expected": "Кандидат называет Bytes → Characters → Tokens → Tree; объясняет tokenization (StartTag, EndTag, Character) и tree construction; упоминает инкрементальный парсинг чанками.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — четыре стадии из ITLead TL;DR",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Bytes",
+              "Tokens",
+              "Tree",
+              "стад"
+            ],
+            "ask": "назови четыре стадии parsing pipeline и что происходит на каждой"
+          }
+        ],
+        "mustConcepts": [
+          "Bytes",
+          "Characters",
+          "Tokens",
+          "Tree",
+          "байт",
+          "символ",
+          "токен",
+          "дерев",
+          "tokenizer",
+          "StartTag",
+          "EndTag",
+          "Character",
+          "tree builder",
+          "tree construction",
+          "инкремент",
+          "чанк",
+          "14KB",
+          "live DOM",
+          "парсинг"
+        ],
+        "falseClaims": [
+          "браузер ждёт весь HTML-файл перед началом парсинга",
+          "pipeline состоит из двух стадий: HTML и CSS",
+          "tokenizer сразу создаёт финальное DOM-дерево без tree builder",
+          "парсинг всегда синхронный и блокирует только CSS"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "encoding_charset",
+      "title": "Понимает определение кодировки",
+      "expected": "Кандидат описывает порядок: BOM → Content-Type → meta charset (первые 1024 байта) → автоопределение; HTTP header побеждает meta; неверная кодировка → перезапуск парсера.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "stage 1 encoding — частая практическая ошибка",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "charset",
+              "кодиров",
+              "UTF-8",
+              "meta"
+            ],
+            "ask": "в каком порядке браузер определяет кодировку и почему meta charset должен быть рано"
+          }
+        ],
+        "mustConcepts": [
+          "charset",
+          "кодиров",
+          "UTF-8",
+          "BOM",
+          "Content-Type",
+          "meta charset",
+          "1024",
+          "HTTP header",
+          "автоопредел",
+          "перезапуск",
+          "restart",
+          "decode",
+          "декодир"
+        ],
+        "falseClaims": [
+          "кодировка не важна — браузер всегда угадывает UTF-8",
+          "meta charset побеждает HTTP Content-Type",
+          "charset можно поставить где угодно в head без последствий",
+          "BOM игнорируется браузером"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "dom_vs_cssom",
+      "title": "Отличает DOM от CSSOM",
+      "expected": "Кандидат: DOM mutable, JS читает/пишет; CSSOM read-only; рендеринг ждёт оба дерева; inline style на DOM-узле побеждает правила CSSOM по специфичности.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевое различие DOM/CSSOM из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "four_stages",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "dom_vs_cssom",
+            "oftenConfusedWith": [
+              "four_stages"
+            ],
+            "anchorTermsExpected": [
+              "CSSOM",
+              "read-only",
+              "mutable",
+              "getComputedStyle",
+              "inline",
+              "render blocked"
+            ],
+            "anchorTermsWrongTopic": [
+              "Virtual DOM React",
+              "CSSOM это shadow DOM"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "DOM",
+          "CSSOM",
+          "mutable",
+          "изменя",
+          "read-only",
+          "только чтен",
+          "getComputedStyle",
+          "inline style",
+          "element.style",
+          "специфич",
+          "render blocked",
+          "блокир рендер",
+          "CSS head",
+          "FOUC",
+          "каскад",
+          "computed",
+          "render tree",
+          "layout blocked",
+          "CSS invalid skip",
+          "tree constructor HTML",
+          "live DOM during parse"
+        ],
+        "falseClaims": [
+          "CSSOM можно изменить через getComputedStyle().color = 'red'",
+          "рендеринг начинается сразу после построения DOM без CSSOM",
+          "element.style пишет напрямую в CSSOM",
+          "CSS в body не влияет на first paint",
+          "render without CSSOM ok always",
+          "CSSOM mutable setProperty direct"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "script_loading",
+      "title": "Понимает defer, async и блокировку парсера",
+      "expected": "Кандидат: sync script блокирует парсер; defer — параллельная загрузка, выполнение после парсинга в порядке документа; async — по готовности, порядок не гарантирован; DOMContentLoaded после DOM.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "defer/async — частый middle+ вопрос и production-паттерн",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "defer",
+              "async"
+            ],
+            "ask": "чем defer отличается от async с точки зрения parsing pipeline"
+          },
+          {
+            "match": [
+              "DOMContentLoaded",
+              "порядок",
+              "jquery"
+            ],
+            "ask": "почему для jQuery + app.js лучше defer, а не async"
+          }
+        ],
+        "mustConcepts": [
+          "script",
+          "defer",
+          "async",
+          "блокир",
+          "parser",
+          "парсер",
+          "DOMContentLoaded",
+          "порядок",
+          "ordered",
+          "параллел",
+          "download",
+          "выполн",
+          "sync script",
+          "type module",
+          "waterfall",
+          "parser pause",
+          "execution order defer",
+          "async race",
+          "blocking render sync",
+          "jquery plugin order"
+        ],
+        "falseClaims": [
+          "async сохраняет порядок выполнения скриптов в документе",
+          "defer выполняет скрипт до завершения парсинга HTML",
+          "script никогда не блокирует парсер",
+          "DOMContentLoaded ждёт async-скрипты",
+          "async preserves order",
+          "defer before DOM ready runs"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "preload_scanner",
+      "title": "Знает preload scanner",
+      "expected": "Кандидат: вторичный поток читает HTML вперёд, пока main parser на script; ставит в очередь stylesheet, script, img, preload; document.write() отключает scanner.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "preload scanner — важная оптимизация из ITLead",
+        "mustConcepts": [
+          "preload scanner",
+          "scanner",
+          "read ahead",
+          "вперёд",
+          "параллел",
+          "script block",
+          "блокир парсер",
+          "link stylesheet",
+          "img src",
+          "rel preload",
+          "document.write",
+          "очеред",
+          "prefetch",
+          "вторичн поток",
+          "secondary thread",
+          "link rel stylesheet queue",
+          "img src early fetch",
+          "blocked main parser",
+          "parallel download optimization"
+        ],
+        "falseClaims": [
+          "preload scanner и main parser — один поток",
+          "document.write() ускоряет параллельную загрузку",
+          "scanner работает только для img, не для CSS",
+          "при блокировке парсера браузер ничего не качает",
+          "scanner same as main parser always",
+          "document.write helps preload"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки parsing",
+      "expected": "Кандидат называет: query DOM до создания узла; CSS в body; запись в getComputedStyle; async для зависимых скриптов; поздний meta charset; большие inline style блоки.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — практические ловушки",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "script_loading",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "querySelector",
+              "null",
+              "script",
+              "h1"
+            ],
+            "ask": "почему script выше h1 даёт null при querySelector"
+          },
+          {
+            "match": [
+              "CSS body",
+              "FOUC",
+              "head"
+            ],
+            "ask": "почему CSS в body задерживает first paint"
+          }
+        ],
+        "mustConcepts": [
+          "querySelector null",
+          "script before",
+          "DOMContentLoaded",
+          "CSS body",
+          "CSS head",
+          "getComputedStyle write",
+          "inline style block",
+          "async order",
+          "charset 1024",
+          "перезапуск",
+          "FOUC",
+          "classList",
+          "mount",
+          "узел не существ",
+          "iptables UDP 443",
+          "Wireshark quic filter",
+          "load test h2 fallback",
+          "Cloudflare 0-RTT GET"
+        ],
+        "falseClaims": [
+          "inline script всегда видит все узлы документа",
+          "getComputedStyle().color = 'red' меняет стиль элемента",
+          "async подходит для jQuery и плагинов с зависимостью по порядку",
+          "CSS в body быстрее для first paint чем в head",
+          "QUIC всегда быстрее на LAN",
+          "HPACK на h3 сервере ок"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "perf_practices",
+      "title": "Понимает практики оптимизации pipeline",
+      "expected": "Кандидат: CSS в head; defer для DOM-скриптов; charset в первых 1024 байтах; критический CSS inline; избегать document.write; streaming/chunked для SSR.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to care + real-world из ITLead",
+        "mustConcepts": [
+          "first paint",
+          "CSS head",
+          "критическ",
+          "inline CSS",
+          "defer",
+          "meta charset",
+          "document.write",
+          "streaming",
+          "chunked",
+          "renderToNodeStream",
+          "SSR",
+          "Parse HTML",
+          "DevTools",
+          "performance",
+          "above-the-fold"
+        ],
+        "falseClaims": [
+          "parsing pipeline никогда не влияет на производительность",
+          "50MB HTML с тысячами inline style — норма без оптимизации",
+          "document.write рекомендуется для динамической подгрузки скриптов",
+          "streaming SSR обходит необходимость CSSOM"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Pipeline: байты → символы (UTF-8, meta charset в первых 1024 байтах) → токены StartTag/EndTag → DOM. CSS параллельно строит read-only CSSOM. Рендер ждёт оба дерева. Script без defer блокирует парсер; defer качает параллельно и выполняет после парсинга в порядке документа.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Парсинг инкрементальный — браузер не ждёт весь файл. Пока sync script блокирует main parser, preload scanner уже качает hero.jpg и styles.css. DOM live: узлы видны JS по мере построения. FOUC если CSS в body — CSSOM не готов когда DOM уже есть.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для app.js + jQuery беру defer — порядок сохраняется, DOM готов. Analytics — async, порядок не важен. querySelector('h1') в script выше h1 вернёт null — жду DOMContentLoaded. getComputedStyle только читает; стиль меняю через element.style или classList.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Браузер сначала качает весь HTML, потом парсит. CSSOM mutable — пишу через getComputedStyle. async сохраняет порядок скриптов как в документе.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "CSS в body быстрее first paint. document.write() ускоряет preload scanner. Кодировка не важна — браузер всегда UTF-8.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Pipeline: HTML → React Virtual DOM → CSSOM. Script с defer выполняется до построения DOM. Preload scanner не существует в современных браузерах.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "four_stages",
+      "exampleType": "good",
+      "exampleText": "Четыре стадии: Bytes → Characters → Tokens → Tree. Tokenizer эмитит StartTag(h1), Character, EndTag(h1); tree builder собирает узлы. Парсинг идёт чанками — h1 уже в DOM до загрузки остального документа.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "four_stages",
+      "exampleType": "good",
+      "exampleText": "ну байты в символы, потом токены, потом дерево — dom live, можно querySelector пока файл ещё качается",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "four_stages",
+      "exampleType": "bad",
+      "exampleText": "Две стадии: скачать HTML и отрендерить. Tokenizer сразу рисует пиксели на экране.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "encoding_charset",
+      "exampleType": "good",
+      "exampleText": "Кодировка: BOM → Content-Type header → meta charset в первых 1024 байтах. HTTP header побеждает meta. Неверный guess — кракозябры и полный restart парсера.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "encoding_charset",
+      "exampleType": "good",
+      "exampleText": "meta charset utf-8 ставлю сразу в head — до title и больших комментариев, иначе браузер уже начал с wrong encoding",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "encoding_charset",
+      "exampleType": "bad",
+      "exampleText": "meta charset можно в конце body — браузер подождёт. Content-Type из HTTP игнорируется если есть meta.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "dom_vs_cssom",
+      "exampleType": "good",
+      "exampleText": "DOM mutable — appendChild, innerHTML. CSSOM read-only — getComputedStyle читает. element.style.color создаёт inline на DOM-узле, побеждает CSSOM по специфичности. Paint ждёт оба дерева.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "dom_vs_cssom",
+      "exampleType": "good",
+      "exampleText": "cssom нельзя писать из js — меняю classList или inline style на dom, браузер пересчитывает computed styles",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "dom_vs_cssom",
+      "exampleType": "bad",
+      "exampleText": "CSSOM и DOM — одно дерево, JS пишет стили напрямую в CSSOM через getComputedStyle.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "script_loading",
+      "exampleType": "good",
+      "exampleText": "Sync script: парсер стоп → download → execute → continue. defer: download параллельно, execute после parse, порядок сохранён. async: execute сразу по ready — app.js может обогнать jquery.js.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "script_loading",
+      "exampleType": "good",
+      "exampleText": "для dom-зависимого кода — defer; analytics isolated — async. DOMContentLoaded после dom built, defer scripts run before event",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "script_loading",
+      "exampleType": "bad",
+      "exampleText": "async и defer одинаковые — оба не блокируют и сохраняют порядок. Script в head без атрибутов не блокирует парсинг.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "preload_scanner",
+      "exampleType": "good",
+      "exampleText": "Main parser стоит на slow-script.js, но preload scanner уже увидел img hero.jpg и link stylesheet — качание началось параллельно.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "preload_scanner",
+      "exampleType": "good",
+      "exampleText": "document.write ломает scanner — поток символов меняется задним числом, prefetch отключается",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "preload_scanner",
+      "exampleType": "bad",
+      "exampleText": "Пока script блокирует парсер, браузер вообще ничего не качает — ждёт только script.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Script перед h1: querySelector('h1') → null, парсер ещё не дошёл. Правильно — DOMContentLoaded или script в конце body с defer.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "CSS link в body — cssom поздно, контент выше уже в dom но paint blocked или FOUC. stylesheet в head. jquery+app — defer not async.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "getComputedStyle(el).color = 'red' — нормальный способ менять стиль. Script в начале body всегда видит весь DOM.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "perf_practices",
+      "exampleType": "good",
+      "exampleText": "CSS critical inline в head + defer app.js. charset meta первым в head. Next renderToNodeStream — браузер парсит чанки до конца response. DevTools Parse HTML — смотрю tokenization+tree time.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "perf_practices",
+      "exampleType": "good",
+      "exampleText": "не document.write, не 50mb inline styles — выношу в css классы, lazy sections",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "perf_practices",
+      "exampleType": "bad",
+      "exampleText": "Parsing pipeline не влияет на LCP — можно CSS грузить после body и sync scripts в head.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "parsing-pipeline-from-bytes-to-dom-and-cssom",
+    "apiUrl": "https://api.itlead.org/api/questions/parsing-pipeline-from-bytes-to-dom-and-cssom",
+    "pageUrl": "https://itlead.org/interview-questions/general/parsing-pipeline-from-bytes-to-dom-and-cssom",
+    "difficulty": "MIDDLE",
+    "titleEn": "Parsing pipeline - from bytes to DOM and CSSOM",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

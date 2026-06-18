@@ -1,0 +1,656 @@
+{
+  "topic": {
+    "code": "docker_security_hardening",
+    "name": "Security hardening Docker-контейнеров",
+    "skillCode": "docker",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как реализовать security hardening Docker-контейнеров?",
+    "shortAnswer": "Применяй defense-in-depth на уровнях build, run и host: non-root USER и минимальный base (distroless), read-only rootfs с tmpfs, `--cap-drop=ALL` с точечным `--cap-add`, seccomp/AppArmor, секреты через mount или vault (не env), сканирование образов и без `--privileged`/docker.sock. Ориентир — CIS Docker Benchmark.",
+    "idealAnswer": "Security hardening контейнеров — снижение attack surface и blast radius. Контейнер — группа процессов с доступом к общему kernel; при компрометации атакующий на одну kernel-уязвимость от host. Hardening минимизирует риск через least-privilege, immutable filesystem, drop capabilities и политики изоляции. CIS Docker Benchmark — канонический чеклист; автоматизация — docker-bench-security. Build-time: non-root USER в Dockerfile, минимальный base (distroless/scratch без shell и package manager), multi-stage чтобы toolchain не попал в финальный образ, без секретов в слоях (ENV/ARG с паролями видны в docker history), сканирование CVE (Trivy, Docker Scout, Snyk) в CI с fail на HIGH/CRITICAL с доступным fix. Run-time: `--read-only` для rootfs, `--tmpfs` для /tmp и /run, `--user` с явным UID/GID, `--cap-drop=ALL` и `--cap-add` только нужных (NET_BIND_SERVICE для портов <1024), `--security-opt=no-new-privileges`, seccomp profile (default блокирует ~44 risky syscalls), AppArmor/SELinux MAC-профили, `--pids-limit`, `--memory`/`--cpus` против resource exhaustion, изолированные user-defined networks (не host, не default bridge без нужды), volume mounts `:ro` для конфигов. Опасные capabilities: SYS_ADMIN, SYS_PTRACE, SYS_MODULE, NET_RAW — не добавлять без крайней необходимости. Секреты: никогда ENV и не bake в образ; Docker Swarm secrets, mount файлов read-only, HashiCorp Vault/AWS Secrets Manager на старте приложения. Host/daemon: daemon.json с icc:false, userns-remap (container root → high host UID), no-new-privileges, TLS для daemon API, audit logs; kernel hardened. Критичные антипаттерны: `--privileged` (эквивалент root на host), mount `/var/run/docker.sock` (spawn privileged контейнеров = root на host), запуск как root по умолчанию (nginx:alpine — root внутри), секреты в env (видны inspect/ps/logs). Supply chain: подписанные образы (cosign, Docker Content Trust), SBOM, admission policy (Kyverno/Gatekeeper). Rootless Docker безопаснее для host (compromise → unprivileged user), но с ограничениями портов и производительности. Real-world: PCI/HIPAA — полный CIS; public API — read-only + cap-drop + seccomp; CI — ephemeral без privileged, rootless DinD вместо host socket.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "hardening_rationale",
+      "title": "Понимает зачем нужен hardening",
+      "expected": "Кандидат объясняет: контейнер не полноценная security boundary, kernel общий; hardening снижает attack surface и blast radius; упоминает defense-in-depth (build/run/host) и CIS Docker Benchmark.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — shared kernel и пирамида hardening из ITLead TL;DR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "hardening_rationale",
+            "oftenConfusedWith": [
+              "runtime_hardening"
+            ],
+            "anchorTermsExpected": [
+              "shared kernel",
+              "attack surface",
+              "blast radius",
+              "defense-in-depth",
+              "CIS",
+              "least-privilege"
+            ],
+            "anchorTermsWrongTopic": [
+              "Kubernetes pod scheduling",
+              "virtual machine hypervisor",
+              "только firewall достаточно"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "kernel",
+              "изоляц",
+              "boundary"
+            ],
+            "ask": "почему контейнер по умолчанию не считается полноценной security boundary"
+          }
+        ],
+        "mustConcepts": [
+          "hardening",
+          "attack surface",
+          "blast radius",
+          "shared kernel",
+          "общий kernel",
+          "defense-in-depth",
+          "least-privilege",
+          "CIS",
+          "Benchmark",
+          "изоляц",
+          "boundary",
+          "компрометац",
+          "escape",
+          "пирамида",
+          "build",
+          "run",
+          "host"
+        ],
+        "falseClaims": [
+          "контейнер полностью изолирован от host как VM",
+          "hardening нужен только на production host, образ не важен",
+          "достаточно одного seccomp без non-root USER",
+          "CIS Benchmark не относится к Docker",
+          "kernel не общий между контейнерами"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "build_time_hardening",
+      "title": "Знает build-time hardening",
+      "expected": "Кандидат называет: non-root USER, distroless/scratch/minimal base, multi-stage build, без секретов в слоях, strip symbols; объясняет почему shell и package manager в образе — риск.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "distroless + USER — первый слой пирамиды ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "hardening_rationale",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "distroless",
+              "USER",
+              "multi-stage"
+            ],
+            "ask": "зачем distroless и multi-stage в hardened Dockerfile"
+          }
+        ],
+        "mustConcepts": [
+          "USER",
+          "nonroot",
+          "non-root",
+          "distroless",
+          "scratch",
+          "minimal base",
+          "multi-stage",
+          "multi stage",
+          "toolchain",
+          "shell",
+          "package manager",
+          "секрет",
+          "слой",
+          "docker history",
+          "ldflags",
+          "static binary",
+          "CGO_ENABLED=0"
+        ],
+        "falseClaims": [
+          "секреты в ENV Dockerfile безопасны если образ private",
+          "alpine с shell безопаснее distroless для production API",
+          "multi-stage не влияет на security финального образа",
+          "root USER в образе компенсируется seccomp на run",
+          "build-time hardening не нужен если runtime read-only"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "runtime_hardening",
+      "title": "Знает run-time флаги hardening",
+      "expected": "Кандидат перечисляет: --read-only, --tmpfs, --user, --cap-drop=ALL, --cap-add точечно, --security-opt=no-new-privileges, pids/memory/cpu limits, изолированная user-defined network, ro volume mounts.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "полный docker run hardening — центральный практический блок ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "build_time_hardening",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "runtime_hardening",
+            "oftenConfusedWith": [
+              "linux_capabilities",
+              "seccomp_apparmor"
+            ],
+            "anchorTermsExpected": [
+              "read-only",
+              "tmpfs",
+              "cap-drop",
+              "no-new-privileges",
+              "pids-limit",
+              "user-defined network"
+            ],
+            "anchorTermsWrongTopic": [
+              "только USER достаточно",
+              "privileged для read-only"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "read-only",
+              "tmpfs"
+            ],
+            "ask": "зачем --read-only и --tmpfs вместе при hardened run"
+          },
+          {
+            "match": [
+              "cap-drop",
+              "NET_BIND_SERVICE"
+            ],
+            "ask": "как cap-drop ALL сочетается с bind на порт 8080 vs 80"
+          }
+        ],
+        "mustConcepts": [
+          "read-only",
+          "tmpfs",
+          "--user",
+          "cap-drop",
+          "ALL",
+          "cap-add",
+          "NET_BIND_SERVICE",
+          "no-new-privileges",
+          "pids-limit",
+          "memory",
+          "cpus",
+          "cgroup",
+          "user-defined network",
+          "app-net",
+          "ro mount",
+          "read only volume",
+          "immutable"
+        ],
+        "falseClaims": [
+          "read-only rootfs не требует tmpfs для /tmp",
+          "cap-drop ALL ломает любое приложение без privileged",
+          "default bridge безопаснее user-defined network",
+          "no-new-privileges заменяет non-root USER",
+          "--network=host рекомендуется для public API"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "seccomp_apparmor",
+      "title": "Понимает seccomp и AppArmor/SELinux",
+      "expected": "Кандидат объясняет: seccomp фильтрует syscalls (default блокирует mount, reboot, ptrace и др.); AppArmor/SELinux — MAC по distro; seccomp=unconfined — плохая практика; custom profile — tighter whitelist.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "MAC и syscall filtering из ITLead seccomp/AppArmor секции",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "seccomp",
+              "syscall"
+            ],
+            "ask": "что делает default Docker seccomp profile и когда нужен custom"
+          },
+          {
+            "match": [
+              "AppArmor",
+              "SELinux"
+            ],
+            "ask": "AppArmor vs SELinux — что ставить на Ubuntu vs RHEL"
+          }
+        ],
+        "mustConcepts": [
+          "seccomp",
+          "syscall",
+          "whitelist",
+          "unconfined",
+          "default profile",
+          "mount",
+          "reboot",
+          "ptrace",
+          "AppArmor",
+          "SELinux",
+          "MAC",
+          "Mandatory Access Control",
+          "docker-default",
+          "security-opt"
+        ],
+        "falseClaims": [
+          "seccomp=unconfined безопасен для production",
+          "default seccomp profile не блокирует syscalls",
+          "AppArmor и SELinux взаимозаменяемы на одной машине без настройки",
+          "seccomp заменяет cap-drop",
+          "custom seccomp profile не требует maintenance"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "secrets_management",
+      "title": "Знает управление секретами",
+      "expected": "Кандидат объясняет: секреты не в ENV и не в слоях образа; mount read-only файлов, Docker Swarm secrets, Vault/Secrets Manager на runtime; env виден в inspect, ps, /proc, logs.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "типичная утечка через ENV — блок Common mistakes ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ENV",
+              "secret",
+              "env"
+            ],
+            "ask": "почему DB_PASSWORD в -e или ENV Dockerfile — плохо и чем заменить"
+          }
+        ],
+        "mustConcepts": [
+          "secret",
+          "секрет",
+          "ENV",
+          "env var",
+          "mount",
+          "read-only",
+          "run/secrets",
+          "Swarm",
+          "Vault",
+          "HashiCorp",
+          "AWS Secrets Manager",
+          "docker inspect",
+          "process table",
+          "/proc",
+          "crash dump",
+          "runtime",
+          "не в образ"
+        ],
+        "falseClaims": [
+          "секреты в ENV безопасны если контейнер private network",
+          "docker secret create работает в обычном docker run без Swarm mount",
+          "секреты в ARG Dockerfile не попадают в history",
+          "env vars не видны через docker inspect",
+          "bake password в слой образа ok для internal registry"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "image_scanning_supply",
+      "title": "Знает сканирование и supply chain",
+      "expected": "Кандидат упоминает Trivy/Docker Scout/Snyk в CI, fail на HIGH/CRITICAL; подпись образов cosign/DCT, SBOM, admission policy; pin и update base images.",
+      "score": 0.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "senior supply chain — бонусный блок ITLead deep dive",
+        "mustConcepts": [
+          "Trivy",
+          "scan",
+          "CVE",
+          "Docker Scout",
+          "Snyk",
+          "CI",
+          "HIGH",
+          "CRITICAL",
+          "cosign",
+          "Content Trust",
+          "SBOM",
+          "admission",
+          "Kyverno",
+          "Gatekeeper",
+          "pin",
+          "update base"
+        ],
+        "falseClaims": [
+          "сканирование образов нужно только раз в год",
+          "node:18 без pin безопасен если образ popular",
+          "supply chain security не относится к container hardening",
+          "cosign заменяет runtime cap-drop"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "privileged_socket_mistakes",
+      "title": "Избегает --privileged и docker.sock",
+      "expected": "Кандидат объясняет: --privileged = root на host; mount docker.sock позволяет spawn privileged контейнеров; root по умолчанию в образах; rootless DinD для CI вместо host socket.",
+      "score": 2,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "критичные антипаттерны ITLead — частые production-ошибки",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "secrets_management",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "privileged",
+              "docker.sock"
+            ],
+            "ask": "почему --privileged и mount /var/run/docker.sock эквивалентны root на host"
+          },
+          {
+            "match": [
+              "root",
+              "nginx",
+              "USER"
+            ],
+            "ask": "почему nginx:alpine по умолчанию опасен и что делать"
+          }
+        ],
+        "mustConcepts": [
+          "privileged",
+          "--privileged",
+          "docker.sock",
+          "/var/run/docker.sock",
+          "root на host",
+          "spawn",
+          "rootless",
+          "DinD",
+          "Docker-in-Docker",
+          "root",
+          "USER override",
+          "nginx:alpine",
+          "setuid",
+          "container escape"
+        ],
+        "falseClaims": [
+          "--privileged безопасен для CI если pipeline короткий",
+          "docker.sock mount ok для convenience в dev containers",
+          "privileged нужен для read-only filesystem",
+          "root внутри контейнера всегда unprivileged на host без userns",
+          "mount docker.sock безопасен если только read-only volume flag"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "host_daemon_hardening",
+      "title": "Знает host/daemon hardening",
+      "expected": "Кандидат упоминает daemon.json: icc:false, userns-remap, live-restore; TLS для daemon API; docker-bench-security; AppArmor/SELinux на host; user-namespace меняет модель root inside/outside.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "host layer пирамиды — senior bonus из daemon.json и userns",
+        "mustConcepts": [
+          "daemon.json",
+          "icc",
+          "userns-remap",
+          "user namespace",
+          "live-restore",
+          "TLS",
+          "docker-bench-security",
+          "audit",
+          "host UID",
+          "rootless Docker",
+          "bind mount ownership"
+        ],
+        "falseClaims": [
+          "userns-remap не влияет на security model",
+          "icc:true безопаснее для microservices",
+          "daemon API без TLS ok за corporate firewall",
+          "host hardening не нужен если контейнеры hardened"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Defense-in-depth на трёх уровнях: в Dockerfile — distroless + USER nonroot, multi-stage без toolchain; при run — read-only, tmpfs /tmp, cap-drop ALL + NET_BIND_SERVICE если нужен 80, no-new-privileges, seccomp default; секреты mount из Vault, не env; образ сканирую Trivy в CI. Никогда privileged и docker.sock.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Контейнер делит kernel с host — это не VM. Hardening: минимальный образ без shell, non-root, read-only FS, drop caps, pids/memory limits, изолированная сеть app-net. CIS Benchmark прогоняю docker-bench-security перед аудитом PCI.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну по сути три слоя — build run host. на build distroless и user 65532, на run cap-drop all и ro rootfs, секреты файлом. privileged и сокет — как root на машине, в CI только rootless dind",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Контейнер полностью изолирован как виртуалка, достаточно firewall. Секреты кладу в ENV — образ же private. Для CI mount docker.sock удобнее privileged.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Hardening — это только seccomp=unconfined отключить. Root в контейнере безопасен, kernel всё равно защищает. DB password в Dockerfile ENV норм для internal apps.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Read-only filesystem не нужен если приложение не пишет файлы. Cap-drop ALL невозможен — всегда нужен privileged. Сканирование образов — waste of CI time.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "hardening_rationale",
+      "exampleType": "good",
+      "exampleText": "Контейнер — процессы с shared kernel; при escape blast radius большой. Hardening убирает типичные пути: root, writable FS, лишние caps. CIS Benchmark — чеклист.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "hardening_rationale",
+      "exampleType": "good",
+      "exampleText": "ну isolation не boundary по умолчанию — один kernel bug и ты на host. defense in depth build run host",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "hardening_rationale",
+      "exampleType": "bad",
+      "exampleText": "Docker контейнеры так же изолированы как VM, hardening нужен только для Kubernetes.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "build_time_hardening",
+      "exampleType": "good",
+      "exampleText": "Multi-stage: golang build → distroless/static:nonroot, USER 65532, без shell — атакующий не drop в sh. Секреты не в ENV слоях.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "build_time_hardening",
+      "exampleType": "good",
+      "exampleText": "финальный образ только бинарь, CGO_ENABLED=0 static, ldflags strip — меньше attack surface",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "build_time_hardening",
+      "exampleType": "bad",
+      "exampleText": "Беру node:18 full image со shell — удобнее debug, security на runtime seccomp решит.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "runtime_hardening",
+      "exampleType": "good",
+      "exampleText": "docker run --read-only --tmpfs /tmp:size=64m --cap-drop=ALL --cap-add=NET_BIND_SERVICE --security-opt=no-new-privileges --user=10001:10001 --pids-limit=200 --network=app-net -v config.yaml:ro",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "runtime_hardening",
+      "exampleType": "good",
+      "exampleText": "ro rootfs + tmpfs для scratch — приложение не может переписать себя; cap-drop all, добавляю только bind service если порт 443",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "runtime_hardening",
+      "exampleType": "bad",
+      "exampleText": "Read-only без tmpfs — приложение само найдёт куда писать в overlay. Cap-drop ALL невозможен для HTTP сервера.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "seccomp_apparmor",
+      "exampleType": "good",
+      "exampleText": "Default seccomp блокирует mount и ptrace; для Go HTTP хватает default. Ubuntu — AppArmor docker-default; seccomp=unconfined только локально и никогда prod.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "seccomp_apparmor",
+      "exampleType": "good",
+      "exampleText": "seccomp whitelist syscalls, apparmor mac поверх caps — два разных слоя защиты",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "seccomp_apparmor",
+      "exampleType": "bad",
+      "exampleText": "Seccomp=unconfined быстрее и безопаснее default profile для API.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "secrets_management",
+      "exampleType": "good",
+      "exampleText": "Пароль БД — файл /run/secrets/db-pass:ro или fetch из Vault при старте. ENV виден docker inspect и в ps aux.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "secrets_management",
+      "exampleType": "good",
+      "exampleText": "никогда ENV DB_PASSWORD в dockerfile — history и inspect. mount ro или vault role",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "secrets_management",
+      "exampleType": "bad",
+      "exampleText": "docker run -e DB_PASSWORD=secret — норм, контейнер же ephemeral и логи не смотрят.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "image_scanning_supply",
+      "exampleType": "good",
+      "exampleText": "Trivy в CI на каждый build, fail HIGH/CRITICAL с fix. Образы подписываем cosign, pin digest base image.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "image_scanning_supply",
+      "exampleType": "good",
+      "exampleText": "node:18 без update — куча CVE через полгода, scan + sbom + admission kyverno",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "image_scanning_supply",
+      "exampleType": "bad",
+      "exampleText": "Сканирование образов не нужно если берём official images с Docker Hub.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "privileged_socket_mistakes",
+      "exampleType": "good",
+      "exampleText": "--privileged снимает всю containerization — как sudo -i на host. docker.sock mount позволяет docker run --privileged изнутри — тоже root.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "privileged_socket_mistakes",
+      "exampleType": "good",
+      "exampleText": "nginx:alpine root по умолчанию — всегда USER или --user. CI DinD rootless, не host socket",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "privileged_socket_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Для Docker-in-Docker в CI mount /var/run/docker.sock — standard practice, безопасно в VPC.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "host_daemon_hardening",
+      "exampleType": "good",
+      "exampleText": "daemon.json: icc false, userns-remap default — root в контейнере → UID 100000 на host. docker-bench-security перед релизом.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "host_daemon_hardening",
+      "exampleType": "good",
+      "exampleText": "userns remap — escape даёт unprivileged host user, но bind mount ownership надо учитывать",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "host_daemon_hardening",
+      "exampleType": "bad",
+      "exampleText": "Host hardening не нужен если все контейнеры read-only — daemon.json можно default.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "docker-security-hardening",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-security-hardening",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-security-hardening",
+    "difficulty": "SENIOR",
+    "titleEn": "How to implement Docker container security hardening?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

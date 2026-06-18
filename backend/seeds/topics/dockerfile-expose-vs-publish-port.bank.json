@@ -1,0 +1,477 @@
+{
+  "topic": {
+    "code": "dockerfile_expose_vs_publish_port",
+    "name": "EXPOSE vs публикация порта",
+    "skillCode": "docker",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "В чём разница между EXPOSE в Dockerfile и публикацией порта (`-p` / `--publish`)?",
+    "shortAnswer": "EXPOSE в Dockerfile — только документация: записывает в метаданные образа, что приложение слушает указанный порт; с хоста контейнер при этом недоступен. `-p` / `--publish` на `docker run` реально пробрасывает порт на хост (iptables NAT). Без `-p` порт доступен другим контейнерам в той же Docker-сети, но не с машины-хоста.",
+    "idealAnswer": "EXPOSE и публикация порта выглядят связанными, но делают разное. EXPOSE 80 в Dockerfile — metadata only: записывает в Config.ExposedPorts образа, что контейнер ожидает порт 80. Это документация для людей и docker inspect; также нужно для docker run -P (capital P), который публикует все EXPOSEd порты на случайные host-порты. EXPOSE НЕ открывает порт на хосте, НЕ настраивает iptables/NAT и НЕ ограничивает безопасность — реальные listening-порты определяет приложение внутри контейнера. docker run -p 8080:80 nginx — это publish: демон добавляет iptables DNAT rule host:8080 → container:80 и (на Linux) docker-proxy как backup. Синтаксис: [HOST_IP:]HOST_PORT:CONTAINER_PORT[/PROTOCOL]; порядок host первый, container второй. Без -p curl localhost не работает даже при EXPOSE 80; с -p 8080:80 — работает. -P публикует все EXPOSEd порты на random high ports (32768+), docker port показывает mapping. Типичные ошибки: EXPOSE 8080 и ожидание доступа с хоста без -p; -P без EXPOSE в Dockerfile (docker port пустой); перевёрнутый -p 80:8080 когда nginx слушает 80; EXPOSE как security — не ограничивает. Межконтейнерная связь на одной Docker-сети не требует EXPOSE или -p: api может достучаться до db:5432 без ports в compose. В production DB/cache не публикуют на host — только web/API. В Compose: expose: — metadata для сервисов в сети (без host publish); ports: — реальная публикация на host. Follow-up: docker port две строки — IPv4 и IPv6; 127.0.0.1:8080:80 — только localhost; опубликовать порт после старта стандартным CLI нельзя — пересоздать контейнер.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "expose_vs_publish_core",
+      "title": "Называет главное отличие EXPOSE и `-p`",
+      "expected": "Кандидат объясняет: EXPOSE — документация/metadata в образе; `-p` / `--publish` — реальный проброс порта на хост через NAT; без `-p` с хоста недоступен, между контейнерами в сети — доступен.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — ядро темы для junior",
+        "mustConcepts": [
+          "EXPOSE",
+          "документац",
+          "metadata",
+          "метаданн",
+          "-p",
+          "--publish",
+          "publish",
+          "проброс",
+          "хост",
+          "host",
+          "NAT",
+          "iptables",
+          "недоступ",
+          "с хоста",
+          "контейнер",
+          "разниц",
+          "hint",
+          "подсказк"
+        ],
+        "falseClaims": [
+          "EXPOSE автоматически публикует порт на хост",
+          "EXPOSE и -p делают одно и то же",
+          "без EXPOSE нельзя использовать -p",
+          "EXPOSE открывает firewall на хосте",
+          "порт контейнера недоступен другим контейнерам без EXPOSE"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "what_expose_does",
+      "title": "Описывает что делает EXPOSE",
+      "expected": "Кандидат объясняет: EXPOSE пишет ExposedPorts в config образа; для docker inspect и документации; нужен для `-P`; не открывает host-порт и не ограничивает listening-порты приложения.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "What EXPOSE actually does из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "expose_vs_publish_core",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "EXPOSE",
+              "inspect",
+              "metadata"
+            ],
+            "ask": "что именно записывает EXPOSE в образ и где это увидеть"
+          }
+        ],
+        "mustConcepts": [
+          "ExposedPorts",
+          "Config",
+          "docker inspect",
+          "metadata",
+          "метаданн",
+          "документац",
+          "-P",
+          "capital P",
+          "publish-all",
+          "не открыва",
+          "не firewall",
+          "не NAT",
+          "listening",
+          "приложен",
+          "bind",
+          "слуша"
+        ],
+        "falseClaims": [
+          "EXPOSE настраивает iptables на хосте",
+          "EXPOSE ограничивает какие порты может слушать приложение",
+          "без EXPOSE docker inspect не показывает порты",
+          "EXPOSE делает контейнер доступным из интернета",
+          "EXPOSE обязателен для работы nginx в контейнере"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "what_p_does",
+      "title": "Описывает механизм `-p` / `--publish`",
+      "expected": "Кандидат описывает: `-p HOST:CONTAINER` добавляет DNAT iptables rule; docker-proxy на Linux; синтаксис host первый, container второй; варианты 127.0.0.1, random host port, UDP, диапазоны.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "What -p actually does + syntax variations",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "expose_vs_publish_core",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "-p",
+              "8080:80",
+              "HOST",
+              "CONTAINER"
+            ],
+            "ask": "что делает docker run -p 8080:80 и в каком порядке host и container"
+          },
+          {
+            "match": [
+              "127.0.0.1",
+              "0.0.0.0",
+              "loopback"
+            ],
+            "ask": "разница между -p 8080:80 и -p 127.0.0.1:8080:80"
+          }
+        ],
+        "mustConcepts": [
+          "-p",
+          "--publish",
+          "HOST_PORT",
+          "CONTAINER_PORT",
+          "8080:80",
+          "host перв",
+          "container втор",
+          "iptables",
+          "DNAT",
+          "docker-proxy",
+          "127.0.0.1",
+          "0.0.0.0",
+          "loopback",
+          "random",
+          "случайн",
+          "UDP",
+          "диапазон",
+          "PROTOCOL",
+          "tcp"
+        ],
+        "falseClaims": [
+          "в -p 8080:80 первое число — порт контейнера",
+          "-p только документирует порт как EXPOSE",
+          "docker-proxy не участвует в publish на Linux",
+          "-p 80:8080 правильно для nginx который слушает 80",
+          "publish работает без правил iptables"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "publish_all_flag",
+      "title": "Знает флаг `-P` (publish-all)",
+      "expected": "Кандидат объясняет: `-P` публикует все EXPOSEd порты на случайные host-порты; docker port показывает mapping; полезно в CI; без EXPOSE в Dockerfile `-P` нечего публиковать.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "-P (capital) из ITLead TL;DR",
+        "mustConcepts": [
+          "-P",
+          "capital P",
+          "publish-all",
+          "publish all",
+          "EXPOSEd",
+          "случайн",
+          "random",
+          "32768",
+          "docker port",
+          "mapping",
+          "CI",
+          "parallel",
+          "без EXPOSE",
+          "пуст",
+          "empty"
+        ],
+        "falseClaims": [
+          "-P и -p — одно и то же",
+          "-P публикует порты без EXPOSE в Dockerfile",
+          "-P всегда мапит на порт 80 хоста",
+          "docker port не нужен после -P",
+          "-P открывает все порты контейнера включая не EXPOSEd"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат опровергает: EXPOSE без `-p` и curl с хоста; перевёрнутый `-p`; `-P` без EXPOSE; EXPOSE как security; публикация DB в production.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes ITLead — частые dev-баги",
+        "falseClaimCapFraction": 0,
+        "probeConceptGroups": [
+          {
+            "match": [
+              "EXPOSE",
+              "curl",
+              "connection refused"
+            ],
+            "ask": "почему EXPOSE 8080 не даёт curl localhost:8080 с хоста"
+          },
+          {
+            "match": [
+              "80:8080",
+              "перевёрнут",
+              "wrong",
+              "наоборот"
+            ],
+            "ask": "что не так с docker run -p 80:8080 nginx"
+          }
+        ],
+        "mustConcepts": [
+          "EXPOSE без -p",
+          "connection refused",
+          "curl localhost",
+          "перевёрнут",
+          "80:8080",
+          "HOST:CONTAINER",
+          "наоборот",
+          "-P без EXPOSE",
+          "security",
+          "безопас",
+          "не огранич",
+          "bind 22",
+          "postgres",
+          "production",
+          "не публик",
+          "DB"
+        ],
+        "falseClaims": [
+          "достаточно EXPOSE чтобы открыть порт на хосте",
+          "EXPOSE закрывает все порты кроме указанного",
+          "-p 80:8080 правильно когда nginx слушает порт 80",
+          "-P работает даже если в Dockerfile нет EXPOSE",
+          "в production нужно -p для postgres чтобы api достучался"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "inter_container_compose",
+      "title": "Понимает межконтейнерный доступ и Compose",
+      "expected": "Кандидат объясняет: контейнеры в одной Docker-сети общаются по имени сервиса без `-p`; EXPOSE и `-p` про видимость с хоста; в Compose `expose:` — metadata, `ports:` — publish на host.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Inter-container + Compose expose vs ports из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "compose",
+              "expose:",
+              "ports:"
+            ],
+            "ask": "разница между expose: и ports: в docker-compose"
+          }
+        ],
+        "mustConcepts": [
+          "Docker network",
+          "bridge",
+          "сеть",
+          "db:5432",
+          "api",
+          "имя сервиса",
+          "DNS",
+          "без -p",
+          "без ports",
+          "host visibility",
+          "с хоста",
+          "Compose",
+          "expose:",
+          "ports:",
+          "internal",
+          "внутрен",
+          "production",
+          "reverse proxy",
+          "изолир"
+        ],
+        "falseClaims": [
+          "контейнеры на одной сети не могут общаться без -p",
+          "expose: в Compose публикует порт на хост",
+          "ports: в Compose только документирует порт",
+          "postgres обязательно нужен -p 5432:5432 для api",
+          "EXPOSE нужен для связи api и db в compose"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "EXPOSE 80 в Dockerfile — только metadata в образе, с хоста nginx недоступен. docker run -p 8080:80 nginx — iptables DNAT, curl localhost:8080 работает. Между контейнерами в одной сети api:3000 и db:5432 доступны без -p.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "EXPOSE — подсказка для docker inspect и для -P. -p HOST:CONTAINER — реальный проброс. Типичная ошибка: EXPOSE 8080 и ждать curl с хоста, или -p 80:8080 когда приложение слушает 80.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну expose это просто запись в образе, порт с ноута не откроется. -p 8080:80 мапит хост на контейнер. в compose db без ports — api достучится, с хоста postgres не виден, так и надо в prod",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "EXPOSE 80 автоматически открывает порт 80 на хосте. -p нужен только если EXPOSE не указан в Dockerfile.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker run -p 80:8080 nginx правильно — 80 это host, 8080 container. EXPOSE ограничивает безопасность и закрывает все порты кроме указанного.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Контейнеры не могут общаться без -p. В Compose expose: публикует порт на localhost так же как ports:.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "expose_vs_publish_core",
+      "exampleType": "good",
+      "exampleText": "EXPOSE — документация в образе; -p — реальный NAT на хост. Без -p с localhost не достучаться, между контейнерами в сети — можно.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "expose_vs_publish_core",
+      "exampleType": "good",
+      "exampleText": "expose это hint, не action. publish добавляет доступ с host-машины",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "expose_vs_publish_core",
+      "exampleType": "bad",
+      "exampleText": "EXPOSE и -p — синонимы, оба пробрасывают порт на хост.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "what_expose_does",
+      "exampleType": "good",
+      "exampleText": "EXPOSE пишет ExposedPorts в docker inspect — metadata для людей и для docker run -P. Не открывает host-порт и не настраивает iptables.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "what_expose_does",
+      "exampleType": "good",
+      "exampleText": "docker inspect mysite --format ExposedPorts покажет 80/tcp — и всё, firewall не трогали",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "what_expose_does",
+      "exampleType": "bad",
+      "exampleText": "EXPOSE создаёт NAT rule и docker-proxy на хосте автоматически при docker build.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "what_p_does",
+      "exampleType": "good",
+      "exampleText": "docker run -p 8080:80 nginx: демон добавляет iptables DNAT host:8080 → container:80, docker-proxy как backup. Порядок: host первый, container второй.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "what_p_does",
+      "exampleType": "good",
+      "exampleText": "-p 127.0.0.1:8080:80 — только localhost; -p 80 — random host port на container 80",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "what_p_does",
+      "exampleType": "bad",
+      "exampleText": "-p 8080:80 означает container 8080 мапится на host 80. Publish не использует iptables.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "publish_all_flag",
+      "exampleType": "good",
+      "exampleText": "docker run -d -P nginx — все EXPOSEd порты на random host ports; docker port покажет 80/tcp -> 0.0.0.0:32768. Удобно в CI.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "publish_all_flag",
+      "exampleType": "good",
+      "exampleText": "-P capital — publish all exposed. без EXPOSE в dockerfile docker port пустой",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "publish_all_flag",
+      "exampleType": "bad",
+      "exampleText": "-P публикует все порты контейнера даже без EXPOSE и всегда на порт 80 хоста.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "EXPOSE 8080 + docker run без -p → curl localhost:8080 connection refused. Нужен -p 8080:8080 или -P.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "docker run -p 80:8080 nginx — wrong: nginx слушает 80, не 8080. Правильно -p 80:80 или -p 8080:80.",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "EXPOSE закрывает порт 22 если указан EXPOSE 80 — security feature Docker.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "inter_container_compose",
+      "exampleType": "good",
+      "exampleText": "В compose api без ports: достучится до db:5432 по Docker DNS. Только web с ports: 80:80 виден с хоста — production-shape.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "inter_container_compose",
+      "exampleType": "good",
+      "exampleText": "compose expose:3000 — metadata для сервисов сети, не host publish. ports: — реальный проброс на хост",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "inter_container_compose",
+      "exampleType": "bad",
+      "exampleText": "Без -p 5432:5432 postgres api не может подключиться к базе в docker compose.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "dockerfile-expose-vs-publish-port",
+    "apiUrl": "https://api.itlead.org/api/questions/dockerfile-expose-vs-publish-port",
+    "pageUrl": "https://itlead.org/interview-questions/docker/dockerfile-expose-vs-publish-port",
+    "difficulty": "JUNIOR",
+    "titleEn": "EXPOSE in Dockerfile vs port publishing: what is the difference?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T20:00:00.000Z"
+  }
+}

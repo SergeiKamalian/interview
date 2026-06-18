@@ -1,0 +1,551 @@
+{
+  "topic": {
+    "code": "docker_compose_service_dependencies",
+    "name": "Зависимости сервисов в Docker Compose",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как управлять зависимостями сервисов в Docker Compose?",
+    "shortAnswer": "Используй `depends_on` с `condition: service_healthy`. Простой `depends_on: [db]` только упорядочивает старт контейнеров — Compose не ждёт, пока приложение внутри dep будет готово принимать соединения. С `condition: service_healthy` Compose ждёт успешный healthcheck зависимости перед стартом dependent.",
+    "idealAnswer": "Зависимости в Docker Compose — не только порядок старта. Plain `depends_on: [db]` или `condition: service_started` ждут только запуск контейнера, но «started» редко означает «готов принимать соединения»: postgres после Started нужна 1–5 секунд до pg_isready. Правильный паттерн для runtime-зависимостей — `depends_on: db: condition: service_healthy` плюс `healthcheck:` на dep (например `pg_isready -U postgres`). Три условия: `service_started` (дефолт, почти никогда для реальных deps), `service_healthy` (ждёт прохождения healthcheck dep), `service_completed_successfully` (ждёт exit code 0 — для one-shot migrate/init контейнеров). Без `depends_on` сервисы стартуют параллельно; с ним Compose соблюдает порядок. Если на dep указан `service_healthy`, но нет блока `healthcheck:`, Compose падает с ошибкой «service has no healthcheck defined». Паттерн db + migrate + app: db healthy → migrate запускается → migrate exit 0 → app стартует; для migrate — `condition: service_completed_successfully`, для db — `service_healthy`. Паттерн web + api + db: каждый tier ждёт healthcheck следующего — api healthy перед web. Смешанные условия в map-форме: db healthy, redis started, migrate completed_successfully. App-level retry с backoff — safety net при transient disconnects даже с service_healthy; вместе дают надёжный startup. Типичные ошибки: plain depends_on для реальной зависимости (api падает на Connection refused); циклические deps (a→b→a — Compose отказывает); `docker compose restart api` не перепроверяет health db; wait-for-it/dockerize для inter-service order в Compose v3+ с service_healthy обычно не нужны (полезны для внешних deps как AWS RDS). Внешние сервисы Compose не health-check'ит — wrapper-контейнер с probe или app retry. `depends_on` работает в merged config нескольких `-f` файлов и при `docker compose run` (отключить `--no-deps`).",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "depends_on_start_only",
+      "title": "Понимает что plain depends_on — только порядок старта",
+      "expected": "Кандидат объясняет: `depends_on` без condition или с `service_started` только упорядочивает старт; контейнер started ≠ приложение готово; api может стартовать пока postgres ещё бутится → Connection refused.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — started не равно ready",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "depends_on_start_only",
+            "oftenConfusedWith": [
+              "service_healthy"
+            ],
+            "anchorTermsExpected": [
+              "порядок старта",
+              "started",
+              "не готов",
+              "Connection refused",
+              "бутится",
+              "не ждёт"
+            ],
+            "anchorTermsWrongTopic": [
+              "healthcheck автоматически",
+              "depends_on ждёт pg_isready"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "depends_on",
+              "порядок",
+              "started"
+            ],
+            "ask": "чем отличается depends_on без condition от реальной готовности postgres"
+          }
+        ],
+        "mustConcepts": [
+          "depends_on",
+          "порядок старта",
+          "start order",
+          "service_started",
+          "started",
+          "не готов",
+          "не ready",
+          "Connection refused",
+          "бутится",
+          "postgres",
+          "1-5 секунд",
+          "принимать соединения",
+          "параллельно",
+          "без depends_on",
+          "контейнер запущен"
+        ],
+        "falseClaims": [
+          "plain depends_on ждёт готовности приложения внутри контейнера",
+          "started и ready в Compose — одно и то же",
+          "depends_on гарантирует что db принимает запросы",
+          "api безопасно стартует сразу после Container db Started"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "service_healthy",
+      "title": "Знает condition: service_healthy",
+      "expected": "Кандидат описывает: `depends_on: db: condition: service_healthy` — Compose ждёт успешный healthcheck dep перед стартом dependent; правильный дефолт для runtime-зависимостей в production.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевой паттерн из ITLead TL;DR и quick example",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "depends_on_start_only",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "service_healthy",
+            "oftenConfusedWith": [
+              "depends_on_start_only",
+              "healthcheck_required"
+            ],
+            "anchorTermsExpected": [
+              "service_healthy",
+              "healthcheck",
+              "pg_isready",
+              "готов",
+              "readiness",
+              "ждёт"
+            ],
+            "anchorTermsWrongTopic": [
+              "service_healthy без healthcheck работает",
+              "service_started то же что healthy"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "service_healthy",
+              "condition"
+            ],
+            "ask": "что делает condition: service_healthy и когда это нужно вместо plain depends_on"
+          }
+        ],
+        "mustConcepts": [
+          "service_healthy",
+          "condition",
+          "healthcheck",
+          "ждёт",
+          "готов",
+          "ready",
+          "readiness",
+          "pg_isready",
+          "production",
+          "runtime",
+          "зависимост",
+          "dependent",
+          "dep",
+          "правильный дефолт",
+          "перед стартом"
+        ],
+        "falseClaims": [
+          "service_healthy работает без healthcheck на dep",
+          "service_healthy ждёт только запуск контейнера",
+          "plain depends_on и service_healthy дают одинаковый результат",
+          "service_healthy не нужен если api делает retry"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "three_conditions",
+      "title": "Знает три condition в depends_on",
+      "expected": "Кандидат перечисляет: `service_started` (дефолт, только старт контейнера), `service_healthy` (healthcheck passed), `service_completed_successfully` (exit 0 для one-shot); может показать map-форму с разными условиями на db/redis/migrate.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "три conditions из секции ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "service_started",
+              "service_healthy",
+              "completed_successfully"
+            ],
+            "ask": "три condition в depends_on — когда каждый использовать"
+          }
+        ],
+        "mustConcepts": [
+          "service_started",
+          "service_healthy",
+          "service_completed_successfully",
+          "completed_successfully",
+          "exit 0",
+          "exit code",
+          "дефолт",
+          "default",
+          "one-shot",
+          "init",
+          "migrate",
+          "map-форма",
+          "redis",
+          "смешанные",
+          "три условия"
+        ],
+        "falseClaims": [
+          "в depends_on только одно условие service_started",
+          "service_completed_successfully ждёт healthcheck",
+          "service_started ждёт exit code 0",
+          "нельзя задать разные condition для разных deps"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "healthcheck_required",
+      "title": "Понимает что dep нужен healthcheck",
+      "expected": "Кандидат объясняет: `service_healthy` требует `healthcheck:` на dep; без него Compose ошибка «service has no healthcheck defined»; фикс — добавить healthcheck (pg_isready, wget /health).",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "частая ошибка Forgetting healthcheck из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "no healthcheck",
+              "healthcheck defined",
+              "без healthcheck"
+            ],
+            "ask": "что произойдёт если service_healthy на db, но healthcheck на db не задан"
+          }
+        ],
+        "mustConcepts": [
+          "healthcheck",
+          "healthcheck:",
+          "no healthcheck",
+          "healthcheck defined",
+          "ошибка",
+          "ERROR",
+          "pg_isready",
+          "interval",
+          "retries",
+          "start_period",
+          "wget",
+          "/health",
+          "обязател",
+          "требует",
+          "на dep"
+        ],
+        "falseClaims": [
+          "Compose сам добавляет healthcheck для postgres",
+          "service_healthy работает без healthcheck блока",
+          "healthcheck нужен только на dependent, не на dep",
+          "ошибка no healthcheck — только warning, старт продолжится"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "migrate_init_pattern",
+      "title": "Паттерн migrate / init one-shot",
+      "expected": "Кандидат описывает: migrate/init как one-shot контейнер с `restart: no`; api зависит от migrate с `condition: service_completed_successfully`; chain db healthy → migrate exit 0 → app start; паттерн web→api→db через healthcheck chain.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "db + migrator + app и web + api + db из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "healthcheck_required",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "migrate",
+              "completed_successfully",
+              "one-shot"
+            ],
+            "ask": "как gate'ить api на успешные миграции через service_completed_successfully"
+          },
+          {
+            "match": [
+              "web",
+              "api",
+              "chain",
+              "three-tier"
+            ],
+            "ask": "паттерн web ждёт api healthy, api ждёт db healthy"
+          }
+        ],
+        "mustConcepts": [
+          "migrate",
+          "миграц",
+          "init",
+          "one-shot",
+          "service_completed_successfully",
+          "exit 0",
+          "restart: no",
+          "restart no",
+          "db healthy",
+          "chain",
+          "цепочка",
+          "web",
+          "api",
+          "db",
+          "three-tier",
+          "детерминован",
+          "gate",
+          "npm run migrate"
+        ],
+        "falseClaims": [
+          "migrate должен работать как долгоживущий сервис с restart always",
+          "service_completed_successfully ждёт healthcheck migrate",
+          "app может стартовать до завершения migrate без condition",
+          "one-shot контейнер не поддерживается в depends_on"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes_retry",
+      "title": "Типичные ошибки и app-level retry",
+      "expected": "Кандидат называет: циклические deps; restart api не перепроверяет db health; wait-for-it/dockerize устарели для inter-service order; внешние deps (RDS) — wrapper или retry; app-level retry с backoff как safety net вместе с service_healthy.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes + app retry + external deps из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "цикл",
+              "cycle",
+              "cyclic"
+            ],
+            "ask": "что произойдёт при циклическом depends_on a→b→a"
+          },
+          {
+            "match": [
+              "restart",
+              "compose restart"
+            ],
+            "ask": "перепроверяет ли docker compose restart api health зависимостей"
+          },
+          {
+            "match": [
+              "retry",
+              "backoff",
+              "RDS",
+              "external"
+            ],
+            "ask": "app-level retry и внешние зависимости когда Compose не health-check'ит"
+          }
+        ],
+        "mustConcepts": [
+          "циклич",
+          "cycle",
+          "dependency cycle",
+          "restart",
+          "compose restart",
+          "не перепровер",
+          "foot-gun",
+          "wait-for-it",
+          "dockerize",
+          "устарел",
+          "внешн",
+          "external",
+          "RDS",
+          "AWS",
+          "wrapper",
+          "retry",
+          "backoff",
+          "safety net",
+          "transient",
+          "compose run",
+          "no-deps",
+          "merged",
+          "-f"
+        ],
+        "falseClaims": [
+          "docker compose restart перепроверяет health всех deps",
+          "wait-for-it всегда нужен даже с service_healthy",
+          "Compose health-check'ит AWS RDS автоматически",
+          "циклические depends_on Compose разрешает с warning",
+          "app-level retry заменяет service_healthy полностью"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Для api ставлю `depends_on: db: condition: service_healthy` и healthcheck на db с pg_isready. Plain depends_on только порядок — postgres после Started ещё секунды не принимает соединения. Migrate one-shot с `condition: service_completed_successfully` gate'ит api после exit 0.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Три condition: redis — service_started, db — service_healthy, migrate — completed_successfully. Плюс retry с backoff в приложении на transient disconnect. restart api не перепроверяет db — знаю этот foot-gun.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну depends_on без condition — db стартует первым, но api падает на connection refused. service_healthy + healthcheck — правильный вариант. wait-for-it для compose внутри проекта уже не нужен",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "depends_on: [db] — Compose ждёт пока postgres полностью готов. service_healthy работает без healthcheck на db. migrate должен быть always-running сервисом.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Циклические depends_on — Compose просто warning и стартует. compose restart api снова проверяет health db. Для RDS Compose сам health-check'ит через embedded DNS.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "service_completed_successfully ждёт healthcheck migrate. App retry заменяет service_healthy — healthcheck на postgres не нужен.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "depends_on_start_only",
+      "exampleType": "good",
+      "exampleText": "depends_on: [db] — только порядок: db Started, api Started, но postgres ещё бутится → Connection refused.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "depends_on_start_only",
+      "exampleType": "good",
+      "exampleText": "started контейнера ≠ ready приложения — база нужна 1-5 сек после Container Started",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "depends_on_start_only",
+      "exampleType": "bad",
+      "exampleText": "Plain depends_on гарантирует что db принимает запросы до старта api.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "service_healthy",
+      "exampleType": "good",
+      "exampleText": "`condition: service_healthy` — Compose ждёт pg_isready на db перед api. Правильный дефолт для runtime deps.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "service_healthy",
+      "exampleType": "good",
+      "exampleText": "service_healthy на api→db + healthcheck с interval/retries — readiness gating, не только start order",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "service_healthy",
+      "exampleType": "bad",
+      "exampleText": "service_healthy и plain depends_on дают одинаковый результат — ждут готовности postgres.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "three_conditions",
+      "exampleType": "good",
+      "exampleText": "service_started — дефолт, только старт; service_healthy — healthcheck passed; completed_successfully — exit 0 для migrate.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "three_conditions",
+      "exampleType": "good",
+      "exampleText": "map: db healthy, redis started, migrate completed_successfully — смешанные условия в одном depends_on",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "three_conditions",
+      "exampleType": "bad",
+      "exampleText": "В depends_on только service_started, других condition не существует.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "healthcheck_required",
+      "exampleType": "good",
+      "exampleText": "service_healthy на db без healthcheck: — ERROR service has no healthcheck defined. Фикс: pg_isready в healthcheck.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "healthcheck_required",
+      "exampleType": "good",
+      "exampleText": "healthcheck на dep обязателен: test CMD-SHELL pg_isready, interval, retries, start_period",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "healthcheck_required",
+      "exampleType": "bad",
+      "exampleText": "Compose автоматически health-check'ит postgres при service_healthy — блок healthcheck не нужен.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "migrate_init_pattern",
+      "exampleType": "good",
+      "exampleText": "db healthy → migrate npm run migrate → exit 0 → api с condition: service_completed_successfully на migrate.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "migrate_init_pattern",
+      "exampleType": "good",
+      "exampleText": "web depends_on api service_healthy, api depends_on db service_healthy — three-tier chain через healthcheck",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "migrate_init_pattern",
+      "exampleType": "bad",
+      "exampleText": "Migrate контейнер с restart always — api стартует параллельно с migrate без condition.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes_retry",
+      "exampleType": "good",
+      "exampleText": "a depends_on b, b depends_on a — dependency cycle detected. restart api не верифицирует db health снова.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes_retry",
+      "exampleType": "good",
+      "exampleText": "RDS Compose не проверяет — wrapper nc -z или app retry с backoff. service_healthy + retry вместе.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes_retry",
+      "exampleType": "good",
+      "exampleText": "wait-for-it для inter-service в compose v3+ с service_healthy обычно не нужен — только для external deps",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes_retry",
+      "exampleType": "bad",
+      "exampleText": "compose restart api перепроверяет health db. wait-for-it всегда обязателен даже с service_healthy.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "docker-compose-service-dependencies",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-compose-service-dependencies",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-compose-service-dependencies",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to manage service dependencies in Docker Compose?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T20:00:00.000Z"
+  }
+}

@@ -1,0 +1,571 @@
+{
+  "topic": {
+    "code": "expressjs_security_rate_limiting",
+    "name": "Безопасность Express.js и rate limiting",
+    "skillCode": "expressjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как защитить Express.js приложение? Расскажите про security middleware и rate limiting.",
+    "shortAnswer": "Безопасность Express.js — несколько слоёв middleware, каждый закрывает свой класс атак: helmet() (HTTP security headers), express-rate-limit (brute-force на auth), express-mongo-sanitize и xss-clean (инъекции), hpp (parameter pollution), express.json с разумным limit. Порядок важен: security middleware подключают до маршрутов; секреты — только в process.env.",
+    "idealAnswer": "Express security — defense in depth: несколько middleware-слоёв, каждый останавливает свой класс угроз; все слои нужны вместе, порядок критичен — security middleware до любых route handlers. helmet() одним вызовом ставит ~11 HTTP security headers: Content-Security-Policy, X-Frame-Options DENY (clickjacking), Strict-Transport-Security (HSTS), X-Content-Type-Options nosniff; убирает X-Powered-By: Express. express-rate-limit считает запросы по IP в окне windowMs: общий лимит ~100/15 мин на /api/, на /auth/login и /auth/register жёстче — 5/15 мин против brute-force; skipSuccessfulRequests: true на auth — в лимит идут только неудачные попытки. express-mongo-sanitize удаляет MongoDB-операторы ($where, $gt, $ne) из input; xss-clean убирает HTML/script из body (но XSS на выходе всё равно нужны CSP и escaping на фронте); hpp нормализует дубли query-параметров (?sort=name&sort=admin). express.json({ limit: '10kb' }) — разумный дефолт против memory exhaustion; file uploads — отдельно через multer. HTTPS: TLS на nginx/load balancer или redirect middleware в production; helmet добавляет HSTS. Секреты (JWT_SECRET) — process.env + dotenv локально, .env в .gitignore с первого дня; fail fast при старте если секрет не задан — process.exit(1), а не ошибка в полночь при login. Типичные ошибки: helmet после routes; limit 100mb на json(); rate limit без trustProxy за load balancer (все делят IP балансировщика — нужен trustProxy + X-Forwarded-For, для нескольких инстансов — Redis store); без skipSuccessfulRequests на login; разные сообщения для wrong email vs wrong password (enumeration); xss-clean как единственная защита от XSS. Auth route: bcryptjs 12+ rounds, одинаковое сообщение «Неверные учётные данные» для неверного email и пароля, короткий JWT expiresIn + refresh tokens. За NAT/corporate IP — комбинировать IP limit с account-level lockout и CAPTCHA. Checklist: helmet, rate limit, cors whitelist, mongo-sanitize, xss-clean, body limit, bcrypt, HTTPS, env secrets, hpp.",
+    "maxScore": 10,
+    "skills": [
+      "expressjs",
+      "javascript",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "security_stack_order",
+      "title": "Понимает многослойную защиту и порядок middleware",
+      "expected": "Кандидат объясняет defense in depth: helmet, sanitize, rate limit, body limit — до route handlers; неправильный порядок ломает защиту.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро ITLead TL;DR — порядок middleware до маршрутов",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "security_stack_order",
+            "oftenConfusedWith": [
+              "helmet_http_headers",
+              "security_pitfalls"
+            ],
+            "anchorTermsExpected": [
+              "до маршрут",
+              "до routes",
+              "порядок",
+              "defense in depth",
+              "слои",
+              "middleware stack"
+            ],
+            "anchorTermsWrongTopic": [
+              "helmet достаточно один",
+              "security после handler"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "порядок",
+              "до routes",
+              "middleware"
+            ],
+            "ask": "почему helmet и rate limit подключают до определения маршрутов"
+          }
+        ],
+        "mustConcepts": [
+          "defense in depth",
+          "многослой",
+          "middleware",
+          "до маршрут",
+          "до routes",
+          "порядок",
+          "security stack",
+          "helmet",
+          "rate limit",
+          "sanitize",
+          "слои",
+          "обработчик",
+          "route handler",
+          "сначала безопас"
+        ],
+        "falseClaims": [
+          "security middleware после routes работает так же",
+          "достаточно одного helmet для полной защиты",
+          "порядок middleware не влияет на headers",
+          "Express автоматически ставит security headers"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "helmet_http_headers",
+      "title": "Использует helmet() для HTTP headers",
+      "expected": "Кандидат: helmet() ставит CSP, HSTS, X-Frame-Options, X-Content-Type-Options; убирает X-Powered-By; защита от XSS/clickjacking/MIME sniffing.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "HTTP headers layer из ITLead Quick setup",
+        "mustConcepts": [
+          "helmet",
+          "HTTP headers",
+          "Content-Security-Policy",
+          "CSP",
+          "HSTS",
+          "Strict-Transport-Security",
+          "X-Frame-Options",
+          "clickjacking",
+          "X-Content-Type-Options",
+          "nosniff",
+          "MIME sniffing",
+          "X-Powered-By",
+          "security headers"
+        ],
+        "falseClaims": [
+          "helmet шифрует HTTPS-трафик",
+          "helmet заменяет HTTPS",
+          "helmet можно подключить после routes — headers всё равно добавятся",
+          "X-Powered-By не раскрывает стек"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "rate_limiting_config",
+      "title": "Настраивает express-rate-limit",
+      "expected": "Кандидат: windowMs + max; общий лимит на /api/ и жёсткий на /auth/login; skipSuccessfulRequests; trustProxy за load balancer; Redis store для нескольких инстансов.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "rate limiting — ключевой слой темы и slug",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "security_pitfalls",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "rate limit",
+              "rateLimit",
+              "express-rate-limit",
+              "brute"
+            ],
+            "ask": "как настроить tighter limit на /auth/login vs общий /api/ и зачем skipSuccessfulRequests"
+          },
+          {
+            "match": [
+              "trust proxy",
+              "load balancer",
+              "X-Forwarded-For",
+              "Redis"
+            ],
+            "ask": "как rate limiting работает за load balancer и при нескольких инстансах"
+          }
+        ],
+        "mustConcepts": [
+          "express-rate-limit",
+          "rate limit",
+          "windowMs",
+          "max",
+          "brute-force",
+          "credential stuffing",
+          "IP",
+          "429",
+          "auth",
+          "login",
+          "skipSuccessfulRequests",
+          "trust proxy",
+          "trustProxy",
+          "load balancer",
+          "X-Forwarded-For",
+          "Redis",
+          "standardHeaders",
+          "15 мин",
+          "5 попыт"
+        ],
+        "falseClaims": [
+          "rate limit за nginx/load balancer работает по умолчанию без trustProxy",
+          "один global limit достаточен для login endpoint",
+          "skipSuccessfulRequests не нужен на auth routes",
+          "IP-based limit всегда корректен за corporate NAT без дополнительных мер"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "input_sanitization_limits",
+      "title": "Sanitization входа и лимит размера body",
+      "expected": "Кандидат: mongoSanitize против NoSQL injection; xss-clean на входе; express.json limit ~10kb; hpp против duplicate query params.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "NoSQL/XSS/payload size из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "xss-clean",
+              "xss",
+              "CSP"
+            ],
+            "ask": "достаточно ли xss-clean одного для защиты от XSS"
+          },
+          {
+            "match": [
+              "10kb",
+              "limit",
+              "100mb",
+              "payload"
+            ],
+            "ask": "почему 10kb разумный дефолт для JSON API"
+          }
+        ],
+        "mustConcepts": [
+          "mongoSanitize",
+          "express-mongo-sanitize",
+          "NoSQL injection",
+          "$where",
+          "$gt",
+          "$ne",
+          "xss-clean",
+          "XSS",
+          "script",
+          "HTML",
+          "express.json",
+          "limit",
+          "10kb",
+          "memory exhaustion",
+          "hpp",
+          "parameter pollution",
+          "duplicate query",
+          "multer",
+          "file upload"
+        ],
+        "falseClaims": [
+          "express.json с limit 100mb безопасен для всех API",
+          "xss-clean полностью предотвращает XSS без CSP и escaping на выходе",
+          "NoSQL injection невозможен в Express с MongoDB",
+          "hpp не нужен для REST API"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "env_secrets_failfast",
+      "title": "Хранит секреты в env и fail fast при старте",
+      "expected": "Кандидат: JWT_SECRET в process.env; dotenv локально; .env в .gitignore; проверка required env при boot с process.exit(1).",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "secrets in env vars ITLead section",
+        "mustConcepts": [
+          "process.env",
+          "JWT_SECRET",
+          "dotenv",
+          ".env",
+          ".gitignore",
+          "секрет",
+          "hardcode",
+          "fail fast",
+          "process.exit",
+          "startup",
+          "при старте",
+          "git history",
+          "Railway",
+          "Render",
+          "deployment"
+        ],
+        "falseClaims": [
+          "секреты в коде безопасны в private repo",
+          "JWT_SECRET undefined упадёт при старте автоматически",
+          ".env можно коммитить если repo private",
+          "dotenv нужен в production на сервере"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "https_auth_patterns",
+      "title": "HTTPS, bcrypt и безопасный auth flow",
+      "expected": "Кандидат: HTTPS redirect или TLS на proxy; bcryptjs 12+ rounds; одинаковое сообщение об ошибке для wrong email/password; короткий JWT expiresIn.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "auth route example + HTTPS из ITLead",
+        "mustConcepts": [
+          "HTTPS",
+          "redirect",
+          "req.secure",
+          "nginx",
+          "TLS",
+          "bcrypt",
+          "bcryptjs",
+          "12 rounds",
+          "hash",
+          "compare",
+          "password",
+          "jsonwebtoken",
+          "JWT",
+          "expiresIn",
+          "refresh token",
+          "enumeration",
+          "одинаков",
+          "Неверные учётные",
+          "401"
+        ],
+        "falseClaims": [
+          "HTTP достаточно для API с JWT",
+          "SHA256 без salt подходит для паролей",
+          "разные ошибки для wrong email и wrong password — нормальная практика",
+          "bcrypt на 4 rounds достаточно для production"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "security_pitfalls",
+      "title": "Знает типичные ошибки и follow-up нюансы",
+      "expected": "Кандидат называет: helmet после routes; huge body limit; rate limit без trustProxy; account enumeration; NAT/corporate IP — account lockout + CAPTCHA; cors whitelist.",
+      "score": 2,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes + interview follow-ups ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "rate_limiting_config",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "NAT",
+              "corporate",
+              "университет"
+            ],
+            "ask": "что делать когда много пользователей за одним IP"
+          },
+          {
+            "match": [
+              "enumeration",
+              "email",
+              "password",
+              "одинаков"
+            ],
+            "ask": "почему wrong email и wrong password должны возвращать одно сообщение"
+          }
+        ],
+        "mustConcepts": [
+          "helmet после routes",
+          "100mb",
+          "огромн limit",
+          "trust proxy",
+          "enumeration",
+          "перебор аккаунт",
+          "одинаков сообщен",
+          "NAT",
+          "corporate IP",
+          "account lockout",
+          "CAPTCHA",
+          "cors",
+          "whitelist",
+          "origin",
+          "credentials",
+          "stack trace",
+          "production"
+        ],
+        "falseClaims": [
+          "cors origin * с credentials — стандартная безопасная настройка",
+          "stack traces клиенту в production помогают UX",
+          "IP-only rate limit достаточен за corporate NAT",
+          "разные error messages для email и password не помогают атакующему"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Сначала весь security stack: helmet(), mongoSanitize(), xss(), hpp(), express.json({ limit: '10kb' }). Потом rateLimit — 100/15 мин на /api/, 5/15 мин на /auth/login с skipSuccessfulRequests. Секреты из process.env, при старте проверяю JWT_SECRET и падаю если нет. За load balancer — trustProxy: true.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Defense in depth: headers через helmet, brute-force через rate limit, NoSQL — mongoSanitize, XSS на входе xss-clean плюс CSP от helmet. Login возвращает одно «Неверные учётные данные» и для неверного email, и для пароля. bcrypt 12 rounds, JWT expiresIn 15m.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну сначала helmet и sanitize до routes, потом лимитеры — на login жёстче. secrets только env, .env в gitignore. за nginx https терминируется, express trust proxy для реального ip",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "helmet подключу после routes — headers всё равно добавятся. express.json limit 100mb для всех API. JWT secret захардкожу в коде, repo private — норм.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Rate limit не нужен — nginx всё решает. xss-clean полностью закрывает XSS. На login возвращаю «email не найден» vs «неверный пароль» — так понятнее пользователю.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Один helmet = полностью защищённый API. MD5 для паролей достаточно. cors origin * с credentials — стандарт.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "security_stack_order",
+      "exampleType": "good",
+      "exampleText": "Security middleware — первым блоком до app.use('/api', routes): helmet, sanitize, rate limit, body parser.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "security_stack_order",
+      "exampleType": "good",
+      "exampleText": "express обрабатывает middleware сверху вниз — если helmet после routes, headers на ответы маршрутов не попадут",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "security_stack_order",
+      "exampleType": "bad",
+      "exampleText": "Порядок не важен — helmet после handler всё равно защитит API.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "helmet_http_headers",
+      "exampleType": "good",
+      "exampleText": "app.use(helmet()) — CSP, HSTS, X-Frame-Options DENY, nosniff; убирает X-Powered-By.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "helmet_http_headers",
+      "exampleType": "good",
+      "exampleText": "helmet закрывает clickjacking через X-Frame-Options и MIME sniffing через nosniff",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "helmet_http_headers",
+      "exampleType": "bad",
+      "exampleText": "helmet шифрует body запросов и заменяет HTTPS.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "rate_limiting_config",
+      "exampleType": "good",
+      "exampleText": "authLimiter: windowMs 15*60*1000, max 5, skipSuccessfulRequests: true на /auth/login; apiLimiter max 100 на /api/.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "rate_limiting_config",
+      "exampleType": "good",
+      "exampleText": "за load balancer trustProxy: true и Redis store — иначе все делят IP балансировщика и один счётчик",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "rate_limiting_config",
+      "exampleType": "bad",
+      "exampleText": "Один global 1000 req/min достаточен для login — brute-force не страшен.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "input_sanitization_limits",
+      "exampleType": "good",
+      "exampleText": "mongoSanitize убирает $gt/$where из body; xss-clean на входе; json limit 10kb — file uploads через multer отдельно.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "input_sanitization_limits",
+      "exampleType": "good",
+      "exampleText": "hpp нормализует ?sort=name&sort=admin — иначе downstream middleware ведёт себя непредсказуемо",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "input_sanitization_limits",
+      "exampleType": "bad",
+      "exampleText": "xss-clean одного достаточно — CSP и escaping на фронте не нужны.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "env_secrets_failfast",
+      "exampleType": "good",
+      "exampleText": "if (!process.env.JWT_SECRET) { console.error(...); process.exit(1); } — падаем при boot, не в полночь на login.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "env_secrets_failfast",
+      "exampleType": "good",
+      "exampleText": "dotenv локально, prod — env через Railway/Render; .env в gitignore с первого коммита",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "env_secrets_failfast",
+      "exampleType": "bad",
+      "exampleText": "const JWT_SECRET = 'hardcoded-secret-123' — private repo, никто не найдёт.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "https_auth_patterns",
+      "exampleType": "good",
+      "exampleText": "production: redirect на https если !req.secure; login — bcrypt.compare, одинаковый 401 «Неверные учётные данные».",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "https_auth_patterns",
+      "exampleType": "good",
+      "exampleText": "bcrypt 12+ rounds, jwt expiresIn 15m — refresh tokens для длинных сессий",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "https_auth_patterns",
+      "exampleType": "bad",
+      "exampleText": "HTTP API с JWT — норм, HTTPS только для форм. SHA1 hash пароля на сервере.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "security_pitfalls",
+      "exampleType": "good",
+      "exampleText": "За corporate NAT — IP limit + account lockout после 5 failed + CAPTCHA; cors whitelist origins, не * с credentials.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "security_pitfalls",
+      "exampleType": "good",
+      "exampleText": "типичные косяки: helmet после routes, limit 100mb json, skipSuccessfulRequests забыли на login",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "security_pitfalls",
+      "exampleType": "bad",
+      "exampleText": "Stack trace клиенту в prod — ускоряет debug. Разные ошибки email/password — лучший UX без рисков.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "expressjs-security-rate-limiting",
+    "apiUrl": "https://api.itlead.org/api/questions/expressjs-security-rate-limiting",
+    "pageUrl": "https://itlead.org/interview-questions/expressjs/expressjs-security-rate-limiting",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to secure an Express.js application?",
+    "categorySlug": "expressjs",
+    "syncedAt": "2026-06-18T16:30:00.000Z"
+  }
+}

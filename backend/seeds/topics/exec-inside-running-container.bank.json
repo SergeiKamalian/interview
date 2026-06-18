@@ -1,0 +1,485 @@
+{
+  "topic": {
+    "code": "exec_inside_running_container",
+    "name": "Зайти внутрь running Docker-контейнера",
+    "skillCode": "docker",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Как зайти внутрь уже запущенного Docker-контейнера?",
+    "shortAnswer": "Команда `docker exec -it <container> <shell>` запускает новый shell внутри уже работающего контейнера. `-i` держит stdin открытым, `-t` выделяет TTY — оба нужны для интерактивной сессии. На большинстве образов используют `sh` (Alpine, nginx-alpine); на Ubuntu/Debian — `bash`. У distroless и `FROM scratch` shell нет — exec с sh невозможен.",
+    "idealAnswer": "Зайти внутрь running-контейнера — базовый debugging-приём: `docker exec -it <name> <cmd>`. exec запускает `<cmd>` как НОВЫЙ процесс внутри контейнера, а не «добавляет» shell к PID 1. Exec-процесс наследует namespaces контейнера (видит ту же filesystem, network, processes), но его родитель — daemon, а не entrypoint-процесс приложения. Для интерактивного shell нужны `-i` (stdin открыт) и `-t` (TTY): без TTY `sh` читает закрытый stdin и сразу выходит; только `-i` — stdin работает, но vi/less без TTY; только `-t` — TTY есть, но ввод не проходит. Выбор shell: Alpine и busybox-образы — `/bin/sh`; Debian/Ubuntu/node/python — `sh` и `/bin/bash`; distroless и `FROM scratch` — shell отсутствует, `OCI runtime exec failed: executable file not found`; для debug distroless используют `:debug` теги с `/busybox/sh` или rebuild с shell-слоем. `docker exec` работает только на running-контейнере; для stopped — `docker start -ai` или commit + run с shell entrypoint. При старте контейнера с shell сразу — `docker run -it <image> sh`, не exec. Полезные флаги: `-u root` или UID для смены пользователя; `-w /app` рабочая директория; `-e DEBUG=1` env только для этой exec-сессии; `-d` detached one-off; `--privileged` для debug с поднятыми capabilities. Отличие от attach: exec создаёт новый процесс — exit/Ctrl+C убивает только exec-shell, контейнер продолжает работать; attach подключается к stdio PID 1 — Ctrl+C может остановить контейнер. `docker compose exec <service>` — обёртка над exec с project context и именем сервиса. Реальные сценарии: debug сервиса (`exec -it web sh`), миграции (`exec db psql ...`), one-off без shell (`docker exec db pg_dump ... > backup.sql` без `-it`), проверка конфига (`exec web cat /etc/nginx/nginx.conf`). Exec-сессия не переживает restart контейнера. Anti-pattern: «починить» через exec и не отразить в Dockerfile — изменения теряются при следующем restart; exec для диагностики, rebuild для фиксов.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "exec_command_core",
+      "title": "Понимает docker exec — новый процесс в running-контейнере",
+      "expected": "Кандидат называет `docker exec -it <container> sh` и объясняет: exec запускает новый процесс внутри уже running-контейнера, не подключается к PID 1; видит те же namespaces (filesystem, network).",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR темы — базовая команда и механизм exec",
+        "confusionPairs": [
+          {
+            "checkpointKey": "exec_command_core",
+            "oftenConfusedWith": [
+              "common_mistakes",
+              "exec_prerequisites"
+            ],
+            "anchorTermsExpected": [
+              "docker exec",
+              "новый процесс",
+              "running",
+              "namespaces",
+              "PID 1",
+              "-it",
+              "sh"
+            ],
+            "anchorTermsWrongTopic": [
+              "exec подключается к PID 1",
+              "exec работает на stopped",
+              "exec заменяет entrypoint"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "docker exec",
+              "exec",
+              "зайти"
+            ],
+            "ask": "что именно делает docker exec — новый процесс или подключение к PID 1"
+          }
+        ],
+        "mustConcepts": [
+          "docker exec",
+          "exec",
+          "новый процесс",
+          "running",
+          "контейнер",
+          "namespaces",
+          "filesystem",
+          "network",
+          "PID 1",
+          "не подключ",
+          "daemon",
+          "entrypoint",
+          "sh",
+          "shell",
+          "-it",
+          "внутр",
+          "запущен"
+        ],
+        "falseClaims": [
+          "docker exec подключается к stdio PID 1 как attach",
+          "exec добавляет shell к PID 1 как дочерний процесс entrypoint",
+          "exec работает на остановленном контейнере",
+          "exec заменяет главный процесс контейнера",
+          "exit из exec shell всегда останавливает контейнер"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "it_flags",
+      "title": "Знает флаги -i и -t для интерактивного shell",
+      "expected": "Кандидат объясняет: `-i` держит stdin открытым; `-t` выделяет TTY; оба нужны для интерактивного shell; без `-it` shell сразу выходит.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "магические флаги -it из ITLead TL;DR и Common mistakes",
+        "mustConcepts": [
+          "-i",
+          "-t",
+          "-it",
+          "stdin",
+          "TTY",
+          "интерактив",
+          "shell",
+          "vi",
+          "less",
+          "закрыт",
+          "выходит",
+          "сразу",
+          "allocate",
+          "открыт"
+        ],
+        "falseClaims": [
+          "для интерактивного shell достаточно только -t",
+          "для интерактивного shell достаточно только -i",
+          "без -it shell остаётся интерактивным",
+          "-it нужен только для docker run, не для exec",
+          "-t без -i даёт полноценный интерактивный ввод"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "shell_selection",
+      "title": "Выбирает правильный shell по образу",
+      "expected": "Кандидат: Alpine/nginx-alpine — `sh`; Ubuntu/Debian — `sh` или `bash`; distroless и `FROM scratch` — shell нет, exec с sh падает; при сомнении пробуют sh, потом bash.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "таблица образов и gotcha distroless/scratch — частая ошибка на практике",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Alpine",
+              "distroless",
+              "scratch",
+              "bash",
+              "sh"
+            ],
+            "ask": "какой shell попробуете на Alpine vs Ubuntu vs distroless"
+          }
+        ],
+        "mustConcepts": [
+          "sh",
+          "bash",
+          "/bin/sh",
+          "/bin/bash",
+          "Alpine",
+          "busybox",
+          "Debian",
+          "Ubuntu",
+          "distroless",
+          "scratch",
+          "FROM scratch",
+          "shell нет",
+          "executable file not found",
+          "debug",
+          "busybox/sh",
+          "nginx-alpine",
+          "node",
+          "python"
+        ],
+        "falseClaims": [
+          "bash всегда есть в любом Linux-образе",
+          "на Alpine можно exec bash по умолчанию",
+          "distroless поддерживает docker exec sh",
+          "FROM scratch всегда содержит /bin/sh",
+          "если sh не работает — образ сломан, exec невозможен никогда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "exec_prerequisites",
+      "title": "Понимает когда exec, когда run",
+      "expected": "Кандидат: exec только для уже running-контейнера; stopped — нельзя exec (start -ai или commit); shell при старте — `docker run -it image sh`.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "различие exec vs run -it из TL;DR",
+        "mustConcepts": [
+          "running",
+          "stopped",
+          "exited",
+          "docker run",
+          "-it",
+          "exec",
+          "start -ai",
+          "commit",
+          "уже запущен",
+          "при старте",
+          "нельзя exec",
+          "требует running"
+        ],
+        "falseClaims": [
+          "docker exec работает на stopped контейнере",
+          "docker run -it и docker exec делают одно и то же",
+          "exec можно использовать вместо run для первого запуска shell",
+          "restart контейнера сохраняет exec-сессию",
+          "exec-сессия переживает restart контейнера"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки exec",
+      "expected": "Кандидат называет: забыть `-it`; `bash` на Alpine; exec vs attach (attach к PID 1); exec-fix без Dockerfile; exec в distroless/scratch.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes и exec vs attach из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "exec_command_core",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "common_mistakes",
+            "oftenConfusedWith": [
+              "exec_command_core"
+            ],
+            "anchorTermsExpected": [
+              "attach",
+              "exec",
+              "-it",
+              "bash",
+              "Alpine",
+              "Dockerfile",
+              "anti-pattern"
+            ],
+            "anchorTermsWrongTopic": [
+              "exec и attach одно и то же",
+              "exec-fix это нормальный deploy",
+              "без -it shell работает"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "attach",
+              "exec",
+              "ошибк"
+            ],
+            "ask": "чем опасно путать exec и attach при debug"
+          }
+        ],
+        "mustConcepts": [
+          "забыл",
+          "-it",
+          "bash",
+          "Alpine",
+          "attach",
+          "exec",
+          "PID 1",
+          "distroless",
+          "scratch",
+          "Dockerfile",
+          "anti-pattern",
+          "exec-fix",
+          "restart",
+          "теря",
+          "изменен",
+          "rebuild",
+          "диагност"
+        ],
+        "falseClaims": [
+          "exec и attach — взаимозаменяемые команды для shell",
+          "можно безопасно «починить» prod через exec без Dockerfile",
+          "bash работает на nginx-alpine",
+          "без -it интерактивный shell всё равно открывается",
+          "изменения через exec сохраняются после restart контейнера"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "flags_and_usage",
+      "title": "Знает полезные флаги и сценарии exec",
+      "expected": "Кандидат упоминает `-u`, `-w`, `-e`, `-d`; one-off без `-it` (pg_dump); compose exec; debug конфигов и миграций.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common flags и Real-world usage из ITLead",
+        "mustConcepts": [
+          "-u",
+          "root",
+          "UID",
+          "-w",
+          "working dir",
+          "-e",
+          "env",
+          "-d",
+          "detached",
+          "compose exec",
+          "one-off",
+          "pg_dump",
+          "psql",
+          "миграц",
+          "backup",
+          "cat",
+          "nginx.conf",
+          "debug",
+          "без -it"
+        ],
+        "falseClaims": [
+          "для любой exec-команды обязательны -it",
+          "docker compose exec не связан с docker exec",
+          "-e меняет env переменные навсегда в образе",
+          "one-off команды всегда требуют интерактивный shell",
+          "-u root невозможен в docker exec"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "В running-контейнер: `docker exec -it web sh`. exec создаёт новый shell-процесс, не трогает PID 1. `-i` — stdin, `-t` — TTY, без них shell сразу умрёт. На Alpine только sh, не bash.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну `docker exec -it имя sh` — зашёл, посмотрел файлы, вышел — контейнер жив. на alpine bash нет, только sh. distroless — shell нет вообще, нужен debug-образ.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "exec только если контейнер уже Up. one-off: `docker exec db pg_dump ...` без -it, вывод на хост. compose: `docker compose exec api sh`. attach не путать — он к PID 1.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Захожу через docker attach web sh — это стандартный способ получить shell. bash работает на любом образе.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker exec web sh без флагов — нормальный интерактивный shell. exec работает и на stopped контейнере.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Починил nginx.conf через exec на prod — после restart всё сохранится. distroless — exec bash как обычно.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "exec_command_core",
+      "exampleType": "good",
+      "exampleText": "`docker exec -it web sh` — новый процесс внутри running-контейнера, те же filesystem и network, родитель daemon, не PID 1.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "exec_command_core",
+      "exampleType": "good",
+      "exampleText": "exec spawn-ит sh рядом с nginx на PID 1 — exit из sh nginx не останавливает",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "exec_command_core",
+      "exampleType": "bad",
+      "exampleText": "docker exec подключает терминал к stdout nginx как attach — это одно и то же.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "it_flags",
+      "exampleType": "good",
+      "exampleText": "`-i` stdin открыт, `-t` TTY — вместе для vi и интерактива. `docker exec web sh` без -t — shell сразу exit.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "it_flags",
+      "exampleType": "good",
+      "exampleText": "без -it sh читает закрытый stdin и умирает — всегда -it для shell",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "it_flags",
+      "exampleType": "bad",
+      "exampleText": "Для exec shell флаги -i и -t не нужны — sh интерактивен по умолчанию.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "shell_selection",
+      "exampleType": "good",
+      "exampleText": "Alpine/nginx-alpine — `sh`; Ubuntu — `bash` если есть; distroless/scratch — shell нет, OCI runtime exec failed.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "shell_selection",
+      "exampleType": "good",
+      "exampleText": "сначала sh, не вышло — bash; distroless:debug с /busybox/sh для debug",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "shell_selection",
+      "exampleType": "bad",
+      "exampleText": "На nginx-alpine делаю `docker exec -it nginx bash` — bash есть везде.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "exec_prerequisites",
+      "exampleType": "good",
+      "exampleText": "exec требует running. stopped — `docker start -ai` или commit. Shell при первом запуске — `docker run -it image sh`.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "exec_prerequisites",
+      "exampleType": "good",
+      "exampleText": "exec-сессия не переживает restart — контейнер рестартнул, shell умер",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "exec_prerequisites",
+      "exampleType": "bad",
+      "exampleText": "docker exec работает на Exited контейнере так же как на Up.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Типично: забыли -it; bash на Alpine; attach вместо exec; exec-fix без Dockerfile — изменения теряются на restart.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "exec для диагностики, rebuild для фикса — exec-fix anti-pattern",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "exec и attach — одно и то же для debug. Правки через exec на prod — нормальный deploy pipeline.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "flags_and_usage",
+      "exampleType": "good",
+      "exampleText": "`-u root -w /etc/nginx -e DEBUG=1` для inspect; `docker exec db pg_dump` без -it; `docker compose exec api sh` в dev.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "flags_and_usage",
+      "exampleType": "good",
+      "exampleText": "one-off backup: exec db pg_dump, redirect на host — -it не нужен",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "flags_and_usage",
+      "exampleType": "bad",
+      "exampleText": "Любая exec-команда требует -it. compose exec — совсем другой механизм, не docker exec.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "exec-inside-running-container",
+    "apiUrl": "https://api.itlead.org/api/questions/exec-inside-running-container",
+    "pageUrl": "https://itlead.org/interview-questions/docker/exec-inside-running-container",
+    "difficulty": "JUNIOR",
+    "titleEn": "How to get inside a running Docker container?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

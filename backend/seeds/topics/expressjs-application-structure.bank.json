@@ -1,0 +1,193 @@
+{
+  "topic": {
+    "code": "expressjs_application_structure",
+    "name": "Структура большого Express.js приложения",
+    "skillCode": "expressjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как структурировать большое Express.js приложение?",
+    "shortAnswer": "Разделить на routes (URL mapping), controllers (HTTP req/res), services (бизнес-логика), models (БД), middleware (auth, errors). `app.js` — setup без listen; `server.js` — только listen для тестов supertest. Routes тонкие; логику не в app.js.",
+    "idealAnswer": "Layered structure: routes → controllers → services → models. routes/users.routes.js — URL + middleware only; controllers — status codes, JSON, delegate to service; services — business logic без HTTP; models — Mongoose/Prisma. app.js exports app без listen; server.js connectDB + listen — supertest imports app. middleware/: auth, rateLimiter, error (last). config/ validated env at startup. validators/ per resource. When: <10 routes flat ok; 10-50 add routes/controllers/models; 50+ full stack + routes/index.js. Errors: logic in routes; global authenticate blocks /health; no routes/index; controller calls Model directly; inline process.env. Testing: unit mock service in controller; integration supertest; Pact contracts. Senior monorepo: bounded context folders billing-domain/, eslint-plugin-import boundaries. Frameworks: NestJS, MedusaJS same layering.",
+    "maxScore": 10,
+    "skills": ["expressjs", "javascript", "nodejs"]
+  },
+  "checkpoints": [
+    {
+      "key": "layered_architecture",
+      "title": "Понимает слоистую архитектуру",
+      "expected": "Кандидат: routes/controllers/services/models/middleware; single responsibility per layer.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR — restaurant analogy layers",
+        "mustConcepts": ["routes", "controllers", "services", "models", "middleware", "слои", "separation", "concerns", "тонк", "mapping"],
+        "falseClaims": ["вся логика в app.js — best practice для 50 routes", "services обязательны для 3 routes всегда"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "app_vs_server",
+      "title": "Разделяет app.js и server.js",
+      "expected": "Кандидат: app.js setup export app; server.js listen only; supertest без port bind.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "app/server split — key senior pattern",
+        "impliesCheckpointFloors": [{ "checkpointKey": "layered_architecture", "floorFraction": 0.45 }],
+        "mustConcepts": ["app.js", "server.js", "listen", "export app", "supertest", "тест", "без port", "setup", "module.exports"],
+        "falseClaims": ["app.listen в app.js — правильно для тестируемости", "supertest требует running server на порту"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "request_flow",
+      "title": "Описывает flow запроса",
+      "expected": "Кандидат: router match → controller → service → model; errors bubble reverse; error middleware last.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Request through layers",
+        "mustConcepts": ["flow", "router", "controller", "service", "model", "bubble", "error middleware", "последн", "trie", "radix"],
+        "falseClaims": ["model вызывает controller", "errors не проходят через middleware stack"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "layer_responsibilities",
+      "title": "Знает ответственность слоёв",
+      "expected": "Кандидат: routes URL only; controllers HTTP; services logic; models DB; no HTTP in services.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Layer responsibility table",
+        "probeConceptGroups": [
+          { "match": ["controller", "service", "HTTP"], "ask": "почему service не знает про res.status" },
+          { "match": ["route", "100 строк"], "ask": "что не так с бизнес-логикой в route handler" }
+        ],
+        "mustConcepts": ["routes thin", "controller HTTP", "service portable", "model DB", "status code", "JSON", "Kafka", "WebSocket", "cron"],
+        "falseClaims": ["controller должен содержать SQL queries напрямую всегда", "service может вызывать res.json для удобства"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_add_layers",
+      "title": "Выбирает когда добавлять слои",
+      "expected": "Кандидат: <10 routes flat ok; 10-50 routes/controllers; 50+ full stack; domain folders at scale.",
+      "score": 0.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "When to add layers",
+        "mustConcepts": ["10 routes", "50 routes", "flat app.js", "routes/index", "bounded context", "domain folder", "team", "overhead"],
+        "falseClaims": ["с первого route нужны services validators config", "flat structure лучше при 100 routes"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "testing_strategy",
+      "title": "Знает стратегию тестирования",
+      "expected": "Кандидат: unit mock service; integration supertest + test DB; Pact contracts; import app not server.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Testing per layer — senior",
+        "mustConcepts": ["unit test", "mock service", "supertest", "integration", "test database", "Pact", "contract", "import app"],
+        "falseClaims": ["route handler unit test без HTTP mock возможен с полной логикой в route", "тесты требуют server.js listen"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки структуры",
+      "expected": "Кандидат: logic in routes; global auth; no routes index; model in controller; inline env.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — frequent production bugs",
+        "confusionPairs": [
+          { "claim": "app.use(authenticate) глобально — secure by default", "correction": "блокирует /login /health — auth на router level" },
+          { "claim": "User.findById в controller достаточно", "correction": "service для reuse в cron/CLI" }
+        ],
+        "mustConcepts": ["global authenticate", "401 health", "routes index", "model in controller", "inline env", "config validation", "startup throws", "100 строк route"],
+        "falseClaims": ["global auth middleware — best practice для всех Express apps", "controller→model без service всегда ok при росте"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "monorepo_boundaries",
+      "title": "Масштабирует domain boundaries",
+      "expected": "Кандидат: bounded context subfolders; eslint import rules; core/ shared; senior monorepo.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "expert",
+        "weightRationale": "Senior follow-up — 100-service monorepo",
+        "probePolicy": { "minProbes": 1, "allowGenericProbe": false },
+        "mustConcepts": ["bounded context", "billing-domain", "eslint-plugin-import", "cross-domain", "core/", "monorepo", "big ball of mud"],
+        "falseClaims": ["в monorepo все domains могут import друг друга напрямую", "одна папка routes на 100 services достаточна"],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    { "exampleType": "good", "exampleText": "routes thin → controller → service → model. app.js export без listen, server.js listen. Auth на usersRouter не глобально. config validated at startup.", "sortOrder": 0 },
+    { "exampleType": "good", "exampleText": "supertest import app. Unit test controller с mock service. routes/index монтирует все routers.", "sortOrder": 1 },
+    { "exampleType": "good", "exampleText": "50+ routes — full stack. domain folders billing-domain/ при monorepo. asyncHandler в controllers", "sortOrder": 2 },
+    { "exampleType": "bad", "exampleText": "Вся логика в app.js 500 строк. app.use(authenticate) глобально. Controller вызывает User.findById, cron копипастит query.", "sortOrder": 0 },
+    { "exampleType": "bad", "exampleText": "app.listen в app.js для supertest. Service вызывает res.json. Config — process.env без validation.", "sortOrder": 1 },
+    { "exampleType": "bad", "exampleText": "3 routes — сразу microservices и 8 папок обязательны.", "sortOrder": 2 },
+    { "checkpointKey": "layered_architecture", "exampleType": "good", "exampleText": "routes/controllers/services/models/middleware — один job per layer.", "sortOrder": 10 },
+    { "checkpointKey": "layered_architecture", "exampleType": "good", "exampleText": "ресторан: route заказ, controller подача, service готовка, model склад", "sortOrder": 11 },
+    { "checkpointKey": "layered_architecture", "exampleType": "bad", "exampleText": "50 routes в одном app.js — maintainable если табы ровные.", "sortOrder": 30 },
+    { "checkpointKey": "app_vs_server", "exampleType": "good", "exampleText": "module.exports = app в app.js; server.js await connectDB(); app.listen()", "sortOrder": 12 },
+    { "checkpointKey": "app_vs_server", "exampleType": "good", "exampleText": "supertest(app) без реального порта", "sortOrder": 13 },
+    { "checkpointKey": "app_vs_server", "exampleType": "bad", "exampleText": "Тесты импортируют server.js с listen на 3000.", "sortOrder": 31 },
+    { "checkpointKey": "request_flow", "exampleType": "good", "exampleText": "GET /api/v1/users/123: router → getUser controller → usersService → User model.", "sortOrder": 14 },
+    { "checkpointKey": "request_flow", "exampleType": "good", "exampleText": "errorHandler последний в app.js, errors bubble up", "sortOrder": 15 },
+    { "checkpointKey": "request_flow", "exampleType": "bad", "exampleText": "Model layer отправляет res.status напрямую.", "sortOrder": 32 },
+    { "checkpointKey": "layer_responsibilities", "exampleType": "good", "exampleText": "router.get('/:id', authenticate, getUser) — URL only. Controller res.json, service findById.", "sortOrder": 16 },
+    { "checkpointKey": "layer_responsibilities", "exampleType": "good", "exampleText": "usersService.findById из REST, cron и websocket без изменений", "sortOrder": 17 },
+    { "checkpointKey": "layer_responsibilities", "exampleType": "bad", "exampleText": "sendEmail в route handler — норм для reuse.", "sortOrder": 33 },
+    { "checkpointKey": "when_add_layers", "exampleType": "good", "exampleText": "5 routes — flat ok. 30 routes — controllers+models. 80 routes — services+validators+index.", "sortOrder": 18 },
+    { "checkpointKey": "when_add_layers", "exampleType": "good", "exampleText": "не over-engineer на старте", "sortOrder": 19 },
+    { "checkpointKey": "when_add_layers", "exampleType": "bad", "exampleText": "Первый hello world — сразу 12 папок и DDD bounded contexts.", "sortOrder": 34 },
+    { "checkpointKey": "testing_strategy", "exampleType": "good", "exampleText": "jest mock usersService в controller test; supertest integration с test DB.", "sortOrder": 20 },
+    { "checkpointKey": "testing_strategy", "exampleType": "good", "exampleText": "Pact contract между frontend и API deploy", "sortOrder": 21 },
+    { "checkpointKey": "testing_strategy", "exampleType": "bad", "exampleText": "Route с 100 строками логики — unit test без HTTP невозможен поэтому ok.", "sortOrder": 35 },
+    { "checkpointKey": "common_mistakes", "exampleType": "good", "exampleText": "usersRouter.use(authenticate) не app.use — /login работает.", "sortOrder": 22 },
+    { "checkpointKey": "common_mistakes", "exampleType": "good", "exampleText": "app.use('/api/v1', require('./routes')) через index", "sortOrder": 23 },
+    { "checkpointKey": "common_mistakes", "exampleType": "good", "exampleText": "config/index throws if DATABASE_URL missing — fail at startup", "sortOrder": 24 },
+    { "checkpointKey": "common_mistakes", "exampleType": "bad", "exampleText": "Global authenticate — security best practice, health check не важен.", "sortOrder": 36 },
+    { "checkpointKey": "monorepo_boundaries", "exampleType": "good", "exampleText": "billing-domain/routes, user-domain/services; eslint block cross-import.", "sortOrder": 24 },
+    { "checkpointKey": "monorepo_boundaries", "exampleType": "good", "exampleText": "madge --circular перед merge", "sortOrder": 25 },
+    { "checkpointKey": "monorepo_boundaries", "exampleType": "bad", "exampleText": "100 services в одной routes/ без domain split — fine.", "sortOrder": 37 }
+  ],
+  "itlead": {
+    "slug": "expressjs-application-structure",
+    "apiUrl": "https://api.itlead.org/api/questions/expressjs-application-structure",
+    "pageUrl": "https://itlead.org/interview-questions/expressjs/expressjs-application-structure",
+    "difficulty": "SENIOR",
+    "titleEn": "How to structure a large Express.js application?",
+    "categorySlug": "expressjs",
+    "syncedAt": "2026-06-18T22:00:00.000Z"
+  }
+}

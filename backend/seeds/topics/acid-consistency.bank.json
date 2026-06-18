@@ -1,0 +1,655 @@
+{
+  "topic": {
+    "code": "acid_consistency",
+    "name": "ACID — согласованность (Consistency)",
+    "skillCode": "architecture",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое согласованность (Consistency) в ACID и как база данных её обеспечивает?",
+    "shortAnswer": "ACID Consistency — гарантия, что каждая транзакция переводит БД из одного валидного состояния в другое, соблюдая все бизнес-правила и ограничения. Проверка на уровне БД (CHECK, FK, триггеры) выполняется атомарно при COMMIT; при нарушении — автоматический ROLLBACK.",
+    "idealAnswer": "ACID Consistency — гарантия БД, что каждая транзакция переводит данные из одного валидного состояния в другое, соблюдая все определённые правила и ограничения. Аналогия: банковский перевод — либо оба счёта обновляются полностью, либо ничего не меняется. БД проверяет все constraints в момент COMMIT; любое нарушение вызывает автоматический ROLLBACK. Consistency — про бизнес-инварианты (balance >= 0, NOT NULL, форматы); Isolation — отдельная буква ACID про скрытие конкурентных изменений. Ключевое отличие от валидации в приложении: DB-ограничения привязаны к транзакции атомарно. App-level check может проиграть гонку между чтением и записью (TOCTOU — time-of-check-to-time-of-update). CHECK/FK/UNIQUE на уровне БД блокируют commit, пока все правила не выполнены по всей транзакции — нет «зомби»-состояний с частичными обновлениями. Когда что: balance >= 0, NOT NULL — CHECK constraints (быстро, concurrent-safe); cross-table правила (долг <= лимит) — триггеры/stored procedures; несколько БД или внешние системы — saga/2PC в приложении; high-scale NoSQL — app logic + eventual consistency (BASE). PostgreSQL: при commit блокирует затронутые строки, перепроверяет constraints и триггеры против финального write set, пишет в WAL только если всё прошло; при ошибке — abort через MVCC rollback. Deferred constraints (SET CONSTRAINTS ALL DEFERRED) ждут до COMMIT — важно для круговых FK и многошаговых переводов, где промежуточное состояние временно невалидно. После краша WAL replay применяет committed транзакции в порядке commit и откатывает незавершённые — частичное состояние не переживает recovery. Типичные ошибки: валидация только в app (две tx проходят IF balance > 100 одновременно); READ COMMITTED при инвариантах на несколько чтений (нужен SERIALIZABLE); IMMEDIATE constraints на двухшаговом переводе (CHECK срабатывает до credit); AFTER-триггеры вместо BEFORE для constraint-логики. Практика: PostgreSQL+Rails CHECK/FK; CockroachDB serializable через total order; Spanner TrueTime для external consistency; MySQL InnoDB gap locks в REPEATABLE READ; DynamoDB/Cassandra — BASE, ACID для денег/инвентаря. Атомарный перевод: BEGIN → debit Alice → credit Bob → COMMIT; оба UPDATE или ни один. Продвинутый слой: optimistic locking через version + CHECK на balance — триггер ловит гонки, CHECK ловит невалидные данные, нужны оба.",
+    "maxScore": 10,
+    "skills": [
+      "architecture"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "acid_consistency_definition",
+      "title": "Понимает определение ACID Consistency",
+      "expected": "Кандидат объясняет: транзакция переводит БД из валидного состояния в валидное; бизнес-правила и constraints; при нарушении — rollback, нет частичного невалидного состояния.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — определение Consistency в ACID из ITLead TL;DR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "acid_consistency_definition",
+            "oftenConfusedWith": [
+              "consistency_vs_isolation",
+              "db_constraints_vs_app"
+            ],
+            "anchorTermsExpected": [
+              "валидн",
+              "состояни",
+              "транзакц",
+              "инвариант",
+              "бизнес-правил",
+              "constraint",
+              "rollback",
+              "COMMIT"
+            ],
+            "anchorTermsWrongTopic": [
+              "CAP Consistency",
+              "eventual consistency это ACID",
+              "Consistency это Isolation"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Consistency",
+              "согласован",
+              "валидн",
+              "инвариант"
+            ],
+            "ask": "что именно гарантирует Consistency в ACID и чем это отличается от «просто валидации полей»"
+          }
+        ],
+        "mustConcepts": [
+          "Consistency",
+          "согласован",
+          "ACID",
+          "транзакц",
+          "валидн",
+          "состояни",
+          "инвариант",
+          "бизнес-правил",
+          "constraint",
+          "ограничен",
+          "rollback",
+          "COMMIT",
+          "частичн",
+          "атомарн",
+          "balance >= 0"
+        ],
+        "falseClaims": [
+          "Consistency в ACID — это то же, что в CAP-теореме",
+          "Consistency гарантирует отсутствие гонок между транзакциями",
+          "Consistency проверяется только в коде приложения",
+          "при нарушении constraint транзакция может частично закоммититься"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "db_constraints_vs_app",
+      "title": "Отличает DB constraints от app-валидации и TOCTOU",
+      "expected": "Кандидат объясняет: CHECK/FK на уровне БД проверяются атомарно при commit; app check между SELECT и UPDATE уязвим к TOCTOU-гонке; DB constraints закрывают этот разрыв.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевая разница DB vs app из ITLead Key difference",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "acid_consistency_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "db_constraints_vs_app",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "TOCTOU",
+              "CHECK",
+              "commit",
+              "гонк",
+              "app",
+              "приложен",
+              "атомарн"
+            ],
+            "anchorTermsWrongTopic": [
+              "достаточно ORM validation",
+              "CHECK не нужен если есть app if"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "TOCTOU",
+              "app",
+              "CHECK",
+              "гонк"
+            ],
+            "ask": "почему IF balance > 100 в приложении не защищает от двух одновременных списаний"
+          }
+        ],
+        "mustConcepts": [
+          "CHECK",
+          "FK",
+          "constraint",
+          "commit",
+          "атомарн",
+          "TOCTOU",
+          "time-of-check",
+          "гонк",
+          "race",
+          "app",
+          "приложен",
+          "валидац",
+          "SELECT",
+          "UPDATE",
+          "между чтением и записью",
+          "DB-level",
+          "уровень БД"
+        ],
+        "falseClaims": [
+          "app-level проверка перед UPDATE так же надёжна как CHECK constraint",
+          "TOCTOU не актуален при транзакциях в приложении",
+          "ORM validation заменяет DB constraints",
+          "CHECK constraint проверяется только при INSERT, не при UPDATE"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "postgres_commit_enforcement",
+      "title": "Знает как PostgreSQL проверяет consistency при commit",
+      "expected": "Кандидат описывает: блокировки затронутых строк, перепроверка constraints/triggers против финального write set, запись в WAL; при ошибке — abort через MVCC; WAL replay после краша.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "механизм commit validation и recovery из ITLead PostgreSQL section",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "WAL",
+              "MVCC",
+              "commit",
+              "replay"
+            ],
+            "ask": "что происходит при COMMIT в PostgreSQL и как WAL replay сохраняет consistency после краша"
+          },
+          {
+            "match": [
+              "lock",
+              "блокир",
+              "write set"
+            ],
+            "ask": "когда именно PostgreSQL перепроверяет constraints относительно записей транзакции"
+          }
+        ],
+        "mustConcepts": [
+          "PostgreSQL",
+          "COMMIT",
+          "WAL",
+          "MVCC",
+          "блокир",
+          "lock",
+          "constraint",
+          "триггер",
+          "trigger",
+          "write set",
+          "abort",
+          "rollback",
+          "replay",
+          "recovery",
+          "краш",
+          "crash",
+          "deferred validation",
+          "post-write",
+          "pre-commit"
+        ],
+        "falseClaims": [
+          "PostgreSQL проверяет constraints только при INSERT, не при commit",
+          "после краша частично закоммиченные транзакции могут остаться в БД",
+          "WAL replay не гарантирует порядок committed транзакций",
+          "MVCC позволяет закоммитить транзакцию с нарушенным CHECK"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "deferred_constraints",
+      "title": "Понимает deferred vs immediate constraints",
+      "expected": "Кандидат объясняет: SET CONSTRAINTS ALL DEFERRED откладывает CHECK/FK до COMMIT; нужно для многошаговых операций и круговых FK; IMMEDIATE падает на промежуточном невалидном состоянии.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "deferred constraints — частая ловушка из ITLead Common mistakes #3",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "DEFERRED",
+              "IMMEDIATE",
+              "deferred"
+            ],
+            "ask": "зачем SET CONSTRAINTS ALL DEFERRED при двухшаговом переводе debit/credit"
+          }
+        ],
+        "mustConcepts": [
+          "DEFERRED",
+          "IMMEDIATE",
+          "SET CONSTRAINTS",
+          "COMMIT",
+          "промежуточн",
+          "многошагов",
+          "перевод",
+          "debit",
+          "credit",
+          "кругов",
+          "FK",
+          "CHECK",
+          "отложен"
+        ],
+        "falseClaims": [
+          "DEFERRED constraints проверяются после каждого UPDATE внутри транзакции",
+          "IMMEDIATE всегда правильный выбор для переводов",
+          "deferred constraints отключают проверку навсегда",
+          "круговые FK нельзя решить через deferred constraints"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "consistency_vs_isolation",
+      "title": "Отличает Consistency от Isolation в ACID",
+      "expected": "Кандидат сравнивает: Consistency — бизнес-инварианты и валидность данных; Isolation — скрытие конкурентных изменений; Consistency падает на плохих данных, Isolation — на гонках.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up Q из ITLead — частая путаница букв ACID",
+        "confusionPairs": [
+          {
+            "checkpointKey": "consistency_vs_isolation",
+            "oftenConfusedWith": [
+              "acid_consistency_definition"
+            ],
+            "anchorTermsExpected": [
+              "Isolation",
+              "изоляц",
+              "инвариант",
+              "конкурент",
+              "гонк",
+              "бизнес-правил"
+            ],
+            "anchorTermsWrongTopic": [
+              "Consistency и Isolation одно и то же",
+              "Isolation проверяет balance >= 0"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "Isolation",
+          "изоляц",
+          "Consistency",
+          "инвариант",
+          "бизнес-правил",
+          "конкурент",
+          "гонк",
+          "race",
+          "валидн",
+          "данн",
+          "SERIALIZABLE",
+          "READ COMMITTED",
+          "ACID"
+        ],
+        "falseClaims": [
+          "Consistency и Isolation решают одну и ту же проблему",
+          "Isolation гарантирует balance >= 0",
+          "Consistency скрывает изменения других транзакций",
+          "при SERIALIZABLE Consistency не нужна"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки consistency",
+      "expected": "Кандидат называет: валидация только в app; READ COMMITTED при multi-read инвариантах; IMMEDIATE constraints на transfer; AFTER вместо BEFORE триггеров; concurrent tx между check и write.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "четыре паттерна ошибок из ITLead Common mistakes",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "db_constraints_vs_app",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "READ COMMITTED",
+              "SERIALIZABLE",
+              "non-repeatable"
+            ],
+            "ask": "почему READ COMMITTED недостаточен для проверки уникальности email перед insert"
+          },
+          {
+            "match": [
+              "BEFORE",
+              "AFTER",
+              "триггер"
+            ],
+            "ask": "почему constraint-логику лучше в BEFORE trigger, а не AFTER"
+          }
+        ],
+        "mustConcepts": [
+          "app only",
+          "только в коде",
+          "READ COMMITTED",
+          "SERIALIZABLE",
+          "non-repeatable",
+          "IMMEDIATE",
+          "DEFERRED",
+          "BEFORE trigger",
+          "AFTER trigger",
+          "RAISE EXCEPTION",
+          "конкурент",
+          "две транзакц",
+          "IF SELECT",
+          "email uniqueness",
+          "phantom"
+        ],
+        "falseClaims": [
+          "READ COMMITTED достаточен для любых инвариантов",
+          "AFTER trigger всегда лучше для rollback constraint",
+          "достаточно одного IF в stored procedure без DB CHECK",
+          "IMMEDIATE constraints безопасны для двухшагового перевода"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает где применять CHECK, триггеры, saga, BASE",
+      "expected": "Кандидат называет: CHECK для полей и NOT NULL; триггеры/stored procedures для cross-table; saga/2PC для нескольких БД; NoSQL BASE + app logic для high-scale; ACID для денег и инвентаря.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "таблица When to use из ITLead — краткий выбор инструмента",
+        "mustConcepts": [
+          "CHECK",
+          "NOT NULL",
+          "триггер",
+          "stored procedure",
+          "cross-table",
+          "saga",
+          "2PC",
+          "NoSQL",
+          "BASE",
+          "eventual",
+          "деньги",
+          "инвентар",
+          "DynamoDB",
+          "Cassandra"
+        ],
+        "falseClaims": [
+          "для всех правил достаточно saga без DB constraints",
+          "NoSQL всегда обеспечивает ACID consistency",
+          "CHECK constraints не работают при конкурентном доступе",
+          "2PC нужен для одной PostgreSQL базы"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "atomic_transfer_pattern",
+      "title": "Знает атомарный перевод и многослойную защиту",
+      "expected": "Кандидат описывает: BEGIN → debit → credit → COMMIT, оба UPDATE или rollback; version trigger + CHECK как два независимых слоя (гонки vs невалидные данные); idempotency keys для retries.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "money transfer и wallets trigger примеры из ITLead Examples",
+        "mustConcepts": [
+          "BEGIN",
+          "COMMIT",
+          "debit",
+          "credit",
+          "перевод",
+          "атомарн",
+          "rollback",
+          "version",
+          "optimistic",
+          "триггер",
+          "CHECK",
+          "idempotency",
+          "Stripe",
+          "оба UPDATE"
+        ],
+        "falseClaims": [
+          "достаточно version trigger без CHECK на balance",
+          "можно закоммитить debit без credit если Bob отсутствует частично",
+          "idempotency keys заменяют транзакции",
+          "optimistic locking убирает необходимость constraints"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Consistency в ACID — каждая транзакция оставляет БД в валидном состоянии: balance >= 0, FK целы. CHECK на уровне PostgreSQL срабатывает при COMMIT; если Alice уходит в минус — весь UPDATE откатывается. App IF между SELECT и UPDATE уязвим к TOCTOU, поэтому правила лучше в БД.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Перевод денег: BEGIN, списать Alice, зачислить Bob, COMMIT. Либо оба счёта обновились, либо rollback — нет состояния «Alice −100, Bob +0». Для двухшагового перевода ставлю SET CONSTRAINTS ALL DEFERRED, иначе IMMEDIATE CHECK упадёт на промежуточном дебете. Consistency — про инварианты, Isolation — про то, видишь ли ты чужие незакоммиченные правки.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На проде: CHECK/FK в схеме, сложные cross-table правила — BEFORE trigger, multi-DB — saga. Для кошелька держу version trigger против гонок и отдельный CHECK(balance >= 0) — триггер не заменяет constraint. После краша PostgreSQL через WAL replay не оставляет частичных commit.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Consistency в ACID — это когда все реплики в кластере eventually сходятся, как в CAP. Достаточно проверить баланс в Node.js перед UPDATE — БД constraints не нужны.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Consistency и Isolation — одно и то же, оба про скрытие транзакций. READ COMMITTED всегда хватает для уникальности email. IMMEDIATE constraints лучше для переводов, DEFERRED отключает проверки.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Если поставить optimistic locking через version, CHECK на balance можно убрать — триггер всё покрывает. После краша PostgreSQL может сохранить половину committed debit без credit.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "acid_consistency_definition",
+      "exampleType": "good",
+      "exampleText": "Consistency — транзакция переводит БД из валидного состояния в валидное; нарушение CHECK → автоматический rollback, без отрицательного баланса.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "acid_consistency_definition",
+      "exampleType": "good",
+      "exampleText": "ну согласованность в acid — как правило сейфа: либо перевод прошёл целиком по правилам, либо ничего не изменилось",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "acid_consistency_definition",
+      "exampleType": "bad",
+      "exampleText": "Consistency гарантирует, что параллельные транзакции не видят друг друга — это главная буква ACID.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "db_constraints_vs_app",
+      "exampleType": "good",
+      "exampleText": "Две tx одновременно читают balance=150, обе решают списать 100 — app IF пропустит обе, CHECK при commit одну откатит. TOCTOU закрывается проверкой на commit под lock.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "db_constraints_vs_app",
+      "exampleType": "good",
+      "exampleText": "CHECK на balance >= 0 в схеме — concurrent-safe; валидация в сервисе между select и update — нет",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "db_constraints_vs_app",
+      "exampleType": "bad",
+      "exampleText": "ORM validates перед save — этого достаточно, TOCTOU в production не бывает.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "postgres_commit_enforcement",
+      "exampleType": "good",
+      "exampleText": "При COMMIT Postgres блокирует строки, гоняет constraint checker по финальному write set, пишет WAL; CHECK fail → abort. После reboot WAL replay применяет только полные committed tx.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "postgres_commit_enforcement",
+      "exampleType": "good",
+      "exampleText": "валидация deferred constraints — после всех write, но до commit; mvcc откатывает снимок если fk упал",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "postgres_commit_enforcement",
+      "exampleType": "bad",
+      "exampleText": "PostgreSQL проверяет CHECK только один раз при создании таблицы, при UPDATE commit не перепроверяет.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "deferred_constraints",
+      "exampleType": "good",
+      "exampleText": "Двухшаговый transfer: SET CONSTRAINTS ALL DEFERRED — CHECK balance >= 0 сработает на COMMIT после debit и credit, не на промежуточном −50.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "deferred_constraints",
+      "exampleType": "good",
+      "exampleText": "immediate constraints на переводе валят tx после первого update, deferred ждёт конца транзакции",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "deferred_constraints",
+      "exampleType": "bad",
+      "exampleText": "DEFERRED значит constraints вообще не проверяются — можно коммитить минусовой баланс.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "consistency_vs_isolation",
+      "exampleType": "good",
+      "exampleText": "Consistency — инварианты данных (balance >= 0); Isolation — не видеть чужие uncommitted изменения. Первое падает на плохих данных, второе на гонках чтения.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "consistency_vs_isolation",
+      "exampleType": "good",
+      "exampleText": "изоляция serializable лечит non-repeatable read, но без check constraint согласованность баланса не гарантируется",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "consistency_vs_isolation",
+      "exampleType": "bad",
+      "exampleText": "Isolation в ACID отвечает за balance >= 0, Consistency — за скрытие параллельных tx.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Ошибка #1: IF в app без CHECK. #2: READ COMMITTED для email uniqueness — нужен SERIALIZABLE. #3: IMMEDIATE на transfer. #4: RAISE в AFTER вместо BEFORE.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "две транзакции прошли if balance > 100 и обе списали — только db check при commit спасает",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "READ COMMITTED блокирует phantom reads для uniqueness check — SERIALIZABLE не нужен.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "NOT NULL и balance — CHECK; долг vs лимит по таблицам — trigger; платёж + внешний ledger — saga; лента новостей — Cassandra eventual.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "деньги и склад — acid + constraints; логи и аналитика — base в nosql ок",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Для fintech всегда только saga, CHECK constraints устарели и не concurrent-safe.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "atomic_transfer_pattern",
+      "exampleType": "good",
+      "exampleText": "BEGIN; UPDATE Alice −100; UPDATE Bob +100; COMMIT — Stripe-паттерн с idempotency key на retry. Version trigger ловит concurrent update, CHECK ловит overdraft — оба слоя нужны.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "atomic_transfer_pattern",
+      "exampleType": "good",
+      "exampleText": "если bob row missing — rollback всего перевода, не остаётся alice без credit",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "atomic_transfer_pattern",
+      "exampleType": "bad",
+      "exampleText": "Version trigger заменяет CHECK — если списали больше баланса, триггер версии всё равно пропустит.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "acid-consistency",
+    "apiUrl": "https://api.itlead.org/api/questions/acid-consistency",
+    "pageUrl": "https://itlead.org/interview-questions/general/acid-consistency",
+    "difficulty": "SENIOR",
+    "titleEn": "ACID - consistency",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T15:00:00.000Z"
+  }
+}

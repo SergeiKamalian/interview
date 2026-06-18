@@ -1,0 +1,482 @@
+{
+  "topic": {
+    "code": "expressjs_jwt_authentication",
+    "name": "JWT-аутентификация в Express.js",
+    "skillCode": "expressjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как реализовать JWT-аутентификацию в Express.js?",
+    "shortAnswer": "JWT-аутентификация в Express.js подписывает JSON payload секретным ключом и отдаёт токен клиенту. Middleware проверяет подпись на каждом запросе через jwt.verify — серверное хранилище сессий не нужно. Всегда указывай expiresIn при sign и { algorithms: ['HS256'] } при verify, чтобы закрыть атаку alg: none.",
+    "idealAnswer": "JWT (JSON Web Token) — компактный самодостаточный токен для stateless-аутентификации без серверных сессий. Токен состоит из трёх частей через точку: header (алгоритм), payload (claims: id, email, role, exp, iat) и signature. jsonwebtoken подписывает HS256 через crypto.createHmac с секретом; verify пересчитывает подпись и бросает ошибку при несовпадении или истечении срока. Flow: POST /auth/login с email/password → bcrypt.compare с passwordHash → jwt.sign({ id, email, role }, process.env.JWT_SECRET, { expiresIn: '15m' }) → клиент сохраняет token (httpOnly cookie предпочтительнее localStorage из-за XSS) → каждый запрос с Authorization: Bearer <token> → middleware authenticate парсит Bearer, jwt.verify(token, SECRET, { algorithms: ['HS256'] }), кладёт decoded в req.user, next(). Сервер не хранит токен — это ключевая идея. JWT vs sessions: сессии требуют lookup в Redis/memory на каждый запрос, но мгновенный logout; JWT масштабируется горизонтально без sticky sessions, но нельзя отозвать до expiry без blacklist (jti + Redis). Когда JWT: REST/GraphQL API, SPA/mobile, microservices, короткие access (15m) + refresh. Когда sessions: server-rendered apps с mutable sensitive state. Типичные ошибки: jwt.sign без expiresIn (вечный токен); jwt.verify без algorithms (alg: none attack); localStorage вместо httpOnly cookie; слабый секрет 'secret'; нет clockTolerance в distributed systems. Role-based: role в payload при login, authorize(...roles) middleware после authenticate — быстро, но старая роль живёт до expiry. Refresh: access 15m в body, refresh 7d в httpOnly cookie, rotation при каждом refresh, blacklist старого jti в Redis. HS256 — симметричный (один секрет); RS256 — асимметричный (private sign, public verify) для microservices и Auth0/Supabase.",
+    "maxScore": 10,
+    "skills": ["expressjs", "javascript", "nodejs"]
+  },
+  "checkpoints": [
+    {
+      "key": "jwt_auth_flow",
+      "title": "Описывает flow login → protected route",
+      "expected": "Кандидат: POST /login → bcrypt → jwt.sign → Bearer в Authorization → middleware jwt.verify → req.user → next().",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — полный цикл из ITLead TL;DR",
+        "probeConceptGroups": [
+          {
+            "match": ["login", "Bearer", "Authorization", "middleware"],
+            "ask": "опиши путь от POST /login до защищённого GET /profile"
+          }
+        ],
+        "mustConcepts": [
+          "POST",
+          "login",
+          "bcrypt",
+          "jwt.sign",
+          "Bearer",
+          "Authorization",
+          "middleware",
+          "jwt.verify",
+          "req.user",
+          "next",
+          "stateless",
+          "без сессий",
+          "protected",
+          "credentials"
+        ],
+        "falseClaims": [
+          "JWT требует хранить токен на сервере в Redis",
+          "Bearer token передаётся в query string — best practice",
+          "jwt.verify делает запрос в БД на каждый запрос",
+          "login возвращает session id вместо JWT"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "jwt_sign_verify",
+      "title": "Использует jwt.sign и jwt.verify",
+      "expected": "Кандидат: sign с payload и expiresIn; verify с SECRET из process.env; decoded claims в req.user; ошибка 401 при invalid/expired.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "базовый API jsonwebtoken из quick example",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "jwt_auth_flow",
+            "floorFraction": 0.45
+          }
+        ],
+        "mustConcepts": [
+          "jwt.sign",
+          "jwt.verify",
+          "payload",
+          "claims",
+          "expiresIn",
+          "process.env",
+          "JWT_SECRET",
+          "SECRET",
+          "exp",
+          "iat",
+          "401",
+          "invalid",
+          "expired",
+          "jsonwebtoken"
+        ],
+        "falseClaims": [
+          "jwt.sign без секрета безопасен для dev",
+          "verify возвращает true/false без throw",
+          "секрет можно хардкодить в app.js",
+          "expiresIn необязателен для access token"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "jwt_structure",
+      "title": "Понимает структуру JWT",
+      "expected": "Кандидат: header.payload.signature; HS256 HMAC; verify пересчитывает подпись; изменённый payload → verify throws.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "how JWT works internally ITLead",
+        "mustConcepts": [
+          "header",
+          "payload",
+          "signature",
+          "три части",
+          "HS256",
+          "HMAC",
+          "createHmac",
+          "подпис",
+          "verify",
+          "пересчит",
+          "tamper",
+          "claims",
+          "exp"
+        ],
+        "falseClaims": [
+          "JWT зашифрован — payload нельзя прочитать",
+          "signature хранится отдельно на сервере",
+          "можно менять payload без invalidation подписи"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "jwt_vs_sessions",
+      "title": "Сравнивает JWT и sessions",
+      "expected": "Кандидат: JWT stateless, без lookup, horizontal scale; sessions — instant revoke, mutable state; trade-off revocation vs scale.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "JWT vs Sessions секция ITLead",
+        "probeConceptGroups": [
+          {
+            "match": ["session", "Redis", "revoke", "logout"],
+            "ask": "когда JWT хуже sessions и как отозвать stateless token"
+          }
+        ],
+        "mustConcepts": [
+          "stateless",
+          "session",
+          "Redis",
+          "lookup",
+          "horizontal",
+          "scale",
+          "sticky",
+          "revoke",
+          "logout",
+          "expiry",
+          "blacklist",
+          "jti",
+          "SPA",
+          "microservice",
+          "server-rendered"
+        ],
+        "falseClaims": [
+          "JWT всегда лучше sessions",
+          "logout с JWT мгновенно инвалидирует токен без доп. логики",
+          "sessions не нужны никогда",
+          "JWT требует shared session store"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "jwt_security_mistakes",
+      "title": "Знает типичные ошибки безопасности JWT",
+      "expected": "Кандидат: expiresIn обязателен; algorithms ['HS256'] против alg:none; httpOnly cookie vs localStorage; сильный secret; clockTolerance.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "common mistakes — критичные production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": ["alg", "none", "algorithms"],
+            "ask": "что такое alg:none attack и как её закрыть"
+          },
+          {
+            "match": ["localStorage", "httpOnly", "cookie", "XSS"],
+            "ask": "где хранить access token и почему localStorage опасен"
+          }
+        ],
+        "mustConcepts": [
+          "expiresIn",
+          "algorithms",
+          "HS256",
+          "alg",
+          "none",
+          "localStorage",
+          "httpOnly",
+          "cookie",
+          "XSS",
+          "secret",
+          "randomBytes",
+          "clockTolerance",
+          "weak",
+          "process.env"
+        ],
+        "falseClaims": [
+          "jwt.verify(token, secret) без algorithms — безопасно",
+          "localStorage защищён от XSS",
+          "токен без expiresIn — норма для access",
+          "секрет 'secret' достаточно для production"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "authenticate_middleware",
+      "title": "Пишет middleware authenticate",
+      "expected": "Кандидат: парсит Authorization Bearer; 401 без токена; try/catch verify; req.user = decoded; next() или 401.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "verify middleware из ITLead quick example",
+        "mustConcepts": [
+          "authenticate",
+          "middleware",
+          "Authorization",
+          "Bearer",
+          "split",
+          "401",
+          "try",
+          "catch",
+          "req.user",
+          "next",
+          "Invalid",
+          "No token",
+          "startsWith"
+        ],
+        "falseClaims": [
+          "токен читают из req.body на GET",
+          "middleware не нужен — verify в каждом handler",
+          "401 и 403 одно и то же для missing token"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "refresh_and_roles",
+      "title": "Refresh tokens и role-based authorize",
+      "expected": "Кандидат: access 15m + refresh 7d httpOnly; rotation; authorize(...roles) после authenticate; HS256 vs RS256 для microservices.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "role-based + refresh examples ITLead",
+        "confusionPairs": [
+          {
+            "checkpointKey": "refresh_and_roles",
+            "oftenConfusedWith": ["jwt_auth_flow"],
+            "anchorTermsExpected": [
+              "refresh",
+              "access",
+              "authorize",
+              "role",
+              "403",
+              "RS256",
+              "rotation"
+            ],
+            "anchorTermsWrongTopic": [
+              "session cookie store",
+              "Bearer в localStorage — best practice"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "refresh",
+          "access",
+          "rotation",
+          "httpOnly",
+          "authorize",
+          "role",
+          "403",
+          "Forbidden",
+          "admin",
+          "RS256",
+          "HS256",
+          "public key",
+          "private key",
+          "microservice",
+          "sameSite"
+        ],
+        "falseClaims": [
+          "role в JWT всегда актуальна после смены в БД",
+          "refresh token можно хранить в localStorage без риска",
+          "RS256 и HS256 взаимозаменяемы без смены архитектуры",
+          "authorize до authenticate — правильный порядок"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "POST /auth/login: bcrypt.compare → jwt.sign({ id, email }, process.env.JWT_SECRET, { expiresIn: '15m' }). Клиент шлёт Authorization: Bearer. Middleware jwt.verify с { algorithms: ['HS256'] }, req.user, next(). Токен в httpOnly cookie, не localStorage.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "JWT stateless — без Redis lookup на каждый запрос, удобно для API и scale-out. Logout/revoke — короткий expiry + jti blacklist в Redis. Access 15m, refresh 7d в httpOnly с rotation.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "authenticate парсит Bearer, verify с algorithms HS256. authorize('admin') после authenticate — role из payload, 403 если не admin. RS256 когда другие сервисы verify public key без private secret.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "jwt.sign без expiresIn — токен вечный. jwt.verify(token, secret) без algorithms. Токен в localStorage — XSS не страшен.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "JWT хранится на сервере в session store. Logout мгновенно убивает stateless token без blacklist. Секрет 'shh' в коде — нормально.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Sessions всегда хуже JWT. alg:none attack — миф, verify сам выберет алгоритм. Refresh token в localStorage с sameSite strict достаточно.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "jwt_auth_flow",
+      "exampleType": "good",
+      "exampleText": "login → sign → Bearer header → verify middleware → req.user на /profile",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "jwt_auth_flow",
+      "exampleType": "good",
+      "exampleText": "ну клиент логинится, получает jwt, дальше каждый запрос с bearer, сервер verify без сессий",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "jwt_auth_flow",
+      "exampleType": "bad",
+      "exampleText": "JWT auth — сервер сохраняет токен в Redis и сверяет на каждый запрос как session id.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "jwt_sign_verify",
+      "exampleType": "good",
+      "exampleText": "jwt.sign({ id: user.id }, SECRET, { expiresIn: '15m' }); jwt.verify(token, SECRET, { algorithms: ['HS256'] })",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "jwt_sign_verify",
+      "exampleType": "good",
+      "exampleText": "SECRET из process.env, не в git; verify throws — catch и 401 Invalid or expired",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "jwt_sign_verify",
+      "exampleType": "bad",
+      "exampleText": "const SECRET = 'keyboard cat'; jwt.sign(payload, SECRET) без expiresIn — production ready.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "jwt_structure",
+      "exampleType": "good",
+      "exampleText": "header.payload.signature — HS256 HMAC; изменил payload — подпись не сойдётся, verify throw",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "jwt_structure",
+      "exampleType": "good",
+      "exampleText": "payload содержит id email exp iat — base64, не encrypted",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "jwt_structure",
+      "exampleType": "bad",
+      "exampleText": "JWT payload зашифрован AES — клиент не видит claims.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "jwt_vs_sessions",
+      "exampleType": "good",
+      "exampleText": "JWT для REST API и horizontal scale без sticky sessions; sessions для SSR с mutable state и instant logout",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "jwt_vs_sessions",
+      "exampleType": "good",
+      "exampleText": "stateless token нельзя отозвать до exp — jti + Redis blacklist или короткий expiry",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "jwt_vs_sessions",
+      "exampleType": "bad",
+      "exampleText": "JWT всегда заменяет sessions; logout с JWT работает как session.destroy().",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "jwt_security_mistakes",
+      "exampleType": "good",
+      "exampleText": "algorithms: ['HS256'] закрывает alg:none; httpOnly secure sameSite cookie; randomBytes(32) для secret",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "jwt_security_mistakes",
+      "exampleType": "good",
+      "exampleText": "clockTolerance: 30 в verify — drift серверных часов не режет валидные токены",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "jwt_security_mistakes",
+      "exampleType": "bad",
+      "exampleText": "jwt.verify(token, secret) — default algorithms безопасны. localStorage для JWT — стандарт MERN.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "authenticate_middleware",
+      "exampleType": "good",
+      "exampleText": "const token = req.headers.authorization?.split(' ')[1]; if (!token) return 401; req.user = jwt.verify(...); next()",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "authenticate_middleware",
+      "exampleType": "good",
+      "exampleText": "if (!header?.startsWith('Bearer ')) 401 No token",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "authenticate_middleware",
+      "exampleType": "bad",
+      "exampleText": "authenticate читает token из req.query.token — REST best practice.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "refresh_and_roles",
+      "exampleType": "good",
+      "exampleText": "authorize('admin') после authenticate; DELETE /users/:id только admin. Refresh rotation + blacklist old jti",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "refresh_and_roles",
+      "exampleType": "good",
+      "exampleText": "access в JSON body 15m, refresh httpOnly 7d — XSS не читает refresh",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "refresh_and_roles",
+      "exampleType": "bad",
+      "exampleText": "role меняется в БД — старый JWT сразу теряет admin без ожидания expiry.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "expressjs-jwt-authentication",
+    "apiUrl": "https://api.itlead.org/api/questions/expressjs-jwt-authentication",
+    "pageUrl": "https://itlead.org/interview-questions/expressjs/expressjs-jwt-authentication",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to implement JWT authentication in Express.js?",
+    "categorySlug": "expressjs",
+    "syncedAt": "2026-06-18T16:30:00.000Z"
+  }
+}

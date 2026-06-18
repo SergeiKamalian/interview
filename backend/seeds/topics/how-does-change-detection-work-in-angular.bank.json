@@ -1,0 +1,529 @@
+{
+  "topic": {
+    "code": "how_does_change_detection_work_angular",
+    "name": "Change Detection в Angular",
+    "skillCode": "angular",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работает change detection в Angular?",
+    "shortAnswer": "Change detection — механизм Angular, который после асинхронного события (через Zone.js) обходит дерево компонентов и сравнивает каждую DOM-привязку с последним сохранённым значением. Default проверяет все компоненты на каждом tick; OnPush пропускает поддерево, пока не изменилась ссылка @Input(), не пришло событие изнутри, Observable через async pipe или не вызван markForCheck().",
+    "idealAnswer": "Change detection в Angular синхронизирует шаблон (DOM) с состоянием приложения: обходит дерево компонентов от корня и diff-ит bindings. Angular не следит за данными напрямую — Zone.js патчит addEventListener, setTimeout, setInterval, XMLHttpRequest, fetch и Promise; при async-активности в Angular zone планируется microtask, срабатывает NgZone.onMicrotaskEmpty и вызывается ApplicationRef.tick(). tick() стартует с root ViewRef (Ivy — LView), для каждого view запускает lifecycle hooks, сравнивает binding по последнему значению и патчит DOM; Ivy хранит 8-байтовые флаги на LView, чтобы пропускать clean views. Default (ChangeDetectionStrategy.Default) проверяет каждый компонент на каждом tick — клик где угодно триггерит проверку всего дерева. OnPush пропускает компонент и subtree, пока не выполнено одно из: изменилась ссылка @Input(), событие изнутри компонента, Observable через async pipe, markForCheck() вручную. Цифры: 100 компонентов Default = 100 checks/click; OnPush с 5 dirty inputs ≈ 5; OnPush + async pipe даёт ~80% меньше циклов в больших apps. Angular сравнивает по reference (===), не deep equal — мутация this.user.name = 'Bob' не триггерит OnPush; нужен this.user = { ...this.user, name: 'Bob' }. Типичные ошибки: мутация @Input в child; setTimeout для state (работает, но full tree walk); cdr.detach() везде без detectChanges(); getFilteredItems() в template — вызов на каждом CD. Паттерны: OnPush + trackBy в *ngFor для списков 100+; NgRx/Observable — OnPush + async pipe; WebSocket — markForCheck() в subscribe. async pipe auto-unsubscribe и markForCheck(); manual subscribe в OnPush требует markForCheck() самому. Без Zone.js — detectChanges()/markForCheck() вручную или Signals (Angular 16+). Ivy vs ViewEngine: LView flags skip clean views; Signals — fine-grained без tree walk.",
+    "maxScore": 10,
+    "skills": [
+      "angular",
+      "typescript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "cd_definition_cycle",
+      "title": "Понимает цикл change detection",
+      "expected": "Кандидат объясняет: CD обходит дерево компонентов, diff-ит bindings с последним значением и обновляет DOM; клик → Zone.js → tick() → обновление {{ count }} и т.п.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — определение и цикл из ITLead TL;DR",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "change detection",
+              "tick",
+              "дерев"
+            ],
+            "ask": "что происходит после клика по кнопке с {{ count }} — от события до обновления DOM"
+          }
+        ],
+        "mustConcepts": [
+          "change detection",
+          "виявлен",
+          "дерев",
+          "компонент",
+          "binding",
+          "привяз",
+          "DOM",
+          "шаблон",
+          "синхрониз",
+          "состоян",
+          "tick",
+          "ApplicationRef",
+          "diff",
+          "патч",
+          "обновлен",
+          "цикл",
+          "корн"
+        ],
+        "falseClaims": [
+          "Angular следит за каждым полем объекта через Proxy",
+          "change detection пересоздаёт весь DOM при каждом событии",
+          "CD запускается только при изменении @Input",
+          "Angular делает deep compare всех объектов в компоненте"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "zone_js_tick",
+      "title": "Знает роль Zone.js и ApplicationRef.tick()",
+      "expected": "Кандидат описывает: Zone.js патчит async API (addEventListener, setTimeout, fetch, Promise); NgZone.onMicrotaskEmpty → ApplicationRef.tick(); Ivy LView flags для skip clean views.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "механизм триггера CD — ключ middle Angular",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Zone.js",
+              "Zone",
+              "patch"
+            ],
+            "ask": "что именно патчит Zone.js и зачем Angular без него не знает об async"
+          },
+          {
+            "match": [
+              "NgZone",
+              "onMicrotaskEmpty",
+              "tick"
+            ],
+            "ask": "как microtask после fetch приводит к ApplicationRef.tick()"
+          }
+        ],
+        "mustConcepts": [
+          "Zone.js",
+          "Zone",
+          "patch",
+          "addEventListener",
+          "setTimeout",
+          "setInterval",
+          "fetch",
+          "XMLHttpRequest",
+          "Promise",
+          "microtask",
+          "NgZone",
+          "onMicrotaskEmpty",
+          "ApplicationRef",
+          "tick",
+          "LView",
+          "Ivy",
+          "ViewRef",
+          "async",
+          "асинхрон"
+        ],
+        "falseClaims": [
+          "Angular сам перехватывает setTimeout без Zone.js",
+          "Zone.js заменяет change detection",
+          "tick() проверяет только компонент где произошло событие при Default strategy",
+          "без Zone.js CD работает автоматически так же"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "default_vs_onpush",
+      "title": "Сравнивает Default и OnPush",
+      "expected": "Кандидат объясняет: Default — все компоненты на каждом tick; OnPush skip subtree пока не изменился @Input ref, событие изнутри, async pipe или markForCheck(); когда OnPush + trackBy для больших списков.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Default vs OnPush — главный trade-off из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "cd_definition_cycle",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "default_vs_onpush",
+            "oftenConfusedWith": [
+              "reference_equality"
+            ],
+            "anchorTermsExpected": [
+              "OnPush",
+              "Default",
+              "ChangeDetectionStrategy",
+              "subtree",
+              "skip",
+              "@Input"
+            ],
+            "anchorTermsWrongTopic": [
+              "OnPush делает deep compare",
+              "Default проверяет только dirty компоненты"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "OnPush",
+              "Default",
+              "100 компонент"
+            ],
+            "ask": "сколько checks на клик при 100 компонентах Default vs OnPush с 5 dirty inputs"
+          },
+          {
+            "match": [
+              "trackBy",
+              "ngFor",
+              "список"
+            ],
+            "ask": "когда OnPush + trackBy для таблицы на 100+ строк"
+          }
+        ],
+        "mustConcepts": [
+          "Default",
+          "OnPush",
+          "ChangeDetectionStrategy",
+          "subtree",
+          "поддерев",
+          "skip",
+          "пропуск",
+          "каждый компонент",
+          "tick",
+          "@Input",
+          "async pipe",
+          "markForCheck",
+          "событие",
+          "trackBy",
+          "ngFor",
+          "80%",
+          "производитель"
+        ],
+        "falseClaims": [
+          "OnPush проверяет компонент при любом клике в приложении",
+          "Default strategy умнее и проверяет только изменившиеся компоненты",
+          "OnPush не нужен для списков меньше 1000 элементов",
+          "OnPush и Default дают одинаковое число checks"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "reference_equality",
+      "title": "Понимает сравнение по ссылке",
+      "expected": "Кандидат объясняет: Angular сравнивает ===, не deep equal; мутация user.name не триггерит OnPush; immutable update — новый объект/массив через spread или concat.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "reference equality — частая production-ошибка OnPush",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "мутац",
+              "reference",
+              "ссылк",
+              "immutable"
+            ],
+            "ask": "почему this.user.name = 'Bob' не обновляет OnPush child и как исправить"
+          }
+        ],
+        "mustConcepts": [
+          "reference",
+          "ссылк",
+          "===",
+          "reference equality",
+          "deep compare",
+          "глубок",
+          "мутац",
+          "immutable",
+          "неизмен",
+          "spread",
+          "concat",
+          "новый объект",
+          "новый массив",
+          "@Input",
+          "OnPush",
+          "user.name",
+          "та же ссылка"
+        ],
+        "falseClaims": [
+          "Angular делает deep equal для @Input объектов",
+          "мутация поля объекта триггерит OnPush если поле изменилось",
+          "push в массив всегда запускает CD при OnPush",
+          "immutable updates нужны только для NgRx"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки CD",
+      "expected": "Кандидат называет: мутация @Input в child; setTimeout для state (full tree walk); detach без detectChanges; функции в template (*ngFor=\"getFilteredItems()\"); pre-compute или pure pipe.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — detach, template functions, setTimeout",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "detach",
+              "ChangeDetectorRef",
+              "detectChanges"
+            ],
+            "ask": "что будет если cdr.detach() на компоненте с кнопками без manual detectChanges"
+          },
+          {
+            "match": [
+              "getFilteredItems",
+              "template",
+              "функц"
+            ],
+            "ask": "почему *ngFor=\"getFilteredItems()\" убивает performance на большом списке"
+          }
+        ],
+        "mustConcepts": [
+          "мутац",
+          "@Input",
+          "child",
+          "setTimeout",
+          "full tree",
+          "detach",
+          "ChangeDetectorRef",
+          "detectChanges",
+          "функц",
+          "template",
+          "шаблон",
+          "ngFor",
+          "getFilteredItems",
+          "pure pipe",
+          "ngOnInit",
+          "pre-compute",
+          "замерз",
+          "UI freeze",
+          "60fps"
+        ],
+        "falseClaims": [
+          "detach() улучшает performance без побочных эффектов на UI",
+          "функции в template вызываются только при изменении аргументов",
+          "setTimeout обновляет только один компонент без tree walk",
+          "можно безопасно мутировать @Input в дочернем OnPush компоненте"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "async_pipe_cdr",
+      "title": "Знает async pipe и ChangeDetectorRef",
+      "expected": "Кандидат объясняет: async pipe вызывает markForCheck() при emit и auto-unsubscribe; manual subscribe в OnPush требует markForCheck(); WebSocket/timer — markForCheck в subscription; без Zone — detectChanges или Signals.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "async pipe + CDR — рекомендованный паттерн NgRx/Material",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "async pipe",
+              "subscribe",
+              "markForCheck"
+            ],
+            "ask": "почему manual subscribe в OnPush не обновляет view без markForCheck"
+          }
+        ],
+        "mustConcepts": [
+          "async pipe",
+          "markForCheck",
+          "ChangeDetectorRef",
+          "detectChanges",
+          "subscribe",
+          "Observable",
+          "unsubscribe",
+          "отписк",
+          "WebSocket",
+          "timer",
+          "NgRx",
+          "Zone.js",
+          "Signals",
+          "без Zone",
+          "emit"
+        ],
+        "falseClaims": [
+          "async pipe не вызывает markForCheck автоматически",
+          "manual subscribe в OnPush обновляет view без дополнительных действий",
+          "markForCheck и detectChanges всегда делают одно и то же",
+          "Signals требуют Zone.js для работы CD"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Change detection — Angular после async-события (Zone.js патчит fetch, click, setTimeout) вызывает tick() и обходит дерево, сравнивая bindings. Default — все 200 компонентов на клик. OnPush + async pipe на todos$ — только dirty subtree, ~80% меньше cycles. @Input user сравнивается по ссылке: spread для нового имени, не user.name = 'Bob'.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Material table 10k rows: OnPush, trackBy id, todos$ | async — markForCheck при HttpClient emit. WebSocket price: subscribe + cdr.markForCheck(). Не вызываю getItems() в template — filteredItems в ngOnInit или pure pipe. detach только на leaf без UI events.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "клик → zone ловит → tick → {{ count }} 0→1. onpush child не трогается пока ref @Input тот же. immutable user = {...user, name}. async pipe сам отписывается и markForCheck",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Angular deep compare все @Input объекты. OnPush обновляется при user.name = 'Bob' без смены ссылки. detach() на root — best practice для performance.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Zone.js не нужен — Angular сам знает когда данные изменились. *ngFor=\"filter()\" вызывается один раз. manual subscribe в OnPush всегда обновляет DOM автоматически.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Default strategy проверяет только компонент где был клик. async pipe требует ручной markForCheck в ngOnDestroy. Signals заменяют только Zone, CD tree walk остаётся всегда.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "cd_definition_cycle",
+      "exampleType": "good",
+      "exampleText": "CD обходит дерево от root, diff-ит {{ count }} с прошлым значением и патчит text node.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "cd_definition_cycle",
+      "exampleType": "good",
+      "exampleText": "ну change detection — синхрон шаблона с ts после события, не magic proxy на поля",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "cd_definition_cycle",
+      "exampleType": "bad",
+      "exampleText": "Change detection — это Virtual DOM diff React, Angular пересоздаёт всё дерево.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "zone_js_tick",
+      "exampleType": "good",
+      "exampleText": "Zone.js патчит addEventListener и fetch → microtask → NgZone.onMicrotaskEmpty → ApplicationRef.tick().",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "zone_js_tick",
+      "exampleType": "good",
+      "exampleText": "без zone angular не знает про settimeout внутри компонента — нужен manual tick или signals",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "zone_js_tick",
+      "exampleType": "bad",
+      "exampleText": "ApplicationRef.tick() вызывается только при router navigation, не при click.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "default_vs_onpush",
+      "exampleType": "good",
+      "exampleText": "Default: 100 checks/click. OnPush: skip subtree пока @Input ref, internal event, async pipe или markForCheck не сработали — ~5 checks.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "default_vs_onpush",
+      "exampleType": "good",
+      "exampleText": "grid 100+ rows — onpush + trackby; маленький app <10 компонентов — default ок",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "default_vs_onpush",
+      "exampleType": "bad",
+      "exampleText": "OnPush проверяет все компоненты так же как Default, просто реже.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "reference_equality",
+      "exampleType": "good",
+      "exampleText": "OnPush: this.user.name = 'Bob' — та же ссылка, UI 'Alice'. Fix: this.user = { ...this.user, name: 'Bob' }.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "reference_equality",
+      "exampleType": "good",
+      "exampleText": "массив тот же ref после push — onpush не видит; [...arr, x] или concat — новая ссылка",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "reference_equality",
+      "exampleType": "bad",
+      "exampleText": "Angular сравнивает @Input deep equal по каждому полю объекта.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Child мутирует @Input user — OnPush parent не перерисует. Template *ngFor=\"getFilteredItems()\" — O(n) каждый CD cycle. detach без detectChanges — frozen UI.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "settimeout(() => data = x) работает но full tree walk — лучше markForCheck в onpush subscription",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "getFilteredItems() в template — Angular memoize автоматически, performance ok на 10k rows.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "async_pipe_cdr",
+      "exampleType": "good",
+      "exampleText": "todos$ | async — subscribe + markForCheck + unsubscribe on destroy. Manual subscribe в OnPush: нужен cdr.markForCheck() в next.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "async_pipe_cdr",
+      "exampleType": "good",
+      "exampleText": "websocket tick — subscribe price, markForCheck в handler; ngrx store + async pipe default в docs",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "async_pipe_cdr",
+      "exampleType": "bad",
+      "exampleText": "async pipe не отписывается — memory leak гарантирован. markForCheck заменяет immutable pattern.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "how-does-change-detection-work-in-angular",
+    "apiUrl": "https://api.itlead.org/api/questions/how-does-change-detection-work-in-angular",
+    "pageUrl": "https://itlead.org/interview-questions/angular/how-does-change-detection-work-in-angular",
+    "difficulty": "MIDDLE",
+    "titleEn": "How does change detection work in Angular?",
+    "categorySlug": "angular",
+    "syncedAt": "2026-06-18T21:30:00.000Z"
+  }
+}

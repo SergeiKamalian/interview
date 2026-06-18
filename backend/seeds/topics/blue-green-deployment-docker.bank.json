@@ -1,0 +1,687 @@
+{
+  "topic": {
+    "code": "blue_green_deployment_docker",
+    "name": "Blue-green deployment с Docker",
+    "skillCode": "docker",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как реализовать blue-green deployment с Docker?",
+    "shortAnswer": "Blue-green — два полных окружения: blue обслуживает прод-трафик, green — новая версия без трафика. После healthcheck и smoke-test переключаете reverse proxy (nginx upstream или Traefik labels) с blue на green; старый blue остаётся мгновенным rollback-target. Цена — удвоение ресурсов на время деплоя; идеально для stateless-сервисов; для БД нужен expand-then-contract.",
+    "idealAnswer": "Blue-green deployment — стратегия, при которой два идентичных окружения кратко сосуществуют: blue (текущая версия) обслуживает трафик, green (новая) прогревается без прод-нагрузки. Reverse proxy или load balancer направляет запросы только на «live»-окружение. Cutover атомарен — меняете upstream/labels и вся система переключается на новую версию; rollback так же атомарен — flip обратно на blue. С Docker: общая сеть `docker network create proxy`; blue уже запущен (`docker run --name api-blue --network proxy myorg/api:1.0`); поднимаете green с healthcheck (`--health-cmd='curl -f http://localhost:3000/health'`); ждёте `healthy` через `docker inspect`; smoke-test green напрямую из той же сети (`curl http://api-green:3000/health`) — прод ещё не затронут; обновляете nginx upstream на `api-green:3000` и `nginx -s reload` или меняете Traefik labels; мониторите error rate и latency 5–10 минут; при проблемах — upstream обратно на blue; после окна — `docker stop api-blue`, rename green→blue или следующий релиз снова станет green. Traefik: green поднимают без routing-labels, после проверки labels переносят с blue на green — декларативный cutover. Сложная часть — state: при overlap обе версии могут читать БД — схема должна быть backward compatible; паттерн expand-then-contract: (1) expand-migration добавляет структуру без удаления старой, (2) green-код использует новое, (3) после стабилизации contract-migration убирает старое; никогда breaking-change схемы во время cutover. In-memory сессии пропадают — externalize в Redis/JWT; WebSocket/gRPC живут на blue до reconnect; файлы — общий volume или S3; кеш — совместимые deserializer или invalidate при cutover. Blue-green бинарен (100% blue или 100% green); canary постепенно смещает %; rolling заменяет инстансы по одному — дешевле, но менее атомарно. Типичные ошибки: не тестировали rollback; DROP COLUMN пока blue ещё query'ит; in-memory state; cutover без мониторинга; ручное редактирование proxy вместо CI/labels. Senior: partial rollout с feature flags — schema expand заранее, оба окружения с новым кодом, flag off на blue и постепенное включение на green; rollback — disable flag без re-deploy.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "bg_definition",
+      "title": "Понимает суть blue-green",
+      "expected": "Кандидат объясняет: два полных окружения (blue — текущий prod, green — новая версия); только одно обслуживает трафик; cutover и rollback атомарны через переключение маршрутизации; стоимость — 2× ресурсов на время деплоя; лучше всего для stateless.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — два окружения и атомарный flip из ITLead TL;DR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "bg_definition",
+            "oftenConfusedWith": [
+              "deploy_variants",
+              "docker_deploy_flow"
+            ],
+            "anchorTermsExpected": [
+              "blue",
+              "green",
+              "два окруж",
+              "cutover",
+              "rollback",
+              "атомар",
+              "load balancer",
+              "reverse proxy",
+              "stateless"
+            ],
+            "anchorTermsWrongTopic": [
+              "rolling заменяет по одному",
+              "canary это blue-green",
+              "green сразу получает 100% трафика при старте"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "blue",
+              "green",
+              "cutover"
+            ],
+            "ask": "чем blue-green отличается от rolling deploy и почему rollback здесь быстрее"
+          }
+        ],
+        "mustConcepts": [
+          "blue",
+          "green",
+          "два окруж",
+          "полн",
+          "идентич",
+          "cutover",
+          "rollback",
+          "атомар",
+          "flip",
+          "load balancer",
+          "reverse proxy",
+          "маршрутиз",
+          "трафик",
+          "stateless",
+          "2x",
+          "удвоен",
+          "ресурс",
+          "prod",
+          "новая верс"
+        ],
+        "falseClaims": [
+          "blue-green и rolling deploy — одно и то же",
+          "green сразу получает прод-трафик при docker run",
+          "rollback требует пересборки и redeploy старой версии",
+          "blue-green не требует двух полных окружений",
+          "cutover всегда требует downtime на минуты"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "docker_deploy_flow",
+      "title": "Знает Docker-пайплайн деплоя",
+      "expected": "Кандидат описывает шаги: общая docker-сеть; blue уже работает; green поднимается с healthcheck; ожидание healthy; out-of-band smoke-test; cutover через proxy; мониторинг; drain и cleanup blue.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "пошаговый flow из ITLead Implementation — core senior skill",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "bg_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "healthcheck",
+              "health",
+              "docker inspect"
+            ],
+            "ask": "зачем ждать healthy и делать smoke-test до cutover"
+          },
+          {
+            "match": [
+              "smoke",
+              "curl",
+              "out-of-band"
+            ],
+            "ask": "как проверить green, не затронув прод-трафик"
+          }
+        ],
+        "mustConcepts": [
+          "docker network",
+          "proxy",
+          "api-blue",
+          "api-green",
+          "healthcheck",
+          "health-cmd",
+          "docker inspect",
+          "healthy",
+          "smoke-test",
+          "curl",
+          "out-of-band",
+          "cutover",
+          "drain",
+          "cleanup",
+          "docker stop",
+          "docker rename",
+          "warmup",
+          "прогрев"
+        ],
+        "falseClaims": [
+          "можно делать cutover сразу после docker run без healthcheck",
+          "smoke-test через публичный URL до cutover — единственный способ",
+          "green и blue должны быть в разных сетях",
+          "после cutover blue нужно немедленно удалить без мониторинга",
+          "healthcheck заменяет smoke-test под реальной нагрузкой"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "reverse_proxy_cutover",
+      "title": "Cutover через reverse proxy",
+      "expected": "Кандидат объясняет: nginx upstream или Traefik labels переключают трафик атомарно; reload nginx или обновление labels; in-flight запросы на blue завершаются gracefully; rollback — обратное переключение за секунды.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "механизм атомарного flip — nginx/Traefik из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "docker_deploy_flow",
+            "floorFraction": 0.35
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "reverse_proxy_cutover",
+            "oftenConfusedWith": [
+              "docker_deploy_flow",
+              "deploy_variants"
+            ],
+            "anchorTermsExpected": [
+              "nginx",
+              "upstream",
+              "Traefik",
+              "labels",
+              "reload",
+              "атомар"
+            ],
+            "anchorTermsWrongTopic": [
+              "docker stop green переключает трафик",
+              "нужен новый DNS для cutover"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "nginx",
+              "upstream",
+              "reload"
+            ],
+            "ask": "как nginx upstream переключает трафик и что с in-flight запросами"
+          },
+          {
+            "match": [
+              "Traefik",
+              "labels",
+              "traefik.enable"
+            ],
+            "ask": "как Traefik label-swap делает cutover декларативным"
+          }
+        ],
+        "mustConcepts": [
+          "nginx",
+          "upstream",
+          "api_backend",
+          "nginx -s reload",
+          "Traefik",
+          "labels",
+          "traefik.enable",
+          "Host rule",
+          "loadbalancer",
+          "reverse proxy",
+          "cutover",
+          "flip",
+          "rollback",
+          "in-flight",
+          "graceful",
+          "consul-template",
+          "CI-скрипт"
+        ],
+        "falseClaims": [
+          "cutover требует остановки reverse proxy",
+          "нужно менять DNS TTL для каждого blue-green деплоя",
+          "Traefik автоматически балансирует 50/50 между blue и green",
+          "nginx reload обрывает все активные соединения без graceful",
+          "docker port publish заменяет reverse proxy для blue-green"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "state_expand_contract",
+      "title": "Expand-then-contract для схемы БД",
+      "expected": "Кандидат объясняет: во время overlap обе версии query БД — схема backward compatible; expand добавляет без удаления; green использует новое; contract удаляет старое после стабилизации; breaking-change во время cutover запрещён.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "state management DB — senior hard part из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "expand",
+              "contract",
+              "migration",
+              "схем"
+            ],
+            "ask": "почему DROP COLUMN во время cutover ломает blue и как expand-then-contract это решает"
+          },
+          {
+            "match": [
+              "feature flag",
+              "partial",
+              "schema"
+            ],
+            "ask": "как feature flags decouple deploy от rollout схемы (senior follow-up ITLead)"
+          }
+        ],
+        "mustConcepts": [
+          "expand-then-contract",
+          "expand",
+          "contract",
+          "backward compatible",
+          "обратн совмест",
+          "migration",
+          "схем",
+          "overlap",
+          "обе верс",
+          "DROP COLUMN",
+          "breaking-change",
+          "новая колонка",
+          "старый код",
+          "три релиз",
+          "feature flag",
+          "gated"
+        ],
+        "falseClaims": [
+          "можно DROP COLUMN сразу при cutover — green уже на 100% трафика",
+          "blue и green могут использовать разные схемы БД без миграций",
+          "expand-then-contract — один релиз вместо трёх",
+          "миграция схемы и cutover всегда атомарны в одной транзакции",
+          "shared DB без backward compatibility безопасен при blue-green"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "state_sessions_caches",
+      "title": "State: сессии, файлы, кеш, WebSocket",
+      "expected": "Кандидат называет: in-memory сессии не переживают cutover — Redis/JWT; WebSocket/gRPC на blue до reconnect; общий volume или S3 для файлов; кеш — совместимые deserializer или invalidate.",
+      "score": 0.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "дополнительный state из ITLead State management",
+        "mustConcepts": [
+          "in-memory",
+          "сесс",
+          "Redis",
+          "JWT",
+          "external",
+          "WebSocket",
+          "gRPC",
+          "reconnect",
+          "drain",
+          "volume",
+          "S3",
+          "object storage",
+          "кеш",
+          "invalidate",
+          "namespace"
+        ],
+        "falseClaims": [
+          "in-memory сессии автоматически мигрируют на green при cutover",
+          "WebSocket мгновенно переезжают на green без reconnect",
+          "blue и green должны иметь отдельные S3 bucket для каждого деплоя"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "deploy_variants",
+      "title": "Blue-green vs canary vs rolling",
+      "expected": "Кандидат сравнивает: blue-green — бинарный 100% flip, мгновенный rollback; canary — постепенный % для slow-burn регрессий; rolling — замена по одному, дешевле, менее атомарно.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "traffic shifting variants из ITLead — контекст выбора стратегии",
+        "confusionPairs": [
+          {
+            "checkpointKey": "deploy_variants",
+            "oftenConfusedWith": [
+              "bg_definition"
+            ],
+            "anchorTermsExpected": [
+              "canary",
+              "rolling",
+              "бинар",
+              "постепен",
+              "100%"
+            ],
+            "anchorTermsWrongTopic": [
+              "canary это то же что blue-green",
+              "rolling всегда атомарнее"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "canary",
+          "rolling",
+          "A/B",
+          "бинар",
+          "100%",
+          "процент",
+          "5%",
+          "постепен",
+          "Swarm",
+          "Kubernetes",
+          "Flagger",
+          "Argo Rollouts",
+          "slow-burn",
+          "регресс",
+          "resource cost"
+        ],
+        "falseClaims": [
+          "canary и blue-green идентичны по атомарности rollback",
+          "rolling deploy всегда дороже blue-green по ресурсам",
+          "blue-green постепенно увеличивает % трафика на green",
+          "A/B testing заменяет healthcheck перед cutover"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: не тестировали rollback; breaking schema при overlap; in-memory state; cutover без мониторинга; ручное редактирование proxy вместо автоматизации.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "rollback",
+              "тест",
+              "flip back"
+            ],
+            "ask": "как регулярно проверять, что rollback playbook реально работает"
+          },
+          {
+            "match": [
+              "DROP",
+              "ALTER",
+              "old_field"
+            ],
+            "ask": "пример schema-breaking миграции во время cutover и последствия"
+          }
+        ],
+        "mustConcepts": [
+          "rollback test",
+          "flip back",
+          "schema-breaking",
+          "DROP COLUMN",
+          "old_field",
+          "in-memory",
+          "мониторинг",
+          "error rate",
+          "latency",
+          "5-10 мин",
+          "ручн",
+          "reverse proxy",
+          "автоматиз",
+          "traefik labels",
+          "consul-template",
+          "no-op green"
+        ],
+        "falseClaims": [
+          "rollback test не нужен если green прошёл healthcheck",
+          "мониторинг можно отложить до следующего дня после cutover",
+          "ручное редактирование nginx безопаснее CI-скрипта",
+          "breaking migration ok если cutover занимает секунды",
+          "in-memory cache переживает cutover без плана"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "rollback_monitoring",
+      "title": "Rollback playbook и мониторинг cutover",
+      "expected": "Кандидат описывает: готовый rollback.sh / revert upstream; мониторинг error rate, latency, throughput в первые 5–10 минут; healthy необходим но недостаточен — нужен warmup под нагрузкой.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "rollback playbook и follow-up Q из ITLead",
+        "mustConcepts": [
+          "rollback.sh",
+          "playbook",
+          "sed",
+          "nginx -t",
+          "error rate",
+          "latency",
+          "throughput",
+          "real time",
+          "warmup",
+          "cold cache",
+          "healthy",
+          "недостаточ",
+          "синтетич",
+          "muscle-memory"
+        ],
+        "falseClaims": [
+          "healthcheck green гарантирует prod performance сразу после cutover",
+          "rollback занимает часы при правильном blue-green",
+          "мониторинг нужен только если пользователи жалуются"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Blue-green: blue на api:1.0 обслуживает трафик через nginx upstream, green на api:1.1 поднимаю в той же proxy-сети с healthcheck. Smoke-test curl на api-green:3000, потом sed upstream на green и nginx -s reload — атомарный cutover. Blue остаётся для rollback. Схему БД меняю expand-then-contract, не DROP COLUMN пока blue жив. После 10 минут мониторинга — stop blue.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На single-host Compose: Traefik с docker provider. Green поднимаю без traefik labels — трафик не идёт. Health + curl smoke. Потом labels с blue на green — Traefik подхватывает за секунды. Rollback — labels обратно. In-memory сессии вынес в Redis, иначе cutover выбьет пользователей. Canary использую для больших релизов, blue-green — для быстрых итераций API.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Два полных контейнера, flip reverse proxy — мгновенный rollback flip назад. Цена 2x RAM на окно деплоя. Stateless API — идеально. Для schema: expand migration, deploy green с кодом под новую колонку, cutover, потом contract. WebSocket на blue drain'ятся сами, новые на green.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Blue-green — это rolling update в Docker Swarm, просто два контейнера с разными именами. Cutover — docker stop blue, green автоматически получает трафик без proxy.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "При деплое сразу ALTER TABLE DROP COLUMN, потому что green уже healthy. Rollback test не нужен — healthcheck достаточен. Сессии в памяти приложения — нормально для blue-green.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Blue-green и canary одно и то же — постепенно 5%, 50%, 100%. После cutover сразу rm blue без мониторинга. Nginx конфиг правлю вручную на проде без rollback.sh.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "bg_definition",
+      "exampleType": "good",
+      "exampleText": "Два идентичных окружения: blue — prod, green — новая версия idle. Flip load balancer — атомарный cutover; flip back — мгновенный rollback. 2x ресурсов на время деплоя.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "bg_definition",
+      "exampleType": "good",
+      "exampleText": "ну blue крутится, green прогревается без трафика, потом переключаешь proxy — вся система на новой версии, старый blue как запасной",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "bg_definition",
+      "exampleType": "bad",
+      "exampleText": "Blue-green — это canary с 50% трафика на green, rollback требует redeploy старого образа с нуля.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "docker_deploy_flow",
+      "exampleType": "good",
+      "exampleText": "docker network proxy → run api-blue → run api-green с --health-cmd → жду healthy в inspect → curl smoke на green из сети → меняю upstream → monitor → stop blue.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "docker_deploy_flow",
+      "exampleType": "good",
+      "exampleText": "green поднял, healthcheck ок, smoke-test до cutover — если green битый, прод не тронут. потом reload nginx и смотрю логи 10 мин",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "docker_deploy_flow",
+      "exampleType": "bad",
+      "exampleText": "docker run green и сразу меняю DNS на green IP — healthcheck опционален, smoke-test через публичный домен до cutover.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "reverse_proxy_cutover",
+      "exampleType": "good",
+      "exampleText": "nginx upstream api-blue → api-green, nginx -t && nginx -s reload — near-instant cutover; in-flight на blue завершаются gracefully.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "reverse_proxy_cutover",
+      "exampleType": "good",
+      "exampleText": "Traefik: green без labels пока тестирую, потом label-swap — traefik.http.routers.api на green, blue traefik.enable=false",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "reverse_proxy_cutover",
+      "exampleType": "bad",
+      "exampleText": "Cutover — docker stop blue, Traefik сам найдёт green по имени контейнера без labels и upstream.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "state_expand_contract",
+      "exampleType": "good",
+      "exampleText": "Expand: ADD COLUMN new_field. Deploy green код читает old_field и new_field. Cutover. Contract: DROP old_field после стабилизации. DROP во время overlap убьёт blue.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "state_expand_contract",
+      "exampleType": "good",
+      "exampleText": "Senior: schema expand заранее, код с feature flag — на green включаю flag постепенно, rollback disable flag без redeploy",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "state_expand_contract",
+      "exampleType": "bad",
+      "exampleText": "Миграция DROP COLUMN в момент cutover — ok, green уже на 100% трафика, blue больше не query'ит БД.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "state_sessions_caches",
+      "exampleType": "good",
+      "exampleText": "Сессии в Redis — оба окружения видят одни ключи. WebSocket на blue до reconnect, новые соединения на green.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "state_sessions_caches",
+      "exampleType": "good",
+      "exampleText": "файлы на общий volume или s3 bucket, кеш при cutover invalidate или namespace по версии",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "state_sessions_caches",
+      "exampleType": "bad",
+      "exampleText": "In-memory session map переживёт cutover — green прочитает память blue автоматически.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "deploy_variants",
+      "exampleType": "good",
+      "exampleText": "Blue-green — 100% flip, rollback за секунды. Canary — 5% на green для slow regressions. Rolling — по одному task, дешевле, не атомарно.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "deploy_variants",
+      "exampleType": "good",
+      "exampleText": "большой релиз — canary/flagger, быстрый hotfix api — blue-green на compose с traefik",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "deploy_variants",
+      "exampleType": "bad",
+      "exampleText": "Blue-green постепенно наращивает трафик как canary — это одна стратегия.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Раз в месяц: no-op green, flip, flip back — rollback playbook проверен. Schema только expand во время overlap.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "не мониторил error rate после flip — green упал под load, а healthcheck был ok на /health без реальных запросов",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Rollback test — waste of time если CI green. Ручное ssh на nginx conf без версионирования — норма.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "rollback_monitoring",
+      "exampleType": "good",
+      "exampleText": "rollback.sh: sed upstream green→blue, nginx -t && reload. Первые 10 мин — dashboard error rate + p99 latency.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "rollback_monitoring",
+      "exampleType": "good",
+      "exampleText": "healthy не enough — cold cache на green, нужен synthetic warmup до cutover",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "rollback_monitoring",
+      "exampleType": "bad",
+      "exampleText": "После cutover смотрю логи на следующий день — healthcheck green уже доказал что prod ok.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "blue-green-deployment-docker",
+    "apiUrl": "https://api.itlead.org/api/questions/blue-green-deployment-docker",
+    "pageUrl": "https://itlead.org/interview-questions/docker/blue-green-deployment-docker",
+    "difficulty": "SENIOR",
+    "titleEn": "How to implement blue-green deployment with Docker?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

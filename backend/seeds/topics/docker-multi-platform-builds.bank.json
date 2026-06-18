@@ -1,0 +1,582 @@
+{
+  "topic": {
+    "code": "docker_multi_platform_builds",
+    "name": "Multi-platform Docker builds (ARM + AMD64)",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как собирать multi-platform Docker-образы (ARM + AMD64)?",
+    "shortAnswer": "Используй `docker buildx build` с флагом `--platform`, перечисляя целевые архитектуры. Buildx создаёт manifest list — один tag указывает на несколько per-arch образов; daemon при pull выбирает нужный вариант. Для релиза обязателен `--push` в registry — multi-arch нельзя сохранить в локальном image store.",
+    "idealAnswer": "Multi-platform образы собираются один раз под одним именем, но содержат слои для нескольких CPU-архитектур (например `linux/amd64` и `linux/arm64`). Это нужно потому что Apple Silicon (M1/M2/M3), AWS Graviton, Raspberry Pi и edge-устройства работают на ARM, а большинство ноутбуков и CI — на x86-64. Если образ только `linux/amd64`, на ARM Mac pull либо медленно эмулируется через QEMU, либо падает с `no matching manifest`. Решение — один tag с manifest list (fat manifest): registry хранит индекс, указывающий на per-arch digest. При `docker pull myorg/app:1.0` daemon читает manifest list и тянет правильные слои для текущей платформы. Сборка — через `docker buildx` (BuildKit): `docker buildx create --name multi --driver docker-container --use`, `docker buildx inspect --bootstrap`, затем `docker buildx build --platform linux/amd64,linux/arm64 -t myorg/app:1.0 --push .`. Флаг `--push` обязателен — локальный Docker image store индексирует по одной архитектуре; multi-arch живёт только в registry (или `--output=oci` для OCI bundle). Проверка: `docker buildx imagetools inspect myorg/app:1.0` — MediaType `application/vnd.oci.image.index.v1+json`, список linux/amd64 и linux/arm64. Два режима сборки: (1) один builder + QEMU — BuildKit регистрирует `binfmt_misc`, RUN-инструкции для чужой архитектуры эмулируются; работает везде, для Rust/C++ в 5–10 раз медленнее native; (2) несколько native builders — arm64 на реальной ARM-машине через `docker buildx create --append --node arm --platform linux/arm64 ssh://user@arm-host`, amd64 на x86; быстро, нужна инфраструктура. Для dev: `docker buildx build --platform local -t myorg/app:dev --load .` — одна локальная архитектура, без push. Типичные ошибки: Python C-extensions ломаются под QEMU (нет prebuilt wheels) — нужны manylinux wheels или native build per arch; Go — `FROM --platform=$BUILDPLATFORM`, `CGO_ENABLED=0`, `GOOS=$TARGETOS GOARCH=$TARGETARCH` — кросс-компиляция без эмуляции; `exec format error` — скопирован amd64 бинарник в arm64 stage. Переменные `$BUILDPLATFORM` (хост) и `$TARGETPLATFORM` (цель): build stage на хосте, финальный образ per-arch. Старый `docker manifest` вручную сшивает образы — buildx предпочтительнее. CI: GitHub Actions — setup-qemu-action, setup-buildx-action, build-push-action с `platforms: linux/amd64,linux/arm64`, `cache-from: type=gha`. Публичные образы (Postgres, Redis, nginx) — multi-arch; внутренним приложениям минимум amd64+arm64 если есть Apple Silicon dev или Graviton prod. Pull multi-arch работает без buildx — buildx нужен только для производства.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "multi_platform_why",
+      "title": "Понимает зачем multi-platform",
+      "expected": "Кандидат объясняет: один tag для amd64 и arm64; причины — Apple Silicon, AWS Graviton, Raspberry Pi/edge vs x86 серверы и CI; без multi-arch — QEMU эмуляция или no matching manifest.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "контекст TL;DR — почему одна архитектура больше не норма",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Apple Silicon",
+              "Graviton",
+              "ARM",
+              "amd64"
+            ],
+            "ask": "почему образ только linux/amd64 проблема на M1 Mac или Graviton"
+          }
+        ],
+        "mustConcepts": [
+          "multi-platform",
+          "multi-arch",
+          "amd64",
+          "arm64",
+          "ARM",
+          "Apple Silicon",
+          "M1",
+          "Graviton",
+          "Raspberry Pi",
+          "edge",
+          "x86",
+          "один tag",
+          "несколько архитектур",
+          "no matching manifest",
+          "QEMU",
+          "эмуляц"
+        ],
+        "falseClaims": [
+          "достаточно собирать только amd64 — Docker сам перекомпилирует под ARM",
+          "multi-platform нужен только для Raspberry Pi",
+          "Apple Silicon автоматически запускает amd64 образы нативно без эмуляции",
+          "все CI и продакшен уже на ARM"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "manifest_list",
+      "title": "Понимает manifest list",
+      "expected": "Кандидат описывает fat manifest: один tag → N per-arch digest; daemon при pull выбирает архитектуру; MediaType image index; тот же tag, разные bytes.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "механизм прозрачного pull — ядро multi-arch",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "multi_platform_why",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "manifest_list",
+            "oftenConfusedWith": [
+              "buildx_workflow"
+            ],
+            "anchorTermsExpected": [
+              "manifest list",
+              "fat manifest",
+              "digest",
+              "pull",
+              "daemon выбирает",
+              "per-arch"
+            ],
+            "anchorTermsWrongTopic": [
+              "docker build без registry",
+              "manifest list создаётся только docker manifest вручную"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "manifest",
+              "digest",
+              "pull"
+            ],
+            "ask": "что происходит при docker pull одного tag на ARM и на x86"
+          }
+        ],
+        "mustConcepts": [
+          "manifest list",
+          "fat manifest",
+          "digest",
+          "per-arch",
+          "registry",
+          "pull",
+          "daemon",
+          "выбирает",
+          "architecture",
+          "linux/amd64",
+          "linux/arm64",
+          "image index",
+          "один tag",
+          "разные слои",
+          "прозрачн"
+        ],
+        "falseClaims": [
+          "при pull скачиваются все архитектуры сразу",
+          "manifest list — это отдельный tag на каждую архитектуру",
+          "daemon не умеет выбирать архитектуру автоматически",
+          "multi-arch образ — один набор слоёв для всех CPU"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "buildx_workflow",
+      "title": "Знает workflow buildx",
+      "expected": "Кандидат описывает: buildx create + bootstrap, `buildx build --platform linux/amd64,linux/arm64 -t name --push`, imagetools inspect; tonistiigi/binfmt для QEMU.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "основная команда и setup из ITLead quick start",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "manifest_list",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "buildx create",
+              "buildx build",
+              "--platform"
+            ],
+            "ask": "полная команда сборки amd64+arm64 и зачем bootstrap builder"
+          },
+          {
+            "match": [
+              "imagetools inspect",
+              "verify"
+            ],
+            "ask": "как проверить что в registry лежат обе архитектуры"
+          }
+        ],
+        "mustConcepts": [
+          "buildx",
+          "buildx create",
+          "buildx build",
+          "--platform",
+          "linux/amd64",
+          "linux/arm64",
+          "--push",
+          "docker-container",
+          "driver",
+          "bootstrap",
+          "inspect",
+          "imagetools inspect",
+          "BuildKit",
+          "binfmt",
+          "tonistiigi/binfmt"
+        ],
+        "falseClaims": [
+          "обычный docker build создаёт multi-arch manifest list",
+          "buildx не нужен для multi-platform сборки",
+          "--platform работает только с одной архитектурой за раз без manifest list",
+          "imagetools inspect смотрит только локальные образы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "qemu_vs_native",
+      "title": "Различает QEMU и native builders",
+      "expected": "Кандидат сравнивает: QEMU/binfmt — эмуляция RUN, медленно для compiled; native builders — отдельная ARM node через ssh append, каждая arch на своём железе; 5–10x разница.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "trade-off скорости — ключ для production",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "QEMU",
+              "native",
+              "эмуляц"
+            ],
+            "ask": "когда QEMU достаточно, когда нужен native ARM builder"
+          },
+          {
+            "match": [
+              "--append",
+              "ssh",
+              "node"
+            ],
+            "ask": "как подключить remote ARM machine к buildx builder"
+          }
+        ],
+        "mustConcepts": [
+          "QEMU",
+          "эмуляц",
+          "binfmt_misc",
+          "native",
+          "builder",
+          "node",
+          "--append",
+          "ssh",
+          "ARM host",
+          "orchestrator",
+          "медленн",
+          "5-10x",
+          "10x",
+          "compiled",
+          "Rust",
+          "C++",
+          "production"
+        ],
+        "falseClaims": [
+          "QEMU всегда так же быстр как native build",
+          "native builders не нужны — QEMU достаточен для production CI",
+          "buildx не умеет распределять arch по разным машинам",
+          "Docker Desktop не регистрирует binfmt автоматически"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "push_vs_load",
+      "title": "Знает --push vs --load",
+      "expected": "Кандидат объясняет: multi-arch нельзя в local image store — нужен --push; для dev — --platform local и --load одной arch; release — --push.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "частая ошибка middle — попытка --load multi-arch",
+        "mustConcepts": [
+          "--push",
+          "--load",
+          "registry",
+          "local image store",
+          "локальн",
+          "нельзя",
+          "--platform local",
+          "dev",
+          "release",
+          "одна архитектура",
+          "--output=oci",
+          "OCI bundle"
+        ],
+        "falseClaims": [
+          "можно docker buildx build multi-arch и --load в локальный docker images",
+          "--push опционален для multi-arch",
+          "--load работает с двумя платформами одновременно",
+          "multi-arch образы хранятся в /var/lib/docker как обычные"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_pitfalls",
+      "title": "Знает типичные ошибки сборки",
+      "expected": "Кандидат называет: Python C-extensions под QEMU; Go CGO_ENABLED=0 и BUILDPLATFORM/TARGETPLATFORM; exec format error; TARGETARCH case в Dockerfile; prebuilt wheels.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "pitfalls из ITLead — отличает практикующего",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "qemu_vs_native",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "CGO_ENABLED",
+              "BUILDPLATFORM",
+              "TARGETPLATFORM"
+            ],
+            "ask": "как собрать Go без QEMU эмуляции в Dockerfile"
+          },
+          {
+            "match": [
+              "exec format error",
+              "Python.h",
+              "wheel"
+            ],
+            "ask": "почему Python package падает под QEMU и как исправить"
+          },
+          {
+            "match": [
+              "arm64",
+              "debug",
+              "--progress=plain"
+            ],
+            "ask": "как отладить build который падает только на arm64"
+          }
+        ],
+        "mustConcepts": [
+          "native dependencies",
+          "C extension",
+          "Python.h",
+          "wheel",
+          "manylinux",
+          "CGO_ENABLED",
+          "BUILDPLATFORM",
+          "TARGETPLATFORM",
+          "TARGETARCH",
+          "TARGETOS",
+          "cross-compile",
+          "exec format error",
+          "amd64 binary",
+          "arm64 stage",
+          "--progress=plain",
+          "prebuilt"
+        ],
+        "falseClaims": [
+          "Go всегда требует QEMU для cross-compile в Docker",
+          "CGO_ENABLED=1 ускоряет multi-arch Go build без проблем",
+          "exec format error значит сломан Dockerfile синтаксис",
+          "Alpine apk не резолвит пакеты per arch автоматически"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "ci_real_world",
+      "title": "Знает CI и практику",
+      "expected": "Кандидат упоминает GitHub Actions setup-qemu/setup-buildx/build-push-action, cache-from gha; минимум amd64+arm64 для internal apps; публичные образы multi-arch; arm/v7 для edge.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "real-world usage и CI из ITLead",
+        "mustConcepts": [
+          "GitHub Actions",
+          "setup-qemu-action",
+          "setup-buildx-action",
+          "build-push-action",
+          "cache-from",
+          "type=gha",
+          "CI",
+          "Postgres",
+          "Redis",
+          "nginx",
+          "internal app",
+          "linux/arm/v7",
+          "edge",
+          "docker manifest",
+          "legacy"
+        ],
+        "falseClaims": [
+          "multi-arch нужен только для публичных образов на Docker Hub",
+          "CI matrix с отдельными job на каждую arch заменяет buildx manifest list",
+          "buildx устарел — всегда используй docker manifest create",
+          "кэш GitHub Actions не работает с buildx"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Собираю через buildx: create builder с docker-container driver, bootstrap, затем build --platform linux/amd64,linux/arm64 -t myorg/app:1.0 --push. В registry manifest list — при pull на M1 Mac daemon сам возьмёт arm64 digest. Для dev — --platform local --load, без push обеих arch.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На CI GitHub Actions: setup-qemu, setup-buildx, build-push-action с platforms amd64+arm64, cache-from type=gha. В проде для скорости повесил native ARM node через buildx create --append ssh://arm-host — QEMU для Rust слишком медленный.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Один tag myorg/app:1.0 — fat manifest на amd64 и arm64. Go собираю на BUILDPLATFORM с CGO_ENABLED=0, TARGETOS/ARCH — без эмуляции. Python wheels manylinux, иначе под QEMU Python.h не найдётся.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Делаю docker build и docker tag — Docker сам сделает multi-arch. Потом docker save в tar для обеих платформ.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Multi-arch не нужен — все разработчики на Intel, а Graviton редкость. QEMU и native builders одинаково быстры.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "buildx build --platform linux/amd64,linux/arm64 --load . и образ появится локально в docker images для обеих arch. --push только для Docker Hub платных аккаунтов.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "multi_platform_why",
+      "exampleType": "good",
+      "exampleText": "Apple Silicon и Graviton на ARM — если образ только amd64, pull на M1 либо QEMU тормозит, либо no matching manifest. Multi-arch даёт один tag для всех.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "multi_platform_why",
+      "exampleType": "good",
+      "exampleText": "ну у нас dev на маках m2, прод graviton — без arm64 слоя образ не взлетит нормально",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "multi_platform_why",
+      "exampleType": "bad",
+      "exampleText": "Multi-platform — это когда один контейнер одновременно работает на двух CPU в runtime.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "manifest_list",
+      "exampleType": "good",
+      "exampleText": "Registry хранит manifest list: tag → digest amd64 и digest arm64. docker pull на x86 тянет amd64 слои, на arm64 Mac — arm64. Один tag, разные bytes.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "manifest_list",
+      "exampleType": "good",
+      "exampleText": "fat manifest — image index, daemon сам выбирает arch при pull, пользователь не меняет команду",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "manifest_list",
+      "exampleType": "bad",
+      "exampleText": "При pull multi-arch образа скачиваются все архитектуры в /var/lib/docker сразу.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "buildx_workflow",
+      "exampleType": "good",
+      "exampleText": "docker buildx create --name multi --driver docker-container --use && inspect --bootstrap. build --platform linux/amd64,linux/arm64 -t app:1.0 --push . imagetools inspect app:1.0 — вижу оба manifest.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "buildx_workflow",
+      "exampleType": "good",
+      "exampleText": "binfmt через tonistiigi/binfmt --install all, потом buildx build с двумя platform и обязательным --push",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "buildx_workflow",
+      "exampleType": "bad",
+      "exampleText": "docker build -t app:1.0 . с --platform в dockerfile достаточно для manifest list без buildx.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "qemu_vs_native",
+      "exampleType": "good",
+      "exampleText": "QEMU через binfmt — RUN для arm64 на x86 хосте эмулируется, Rust может быть в 10 раз медленнее. Для CI release добавил ssh ARM node в buildx — arm64 нативно.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "qemu_vs_native",
+      "exampleType": "good",
+      "exampleText": "для мелкого node app qemu ок, для тяжёлого c++ — только native builder per arch",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "qemu_vs_native",
+      "exampleType": "bad",
+      "exampleText": "Native builders — это когда QEMU установлен на ARM машине вместо x86.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "push_vs_load",
+      "exampleType": "good",
+      "exampleText": "Multi-arch нельзя --load в локальный store — только --push в registry. Итерация: --platform local --load одной arch.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "push_vs_load",
+      "exampleType": "good",
+      "exampleText": "релиз — push в ecr, дев — local platform load, не пытаюсь две arch локально",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "push_vs_load",
+      "exampleType": "bad",
+      "exampleText": "--push нужен только если нет docker login; иначе multi-arch сохраняется в docker images локально.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_pitfalls",
+      "exampleType": "good",
+      "exampleText": "Go: FROM --platform=$BUILDPLATFORM golang, CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build — кросс-компиляция без QEMU. exec format error — скопировал amd64 бинарь в arm64 финальный stage.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_pitfalls",
+      "exampleType": "good",
+      "exampleText": "Python C ext под qemu — Python.h missing, фикс manylinux wheels или native build на arm node",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_pitfalls",
+      "exampleType": "good",
+      "exampleText": "arm64 only fail — build --platform linux/arm64 --load, run --platform linux/arm64 sh, логи --progress=plain",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_pitfalls",
+      "exampleType": "bad",
+      "exampleText": "exec format error — надо добавить --privileged к docker run, архитектура не при чём.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "ci_real_world",
+      "exampleType": "good",
+      "exampleText": "В Actions: setup-qemu-action, setup-buildx-action, build-push-action platforms amd64+arm64, cache-from type=gha mode=max — не пересобираем обе arch с нуля каждый push.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "ci_real_world",
+      "exampleType": "good",
+      "exampleText": "внутренний сервис — минимум amd64+arm64 если хоть один dev на apple silicon; edge pi — ещё linux/arm/v7",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "ci_real_world",
+      "exampleType": "bad",
+      "exampleText": "docker manifest create — современный способ, buildx deprecated для multi-arch.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-multi-platform-builds",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-multi-platform-builds",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-multi-platform-builds",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to build multi-platform Docker images (ARM + AMD64)?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

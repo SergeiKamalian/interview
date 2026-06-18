@@ -1,0 +1,557 @@
+{
+  "topic": {
+    "code": "what_is_rxjs_how_is_it_integrated_angular",
+    "name": "RxJS и интеграция в Angular",
+    "skillCode": "angular",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое RxJS и как он интегрирован в Angular?",
+    "shortAnswer": "RxJS — библиотека реактивного программирования на Observable-потоках, операторах и подписчиках. Angular 16+ поставляется с RxJS 7.8+ и использует Observables в HttpClient, Router и Forms по умолчанию. Ничего не выполняется до вызова subscribe(); для очистки подписок — async pipe или takeUntilDestroyed().",
+    "idealAnswer": "RxJS (Reactive Extensions for JavaScript) — библиотека для реактивного программирования: асинхронные потоки данных через Observable, операторы в pipe() и подписчики через subscribe(). Модель lazy execution: producer запускается только при subscribe(), до этого поток «холодный» и ничего не делает. pipe() связывает операторы (map, filter, switchMap) без мутации исходного Observable. Главное отличие от Promise: Promise резолвится один раз; Observable может выдать 0, 1 или много значений со временем и поддерживает отмену через teardown. Правило выбора: несколько async-источников или отменяемые операции → RxJS; одноразовый fetch без трансформаций → Promise достаточно. Angular 16+ включает RxJS 7.8+ через @angular/core. Почти каждый async API возвращает Observable: HttpClient.get/post → Observable<T> (cold — каждый subscribe = новый HTTP); router.events → Observable<RouterEvent>; Reactive Forms valueChanges → Observable; async pipe в шаблоне {{ data$ | async }} автоматически подписывается и отписывается при destroy компонента. Внутри Observable — объект с методом subscribe; операторы возвращают новые Observables, проксируя эмиссии; RxJS 7+ использует TeardownLogic для cleanup. Cold Observable создаёт нового producer на каждого подписчика (HttpClient); hot делит одного producer (Subject, fromEvent на DOM). shareReplay(1) превращает cold в hot-подобное поведение с кешем последнего значения. Типичные ошибки: interval/router.events.subscribe без отписки — утечка памяти; http.get().then() — TypeError, нужен subscribe или firstValueFrom; двойной subscribe на cold HttpClient — два запроса, fix через shareReplay(1); subscribe без error handler — поток умирает молча. Очистка: async pipe в шаблоне; takeUntilDestroyed() (Angular 16+) в конструкторе/injection context; takeUntil(destroy$) legacy. Реальные кейсы: HttpClient + switchMap для token refresh; router.events.pipe(filter NavigationEnd); NgRx Effects; Material autocomplete debounceTime + switchMap; Angular 18 toSignal() для signals. Когда RxJS: combineLatest/merge для нескольких источников, switchMap для search-as-you-type, WebSocket с takeUntilDestroyed. Когда Promise: простой одноразовый async без комбинирования.",
+    "maxScore": 10,
+    "skills": [
+      "angular",
+      "typescript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "rxjs_observable_basics",
+      "title": "Понимает Observable, subscribe и lazy execution",
+      "expected": "Кандидат объясняет: Observable — поток значений; pipe() цепляет операторы без мутации источника; ничего не выполняется до subscribe(); of/pipe/map/delay как базовый пример.",
+      "score": 1,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовая модель RxJS из ITLead quick example",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "subscribe",
+              "lazy",
+              "pipe"
+            ],
+            "ask": "что происходит до вызова subscribe() и зачем нужен pipe()"
+          }
+        ],
+        "mustConcepts": [
+          "Observable",
+          "subscribe",
+          "pipe",
+          "оператор",
+          "lazy",
+          "отложен",
+          "эмиссия",
+          "complete",
+          "producer",
+          "поток",
+          "of",
+          "map",
+          "не мутирует",
+          "новый Observable",
+          "реактивн"
+        ],
+        "falseClaims": [
+          "Observable начинает эмитить сразу при создании без subscribe",
+          "pipe мутирует исходный Observable",
+          "subscribe и pipe выполняют одну и ту же роль",
+          "RxJS требует специальный runtime помимо JS"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "promise_vs_observable",
+      "title": "Отличает Observable от Promise",
+      "expected": "Кандидат сравнивает: Promise — одно значение, eager после создания; Observable — 0..N значений, lazy до subscribe, отмена через unsubscribe; правило: несколько async/отмена → RxJS, один fetch → Promise.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевая разница TL;DR ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "promise_vs_observable",
+            "oftenConfusedWith": [
+              "when_to_use"
+            ],
+            "anchorTermsExpected": [
+              "Promise",
+              "один раз",
+              "много значений",
+              "lazy",
+              "subscribe",
+              "отмен"
+            ],
+            "anchorTermsWrongTopic": [
+              "Promise и Observable одинаковы",
+              "HttpClient возвращает Promise"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Promise",
+              "Observable"
+            ],
+            "ask": "чем Promise отличается от Observable по количеству значений и моменту запуска"
+          }
+        ],
+        "mustConcepts": [
+          "Promise",
+          "Observable",
+          "один раз",
+          "одно значение",
+          "много значений",
+          "lazy",
+          "subscribe",
+          "отмен",
+          "unsubscribe",
+          "declarative",
+          "pipeline",
+          "callback hell",
+          "firstValueFrom"
+        ],
+        "falseClaims": [
+          "Promise может эмитить несколько значений",
+          "Observable всегда eager как Promise",
+          "HttpClient возвращает Promise по умолчанию",
+          "Promise поддерживает отмену inner запроса из коробки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "angular_rxjs_integration",
+      "title": "Знает где Angular использует RxJS",
+      "expected": "Кандидат перечисляет: HttpClient → Observable<T>; router.events; form.valueChanges; async pipe в шаблоне; Angular 16+ bundled RxJS 7.8+.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ядро вопроса — интеграция в Angular API",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "rxjs_observable_basics",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "HttpClient",
+              "Router",
+              "valueChanges",
+              "async"
+            ],
+            "ask": "какие Angular API возвращают Observable и зачем async pipe в шаблоне"
+          },
+          {
+            "match": [
+              "switchMap",
+              "debounceTime",
+              "filter"
+            ],
+            "ask": "типичные операторы для HttpClient chains и router.events"
+          }
+        ],
+        "mustConcepts": [
+          "HttpClient",
+          "Observable",
+          "router.events",
+          "Router",
+          "valueChanges",
+          "Reactive Forms",
+          "async pipe",
+          "Angular 16",
+          "RxJS 7",
+          "switchMap",
+          "debounceTime",
+          "NavigationEnd",
+          "filter",
+          "NgRx",
+          "toSignal"
+        ],
+        "falseClaims": [
+          "Angular не использует RxJS в HttpClient",
+          "router.events это Promise",
+          "async pipe требует ручной unsubscribe в ngOnDestroy",
+          "Reactive Forms не используют Observables"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "cold_vs_hot",
+      "title": "Понимает cold vs hot Observables",
+      "expected": "Кандидат объясняет: cold — новый producer на каждый subscribe (HttpClient); hot — общий producer (Subject, fromEvent); shareReplay(1) делит cold execution.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "cold/hot из ITLead internal section и follow-up",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "cold",
+              "hot",
+              "HttpClient",
+              "Subject"
+            ],
+            "ask": "почему две подписки на HttpClient дают два запроса и как это исправить"
+          }
+        ],
+        "mustConcepts": [
+          "cold",
+          "hot",
+          "HttpClient",
+          "Subject",
+          "shareReplay",
+          "producer",
+          "подписчик",
+          "fromEvent",
+          "два запроса",
+          "общий producer",
+          "пропуск",
+          "late subscriber",
+          "multicast"
+        ],
+        "falseClaims": [
+          "HttpClient hot по умолчанию",
+          "Subject cold и создаёт producer на каждый subscribe",
+          "shareReplay отменяет необходимость subscribe",
+          "cold Observable делит одного producer между подписчиками"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки RxJS в Angular",
+      "expected": "Кандидат называет: забытая отписка (interval/router); .then на Observable; двойной subscribe на cold HTTP; игнор error в subscribe; fix — shareReplay, subscribe с error, firstValueFrom.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — частые production bugs",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "cleanup_patterns",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "interval",
+              "unsubscribe",
+              "memory leak",
+              "утечк"
+            ],
+            "ask": "почему interval в ngOnInit без отписки — утечка и как исправить"
+          },
+          {
+            "match": [
+              ".then",
+              "firstValueFrom",
+              "TypeError"
+            ],
+            "ask": "почему http.get().then() падает и как правильно получить данные"
+          },
+          {
+            "match": [
+              "shareReplay",
+              "два subscribe",
+              "два запроса"
+            ],
+            "ask": "два subscribe на users$ — сколько HTTP запросов и fix"
+          }
+        ],
+        "mustConcepts": [
+          "unsubscribe",
+          "утечк",
+          "memory leak",
+          "interval",
+          "then",
+          "TypeError",
+          "firstValueFrom",
+          "shareReplay",
+          "два subscribe",
+          "error handler",
+          "subscribe",
+          "destroy",
+          "router.events",
+          "ngOnInit"
+        ],
+        "falseClaims": [
+          "Observable автоматически отписывается при destroy компонента",
+          "http.get().then() работает как у Promise",
+          "два subscribe на cold HttpClient — один запрос",
+          "error в subscribe необязателен — поток продолжит работать"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "cleanup_patterns",
+      "title": "Знает async pipe и takeUntilDestroyed",
+      "expected": "Кандидат описывает: async pipe авто-unsubscribe в шаблоне; takeUntilDestroyed (Angular 16+) для ручных подписок; takeUntil(destroy$) legacy; firstValueFrom для Promise-like await.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Angular 16+ cleanup — стандарт собеседований",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "async pipe",
+              "takeUntilDestroyed"
+            ],
+            "ask": "async pipe vs takeUntilDestroyed — когда что использовать"
+          }
+        ],
+        "mustConcepts": [
+          "async pipe",
+          "takeUntilDestroyed",
+          "Angular 16",
+          "rxjs-interop",
+          "destroy",
+          "unsubscribe",
+          "takeUntil",
+          "destroy$",
+          "ngOnDestroy",
+          "firstValueFrom",
+          "lastValueFrom",
+          "шаблон",
+          "конструктор",
+          "injection context"
+        ],
+        "falseClaims": [
+          "async pipe не отписывается при destroy",
+          "takeUntilDestroyed работает только в ngOnDestroy",
+          "ручной subscribe без cleanup безопасен для router.events",
+          "firstValueFrom ждёт complete всего потока"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда RxJS vs Promise",
+      "expected": "Кандидат называет: combineLatest/merge для нескольких источников; switchMap для отменяемого search; WebSocket/interval; простой one-shot fetch → Promise; без async → обычные функции.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "decision rule when to use из ITLead",
+        "mustConcepts": [
+          "combineLatest",
+          "merge",
+          "switchMap",
+          "search",
+          "WebSocket",
+          "Promise",
+          "one-shot",
+          "отмен",
+          "несколько источников",
+          "plain function"
+        ],
+        "falseClaims": [
+          "RxJS нужен всегда даже для синхронного кода",
+          "Promise лучше для search-as-you-type с отменой",
+          "WebSocket без RxJS проще"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "RxJS — потоки через Observable и операторы в pipe(). Angular в HttpClient, Router и Forms отдаёт Observables. До subscribe() ничего не бежит. async pipe или takeUntilDestroyed() — без утечек. HttpClient cold: два subscribe = два HTTP.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Promise один раз resolve; Observable — 0..N значений, lazy. Поиск: debounceTime + switchMap отменяет старый запрос. router.events — filter NavigationEnd. Ошибку в subscribe не игнорирую. shareReplay(1) если два потребителя одного GET.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "of('Alice').pipe(map, delay) — цепочка без мутации. В шаблоне users$ | async. В сервисе interval(1000).pipe(takeUntilDestroyed()). Простой await — firstValueFrom(http.get(...)).",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "RxJS — это Promise для Angular. HttpClient возвращает Promise, subscribe не нужен. Observable сам отписывается при navigate.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "http.get('/api/users').then(data => ...) — норм. Два subscribe на один users$ — один запрос, HttpClient hot. interval в ngOnInit без cleanup — Angular сам остановит.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Cold и hot одно и то же. Subject создаёт новый HTTP на каждый subscribe. async pipe требует ngOnDestroy с unsubscribe.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "rxjs_observable_basics",
+      "exampleType": "good",
+      "exampleText": "of('Alice').pipe(map, delay) — lazy: лог только после subscribe(). pipe не мутирует source.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "rxjs_observable_basics",
+      "exampleType": "good",
+      "exampleText": "ну observable — поток, subscribe включает producer, операторы в pipe цепочкой",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "rxjs_observable_basics",
+      "exampleType": "bad",
+      "exampleText": "Observable сразу эмитит при создании, subscribe только слушает уже готовые данные.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "promise_vs_observable",
+      "exampleType": "good",
+      "exampleText": "Promise — одно значение; Observable — поток, можно отменить unsubscribe. Несколько async источников — RxJS, один fetch — Promise ok.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "promise_vs_observable",
+      "exampleType": "good",
+      "exampleText": "promise eager после создания, observable lazy до subscribe — главное отличие на собесе",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "promise_vs_observable",
+      "exampleType": "bad",
+      "exampleText": "HttpClient.get возвращает Promise, поэтому .then() правильный способ.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "angular_rxjs_integration",
+      "exampleType": "good",
+      "exampleText": "HttpClient → Observable; router.events + filter NavigationEnd; form.valueChanges + debounceTime; шаблон {{ data$ | async }}.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "angular_rxjs_integration",
+      "exampleType": "good",
+      "exampleText": "angular 16+ rxjs 7.8 в core, ngrx effects на actions$ pipe switchMap",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "angular_rxjs_integration",
+      "exampleType": "bad",
+      "exampleText": "Router и Forms синхронные, RxJS только в HttpClient опционально.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "cold_vs_hot",
+      "exampleType": "good",
+      "exampleText": "HttpClient cold — каждый subscribe новый запрос. Subject hot — один producer. shareReplay(1) шарит результат.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "cold_vs_hot",
+      "exampleType": "good",
+      "exampleText": "fromEvent на input — hot; два http.get без share — два network call",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "cold_vs_hot",
+      "exampleType": "bad",
+      "exampleText": "HttpClient hot по умолчанию, второй subscribe получает кеш без нового запроса.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "interval в ngOnInit без отписки — leak; fix takeUntilDestroyed или async pipe. http.get().then — TypeError. Два subscribe — shareReplay(1).",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "subscribe без error — поток умирает молча; всегда next + error или catchError в pipe",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Два subscribe на users$ — один HTTP, Observable multicast из коробки.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "cleanup_patterns",
+      "exampleType": "good",
+      "exampleText": "Шаблон: count$ | async — авто-unsubscribe. Класс: readonly count$ = interval(1000).pipe(takeUntilDestroyed()).",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "cleanup_patterns",
+      "exampleType": "good",
+      "exampleText": "legacy destroy$ + takeUntil в ngOnDestroy; await — firstValueFrom(obs$)",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "cleanup_patterns",
+      "exampleType": "bad",
+      "exampleText": "takeUntilDestroyed только в ngOnDestroy, в конструкторе не работает.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Search + cancel → switchMap; HTTP + clicks → combineLatest; one GET без трансформаций → Promise/firstValueFrom.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "websocket interval — rxjs + takeUntilDestroyed; синхронная математика — просто функция",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "RxJS обязателен для любого async, Promise в Angular deprecated.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "what-is-rxjs-and-how-is-it-integrated-in-angular",
+    "apiUrl": "https://api.itlead.org/api/questions/what-is-rxjs-and-how-is-it-integrated-in-angular",
+    "pageUrl": "https://itlead.org/interview-questions/angular/what-is-rxjs-and-how-is-it-integrated-in-angular",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is RxJS and how is it integrated in Angular?",
+    "categorySlug": "angular",
+    "syncedAt": "2026-06-18T21:30:00.000Z"
+  }
+}

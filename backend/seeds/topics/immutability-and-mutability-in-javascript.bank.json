@@ -1,0 +1,567 @@
+{
+  "topic": {
+    "code": "immutability_and_mutability_in_javascript",
+    "name": "Иммутабельность и мутабельность в JavaScript",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Чем отличаются мутабельность и иммутабельность в JavaScript и когда что использовать?",
+    "shortAnswer": "Мутабельность — изменение объекта in-place: все ссылки на тот же объект видят изменение. Иммутабельность — каждое изменение создаёт новый объект, оригинал не трогается. Для shared state в React и Redux нужна иммутабельность: React сравнивает ссылки (`===`), мутация того же объекта не вызовет re-render. `const` не делает значение immutable.",
+    "idealAnswer": "В JavaScript объекты и массивы — reference types: переменная хранит ссылку на heap, а не копию данных. Мутабельная операция (`obj.name = 'Bob'`, `arr.push(2)`) перезаписывает данные в общем слоте памяти — все переменные с той же ссылкой видят изменение. Иммутабельная операция (`{ ...obj, name: 'Bob' }`, `[...arr, 2]`) выделяет новый объект и shallow-копирует own properties; оригинальная ссылка изолирована, но вложенные объекты могут оставаться общими. Для React props/useState и Redux store — иммутабельность обязательна: reconciler сравнивает ссылки; `todos[0].done = true; setTodos(todos)` не обновит UI. Правильно: `setTodos(todos.map(...))` или `setState({ ...prev, name })`. Redux Toolkit и Immer дают синтаксис мутаций на draft, но наружу уходит immutable patch со structural sharing. Spread и Object.assign — только shallow copy; nested mutation через `{ ...state }` — частая ловушка; для deep copy — `structuredClone` (Node 17+, Chrome 98+), `_.cloneDeep`, или копировать путь вручную `{ ...obj, scores: [...obj.scores, 30] }`. `const` блокирует перепризначение binding, не мутацию (`arr.push` работает). `Object.freeze` — shallow read-only один уровень, не заменяет immutable update patterns. Когда mutable: private локальные данные, tight loops, buffers. Когда immutable: shared UI state, pure functions, memoization. Performance: shallow copy O(n) по числу свойств; Immer копирует только изменённый path O(depth). Ошибки: мутировать аргументы функций (ломает React.memo/selectors); считать JSON.parse/stringify универсальным deep clone (теряет Date, functions, circular refs).",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "mutable_vs_immutable",
+      "title": "Отличает мутабельность от иммутабельности",
+      "expected": "Кандидат объясняет: мутация меняет объект in-place и затрагивает все ссылки; иммутабельное обновление создаёт новый объект, оригинал остаётся неизменным; spread/shallow copy на верхнем уровне.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — in-place vs новый объект",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "spread",
+              "мута",
+              "in-place"
+            ],
+            "ask": "чем `user.name = 'Bob'` отличается от `{ ...user, name: 'Bob' }` для всех ссылок на объект"
+          }
+        ],
+        "mustConcepts": [
+          "мутаб",
+          "immutab",
+          "immutable",
+          "in-place",
+          "на месте",
+          "новый объект",
+          "spread",
+          "оригинал",
+          "неизмен",
+          "копия",
+          "ссылк",
+          "reference",
+          "shared",
+          "общ",
+          "изолир"
+        ],
+        "falseClaims": [
+          "immutability и mutation — одно и то же для объектов",
+          "spread всегда делает deep copy",
+          "const делает объект immutable",
+          "иммутабельность не создаёт новый объект в памяти"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "reference_types_shared",
+      "title": "Понимает reference types и общие ссылки",
+      "expected": "Кандидат объясняет: объекты/массивы — ссылки на heap; `const b = a; a.push(2)` изменит и `b`; мутация затрагивает всех, кто держит ту же ссылку.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "reference model — база для всех gotcha",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "mutable_vs_immutable",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "push",
+              "const a",
+              "const b"
+            ],
+            "ask": "что выведет `const a = [1]; const b = a; a.push(2); console.log(b)` и почему"
+          }
+        ],
+        "mustConcepts": [
+          "reference",
+          "ссылк",
+          "heap",
+          "памят",
+          "общ",
+          "shared",
+          "push",
+          "массив",
+          "объект",
+          "ref",
+          "указ",
+          "та же ссылка",
+          "все ссылки",
+          "reference type"
+        ],
+        "falseClaims": [
+          "присвоение объекта создаёт глубокую копию",
+          "const b = a создаёт независимый массив",
+          "изменение через одну переменную не видно через другую ссылку",
+          "примитивы и объекты одинаково копируются при присвоении"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "react_state_immutability",
+      "title": "Понимает immutability в React state",
+      "expected": "Кандидат объясняет: React сравнивает state по ссылке (`===`); прямая мутация + setState с тем же ref не вызывает re-render; правильно — map/spread для нового массива/объекта.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "главный production-кейс из ITLead React todos",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "setTodos",
+              "re-render",
+              "==="
+            ],
+            "ask": "почему `todos[0].done = true; setTodos(todos)` не обновляет UI"
+          },
+          {
+            "match": [
+              "map",
+              "spread",
+              "useState"
+            ],
+            "ask": "как правильно пометить todo done через immutable update"
+          }
+        ],
+        "mustConcepts": [
+          "React",
+          "re-render",
+          "render",
+          "useState",
+          "setState",
+          "setTodos",
+          "reference",
+          "===",
+          "shallow",
+          "поверхност",
+          "map",
+          "spread",
+          "новый массив",
+          "новый объект",
+          "reconciler",
+          "тот же ref",
+          "stale UI"
+        ],
+        "falseClaims": [
+          "React сравнивает state deep equality по содержимому",
+          "мутация объекта в state всегда вызывает re-render",
+          "setState с тем же массивом после push обновит UI",
+          "React выдаёт warning при каждой мутации state"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "shallow_deep_copy",
+      "title": "Знает shallow vs deep copy",
+      "expected": "Кандидат объясняет: spread/Object.assign — shallow; nested объекты остаются общими; `copy.scores.push` мутирует original; structuredClone/cloneDeep для deep; JSON.parse/stringify с ограничениями.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "самая частая ловушка при переходе на React",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "shallow_deep_copy",
+            "oftenConfusedWith": [
+              "mutable_vs_immutable"
+            ],
+            "anchorTermsExpected": [
+              "shallow",
+              "deep",
+              "nested",
+              "structuredClone",
+              "spread"
+            ],
+            "anchorTermsWrongTopic": [
+              "spread всегда deep",
+              "Object.assign deep clone"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "scores.push",
+              "nested",
+              "spread"
+            ],
+            "ask": "почему `{ ...original }` не защищает nested массив от мутации"
+          },
+          {
+            "match": [
+              "structuredClone",
+              "JSON.stringify"
+            ],
+            "ask": "когда structuredClone лучше JSON.parse(JSON.stringify(x))"
+          }
+        ],
+        "mustConcepts": [
+          "shallow",
+          "deep",
+          "поверхност",
+          "глубок",
+          "nested",
+          "вложен",
+          "spread",
+          "Object.assign",
+          "structuredClone",
+          "cloneDeep",
+          "lodash",
+          "JSON.parse",
+          "JSON.stringify",
+          "scores.push",
+          "общая ссылка",
+          "copy",
+          "копир"
+        ],
+        "falseClaims": [
+          "spread копирует nested arrays и объекты рекурсивно",
+          "Object.assign делает deep clone",
+          "JSON.parse/stringify корректно клонирует Date и circular refs",
+          "shallow copy изолирует все уровни вложенности"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Выбирает mutable vs immutable",
+      "expected": "Кандидат называет: shared UI state/props/Redux — immutable; private локальные переменные и performance-critical loops/buffers — mutable; pure functions и memo — immutable.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "when to use table из ITLead",
+        "mustConcepts": [
+          "shared state",
+          "общий",
+          "React props",
+          "Redux",
+          "store",
+          "performance",
+          "loop",
+          "buffer",
+          "private",
+          "локальн",
+          "pure function",
+          "чист",
+          "memo",
+          "мемо",
+          "time-travel",
+          "predictable",
+          "tight loop",
+          "single-owner",
+          "side effect isolated",
+          "Redux Toolkit Immer",
+          "structural sharing"
+        ],
+        "falseClaims": [
+          "всегда нужна immutability даже в локальном for-цикле",
+          "mutable всегда быстрее и лучше для React state",
+          "Redux store можно безопасно мутировать напрямую",
+          "immutability не влияет на debugging и history"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "const_freeze_immer",
+      "title": "Понимает const, Object.freeze и Immer",
+      "expected": "Кандидат объясняет: const блокирует reassignment, не mutation; Object.freeze — shallow read-only; Immer/RTK produce draft → immutable patch со structural sharing O(depth).",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "const mistake + Immer/RTK из ITLead real-world",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Object.freeze",
+              "const"
+            ],
+            "ask": "чем const отличается от Object.freeze и от настоящей immutability в Redux"
+          },
+          {
+            "match": [
+              "Immer",
+              "produce",
+              "structural sharing"
+            ],
+            "ask": "как Immer даёт синтаксис мутации, но immutable результат"
+          }
+        ],
+        "mustConcepts": [
+          "const",
+          "reassign",
+          "переприсво",
+          "push",
+          "Object.freeze",
+          "read-only",
+          "shallow",
+          "strict mode",
+          "Immer",
+          "produce",
+          "draft",
+          "proxy",
+          "RTK",
+          "createSlice",
+          "structural sharing",
+          "Redux Toolkit"
+        ],
+        "falseClaims": [
+          "const arr запрещает arr.push",
+          "Object.freeze делает nested объекты immutable",
+          "Immer мутирует store напрямую без нового state",
+          "freeze заменяет immutable update в React"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки и чистые функции",
+      "expected": "Кандидат называет: mutate function args (impure); mutate Redux/React state; ожидать deep copy от spread/assign; ломать React.memo/selectors; правильно — return new array/object.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "bonus pitfalls — mutate args, memo cache",
+        "mustConcepts": [
+          "mutate",
+          "аргумент",
+          "impure",
+          "нечист",
+          "React.memo",
+          "selector",
+          "memo",
+          "кеш",
+          "return",
+          "новый массив",
+          "list.push",
+          "addItem",
+          "iptables UDP 443",
+          "Wireshark quic filter",
+          "load test h2 fallback",
+          "Cloudflare 0-RTT GET"
+        ],
+        "falseClaims": [
+          "можно мутировать входной массив в utility без последствий",
+          "mutation input не ломает memoization",
+          "spread один раз защищает от всех nested мутаций навсегда",
+          "QUIC всегда быстрее на LAN",
+          "HPACK на h3 сервере ок"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Мутабельно: `mutableUser.name = 'Bob'` — все ссылки видят Bob. Иммутабельно: `{ ...user, name: 'Bob' }` — оригинал Alice, новый объект для обновления. В React state всегда возвращаю новую ссылку, иначе reconciler пропустит re-render.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Spread — shallow: `{ ...original }` не копирует nested массив. Безопасно: `{ ...original, scores: [...original.scores, 30] }`. Для полного deep clone — structuredClone. Redux Toolkit с Immer: пишу draft мутацией, наружу immutable patch.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Shared props/store — immutable. Локальный счётчик в tight loop — mutable, копии не нужны. const не спасает: arr.push ок. Object.freeze только один уровень, nested всё ещё mutable.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "const делает объект immutable. Spread — deep clone. React сравнивает содержимое объектов, не ссылки. Можно todos[0].done = true и setTodos(todos) — UI обновится.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "JSON.parse(JSON.stringify(x)) — лучший универсальный clone для Date, Map и circular refs. Object.assign делает deep copy nested state.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В Redux можно напрямую store.items.push(newItem) — RTK сам разрулит. Мутировать аргументы helper-функций безопасно для React.memo.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "mutable_vs_immutable",
+      "exampleType": "good",
+      "exampleText": "Мутация in-place — общая доска: ref.name тоже Bob. Spread — новая копия верхнего уровня, immutableUser.name остаётся Alice.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "mutable_vs_immutable",
+      "exampleType": "good",
+      "exampleText": "ну mutable — меняешь объект напрямую, все refs видят; immutable — {...obj} новый адрес в памяти",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "mutable_vs_immutable",
+      "exampleType": "bad",
+      "exampleText": "Immutability и mutation в JS одинаковы — объект всё равно меняется in-place при spread.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "reference_types_shared",
+      "exampleType": "good",
+      "exampleText": "const a = [1]; const b = a; a.push(2) → b тоже [1,2], потому что одна ссылка на heap.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "reference_types_shared",
+      "exampleType": "good",
+      "exampleText": "объекты reference type — присвоение копирует ссылку, не данные; мутация через любую переменную общая",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "reference_types_shared",
+      "exampleType": "bad",
+      "exampleText": "const b = a создаёт независимую копию массива, push в a не затронет b.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "react_state_immutability",
+      "exampleType": "good",
+      "exampleText": "todos[0].done=true; setTodos(todos) — тот же ref, React skip render. Правильно: setTodos(todos.map(t => t.id===1 ? {...t, done:true} : t)).",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "react_state_immutability",
+      "exampleType": "good",
+      "exampleText": "React сравнивает === по state ref — без нового массива/объекта UI stale, ошибок может не быть",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "react_state_immutability",
+      "exampleType": "bad",
+      "exampleText": "React всегда deep compare todos и перерисует при изменении поля done in-place.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "shallow_deep_copy",
+      "exampleType": "good",
+      "exampleText": "copy = {...original}; copy.scores.push(30) мутирует original.scores — nested shared. Fix: scores: [...original.scores, 30].",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "shallow_deep_copy",
+      "exampleType": "good",
+      "exampleText": "structuredClone(state) — deep copy Date/Map/Set; JSON.stringify теряет undefined и ломается на circular",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "shallow_deep_copy",
+      "exampleType": "bad",
+      "exampleText": "Spread делает полную deep copy всех nested объектов автоматически.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "useState props Redux — immutable updates. Внутренний for с temp buffer — mutate ok. Pure utils для memo — не мутировать input.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "redux time-travel и predictable history — только при immutable reducer output",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "В React всегда mutate state in-place — так быстрее и reconciler всё равно обновит.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "const_freeze_immer",
+      "exampleType": "good",
+      "exampleText": "const arr = [1,2]; arr.push(3) работает — блокируется только arr = []. Object.freeze shallow, nested mutable.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "const_freeze_immer",
+      "exampleType": "good",
+      "exampleText": "Immer produce: пишу state.user.name='Bob' на draft, commit — новый immutable root со structural sharing",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "const_freeze_immer",
+      "exampleType": "bad",
+      "exampleText": "Object.freeze делает весь nested Redux state read-only навсегда без новых объектов.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "addItem: return [...list, item], не list.push(item) — иначе impure и memo cache сломан.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Object.assign({}, state) — та же shallow ловушка что spread; nested arr.push бьёт original",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Мутировать аргументы массива в селекторе Redux — нормальная практика для performance.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "immutability-and-mutability-in-javascript",
+    "apiUrl": "https://api.itlead.org/api/questions/immutability-and-mutability-in-javascript",
+    "pageUrl": "https://itlead.org/interview-questions/general/immutability-and-mutability-in-javascript",
+    "difficulty": "MIDDLE",
+    "titleEn": "Immutability and mutability in JavaScript",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

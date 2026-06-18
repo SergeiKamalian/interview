@@ -1,0 +1,558 @@
+{
+  "topic": {
+    "code": "rest_api_design_principles",
+    "name": "Принципы проектирования REST API",
+    "skillCode": "architecture",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Какие принципы и лучшие практики при проектировании REST API вы знаете?",
+    "shortAnswer": "REST API представляет данные как ресурсы по предсказуемым URL с существительными во множественном числе (`/users/123`), а действия задаются HTTP-методами: GET читает, POST создаёт, PUT/PATCH обновляет, DELETE удаляет. Каждый запрос stateless — полный контекст в заголовках и теле, без серверных сессий. POST возвращает 201 с Location, DELETE — 204 без тела; списки обязательно пагинируют.",
+    "idealAnswer": "REST API — набор соглашений для веб-сервисов: данные как адресуемые ресурсы по предсказуемым URL, HTTP-методы определяют действие. Главное правило: существительные во множественном числе в путях (`/users`), глаголы через HTTP (`GET` список, `POST` создание, `DELETE` удаление). `GET /users/123` читает пользователя, `DELETE /users/123` удаляет — URL не меняется, меняется только метод. RPC-стиль (`/getUserById`, `/createUser`) ломает кеширование CDN и reverse proxy, которые принимают решения по методу без разбора семантики URL. REST stateless: каждый запрос несёт полный контекст — JWT в `Authorization: Bearer`, фильтры в query, тело в JSON; серверные сессии нарушают stateless и усложняют горизонтальное масштабирование. CRUD и статус-коды: GET → 200 или 404; POST → 201 Created + заголовок Location на новый ресурс; PUT/PATCH → 200 с телом или 204; DELETE → 204 No Content без тела. PUT полностью заменяет ресурс — `{ name: 'Bob' }` на PUT может стереть email; PATCH — частичное обновление (Object.assign или JSON Patch RFC 6902). Типичные ошибки: глагольные пути `/getAllUsers`; единственное число `/user` (неясно POST /user — создать или текущий?); 200 вместо 201 при создании; списки без pagination (`?page=1&limit=20`) — падают под нагрузкой; серверные сессии вместо JWT. Списки: `{ data: [], pagination: { page, limit, total, pages } }`, опциональная фильтрация через query — как Stripe/GitHub. GET кешируется через ETag/Last-Modified: клиент шлёт If-None-Match → 304 Not Modified без тела. Когда REST: публичные API, CRUD, кешируемость; GraphQL — гибкий выбор полей; WebSockets/SSE — push. Версионирование: URL `/api/v1/users` проще для proxy; header `Accept: application/vnd.myapi.v2+json` чище, но сложнее в браузере. HATEOAS `_links` (GitHub) — клиент навигирует без hardcode URL. Примеры: Stripe cursor pagination + idempotency keys; GitHub `_links`; senior design блога: GET /posts?page&search, POST /posts 201, GET /posts/:id/comments, Bearer JWT, X-RateLimit-* headers.",
+    "maxScore": 10,
+    "skills": [
+      "architecture",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "rest_resources_nouns",
+      "title": "Понимает ресурсы, существительные и HTTP-методы",
+      "expected": "Кандидат объясняет: данные как ресурсы по URL; существительные во множественном числе (`/users`); действия через HTTP-методы; stateless — каждый запрос автономен.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — nouns in paths, verbs via HTTP, stateless",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "rest_resources_nouns",
+            "oftenConfusedWith": [
+              "rest_vs_rpc",
+              "http_methods_status_codes"
+            ],
+            "anchorTermsExpected": [
+              "ресурс",
+              "существительн",
+              "множественн",
+              "/users",
+              "GET",
+              "POST",
+              "stateless",
+              "HTTP-метод"
+            ],
+            "anchorTermsWrongTopic": [
+              "/getUsers",
+              "REST это SOAP",
+              "GraphQL заменяет REST полностью"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "REST",
+              "ресурс",
+              "/users"
+            ],
+            "ask": "чем URL ресурса отличается от RPC-пути и как HTTP-метод задаёт действие"
+          }
+        ],
+        "mustConcepts": [
+          "REST",
+          "ресурс",
+          "URL",
+          "существительн",
+          "множественн",
+          "/users",
+          "GET",
+          "POST",
+          "DELETE",
+          "HTTP-метод",
+          "stateless",
+          "без состоян",
+          "автономн",
+          "контекст в запросе",
+          "предсказуем"
+        ],
+        "falseClaims": [
+          "в REST глаголы пишут в URL (/createUser)",
+          "REST требует серверных сессий",
+          "GET /users/123 и DELETE /users/123 — разные URL для одного ресурса",
+          "REST и HTTP — разные протоколы",
+          "stateless значит без авторизации"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "rest_vs_rpc",
+      "title": "Отличает REST от RPC-стиля",
+      "expected": "Кандидат сравнивает: RPC — `/getUserById`, `/createUser`; REST — URL как существительное, метод как глагол; CDN/proxy кешируют по методу без парсинга URL.",
+      "score": 1.0,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Key difference from RPC из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "rest_resources_nouns",
+            "floorFraction": 0.45
+          }
+        ],
+        "mustConcepts": [
+          "RPC",
+          "REST",
+          "/getUserById",
+          "/createUser",
+          "существительное",
+          "глагол",
+          "HTTP-метод",
+          "CDN",
+          "кеш",
+          "reverse proxy",
+          "семантик URL",
+          "разделение"
+        ],
+        "falseClaims": [
+          "RPC и REST дают одинаковую кешируемость GET",
+          "REST запрещает POST",
+          "RPC всегда быстрее REST",
+          "REST — это только JSON over HTTP без соглашений"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "http_methods_status_codes",
+      "title": "Знает HTTP-методы и статус-коды CRUD",
+      "expected": "Кандидат называет: GET 200/404; POST 201 + Location; PUT/PATCH 200 или 204; DELETE 204; понимает зачем клиентам и CDN правильные коды.",
+      "score": 2.0,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "статус-коды — частая middle+ ошибка и ожидание HTTP-клиентов",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "201",
+              "POST",
+              "Location"
+            ],
+            "ask": "что вернуть при POST /users и зачем заголовок Location"
+          },
+          {
+            "match": [
+              "204",
+              "DELETE"
+            ],
+            "ask": "почему DELETE возвращает 204 без тела"
+          },
+          {
+            "match": [
+              "ETag",
+              "304",
+              "If-None-Match"
+            ],
+            "ask": "как работает условный GET с ETag и 304 Not Modified"
+          }
+        ],
+        "mustConcepts": [
+          "GET",
+          "POST",
+          "PUT",
+          "PATCH",
+          "DELETE",
+          "200",
+          "201",
+          "204",
+          "404",
+          "304",
+          "Location",
+          "Created",
+          "No Content",
+          "Not Found",
+          "Not Modified",
+          "ETag",
+          "If-None-Match",
+          "CRUD"
+        ],
+        "falseClaims": [
+          "POST при создании должен возвращать 200",
+          "DELETE должен возвращать 200 с телом удалённого объекта всегда",
+          "404 только для GET, не для PATCH",
+          "304 возвращает полное тело ответа",
+          "статус-коды опциональны если есть JSON error"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "put_vs_patch",
+      "title": "Различает PUT и PATCH",
+      "expected": "Кандидат объясняет: PUT — полная замена ресурса; PATCH — частичное обновление; риск потери полей при PUT; JSON Patch (RFC 6902) как явные операции.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes PUT/PATCH из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "PUT",
+              "PATCH",
+              "частичн"
+            ],
+            "ask": "что произойдёт с email при PUT /users/1 с телом только { name: 'Bob' }"
+          },
+          {
+            "match": [
+              "JSON Patch",
+              "RFC 6902",
+              "op replace"
+            ],
+            "ask": "чем JSON Patch отличается от отправки частичного объекта"
+          }
+        ],
+        "mustConcepts": [
+          "PUT",
+          "PATCH",
+          "полная замена",
+          "частичн",
+          "partial update",
+          "Object.assign",
+          "merge",
+          "email пропад",
+          "JSON Patch",
+          "RFC 6902",
+          "op replace",
+          "GitHub PATCH"
+        ],
+        "falseClaims": [
+          "PUT и PATCH всегда делают одно и то же",
+          "PATCH обязан заменять весь ресурс",
+          "PUT безопасен для частичного обновления одного поля",
+          "PATCH не стандартизирован в HTTP"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "stateless_auth",
+      "title": "Понимает stateless и авторизацию",
+      "expected": "Кандидат объясняет: без серверных сессий; JWT в Authorization Bearer; каждый запрос самодостаточен; сессии мешают масштабированию.",
+      "score": 1.0,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "stateless + JWT из ITLead Common mistakes",
+        "mustConcepts": [
+          "stateless",
+          "JWT",
+          "Authorization",
+          "Bearer",
+          "токен",
+          "без сесс",
+          "серверн сесс",
+          "горизонтальн",
+          "масштаб",
+          "контекст в заголовке",
+          "cookie session"
+        ],
+        "falseClaims": [
+          "REST требует sticky sessions на балансировщике",
+          "JWT нельзя использовать в REST",
+          "stateless API хранит user state на сервере между запросами",
+          "Authorization header только для Basic auth"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки REST",
+      "expected": "Кандидат называет: verb paths; singular nouns; 200 вместо 201; списки без pagination; серверные сессии; DELETE через GET.",
+      "score": 2.0,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "/getUsers",
+              "глагол",
+              "verb"
+            ],
+            "ask": "почему /getAllUsers хуже /users для GET списка"
+          },
+          {
+            "match": [
+              "/user",
+              "единственн",
+              "singular"
+            ],
+            "ask": "почему POST /user создаёт неоднозначность"
+          }
+        ],
+        "mustConcepts": [
+          "/getUsers",
+          "/getAllUsers",
+          "/deleteUser",
+          "глагольн",
+          "verb path",
+          "/user",
+          "единственн",
+          "singular",
+          "200 вместо 201",
+          "без pagination",
+          "сессия на сервере",
+          "GET для delete",
+          "неправильн статус"
+        ],
+        "falseClaims": [
+          "/getUsers — нормальный REST endpoint",
+          "POST /user понятнее чем POST /users",
+          "201 и 200 для create — без разницы для клиентов",
+          "pagination нужна только если записей больше миллиона",
+          "DELETE через GET допустим если id в query"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "pagination_filtering",
+      "title": "Понимает пагинацию и фильтрацию списков",
+      "expected": "Кандидат описывает: `?page=1&limit=20`; обёртка `{ data, pagination }`; фильтры в query; cursor pagination (Stripe) как альтернатива offset.",
+      "score": 1.0,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Pagination pattern из ITLead Examples + real-world Stripe/GitHub",
+        "mustConcepts": [
+          "pagination",
+          "пагинац",
+          "page",
+          "limit",
+          "query param",
+          "data",
+          "total",
+          "pages",
+          "фильтр",
+          "filter",
+          "неограниченн список",
+          "LIMIT",
+          "cursor",
+          "Stripe",
+          "metadata"
+        ],
+        "falseClaims": [
+          "GET /users может возвращать все записи без limit",
+          "pagination только на frontend",
+          "фильтры должны быть в path /users/name/Alice",
+          "offset pagination всегда лучше cursor для любых данных"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "REST: `/users` — коллекция, `/users/123` — ресурс. GET читает, POST создаёт с 201 и Location, DELETE — 204. Запросы stateless: JWT в Authorization. Списки с ?page=1&limit=20, не отдаю всю таблицу. PATCH для частичных правок, PUT — только когда заменяю объект целиком.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Публичный API делаю REST — предсказуемо, CDN кеширует GET по ETag. Внутренний сервис с гибкими полями — GraphQL. RPC-пути типа /createOrder избегаю: ломают кеш и семантику HTTP. При POST /users — 201, Location /users/{id}, не 200.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну rest — существительные в url, методы http. post 201 location, delete 204. без серверных сессий, bearer jwt. списки пагинирую page limit",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "REST — это когда все endpoints начинаются с /api/getSomething. POST создаёт — возвращаю 200 OK с телом. Сессию храню на сервере, так проще авторизация.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "PUT и PATCH одно и то же — шлёшь { name: 'Bob' } и всё обновляется без потери полей. GET /users отдаёт все 500k записей — клиент сам разберётся.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "DELETE делаю через GET /deleteUser?id=123 — так проще тестировать в браузере. Единственное число /user правильнее чем /users.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "rest_resources_nouns",
+      "exampleType": "good",
+      "exampleText": "Данные как ресурсы: /users/123. GET читает, DELETE удаляет — один URL, разные методы. Stateless: токен в каждом запросе.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "rest_resources_nouns",
+      "exampleType": "good",
+      "exampleText": "rest — url это сущность, не действие. get post delete через http, без state на сервере",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "rest_resources_nouns",
+      "exampleType": "bad",
+      "exampleText": "REST endpoint: POST /createUser и GET /getUserById/123 — классика.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "rest_vs_rpc",
+      "exampleType": "good",
+      "exampleText": "RPC: /getUserById — intent в URL; REST: /users/123 + GET — CDN кеширует по методу без парсинга path.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "rest_vs_rpc",
+      "exampleType": "good",
+      "exampleText": "rpc пути с глаголами ломают кеш, rest разделяет noun и verb",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "rest_vs_rpc",
+      "exampleType": "bad",
+      "exampleText": "RPC и REST одинаково кешируются — CDN смотрит только на URL, метод не важен.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "http_methods_status_codes",
+      "exampleType": "good",
+      "exampleText": "POST /users → 201 Created, Location: /users/2. DELETE /users/1 → 204 без body. GET с ETag → клиент шлёт If-None-Match → 304 если не изменилось.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "http_methods_status_codes",
+      "exampleType": "good",
+      "exampleText": "create — 201 location, delete — 204, not found — 404. etag + 304 экономит трафик",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "http_methods_status_codes",
+      "exampleType": "bad",
+      "exampleText": "POST создаёт пользователя — возвращаю 200 с JSON, Location не нужен. DELETE всегда 200 с deleted: true.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "put_vs_patch",
+      "exampleType": "good",
+      "exampleText": "PATCH /users/1 { name: 'Bob' } — merge, email остаётся. PUT заменяет весь объект — без email в теле поле пропадёт.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "put_vs_patch",
+      "exampleType": "good",
+      "exampleText": "для редактирования одного поля — patch или json patch rfc6902, put только full replace",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "put_vs_patch",
+      "exampleType": "bad",
+      "exampleText": "PUT и PATCH — синонимы, можно слать одно поле на PUT без риска.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "stateless_auth",
+      "exampleType": "good",
+      "exampleText": "Без server-side session: Authorization: Bearer <jwt>. Любой инстанс API валидирует токен — горизонтальное масштабирование без sticky.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "stateless_auth",
+      "exampleType": "good",
+      "exampleText": "stateless — каждый запрос с bearer, не храню сессию в памяти node",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "stateless_auth",
+      "exampleType": "bad",
+      "exampleText": "REST API держит sessionId в Redis между запросами — это нормальный RESTful подход.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Избегаю /getAllUsers, /user singular, 200 на create, unbounded GET /orders. DELETE только DELETE method, не GET.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "видел баг: get /orders без limit упал в понедельник — с тех пор page limit по умолчанию",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "GET /deleteUser/:id — удобно для QA в браузере, REST это не запрещает.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "pagination_filtering",
+      "exampleType": "good",
+      "exampleText": "GET /users?page=1&limit=20&name=Alice → { data: [...], pagination: { total, pages } }. Stripe-style cursor для больших таблиц.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "pagination_filtering",
+      "exampleType": "good",
+      "exampleText": "списки всегда с limit, фильтры в query, не в path",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "pagination_filtering",
+      "exampleType": "bad",
+      "exampleText": "Pagination добавлю когда пользователей станет много — пока GET /users возвращает весь массив.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "rest-api-design-principles",
+    "apiUrl": "https://api.itlead.org/api/questions/rest-api-design-principles",
+    "pageUrl": "https://itlead.org/interview-questions/architecture/rest-api-design-principles",
+    "difficulty": "MIDDLE",
+    "titleEn": "REST API design principles and best practices?",
+    "categorySlug": "architecture",
+    "syncedAt": "2026-06-18T15:00:00.000Z"
+  }
+}

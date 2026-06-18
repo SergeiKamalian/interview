@@ -1,0 +1,652 @@
+{
+  "topic": {
+    "code": "modern_browser_architecture_processes_and_threads",
+    "name": "Архитектура современного браузера: процессы и потоки",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как устроена архитектура современного браузера: процессы и потоки?",
+    "shortAnswer": "Современный браузер — multi-process система: browser process координирует renderer (один на site/origin), GPU process и network process. Внутри renderer main thread выполняет JS и DOM, compositor thread обрабатывает анимации на 60fps. Блокировка main thread останавливает только этот таб; тяжёлые вычисления — в Web Worker.",
+    "idealAnswer": "Chrome с 2008 года — multi-process: browser process (координатор, UI, permissions, lifecycle), renderer process на site/tab (Blink + V8, sandbox, без прямого disk/network — всё через IPC Mojo), GPU process (композитинг слоёв от всех renderer), network process (с Chrome 88 — HTTP, DNS, TLS, cookies, CORS изолированно). Single-process эра (IE6): один crash убивает всё; сейчас crash изолирован в renderer. Site Isolation (Chrome 67+): каждый origin в своём renderer — ответ на Spectre/Meltdown. Потоки в renderer: main thread (JS, DOM, layout, paint), compositor thread (scroll, transform/opacity анимации), raster threads, Web Workers (отдельный поток, тот же process). Pipeline открытия таба: URL → network process → выбор renderer (новый для cross-site, существующий для same-site) → Blink paint commands → compositor layers → GPU via Mojo. V8: один heap на renderer; два таба google.com могут делить renderer, но JS-контексты изолированы. Trade-off изоляции: ~100MB overhead на renderer; при memory pressure Chrome сливает same-site табы и отбрасывает background renderer («Aw, Snap!»). Паттерны: тяжёлый JS → Web Worker; плавные анимации → transform/opacity (compositor, не main); cross-tab → BroadcastChannel/postMessage через browser IPC (копия, не shared memory); SharedArrayBuffer требует COOP/COEP. Ошибки: while(true) на main; анимация width/left вместо transform; SAB без заголовков; console.log только per-renderer — для cross-process chrome://tracing. Firefox e10s (до 8 content processes), Safari WebKit2 — partial Site Isolation. Service Worker — отдельный поток в renderer, fetch идёт через network process даже когда renderer inactive.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "process_map",
+      "title": "Знает карту процессов браузера",
+      "expected": "Кандидат перечисляет browser, renderer, GPU, network process и их роли: координатор, контент страницы, графика, сеть; sandbox renderer и IPC через Mojo.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — четыре ключевые OS-процессы из ITLead process map",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "process_map",
+            "oftenConfusedWith": [
+              "threads_in_renderer"
+            ],
+            "anchorTermsExpected": [
+              "browser process",
+              "renderer",
+              "GPU",
+              "network process",
+              "sandbox",
+              "IPC",
+              "Mojo"
+            ],
+            "anchorTermsWrongTopic": [
+              "main thread это process",
+              "Worker отдельный OS process"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "renderer",
+              "GPU",
+              "network"
+            ],
+            "ask": "какие процессы запускает browser process и за что каждый отвечает"
+          },
+          {
+            "match": [
+              "sandbox",
+              "IPC",
+              "Mojo"
+            ],
+            "ask": "почему renderer не может напрямую читать диск или открывать сеть"
+          }
+        ],
+        "mustConcepts": [
+          "browser process",
+          "renderer process",
+          "GPU process",
+          "network process",
+          "координатор",
+          "sandbox",
+          "IPC",
+          "Mojo",
+          "Site Isolation",
+          "origin",
+          "изолирован",
+          "Chrome 88",
+          "HTTP",
+          "TLS",
+          "cookies",
+          "CORS",
+          "spawn",
+          "lifecycle",
+          "address bar",
+          "permissions"
+        ],
+        "falseClaims": [
+          "все вкладки в одном renderer process",
+          "renderer напрямую открывает сетевые соединения",
+          "network stack всегда живёт в browser process",
+          "GPU process выполняет JavaScript",
+          "browser process рендерит HTML страницы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "threads_in_renderer",
+      "title": "Понимает потоки внутри renderer",
+      "expected": "Кандидат объясняет: main thread — JS/DOM/layout; compositor — scroll и transform/opacity на 60fps; raster threads; Web Worker — отдельный поток в том же process; Service Worker — отдельный поток в renderer.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR — main vs compositor vs workers",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "process_map",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "threads_in_renderer",
+            "oftenConfusedWith": [
+              "process_map",
+              "performance_patterns"
+            ],
+            "anchorTermsExpected": [
+              "main thread",
+              "compositor",
+              "Web Worker",
+              "60fps",
+              "transform",
+              "opacity"
+            ],
+            "anchorTermsWrongTopic": [
+              "Worker это OS process",
+              "compositor выполняет V8"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "main thread",
+              "compositor"
+            ],
+            "ask": "чем main thread отличается от compositor thread и что блокируется при stall main"
+          },
+          {
+            "match": [
+              "Web Worker",
+              "worker"
+            ],
+            "ask": "Worker — отдельный process или поток; где он живёт"
+          }
+        ],
+        "mustConcepts": [
+          "main thread",
+          "compositor thread",
+          "raster",
+          "Web Worker",
+          "worker thread",
+          "60fps",
+          "transform",
+          "opacity",
+          "Service Worker",
+          "V8",
+          "Blink",
+          "JS",
+          "DOM",
+          "layout",
+          "paint",
+          "scroll",
+          "блокиров",
+          "stall",
+          "отдельный поток",
+          "тот же renderer"
+        ],
+        "falseClaims": [
+          "Web Worker — отдельный OS process",
+          "compositor thread выполняет JavaScript",
+          "все анимации всегда на main thread",
+          "Service Worker в browser process",
+          "raster threads парсят HTML"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "isolation_tradeoffs",
+      "title": "Понимает изоляцию и trade-offs",
+      "expected": "Кандидат сравнивает single-process (IE6) vs multi-process: crash/memory isolation, OS sandbox; Site Isolation после Spectre; overhead ~100MB на renderer; merge tabs при memory pressure.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "key difference single vs multi из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Spectre",
+              "Site Isolation",
+              "origin"
+            ],
+            "ask": "зачем Chrome 67+ изолирует origin в отдельный renderer"
+          },
+          {
+            "match": [
+              "memory",
+              "100MB",
+              "merge",
+              "Aw Snap"
+            ],
+            "ask": "что происходит при 20 табах на слабом устройстве"
+          }
+        ],
+        "mustConcepts": [
+          "изоляц",
+          "single-process",
+          "IE6",
+          "crash",
+          "Spectre",
+          "Meltdown",
+          "Site Isolation",
+          "Chrome 67",
+          "memory overhead",
+          "100MB",
+          "sandbox",
+          "address space",
+          "tab crash",
+          "memory pressure",
+          "merge",
+          "discard",
+          "Aw Snap",
+          "max-renderer-process-count",
+          "threads share memory",
+          "OS-level"
+        ],
+        "falseClaims": [
+          "потоки дают такую же безопасность как отдельные процессы",
+          "изоляция процессов не имеет overhead",
+          "Site Isolation объединяет все origin в один renderer",
+          "multi-process не защищает от Spectre без Site Isolation"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "internal_pipeline",
+      "title": "Знает внутренний pipeline навигации",
+      "expected": "Кандидат описывает: URL → network process → выбор renderer (cross-site новый, same-site существующий); Blink + V8; paint → compositor layers → GPU via Mojo; V8 heap per renderer.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "how it works internally — middle+ pipeline",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "process_map",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "google.com",
+              "example.com",
+              "два таб"
+            ],
+            "ask": "нарисуй процессы для google.com и example.com — кто с кем общается"
+          },
+          {
+            "match": [
+              "Blink",
+              "V8",
+              "compositor",
+              "GPU"
+            ],
+            "ask": "путь от paint command до экрана и почему transform не трогает main"
+          }
+        ],
+        "mustConcepts": [
+          "network process",
+          "URL",
+          "response headers",
+          "cross-site",
+          "same-site",
+          "navigation",
+          "Blink",
+          "V8",
+          "paint",
+          "compositor",
+          "layers",
+          "GPU process",
+          "Mojo IPC",
+          "heap",
+          "контекст",
+          "google.com",
+          "renderer1",
+          "renderer2",
+          "не напрямую",
+          "pipeline"
+        ],
+        "falseClaims": [
+          "renderer общается напрямую с другим renderer",
+          "два таба одного origin всегда делят JS heap",
+          "V8 живёт в browser process",
+          "network process рендерит HTML"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "performance_patterns",
+      "title": "Знает паттерны производительности",
+      "expected": "Кандидат: Web Worker для тяжёлого JS; transform/opacity на compositor; chunk через requestAnimationFrame; не анимировать width/left; COOP/COEP для SharedArrayBuffer.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "when to use + common mistakes perf из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Worker",
+              "while",
+              "main thread"
+            ],
+            "ask": "while(true) на main vs Web Worker — что происходит с табом"
+          },
+          {
+            "match": [
+              "width",
+              "transform",
+              "left",
+              "layout"
+            ],
+            "ask": "почему анимация width дропает fps а transform — нет"
+          }
+        ],
+        "mustConcepts": [
+          "Web Worker",
+          "main thread block",
+          "while",
+          "requestAnimationFrame",
+          "chunk",
+          "transform",
+          "translateX",
+          "opacity",
+          "width",
+          "left",
+          "layout",
+          "compositor",
+          "paint",
+          "COOP",
+          "COEP",
+          "SharedArrayBuffer",
+          "SecurityError",
+          "same-origin",
+          "require-corp",
+          "60fps"
+        ],
+        "falseClaims": [
+          "анимация width обрабатывается compositor без main thread",
+          "длинный синхронный loop на main — нормальный паттерн",
+          "SharedArrayBuffer работает без COOP/COEP в Chrome 68+",
+          "requestAnimationFrame заменяет Web Worker для чистых вычислений"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "cross_tab_communication",
+      "title": "Знает межвкладочную коммуникацию",
+      "expected": "Кандидат: BroadcastChannel/postMessage через browser process IPC; сообщения копируются, не shared memory; после Spectre SAB нужен COOP/COEP; renderer не общается напрямую.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "BroadcastChannel example из ITLead",
+        "mustConcepts": [
+          "BroadcastChannel",
+          "postMessage",
+          "IPC",
+          "browser process",
+          "cross-tab",
+          "копир",
+          "не shared",
+          "same origin",
+          "renderer1",
+          "renderer2",
+          "Spectre",
+          "COOP",
+          "COEP",
+          "opt-in",
+          "overhead"
+        ],
+        "falseClaims": [
+          "renderer processes делят JS heap напрямую",
+          "BroadcastChannel использует shared memory без заголовков",
+          "два renderer общаются без browser process",
+          "postMessage между табами — zero-copy всегда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки и отладку",
+      "expected": "Кандидат: block main thread; SAB без headers; анимация layout properties; console.log только per-renderer; Service Worker в другом DevTools контексте; chrome://tracing для cross-process.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "common mistakes + debug tools",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "console",
+              "tracing",
+              "DevTools"
+            ],
+            "ask": "почему console.log не покрывает все процессы и что использовать для cross-process"
+          },
+          {
+            "match": [
+              "Service Worker",
+              "console"
+            ],
+            "ask": "где смотреть логи Service Worker vs page JS"
+          }
+        ],
+        "mustConcepts": [
+          "while true",
+          "block",
+          "COOP",
+          "COEP",
+          "SecurityError",
+          "chrome://tracing",
+          "chrome://crashes",
+          "chrome://memory-internals",
+          "DevTools",
+          "Service Worker",
+          "отдельный контекст",
+          "per-renderer",
+          "width animation",
+          "main thread paint",
+          "disabled-by-default-devtools.timeline",
+          "Puppeteer",
+          "newPage"
+        ],
+        "falseClaims": [
+          "SharedArrayBuffer доступен по умолчанию после Spectre",
+          "console.log показывает логи всех процессов в одном окне",
+          "Service Worker логи в том же DevTools что page без переключения",
+          "chrome://tracing только для GPU"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Chrome — multi-process: browser координирует renderer на origin, GPU композитит слои, network с 88-го держит HTTP/TLS. Main thread — JS и DOM; compositor крутит transform на 60fps без main. while(true) зависает только этот таб. Тяжёлую сумму — в Worker. Cross-tab — BroadcastChannel через browser IPC, данные копируются.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну браузер процесс главный, рендерер на сайт изолирован sandbox. анимацию через transform, не width — compositor сам крутит. SAB без COOP COEP — SecurityError. дебажить кросс-процесс — chrome://tracing, не только console.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Два таба google.com и example.com — два renderer, общаются только с browser через Mojo. Site Isolation после Spectre. При нехватке памяти Chrome сливает same-site табы; background renderer отбрасывают — Aw Snap при возврате.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Все вкладки Chrome в одном процессе как IE6. Renderer сам открывает TLS. Web Worker — отдельный OS process. Анимация width и transform одинаково на compositor.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "SharedArrayBuffer шлёшь postMessage без заголовков — работает. console.log в табе покажет логи Service Worker и GPU process.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Изоляция процессов бесплатная, overhead ноль. Потоки дают ту же защиту памяти что отдельные процессы. BroadcastChannel — shared memory между renderer.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "process_map",
+      "exampleType": "good",
+      "exampleText": "Browser process spawn renderer, GPU, network. Renderer sandbox — сеть и диск только через IPC Mojo в browser.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "process_map",
+      "exampleType": "good",
+      "exampleText": "network process с Chrome 88 — HTTP DNS TLS cookies CORS отдельно от browser coordinator",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "process_map",
+      "exampleType": "bad",
+      "exampleText": "Renderer напрямую читает файлы и открывает сокеты без sandbox.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "threads_in_renderer",
+      "exampleType": "good",
+      "exampleText": "Main thread — V8 + Blink DOM layout. Compositor — scroll и transform/opacity 60fps. Worker — другой поток, тот же renderer process.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "threads_in_renderer",
+      "exampleType": "good",
+      "exampleText": "service worker в отдельном потоке renderer, fetch не блокирует page js",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "threads_in_renderer",
+      "exampleType": "bad",
+      "exampleText": "Web Worker — полноценный OS process как renderer.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "isolation_tradeoffs",
+      "exampleType": "good",
+      "exampleText": "Multi-process: crash одного таба не убивает браузер. Site Isolation 67+ — origin в своём renderer после Spectre. Цена — ~100MB на renderer.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "isolation_tradeoffs",
+      "exampleType": "good",
+      "exampleText": "20 табов на слабом телефоне — merge same-site, discard background, max-renderer-process-count",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "isolation_tradeoffs",
+      "exampleType": "bad",
+      "exampleText": "Потоки изолируют память на уровне OS так же надёжно как процессы.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "internal_pipeline",
+      "exampleType": "good",
+      "exampleText": "URL → network → новый renderer для cross-site → Blink paint → compositor layers → GPU Mojo. Renderer1 и Renderer2 не общаются напрямую.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "internal_pipeline",
+      "exampleType": "good",
+      "exampleText": "два таба google.com могут один renderer но v8 heap изолирован по контексту таба",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "internal_pipeline",
+      "exampleType": "bad",
+      "exampleText": "Renderer google.com шлёт paint напрямую в renderer example.com.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "performance_patterns",
+      "exampleType": "good",
+      "exampleText": "Миллиард итераций — Worker, не main. Анимация — transform translateX, не left/width. SAB — COOP same-origin + COEP require-corp.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "performance_patterns",
+      "exampleType": "good",
+      "exampleText": "визуальную работу чанками через rAF, чистые вычисления в worker.js",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "performance_patterns",
+      "exampleType": "bad",
+      "exampleText": "for с миллиардом на main — ок, compositor всё равно 60fps при width animation.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "cross_tab_communication",
+      "exampleType": "good",
+      "exampleText": "BroadcastChannel: renderer1 → browser IPC → renderer2, сообщение скопировано, не shared heap.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "cross_tab_communication",
+      "exampleType": "good",
+      "exampleText": "после spectre shared memory между renderer только с coop coep opt-in",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "cross_tab_communication",
+      "exampleType": "bad",
+      "exampleText": "Табы делят один JS heap, BroadcastChannel — zero-copy shared memory всегда.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Дроп фреймов — анимировали width, DevTools paint каждый кадр на main. Замена на transform:scaleX — compositor path.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "логи service worker в другом devtools контексте, cross-process — chrome://tracing timeline",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "SAB new SharedArrayBuffer(1024) postMessage без заголовков — норма в Chrome 68+.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "modern-browser-architecture-processes-and-threads",
+    "apiUrl": "https://api.itlead.org/api/questions/modern-browser-architecture-processes-and-threads",
+    "pageUrl": "https://itlead.org/interview-questions/general/modern-browser-architecture-processes-and-threads",
+    "difficulty": "MIDDLE",
+    "titleEn": "Modern browser architecture (processes and threads)",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

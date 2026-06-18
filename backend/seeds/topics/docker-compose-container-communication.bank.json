@@ -1,0 +1,381 @@
+{
+  "topic": {
+    "code": "docker_compose_container_communication",
+    "name": "Связь контейнеров в Docker Compose",
+    "skillCode": "docker",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Как контейнеры общаются между собой в Docker Compose?",
+    "shortAnswer": "Docker Compose создаёт для каждого проекта дефолтную user-defined bridge-сеть. Все сервисы из compose.yaml подключаются к ней автоматически и достигают друг друга по имени сервиса через встроенный DNS Docker — без IP, без localhost и без ручной настройки. Из api `db:5432` работает; с хоста нужен `localhost:<published-port>`.",
+    "idealAnswer": "При `docker compose up` Compose читает compose.yaml, создаёт сеть `<project>_default` (project — имя директории, если не переопределено через `-p`, `COMPOSE_PROJECT_NAME` или `name:`), поднимает контейнер по сервису и подключает каждый к этой bridge-сети. Внутри сети имена сервисов — hostnames: из api `DATABASE_URL=postgres://...@db:5432/app` резолвится в IP контейнера db. Механизм — стандартный user-defined bridge Docker + embedded DNS: `/etc/resolv.conf` указывает на `127.0.0.11`, DNS знает все контейнеры сети по `<service-name>` и `<container-name>`. Между контейнерами доступен любой порт, на котором слушает destination — не только опубликованные через `ports:`. `ports:` нужен только для доступа с хоста (`-p`); `expose:` — документация, на reachability между контейнерами не влияет; без `ports` db всё равно доступен api на `db:5432`. `localhost` между сервисами не работает: внутри api `localhost` — это сам api, `localhost:5432` не дойдёт до postgres. Несколько сетей: `networks: [frontend]` у web, `[frontend, backend]` у api, `[backend]` у db — web не достанет db напрямую, только через api (three-tier). External network `external: true` — для связи между разными Compose-проектами или с Traefik/nginx-proxy на общей `proxy`-сети. Типичные ошибки: localhost в connection string; лишний `ports:` только для трафика service→service; хардкод `myapp-db-1` вместо стабильного имени сервиса `db`; два проекта без shared external network не видят друг друга. `docker compose run --rm migrator` и CI-тесты поднимаются в сети проекта и тоже ходят к `db` по имени. С хоста — только через published port, например `localhost:3000`.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "default_network_dns",
+      "title": "Понимает дефолтную сеть и DNS по имени сервиса",
+      "expected": "Кандидат объясняет: Compose создаёт `<project>_default`, все сервисы в одной сети; имена сервисов — hostnames; из api `db:5432` и `redis:6379` резолвятся без ручных IP.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы из TL;DR — service name как hostname",
+        "mustConcepts": [
+          "default network",
+          "дефолтн",
+          "bridge",
+          "user-defined",
+          "project_default",
+          "имя сервиса",
+          "service name",
+          "hostname",
+          "DNS",
+          "db:5432",
+          "redis:6379",
+          "автоматическ",
+          "compose up",
+          "без IP",
+          "резолв",
+          "сеть проекта"
+        ],
+        "falseClaims": [
+          "в Compose нужно вручную прописывать IP каждого контейнера",
+          "сервисы по умолчанию в изолированных сетях и не видят друг друга",
+          "имя сервиса работает только если указан ports",
+          "для связи api и db обязателен localhost"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "compose_dns_mechanism",
+      "title": "Знает механизм под капотом",
+      "expected": "Кандидат описывает: bridge network, embedded DNS `127.0.0.11`, resolv.conf в контейнере; Compose автоматизирует `docker network create` + attach; имена `<project>-<service>-<index>` у контейнеров.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "What Compose creates under the hood из ITLead",
+        "mustConcepts": [
+          "127.0.0.11",
+          "embedded DNS",
+          "resolv.conf",
+          "bridge",
+          "network create",
+          "docker run",
+          "attach",
+          "container name",
+          "project",
+          "директор",
+          "COMPOSE_PROJECT_NAME",
+          "nslookup",
+          "имя контейнера"
+        ],
+        "falseClaims": [
+          "DNS в Compose — внешний dnsmasq на хосте, не Docker",
+          "resolv.conf в контейнере указывает на 8.8.8.8 по умолчанию",
+          "Compose не создаёт сеть, только контейнеры",
+          "имя проекта всегда фиксировано и не зависит от папки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "localhost_mistake",
+      "title": "Понимает почему localhost не работает между сервисами",
+      "expected": "Кандидат объясняет: внутри контейнера localhost — это он сам; для postgres нужно `db`, не `localhost:5432`; у каждого контейнера свой loopback.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "самая частая Compose-ошибка из Common mistakes",
+        "mustConcepts": [
+          "localhost",
+          "loopback",
+          "сам контейнер",
+          "не работает",
+          "service name",
+          "db",
+          "DATABASE_URL",
+          "5432",
+          "между сервисами",
+          "не localhost",
+          "connection string",
+          "внутри api"
+        ],
+        "falseClaims": [
+          "localhost:5432 из api достаёт postgres в соседнем контейнере",
+          "localhost в Docker Compose — общий адрес всех сервисов проекта",
+          "можно писать 127.0.0.1 вместо имени сервиса между контейнерами",
+          "localhost и имя сервиса взаимозаменяемы внутри compose-сети"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "ports_vs_expose",
+      "title": "Различает ports, expose и внутренний доступ",
+      "expected": "Кандидат объясняет: `ports:` публикует на хост; между контейнерами сервис доступен на любом listening-порту без publish; `expose:` — только документация; с хоста нужен published port.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ports vs expose vs nothing — ключевой junior pitfall",
+        "mustConcepts": [
+          "ports",
+          "expose",
+          "publish",
+          "хост",
+          "host",
+          "localhost:3000",
+          "внутренн",
+          "между контейнерами",
+          "listening",
+          "слушает",
+          "не нужен ports",
+          "документац",
+          "db:5432 без ports",
+          "опубликован"
+        ],
+        "falseClaims": [
+          "без ports db недоступен api на 5432",
+          "expose открывает порт только для других контейнеров как firewall rule",
+          "ports обязателен для любого service-to-service трафика",
+          "с хоста можно подключиться к db:5432 по имени сервиса без publish"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "multiple_networks",
+      "title": "Понимает несколько сетей и изоляцию",
+      "expected": "Кандидат описывает: `networks:` на уровне сервиса; web на frontend, db на backend, api на обеих; web не достаёт db без общей сети; three-tier edge/app/data.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Multiple networks for separation из ITLead",
+        "mustConcepts": [
+          "несколько сетей",
+          "frontend",
+          "backend",
+          "networks",
+          "изоляц",
+          "web",
+          "api",
+          "db",
+          "общая сеть",
+          "three-tier",
+          "edge",
+          "не достаёт напрямую",
+          "straddle",
+          "мост"
+        ],
+        "falseClaims": [
+          "все сервисы compose всегда в одной сети без возможности разделить",
+          "web может ходить к db напрямую если они в одном compose-файле",
+          "несколько networks отключают DNS по имени сервиса полностью",
+          "api на двух сетях ломает резолвинг имён"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки и cross-project",
+      "expected": "Кандидат называет: хардкод container name вместо service name; лишний ports для internal-only api; два Compose-проекта без `external: true` network; `docker compose run` migrator на сети проекта.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes + external network из ITLead",
+        "mustConcepts": [
+          "container name",
+          "service name",
+          "myapp-db-1",
+          "портатив",
+          "external",
+          "external: true",
+          "cross-project",
+          "два проекта",
+          "proxy",
+          "Traefik",
+          "migrator",
+          "compose run",
+          "CI",
+          "shared network"
+        ],
+        "falseClaims": [
+          "имя контейнера стабильнее имени сервиса при переименовании проекта",
+          "два compose-проекта по умолчанию в одной default-сети",
+          "external network создаётся compose автоматически при external: true",
+          "docker compose run не подключается к сети проекта"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Compose поднимает myapp_default, api ходит к postgres по `db:5432` и redis по `redis:6379` — DNS внутри сети. localhost между сервисами не использовать. ports только если с хоста нужен localhost:3000.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В DATABASE_URL пишу `postgres://postgres:dev@db:5432/app`, не localhost. db без ports всё равно виден api. resolv.conf → 127.0.0.11, nslookup db даёт IP контейнера.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну compose сам сеть делает, сервисы по имени находят — api к db как hostname. localhost внутри контейнера это он сам. ports для хоста, между контейнерами не надо",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Между api и db в Compose подключаюсь через localhost:5432 — это же один docker host. ports на db обязателен, иначе DNS не резолвит имя сервиса.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Использую myapp-db-1 в connection string — стабильнее service name. Два compose-проекта автоматически в одной сети и видят app-b по имени.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "expose открывает порт для других контейнеров, без expose db недоступен. С хоста подключаюсь к db:5432 напрямую без published port.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "default_network_dns",
+      "exampleType": "good",
+      "exampleText": "Все сервисы в `<project>_default`, из api `db:5432` резолвится embedded DNS — IP вручную не нужен.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "default_network_dns",
+      "exampleType": "good",
+      "exampleText": "redis://redis:6379 в env api — имя сервиса как hostname в одной compose-сети",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "default_network_dns",
+      "exampleType": "bad",
+      "exampleText": "Каждый сервис изолирован, для связи надо вручную docker network connect и прописать IP в env.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "compose_dns_mechanism",
+      "exampleType": "good",
+      "exampleText": "compose up создаёт bridge `<dir>_default`, resolv.conf → 127.0.0.11, DNS знает service-name и container-name.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "compose_dns_mechanism",
+      "exampleType": "good",
+      "exampleText": "project name из папки, контейнер myapp-api-1, но в URL лучше стабильное имя сервиса api",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "compose_dns_mechanism",
+      "exampleType": "bad",
+      "exampleText": "DNS в compose — это /etc/hosts на хост-машине, 127.0.0.11 не используется.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "localhost_mistake",
+      "exampleType": "good",
+      "exampleText": "В api localhost — сам api; postgres на `db:5432`, не localhost:5432.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "localhost_mistake",
+      "exampleType": "good",
+      "exampleText": "DATABASE_URL с @db:5432 — типичный фикс когда новичок ставил localhost",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "localhost_mistake",
+      "exampleType": "bad",
+      "exampleText": "localhost в connection string норм — docker пробрасывает postgres на loopback всех контейнеров.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "ports_vs_expose",
+      "exampleType": "good",
+      "exampleText": "db без ports доступен api на 5432 внутри сети; ports: 3000:3000 только чтобы я с хоста открыл api.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "ports_vs_expose",
+      "exampleType": "good",
+      "exampleText": "expose: 3000 — подсказка в compose, на reach между контейнерами не влияет",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "ports_vs_expose",
+      "exampleType": "bad",
+      "exampleText": "Чтобы web достал api, обязательно ports на api — без publish контейнеры не общаются.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "multiple_networks",
+      "exampleType": "good",
+      "exampleText": "web на frontend, db на backend, api на обеих — web к db только через api, классический three-tier.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "multiple_networks",
+      "exampleType": "good",
+      "exampleText": "разделил сети чтобы nginx не видел postgres напрямую, api мост между frontend и backend",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "multiple_networks",
+      "exampleType": "bad",
+      "exampleText": "Если web и db в одном compose.yaml, web всегда может подключиться к db:5432 независимо от networks.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "В env `db`, не `myapp-db-1` — имя контейнера меняется с project. Два проекта — shared external proxy network.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "compose run --rm migrator на сети проекта, достаёт db по имени; в CI up db redis, тесты по service name",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Хардкожу myapp-db-1 — service name ненадёжно. external: true заставляет compose создать новую сеть при каждом up.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "docker-compose-container-communication",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-compose-container-communication",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-compose-container-communication",
+    "difficulty": "JUNIOR",
+    "titleEn": "How do containers communicate in Docker Compose?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

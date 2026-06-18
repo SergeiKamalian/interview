@@ -1,0 +1,649 @@
+{
+  "topic": {
+    "code": "docker_live_migration_criu",
+    "name": "Live migration Docker-контейнера через CRIU",
+    "skillCode": "docker",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как выполнить live migration Docker-контейнера между хостами с помощью CRIU?",
+    "shortAnswer": "Docker предоставляет экспериментальную команду `docker checkpoint` (на базе CRIU) для заморозки состояния running-контейнера на диск и восстановления на другом хосте: checkpoint на host A → копирование файлов checkpoint и volume → `docker create` + `docker start --checkpoint` на host B. На практике это experimental и редко production-grade; большинство команд используют stateless redeploy. CRIU оправдан для HPC/научных workload с долгими вычислениями в памяти.",
+    "idealAnswer": "CRIU (Checkpoint/Restore In Userspace) — Linux-механизм: замораживает дерево процессов и сериализует memory pages, file descriptors, sockets, namespaces (PID, mnt, net, uts, ipc, user), threads, futexes, signals в protobuf-файлы на диск; на restore воссоздаёт процессы с теми же PID в новом namespace, восстанавливает память и FD, продолжает выполнение. Docker интегрирует CRIU через experimental subcommand `docker checkpoint`: требует `\"experimental\": true` в `/etc/docker/daemon.json`, CRIU в системе (`criu check`), kernel с CONFIG_CHECKPOINT_RESTORE. Same-host flow: `docker checkpoint create counter cp1` (контейнер останавливается по умолчанию) → `docker start --checkpoint=cp1 counter` — счётчик продолжает с 48, не с 0. `--leave-running` делает snapshot без остановки. Cross-host migration: (1) одинаковый image на обоих хостах (docker save/load или registry); (2) `docker checkpoint create --checkpoint-dir=/var/checkpoints app cp1` на host A; (3) rsync checkpoint + bind mounts/volumes на host B; (4) `docker create` с теми же mounts/ports/image; (5) `docker start --checkpoint=cp1 --checkpoint-dir=/var/checkpoints app`. Критично: одинаковые kernel version, CPU instruction set, Docker version, идентичное состояние filesystem (open files, volume contents, secrets, /etc/resolv.conf). Сеть: IP/MAC контейнера переезжают с migration — инфраструктура долж это допускать. Open TCP connections ломаются часто; `--tcp-established` ненадёжен для long-lived. Типичные ошибки restore: open files mismatch, socket peer not found, PID conflict, kernel/glibc/CPU mismatch. Узкий use case: HPC, 12–24h simulation/ML training где progress только в process memory и host нужен на maintenance — snapshot дешевле restart с нуля. Для web apps, microservices, stateful DB — stateless redeploy, blue-green, rolling update, K8s drain/reschedule, externalized state (DB, S3), application-level checkpoint каждые N минут — проще и надёжнее. Ограничения: experimental (не GA), нет GPU state migration, не в Docker Desktop, dump всей memory — секунды-минуты для больших контейнеров. K8s KEP-2008 (Container Live Migration) alpha, CRIU под капотом. Senior insight: CRIU требует «identical state on both hosts» — brittle; stateful сервисы проектируют replication (Postgres, Kafka), а не kernel snapshot.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "criu_definition",
+      "title": "Понимает CRIU и механизм checkpoint/restore",
+      "expected": "Кандидат объясняет: CRIU замораживает process tree через ptrace, сериализует memory, FD, sockets, namespaces на диск; restore воссоздаёт процессы и продолжает выполнение; kernel state должен совпадать.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — freeze/restore process tree и kernel state",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "criu_definition",
+            "oftenConfusedWith": [
+              "docker_checkpoint_integration",
+              "same_host_checkpoint"
+            ],
+            "anchorTermsExpected": [
+              "CRIU",
+              "checkpoint",
+              "restore",
+              "memory",
+              "namespaces",
+              "file descriptor",
+              "process tree"
+            ],
+            "anchorTermsWrongTopic": [
+              "docker save",
+              "volume backup",
+              "image export"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "CRIU",
+              "checkpoint",
+              "restore"
+            ],
+            "ask": "что именно CRIU сохраняет на диск и что должно совпадать при restore"
+          }
+        ],
+        "mustConcepts": [
+          "CRIU",
+          "Checkpoint/Restore",
+          "checkpoint",
+          "restore",
+          "process tree",
+          "дерево процесс",
+          "memory",
+          "память",
+          "file descriptor",
+          "дескриптор",
+          "socket",
+          "namespace",
+          "PID",
+          "mnt",
+          "net",
+          "ptrace",
+          "freeze",
+          "замороз",
+          "serialize",
+          "сериализ",
+          "kernel state",
+          "состояние ядра"
+        ],
+        "falseClaims": [
+          "CRIU сохраняет только образ контейнера",
+          "CRIU это backup volume без процессов",
+          "restore работает на любом kernel без ограничений",
+          "CRIU мигрирует только файлы, не память процесса"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "docker_checkpoint_integration",
+      "title": "Знает docker checkpoint и experimental",
+      "expected": "Кандидат называет: experimental в daemon.json, `docker checkpoint create`, `docker start --checkpoint`, `--checkpoint-dir`, `--leave-running`; CRIU установлен, `criu check`.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовые команды Docker + включение experimental",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "experimental",
+              "daemon.json",
+              "checkpoint create"
+            ],
+            "ask": "как включить docker checkpoint и какие команды для create/restore"
+          }
+        ],
+        "mustConcepts": [
+          "docker checkpoint",
+          "checkpoint create",
+          "start --checkpoint",
+          "experimental",
+          "daemon.json",
+          "checkpoint-dir",
+          "leave-running",
+          "criu check",
+          "CONFIG_CHECKPOINT",
+          "systemctl restart docker"
+        ],
+        "falseClaims": [
+          "docker checkpoint включён по умолчанию",
+          "checkpoint работает без experimental flag",
+          "docker checkpoint не требует CRIU в системе",
+          "docker checkpoint это GA production feature"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "same_host_checkpoint",
+      "title": "Умеет snapshot/restore на одном хосте",
+      "expected": "Кандидат описывает: running container → checkpoint create (stopped by default) → start --checkpoint resumes state (counter 48→49); знает где лежат файлы checkpoint.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "простейший proof-of-concept из ITLead counter example",
+        "mustConcepts": [
+          "same host",
+          "один хост",
+          "counter",
+          "busybox",
+          "checkpoint create",
+          "start --checkpoint",
+          "resume",
+          "продолж",
+          "не с нуля",
+          "stopped",
+          "останов",
+          "checkpoints/cp1",
+          "state preserved",
+          "состояние сохран"
+        ],
+        "falseClaims": [
+          "после restore контейнер всегда стартует с нуля",
+          "checkpoint create не останавливает контейнер по умолчанию",
+          "restore создаёт новый контейнер без checkpoint flag"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "cross_host_migration",
+      "title": "Описывает cross-host migration flow",
+      "expected": "Кандидат перечисляет шаги: image на обоих хostах → checkpoint на A с --checkpoint-dir → rsync checkpoint + volumes → docker create (same mounts/ports) на B → start --checkpoint.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевой senior flow — 5 шагов cross-host из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "docker_checkpoint_integration",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "rsync",
+              "host A",
+              "host B",
+              "cross-host"
+            ],
+            "ask": "пошагово: что делать на host A и host B для live migration"
+          },
+          {
+            "match": [
+              "docker create",
+              "docker save",
+              "registry"
+            ],
+            "ask": "как обеспечить одинаковый image и конфигурацию контейнера на обоих хостах"
+          }
+        ],
+        "mustConcepts": [
+          "cross-host",
+          "между хост",
+          "host A",
+          "host B",
+          "docker save",
+          "docker load",
+          "registry",
+          "pull",
+          "checkpoint-dir",
+          "rsync",
+          "scp",
+          "docker create",
+          "stopped state",
+          "start --checkpoint",
+          "volume",
+          "bind mount",
+          "same ports",
+          "same image",
+          "одинаков"
+        ],
+        "falseClaims": [
+          "достаточно скопировать только checkpoint без volumes",
+          "можно start --checkpoint на B без предварительного docker create",
+          "image на B не обязателен если есть checkpoint",
+          "rsync checkpoint заменяет синхронизацию bind mounts"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "host_state_requirements",
+      "title": "Понимает требования к идентичности хостов",
+      "expected": "Кандидат называет: same kernel version, CPU ISA, Docker version, identical filesystem/volume state, network IP/MAC; CRIU отказывает при mismatch.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "identical state — главный brittle constraint senior темы",
+        "confusionPairs": [
+          {
+            "checkpointKey": "host_state_requirements",
+            "oftenConfusedWith": [
+              "cross_host_migration"
+            ],
+            "anchorTermsExpected": [
+              "kernel",
+              "CPU",
+              "Docker version",
+              "volume",
+              "filesystem",
+              "network"
+            ],
+            "anchorTermsWrongTopic": [
+              "достаточно одного rsync checkpoint",
+              "любой kernel подойдёт"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "kernel",
+              "5.10",
+              "5.15",
+              "CPU"
+            ],
+            "ask": "почему migration между разными kernel/CPU может упасть"
+          }
+        ],
+        "mustConcepts": [
+          "kernel version",
+          "версия ядра",
+          "CPU",
+          "instruction set",
+          "AVX",
+          "TSC",
+          "Docker version",
+          "filesystem",
+          "файлов",
+          "volume contents",
+          "bind mount",
+          "identical state",
+          "идентичн",
+          "open files",
+          "network IP",
+          "MAC",
+          "resolv.conf",
+          "secrets",
+          "mismatch",
+          "отказ restore"
+        ],
+        "falseClaims": [
+          "kernel version не важен для CRIU restore",
+          "разные CPU vendor всегда совместимы",
+          "checkpoint переносит volume data автоматически",
+          "network state не влияет на migration"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "use_cases_vs_alternatives",
+      "title": "Различает когда CRIU vs stateless redeploy",
+      "expected": "Кандидат: CRIU для HPC/ML/long simulation с progress в memory; для web/microservices — stateless redeploy, blue-green, drain, externalized state, app-level checkpoint.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "reality check senior — узкий use case vs production patterns",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "HPC",
+              "simulation",
+              "ML",
+              "stateless"
+            ],
+            "ask": "когда CRIU оправдан, а когда лучше rolling deploy или app-level checkpoint"
+          }
+        ],
+        "mustConcepts": [
+          "HPC",
+          "scientific",
+          "simulation",
+          "ML training",
+          "long-running",
+          "progress in memory",
+          "stateless redeploy",
+          "blue-green",
+          "rolling update",
+          "canary",
+          "drain",
+          "reschedule",
+          "Kubernetes",
+          "externalized state",
+          "DB",
+          "S3",
+          "application-level checkpoint",
+          "narrow use case",
+          "узкий"
+        ],
+        "falseClaims": [
+          "CRIU стандарт для production web apps",
+          "stateless redeploy хуже CRIU для microservices",
+          "app-level checkpoint всегда хуже CRIU",
+          "Docker Swarm production relies on CRIU migration"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки migration",
+      "expected": "Кандидат: не считать CRIU production-grade; match state across hosts; drain TCP или accept reset; test kernel match; open files/socket/PID errors.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes + restore failures из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "TCP",
+              "tcp-established",
+              "connection"
+            ],
+            "ask": "почему active TCP connections ломают migration и что делать"
+          },
+          {
+            "match": [
+              "open files mismatch",
+              "socket peer",
+              "PID"
+            ],
+            "ask": "типичные ошибки restore и их причины"
+          }
+        ],
+        "mustConcepts": [
+          "production-grade",
+          "experimental",
+          "state across hosts",
+          "volume mismatch",
+          "TCP",
+          "tcp-established",
+          "drain connection",
+          "connection reset",
+          "kernel match",
+          "staging test",
+          "open files mismatch",
+          "socket peer not found",
+          "Unable to restore PID",
+          "database inside container",
+          "replication"
+        ],
+        "falseClaims": [
+          "CRIU production-ready для любого workload",
+          "tcp-established надёжен для long-lived connections",
+          "можно migrate без синхронизации secrets и resolv.conf",
+          "DB внутри контейнера — нормальный паттерн для CRIU migration"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "limitations_experimental",
+      "title": "Знает ограничения и статус experimental",
+      "expected": "Кандидат упоминает: experimental не GA, no GPU migration, не Docker Desktop, performance dump memory, KEP-2008 alpha.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "limitations table — бонус senior awareness",
+        "mustConcepts": [
+          "experimental",
+          "not GA",
+          "GPU",
+          "Docker Desktop",
+          "performance",
+          "memory dump",
+          "KEP-2008",
+          "alpha",
+          "Kubernetes live migration"
+        ],
+        "falseClaims": [
+          "GPU state мигрируется в stock CRIU",
+          "docker checkpoint работает в Docker Desktop",
+          "K8s live migration GA в production"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "CRIU замораживает process tree и пишет memory, FD и namespaces на диск. На host A: experimental в daemon.json, `docker checkpoint create app cp1 --checkpoint-dir=/var/checkpoints`, rsync checkpoint и volumes на B. На B: тот же image и mounts, `docker create`, `docker start --checkpoint=cp1`. Для обычного web app — stateless redeploy, не CRIU.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Live migration через CRIU — узкая история. 18-часовая симуляция на GPU-host: checkpoint с --leave-running, rsync на второй хост с тем же kernel и image, restore — продолжаем последние 6 часов. Microservice с Postgres снаружи — rolling update, не snapshot памяти.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Same-host proof: busybox counter на 47, checkpoint create, start --checkpoint — идёт 48, 49. Cross-host: kernel/CPU/Docker должны совпадать, open TCP — drain или reset. Ошибки: open files mismatch, socket peer not found.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "CRIU — стандартный способ zero-downtime migration для production microservices. Достаточно rsync checkpoint, volumes и kernel version не важны.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker checkpoint включён по default. На host B просто docker run --checkpoint без create и без того же image.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Active TCP connections переносятся надёжно через --tcp-established. CRIU лучше Postgres replication для stateful сервисов.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "criu_definition",
+      "exampleType": "good",
+      "exampleText": "CRIU через ptrace останавливает процессы, сериализует память, сокеты и namespaces в файлы; restore воссоздаёт PID и продолжает с того же места.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "criu_definition",
+      "exampleType": "good",
+      "exampleText": "ну criu — freeze всего дерева процессов на диск, потом restore на том же или другом хосте если kernel state совпадает",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "criu_definition",
+      "exampleType": "bad",
+      "exampleText": "CRIU — это docker save образа и restore контейнера из tar.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "docker_checkpoint_integration",
+      "exampleType": "good",
+      "exampleText": "В daemon.json `\"experimental\": true`, restart dockerd, `criu check`. Snapshot: `docker checkpoint create app cp1`, restore: `docker start --checkpoint=cp1 app`.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "docker_checkpoint_integration",
+      "exampleType": "good",
+      "exampleText": "checkpoint create с --leave-running — контейнер не останавливается; --checkpoint-dir задаёт куда положить файлы для rsync",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "docker_checkpoint_integration",
+      "exampleType": "bad",
+      "exampleText": "docker checkpoint работает out of the box без experimental и без установки criu.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "same_host_checkpoint",
+      "exampleType": "good",
+      "exampleText": "counter на 47 → checkpoint create cp1 → start --checkpoint=cp1 → логи 48, 49. State в памяти сохранился.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "same_host_checkpoint",
+      "exampleType": "good",
+      "exampleText": "по умолчанию create останавливает контейнер; файлы лежат в containers/<id>/checkpoints/cp1/",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "same_host_checkpoint",
+      "exampleType": "bad",
+      "exampleText": "после checkpoint restore счётчик всегда сбрасывается на 0 как при новом docker run.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "cross_host_migration",
+      "exampleType": "good",
+      "exampleText": "A: checkpoint в /var/checkpoints. rsync cp1 и /data на B. B: docker create с теми же -v и -p, docker start --checkpoint=cp1 --checkpoint-dir=/var/checkpoints.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "cross_host_migration",
+      "exampleType": "good",
+      "exampleText": "image на оба хоста через registry pull или docker save|load; без одинакового image restore не взлетит",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "cross_host_migration",
+      "exampleType": "bad",
+      "exampleText": "На host B достаточно docker start --checkpoint без docker create и без копирования volumes.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "host_state_requirements",
+      "exampleType": "good",
+      "exampleText": "Kernel 5.10→5.15 может сломать restore: internal structures changed. CPU vendor/microarch, одинаковые bind mounts и volume contents обязательны.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "host_state_requirements",
+      "exampleType": "good",
+      "exampleText": "IP/MAC контейнера едут с migration — сеть должна это принять; open file на A без файла на B → open files mismatch",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "host_state_requirements",
+      "exampleType": "bad",
+      "exampleText": "CRIU restore не смотрит на kernel и CPU — главное скопировать checkpoint directory.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "use_cases_vs_alternatives",
+      "exampleType": "good",
+      "exampleText": "12h simulation на 8h — checkpoint и migrate на maintenance host. Web API — blue-green, state в Redis/Postgres, kill A start B.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "use_cases_vs_alternatives",
+      "exampleType": "good",
+      "exampleText": "app-level checkpoint каждые N минут на disk — portable через kernel upgrades; criu только когда progress только в ram и restart дорогой",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "use_cases_vs_alternatives",
+      "exampleType": "bad",
+      "exampleText": "Для e-commerce zero-downtime всегда используют docker checkpoint между нодами вместо rolling update.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Не считаю CRIU production-grade для microservices. Перед migration — drain TCP, sync secrets/resolv.conf, test kernel match в staging.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "socket peer not found — long-lived tcp не переживает migration; --tcp-established fragile. DB лучше на volume с replication, не snapshot in-container",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "CRIU заменяет Postgres replication — просто checkpoint контейнер с postgres внутри и restore на другом хосте.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "limitations_experimental",
+      "exampleType": "good",
+      "exampleText": "docker checkpoint experimental, не GA; GPU state не мигрирует; Docker Desktop без CRIU; K8s KEP-2008 alpha.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "limitations_experimental",
+      "exampleType": "good",
+      "exampleText": "dump всей memory большого контейнера — секунды-минуты, это не instant live migration",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "limitations_experimental",
+      "exampleType": "bad",
+      "exampleText": "CRIU в Docker Desktop production-ready и GPU checkpoint работает из коробки.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "docker-live-migration-criu",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-live-migration-criu",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-live-migration-criu",
+    "difficulty": "SENIOR",
+    "titleEn": "How to live migrate a Docker container between hosts using CRIU?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T15:00:00.000Z"
+  }
+}

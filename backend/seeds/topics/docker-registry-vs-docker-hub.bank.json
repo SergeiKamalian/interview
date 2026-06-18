@@ -1,0 +1,612 @@
+{
+  "topic": {
+    "code": "docker_registry_vs_docker_hub",
+    "name": "Docker Registry vs Docker Hub",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "В чём разница между Docker registry и Docker Hub?",
+    "shortAnswer": "Docker registry — это любой сервис, который хранит и отдаёт образы по OCI Distribution Spec. Docker Hub — один конкретный публичный registry на docker.io, используемый по умолчанию, если в имени образа не указан префикс registry.",
+    "idealAnswer": "Registry — общий термин: сервер, который хранит и распространяет образы по OCI Distribution Spec (manifests, blobs, push/pull через HTTP). Docker Hub — конкретный публичный registry, который запускает Docker Inc на docker.io; это дефолт, когда в `docker pull nginx` нет префикса. Все OCI-совместимые registry говорят на одном протоколе — нет отдельного «протокола Docker Hub»; отличаются только хост, auth, сеть и лимиты. Имя образа: префикс до первого `/` — это registry (`ghcr.io`, `123456.dkr.ecr.us-east-1.amazonaws.com`, `harbor.example.com`); без префикса Docker считает docker.io. Docker Hub даёт бесплатные public repos, ограниченные private, Official Images (nginx, postgres), Verified Publisher, anonymous pull rate limit 100/6ч на IP, webhooks и UI hub.docker.com. В production обычно выбирают registry ближе к нагрузке: ECR для AWS, GCR/Artifact Registry для GCP, ACR для Azure, GHCR для GitHub-centric команд, Harbor для self-hosted/air-gapped. Типичный паттерн: build в CI → push в primary registry рядом с prod (иногда backup) → deploy оттуда. Pull-through cache/mirror решает CI-проблемы с rate limit Hub: первый pull идёт в Hub, дальше кластер/CI тянет из локального mirror (ECR pull-through, Harbor). Auth: `docker login` одинаков для всех, но механизм разный — PAT для Hub, IAM token для ECR (`aws ecr get-login-password`), GITHUB_TOKEN для GHCR, robot accounts в Harbor. Типичные ошибки: называть Docker Hub «the registry»; push без префикса ECR/GHCR — Docker пушит в Hub и даёт misleading denied; anonymous rate limit в shared CI NAT; self-hosted distribution без auth — read/write для всех; mirror настроен, но CI не залогинен в mirror. Один образ может жить в нескольких registry — tag для каждого и push. GHCR vs Hub: оба OCI, GHCR интегрирован с GitHub Actions и без Hub pull limits на public. Self-hosted: CNCF distribution (`registry:2`) для теста, Harbor для prod (auth, scanning, UI). Глобальный K8s: regional mirrors + hub-and-spoke replication, pull-through для public images.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "registry_vs_hub",
+      "title": "Отличает registry от Docker Hub",
+      "expected": "Кандидат объясняет: registry — общий тип сервиса для хранения/дистрибуции образов; Docker Hub — один конкретный публичный registry на docker.io, дефолт без префикса в имени образа.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — тип vs экземпляр, самая частая путаница",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "registry_vs_hub",
+            "oftenConfusedWith": [
+              "docker_hub_specifics",
+              "production_registry_choice"
+            ],
+            "anchorTermsExpected": [
+              "registry",
+              "Docker Hub",
+              "docker.io",
+              "тип",
+              "экземпляр",
+              "конкретн",
+              "дефолт",
+              "OCI"
+            ],
+            "anchorTermsWrongTopic": [
+              "registry это только Docker Hub",
+              "Docker Hub другой протокол",
+              "registry запускает контейнеры"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "registry",
+              "Docker Hub",
+              "docker.io"
+            ],
+            "ask": "чем registry как понятие отличается от Docker Hub конкретно"
+          }
+        ],
+        "mustConcepts": [
+          "registry",
+          "Docker Hub",
+          "docker.io",
+          "тип",
+          "экземпляр",
+          "конкретн",
+          "публичн",
+          "дефолт",
+          "по умолчанию",
+          "без префикса",
+          "хран",
+          "дистрибуц",
+          "образ",
+          "image",
+          "не единственн",
+          "один из",
+          "OCI"
+        ],
+        "falseClaims": [
+          "Docker Hub — единственный registry",
+          "registry и Docker Hub — синонимы",
+          "registry — это только docker.io",
+          "без Docker Hub нельзя использовать Docker",
+          "registry — это daemon dockerd"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "oci_distribution_spec",
+      "title": "Понимает OCI Distribution Spec",
+      "expected": "Кандидат объясняет: все OCI-совместимые registry используют один набор HTTP endpoints (manifests, blobs, push/pull); `docker push/pull` работает одинаково, отличается только хост и auth.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "общий протокол — почему ECR/GHCR/Harbor взаимозаменяемы на уровне клиента",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "registry_vs_hub",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "OCI",
+              "manifest",
+              "blob",
+              "Distribution Spec"
+            ],
+            "ask": "какие операции делает daemon при docker push и почему протокол один для всех registry"
+          }
+        ],
+        "mustConcepts": [
+          "OCI",
+          "Distribution Spec",
+          "manifest",
+          "blob",
+          "HTTP",
+          "endpoint",
+          "push",
+          "pull",
+          "один протокол",
+          "одинаков",
+          "совместим",
+          "формат образа",
+          "daemon",
+          "v2",
+          "digest",
+          "tag",
+          "нет отдельного протокола Hub"
+        ],
+        "falseClaims": [
+          "у Docker Hub свой уникальный протокол push/pull",
+          "ECR требует другой формат образа не OCI",
+          "docker push в Harbor работает иначе чем в Hub на уровне протокола",
+          "OCI Spec применяется только к Docker Hub",
+          "registry и runtime spec — одно и то же"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "image_name_prefix",
+      "title": "Знает префикс registry в имени образа",
+      "expected": "Кандидат объясняет: префикс до первого `/` — имя registry; `docker pull nginx` → implicit docker.io; для ECR/GHCR/Harbor нужен полный префикс в tag.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "quick example из ITLead — практический синтаксис имён",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "префикс",
+              "ghcr.io",
+              "ecr",
+              "docker.io"
+            ],
+            "ask": "как Docker понимает куда push/pull по имени образа"
+          }
+        ],
+        "mustConcepts": [
+          "префикс",
+          "до первого",
+          "docker.io",
+          "implicit",
+          "неявн",
+          "ghcr.io",
+          "ecr",
+          "harbor",
+          "tag",
+          "docker tag",
+          "полный путь",
+          "hostname",
+          "без префикса",
+          "library"
+        ],
+        "falseClaims": [
+          "docker push myapp:1.0 автоматически идёт в ECR",
+          "префикс registry необязателен для private registry",
+          "nginx без префикса тянется из ghcr.io",
+          "имя пользователя в Docker Hub заменяет префикс registry для ECR"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "docker_hub_specifics",
+      "title": "Знает особенности Docker Hub",
+      "expected": "Кандидат называет: Official Images, Verified Publisher, free public/private с лимитами, anonymous pull rate limit 100/6ч, webhooks, hub.docker.com UI; понимает что без extras Hub — просто большой registry.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "отличия Hub от generic registry — rate limit и curated images",
+        "confusionPairs": [
+          {
+            "checkpointKey": "docker_hub_specifics",
+            "oftenConfusedWith": [
+              "registry_vs_hub",
+              "pull_through_cache"
+            ],
+            "anchorTermsExpected": [
+              "Official Images",
+              "rate limit",
+              "100",
+              "anonymous",
+              "webhook",
+              "hub.docker.com"
+            ],
+            "anchorTermsWrongTopic": [
+              "Hub другой формат образа",
+              "Hub не OCI"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "rate limit",
+              "toomanyrequests",
+              "anonymous"
+            ],
+            "ask": "что такое anonymous pull rate limit Hub и когда он бьёт CI"
+          }
+        ],
+        "mustConcepts": [
+          "Official Images",
+          "Verified Publisher",
+          "rate limit",
+          "anonymous",
+          "100",
+          "6 час",
+          "toomanyrequests",
+          "free",
+          "public",
+          "private",
+          "webhook",
+          "hub.docker.com",
+          "Docker Inc",
+          "curated",
+          "nginx",
+          "postgres",
+          "PAT",
+          "personal access token"
+        ],
+        "falseClaims": [
+          "Docker Hub не имеет rate limits",
+          "anonymous pull безлимитный",
+          "Official Images — это отдельный протокол не OCI",
+          "Docker Hub — единственное место для public образов",
+          "webhooks Hub работают только с Kubernetes"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "production_registry_choice",
+      "title": "Выбирает registry для production",
+      "expected": "Кандидат сопоставляет контекст и registry: ECR для AWS, GCR/Artifact для GCP, ACR для Azure, GHCR для GitHub, Harbor для self-hosted/air-gapped; CI build → push primary → deploy; multi-registry для redundancy.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "when to use which — практический выбор middle",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "registry_vs_hub",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ECR",
+              "AWS",
+              "GCR",
+              "GHCR",
+              "Harbor"
+            ],
+            "ask": "какой registry выберешь для AWS production и почему не только Docker Hub"
+          },
+          {
+            "match": [
+              "air-gapped",
+              "self-hosted",
+              "multi-cloud"
+            ],
+            "ask": "как организовать registry в air-gapped или multi-cloud среде"
+          }
+        ],
+        "mustConcepts": [
+          "ECR",
+          "GCR",
+          "Artifact Registry",
+          "ACR",
+          "GHCR",
+          "Harbor",
+          "GitLab Registry",
+          "Quay",
+          "production",
+          "CI",
+          "build",
+          "push",
+          "deploy",
+          "VPC",
+          "egress",
+          "регион",
+          "self-hosted",
+          "air-gapped",
+          "redundancy",
+          "backup",
+          "миграц"
+        ],
+        "falseClaims": [
+          "в production всегда достаточно только Docker Hub",
+          "ECR работает только через kubectl без docker pull",
+          "Harbor несовместим с docker CLI",
+          "нельзя хранить один образ в двух registry",
+          "cloud registry всегда дороже Hub по egress"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: Hub как «the registry»; push без префикса ECR → denied в Hub; anonymous rate limit в shared CI; self-hosted registry без auth; mirror настроен но CI не authenticated.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — частые production/CI сбои",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "image_name_prefix",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "access denied",
+              "push",
+              "префикс"
+            ],
+            "ask": "почему docker push myapp:1.0 даёт denied когда целили в ECR"
+          },
+          {
+            "match": [
+              "mirror",
+              "registry-mirrors",
+              "credentials"
+            ],
+            "ask": "почему pull работает локально но падает в CI с настроенным mirror"
+          }
+        ],
+        "mustConcepts": [
+          "the registry",
+          "префикс",
+          "access denied",
+          "toomanyrequests",
+          "rate limit",
+          "NAT",
+          "CI",
+          "anonymous",
+          "docker login",
+          "self-hosted",
+          "без auth",
+          "distribution",
+          "mirror",
+          "registry-mirrors",
+          "credentials",
+          "misleading",
+          "оманлив"
+        ],
+        "falseClaims": [
+          "push без префикса всегда идёт в правильный private registry",
+          "open distribution registry без auth безопасен в production",
+          "mirror не требует отдельной аутентификации",
+          "rate limit Hub не влияет на CI за NAT",
+          "docker login не нужен для private ECR pull"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "pull_through_cache",
+      "title": "Понимает pull-through cache / mirror",
+      "expected": "Кандидат описывает цепочку CI/кластер → caching mirror → Docker Hub; первый pull кешируется, последующие быстрее и без burn rate limit.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "современный fix CI outages 2020-2021 из ITLead",
+        "mustConcepts": [
+          "pull-through",
+          "mirror",
+          "кеш",
+          "cache",
+          "ECR pull-through",
+          "Harbor",
+          "GAR",
+          "rate limit",
+          "CI",
+          "кластер",
+          "первый pull",
+          "последующ",
+          "быстр",
+          "ближн",
+          "сеть"
+        ],
+        "falseClaims": [
+          "pull-through cache меняет формат образа",
+          "mirror полностью заменяет need в docker login Hub навсегда без первого pull",
+          "pull-through работает только с Docker Hub private repos",
+          "кеш mirror не требует настройки credentials"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Registry — любой OCI-сервер для образов. Docker Hub — один такой сервер на docker.io, дефолт без префикса. В проде на AWS беру ECR — pull в том же регионе без egress. Hub удобен для open-source и Official Images, но anonymous rate limit 100/6ч ломает CI — ставлю pull-through mirror.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Все registry говорят OCI Distribution Spec — manifests и blobs по HTTP. docker push/pull одинаковы, меняется только хост и auth: PAT для Hub, aws ecr get-login-password для ECR. Один образ можно tagнуть в docker.io и ghcr.io и запушить в оба.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну hub это просто публичный registry от docker, а registry вообще — тип сервиса. без ghcr.io/ecr в имени docker думает что hub. в ci mirror перед hub чтобы не ловить toomanyrequests",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Docker registry и Docker Hub — одно и то же, других registry не существует. ECR использует другой формат образа не совместимый с docker pull.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker push myapp:1.0 сам найдёт наш ECR без префикса в tag. Self-hosted registry:2 можно открыть в интернет без auth — это норма для prod.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Rate limit Docker Hub — миф, anonymous pull безлимитный. registry-mirrors в daemon заменяет необходимость docker login полностью.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "registry_vs_hub",
+      "exampleType": "good",
+      "exampleText": "Registry — категория сервисов по OCI Spec. Docker Hub — конкретный публичный instance на docker.io, default когда нет префикса.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "registry_vs_hub",
+      "exampleType": "good",
+      "exampleText": "hub это один registry, как ecr или harbor — не путать тип с конкретным хостом",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "registry_vs_hub",
+      "exampleType": "bad",
+      "exampleText": "Registry — это синоним Docker Hub, других вариантов для docker push нет.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "oci_distribution_spec",
+      "exampleType": "good",
+      "exampleText": "OCI Distribution Spec: GET/PUT manifests, blobs — один API для Hub, ECR, GHCR, Harbor. Daemon не меняет команды, только endpoint.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "oci_distribution_spec",
+      "exampleType": "good",
+      "exampleText": "протокол v2 одинаковый — push в harbor и hub одни и те же http вызовы",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "oci_distribution_spec",
+      "exampleType": "bad",
+      "exampleText": "Docker Hub использует проприетарный протокол, ECR только через aws cli без OCI.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "image_name_prefix",
+      "exampleType": "good",
+      "exampleText": "docker pull nginx → docker.io/library/nginx implicit. Для ECR: 1234.dkr.ecr.us-east-1.amazonaws.com/myapp:1.0 — префикс обязателен.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "image_name_prefix",
+      "exampleType": "good",
+      "exampleText": "префикс до слэша — registry host, без него hub",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "image_name_prefix",
+      "exampleType": "bad",
+      "exampleText": "docker tag myapp:1.0 myapp:1.0 и push — Docker сам поймёт что это наш Harbor.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "docker_hub_specifics",
+      "exampleType": "good",
+      "exampleText": "Hub: Official Images nginx/postgres, anonymous 100 pulls/6h per IP, webhooks на push. Для busy CI за NAT — login или mirror.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "docker_hub_specifics",
+      "exampleType": "good",
+      "exampleText": "verified publisher bitnami/mongo, free public repos, private с лимитами — extras поверх обычного registry",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "docker_hub_specifics",
+      "exampleType": "bad",
+      "exampleText": "Docker Hub не ограничивает anonymous pulls, toomanyrequests бывает только на push.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "production_registry_choice",
+      "exampleType": "good",
+      "exampleText": "AWS prod → ECR same region, no egress. GitHub Actions → GHCR с GITHUB_TOKEN. Air-gapped bank → internal Harbor + one-way sync с public.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "production_registry_choice",
+      "exampleType": "good",
+      "exampleText": "ci build once, push primary ecr + backup ghcr, deploy from regional mirror в k8s",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "production_registry_choice",
+      "exampleType": "bad",
+      "exampleText": "Production всегда только Docker Hub — ECR и Harbor не нужны если есть интернет.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Говорить «запушь в registry» без имени — новички идут в Hub. Push myapp:1.0 без ecr prefix → denied в Hub, не в ECR.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "registry:2 на 5000 без auth в prod — любой может push. mirror в daemon но ci без login к mirror — pull fail только в pipeline",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Rate limit Hub не бывает в CI. Mirror автоматически наследует credentials с laptop разработчика.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "pull_through_cache",
+      "exampleType": "good",
+      "exampleText": "CI → Harbor pull-through → Hub: nginx тянется один раз, дальше из локального кеша, rate limit не горит.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "pull_through_cache",
+      "exampleType": "good",
+      "exampleText": "ecr pull-through cache для public images — быстрее и без hub anonymous limit",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "pull_through_cache",
+      "exampleType": "bad",
+      "exampleText": "Pull-through mirror полностью отключает необходимость Hub — образы появляются без первого upstream pull.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-registry-vs-docker-hub",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-registry-vs-docker-hub",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-registry-vs-docker-hub",
+    "difficulty": "MIDDLE",
+    "titleEn": "Docker registry vs Docker Hub: what is the difference?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

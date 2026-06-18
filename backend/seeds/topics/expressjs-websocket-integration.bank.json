@@ -1,0 +1,578 @@
+{
+  "topic": {
+    "code": "expressjs_websocket_integration",
+    "name": "Интеграция WebSocket с Express.js",
+    "skillCode": "expressjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как интегрировать WebSocket с Express.js?",
+    "shortAnswer": "Express сам не обрабатывает WebSocket upgrade: оборачиваем приложение в http.createServer(app), подключаем Socket.IO или ws к этому серверу и вызываем server.listen(). HTTP-маршруты и WebSocket делят один порт; raw http.Server отдаёт событие upgrade для 101 Switching Protocols.",
+    "idealAnswer": "WebSocket — полнодуплексное постоянное соединение: сервер может push-ить данные клиенту без цикла request-response. Express — цепочка middleware для HTTP: получил запрос, ответил, цикл завершён. WebSocket начинается как HTTP-запрос с заголовком Upgrade: websocket и ожидает 101 Switching Protocols; после handshake соединение уходит из HTTP в сырые TCP/WebSocket-фреймы. Событие upgrade живёт на raw Node http.Server, не на объекте Express app — поэтому app.listen() и new Server(app) не работают. Правильный паттерн: const server = http.createServer(app); const io = new Server(server, { cors: { origin: '...' } }); server.listen(3000). Express обслуживает /api/health, Socket.IO — ws:// на том же порту. Socket.IO (~50KB): rooms, namespaces, fallback на HTTP long-polling, auto-reconnect, Redis adapter для масштабирования. ws (~3KB): минимум зависимостей, кастомные протоколы, scaling вручную (sticky sessions). emit: socket.emit — одному клиенту; io.emit — всем; io.to(room).emit — комната включая отправителя; socket.to(room).emit — комната без отправителя. Rooms — динамические группы внутри namespace; namespaces — изолированные каналы io.of('/admin'). Когда WebSocket: чат, collaborative editing, live cursors, stock tickers, push notifications, progress bars, gaming lobbies, 10k+ CCU с Redis adapter. Когда polling/SSE: dashboard с refresh раз в 30 секунд. Простой REST без live updates — WebSocket не нужен. Типичные ошибки: new Server(app) → TypeError; отсутствие CORS на Socket.IO handshake; неправильная цель emit в rooms; нет cleanup на disconnect (утечка listeners при hot-reload); несколько Node-процессов без Redis adapter — io.emit достигает только клиентов текущего процесса. JWT: io.use middleware на handshake.auth.token до connection. Масштабирование: @socket.io/redis-adapter pub/sub между PM2 workers. Multi-region senior: sticky sessions недостаточны (~30% fail при рестарте LB); Redis Streams/Kafka для durable history, session tokens при reconnect, heartbeats и exponential backoff на клиенте.",
+    "maxScore": 10,
+    "skills": [
+      "expressjs",
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "ws_vs_http",
+      "title": "Отличает WebSocket от HTTP",
+      "expected": "Кандидат объясняет: HTTP — request-response, соединение закрывается; WebSocket — full-duplex persistent, сервер push-ит данные в реальном времени.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — walkie-talkie vs phone call",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "WebSocket",
+              "HTTP",
+              "full-duplex",
+              "push"
+            ],
+            "ask": "чем WebSocket отличается от обычного HTTP и polling"
+          }
+        ],
+        "mustConcepts": [
+          "WebSocket",
+          "HTTP",
+          "full-duplex",
+          "полнодуплекс",
+          "persistent",
+          "постоянн",
+          "push",
+          "request-response",
+          "запрос-ответ",
+          "real-time",
+          "реальн",
+          "соединение",
+          "двусторон"
+        ],
+        "falseClaims": [
+          "WebSocket это обычный HTTP polling",
+          "HTTP всегда двусторонний без upgrade",
+          "WebSocket закрывает соединение после каждого сообщения как HTTP",
+          "WebSocket не позволяет серверу отправлять данные без запроса клиента"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "http_create_server",
+      "title": "Знает http.createServer и upgrade",
+      "expected": "Кандидат: Express не перехватывает upgrade; нужен http.createServer(app) + server.listen(); Upgrade: websocket → 101 Switching Protocols на raw http.Server; new Server(app) — TypeError.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро интеграции — почему Express alone не работает",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "ws_vs_http",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "http_create_server",
+            "oftenConfusedWith": [
+              "ws_vs_http"
+            ],
+            "anchorTermsExpected": [
+              "http.createServer",
+              "upgrade",
+              "101",
+              "http.Server",
+              "server.listen"
+            ],
+            "anchorTermsWrongTopic": [
+              "Express middleware перехватывает websocket",
+              "app.listen достаточно для Socket.IO"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "http.createServer",
+              "upgrade",
+              "101"
+            ],
+            "ask": "почему нельзя передать express app напрямую в Socket.IO и что делает http.createServer"
+          }
+        ],
+        "mustConcepts": [
+          "http.createServer",
+          "app.listen",
+          "server.listen",
+          "upgrade",
+          "Upgrade: websocket",
+          "101",
+          "Switching Protocols",
+          "http.Server",
+          "raw",
+          "middleware",
+          "Socket.IO",
+          "new Server(app)",
+          "TypeError",
+          "handshake",
+          "TCP"
+        ],
+        "falseClaims": [
+          "new Server(app) работает без http.createServer",
+          "Express сам перехватывает upgrade event",
+          "app.listen() открывает WebSocket upgrade",
+          "WebSocket handshake остаётся в HTTP middleware chain навсегда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "socketio_vs_ws",
+      "title": "Сравнивает Socket.IO и ws",
+      "expected": "Кандидат: Socket.IO — rooms, namespaces, fallback polling, auto-reconnect, Redis adapter (~50KB); ws — 3KB minimal, scaling вручную.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "таблица ITLead socketio vs ws",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Socket.IO",
+              "ws",
+              "fallback",
+              "polling"
+            ],
+            "ask": "когда выбрать Socket.IO, а когда native ws"
+          }
+        ],
+        "mustConcepts": [
+          "Socket.IO",
+          "ws",
+          "rooms",
+          "namespace",
+          "fallback",
+          "long-polling",
+          "polling",
+          "auto-reconnect",
+          "переподключ",
+          "50KB",
+          "3KB",
+          "Redis adapter",
+          "sticky",
+          "production",
+          "minimal"
+        ],
+        "falseClaims": [
+          "ws имеет встроенные rooms и namespaces",
+          "Socket.IO не использует HTTP handshake",
+          "ws автоматически fallback на polling",
+          "Socket.IO всегда хуже ws по размеру и скорости без исключений"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "emit_patterns",
+      "title": "Понимает emit, rooms и namespaces",
+      "expected": "Кандидат: socket.emit — одному; io.emit — всем; io.to(room) — комната с sender; socket.to(room) — комната без sender; rooms vs namespaces.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "emit targets и rooms — частая production ошибка",
+        "confusionPairs": [
+          {
+            "checkpointKey": "emit_patterns",
+            "oftenConfusedWith": [
+              "socketio_vs_ws"
+            ],
+            "anchorTermsExpected": [
+              "socket.emit",
+              "io.emit",
+              "socket.to",
+              "io.to",
+              "room",
+              "namespace"
+            ],
+            "anchorTermsWrongTopic": [
+              "rooms это то же что namespaces",
+              "socket.emit broadcast всем"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "socket.emit",
+              "io.emit",
+              "socket.to",
+              "io.to"
+            ],
+            "ask": "разница socket.emit, io.emit, socket.to(room) и io.to(room) в чате"
+          },
+          {
+            "match": [
+              "room",
+              "namespace",
+              "io.of"
+            ],
+            "ask": "чем rooms отличаются от namespaces"
+          }
+        ],
+        "mustConcepts": [
+          "socket.emit",
+          "io.emit",
+          "socket.to",
+          "io.to",
+          "room",
+          "rooms",
+          "namespace",
+          "io.of",
+          "broadcast",
+          "sender",
+          "отправител",
+          "join",
+          "socket.join",
+          "комнат",
+          "admin"
+        ],
+        "falseClaims": [
+          "socket.emit отправляет сообщение всем клиентам",
+          "io.to(room) исключает отправителя",
+          "rooms и namespaces — одно и то же",
+          "socket.to(room) включает отправителя в broadcast"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "scaling_redis",
+      "title": "Знает масштабирование WebSocket",
+      "expected": "Кандидат: несколько Node-процессов — Redis adapter pub/sub; без него io.emit только текущий процесс; sticky sessions; 10k+ CCU.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Redis adapter — senior scaling из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Redis",
+              "adapter",
+              "pub/sub",
+              "PM2"
+            ],
+            "ask": "почему io.emit не работает между процессами без Redis adapter"
+          }
+        ],
+        "mustConcepts": [
+          "Redis adapter",
+          "redis-adapter",
+          "pub/sub",
+          "sticky",
+          "load balancer",
+          "балансиров",
+          "10k",
+          "процесс",
+          "cluster",
+          "PM2",
+          "multi-process",
+          "shard",
+          "failover",
+          "Kafka",
+          "Redis Streams"
+        ],
+        "falseClaims": [
+          "io.emit автоматически доходит до всех Node-процессов без adapter",
+          "sticky sessions полностью решают scaling без Redis",
+          "WebSocket не требует shared state между workers",
+          "один Node процесс достаточен для 10k+ без инфраструктуры"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда нужен WebSocket",
+      "expected": "Кандидат: chat, collab, live cursors, tickers — WebSocket; dashboard refresh 30s — polling; push-only — WS или SSE; простой REST — не нужен.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use таблица ITLead",
+        "mustConcepts": [
+          "chat",
+          "чат",
+          "collab",
+          "collaborative",
+          "live",
+          "cursor",
+          "ticker",
+          "polling",
+          "SSE",
+          "dashboard",
+          "дашборд",
+          "30 сек",
+          "REST",
+          "push notification",
+          "gaming"
+        ],
+        "falseClaims": [
+          "WebSocket нужен для любого REST API",
+          "HTTP polling всегда лучше WebSocket",
+          "SSE и WebSocket никогда не подходят для push",
+          "dashboard с редким refresh обязан использовать WebSocket"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки интеграции",
+      "expected": "Кандидат: new Server(app) TypeError; missing CORS на Socket.IO handshake; wrong emit target; нет disconnect cleanup; JWT через io.use.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes ITLead — CORS, cleanup, auth",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "http_create_server",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "CORS",
+              "cors",
+              "origin"
+            ],
+            "ask": "почему Socket.IO без CORS блокируется в браузере"
+          },
+          {
+            "match": [
+              "disconnect",
+              "cleanup",
+              "memory leak"
+            ],
+            "ask": "что будет без socket.on disconnect cleanup при hot-reload"
+          }
+        ],
+        "mustConcepts": [
+          "CORS",
+          "cors",
+          "origin",
+          "disconnect",
+          "cleanup",
+          "memory leak",
+          "утечк",
+          "TypeError",
+          "Server(app)",
+          "handshake.auth",
+          "JWT",
+          "io.use",
+          "connect_error",
+          "hot-reload",
+          "socket.off"
+        ],
+        "falseClaims": [
+          "CORS не нужен для Socket.IO потому что это WebSocket",
+          "disconnect handlers не обязательны на сервере",
+          "JWT проверяют только в REST middleware Express",
+          "браузер не блокирует Socket.IO handshake без cors config"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Express не видит upgrade — делаю http.createServer(app), Socket.IO на server с cors, server.listen(3000). HTTP /api/health и ws на одном порту. Для чата — rooms и socket.to(room) без sender; для 10k users — Redis adapter между PM2 workers.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "WebSocket — постоянная двусторонняя линия, сервер push-ит без запроса. Socket.IO беру для production chat: fallback polling, reconnect, rooms. ws — когда нужен минимальный бинарный протокол. Dashboard раз в 30 сек — хватит HTTP polling, WS overkill.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "const server = http.createServer(app); const io = new Server(server, { cors: { origin: frontendUrl } }); io.on connection → socket.emit welcome; io.use jwt на handshake.auth.token; disconnect cleanup; Redis adapter если cluster mode.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Подключаю Socket.IO так: new Server(expressApp) и app.listen — Express сам разберётся с websocket upgrade.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "WebSocket и HTTP одно и то же — polling каждую секунду это full-duplex. CORS для Socket.IO не нужен после upgrade.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "io.emit между двумя Node процессами работает из коробки; sticky sessions заменяют Redis adapter. socket.emit шлёт сообщение всей комнате.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "ws_vs_http",
+      "exampleType": "good",
+      "exampleText": "HTTP — спросил-получил-закрыл; WebSocket — линия открыта, сервер сам шлёт stock tickers и chat messages.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "ws_vs_http",
+      "exampleType": "good",
+      "exampleText": "ну websocket как звонок — оба говорят когда хотят, http как рация — только по очереди",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "ws_vs_http",
+      "exampleType": "bad",
+      "exampleText": "WebSocket это просто быстрый HTTP GET без постоянного соединения.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "http_create_server",
+      "exampleType": "good",
+      "exampleText": "http.createServer(app) даёт raw Server с событием upgrade → 101 Switching Protocols; Socket.IO вешается на server, не на express app.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "http_create_server",
+      "exampleType": "good",
+      "exampleText": "app.listen не подходит — нужен server.listen после createServer, иначе upgrade не перехватить",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "http_create_server",
+      "exampleType": "bad",
+      "exampleText": "Express middleware chain обрабатывает WebSocket frames после handshake так же как JSON body.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "socketio_vs_ws",
+      "exampleType": "good",
+      "exampleText": "Socket.IO — rooms, fallback, reconnect, Redis adapter; ws — 3KB, свой протокол, scaling руками.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "socketio_vs_ws",
+      "exampleType": "good",
+      "exampleText": "для trello-style collab — socket.io; для custom binary game protocol — ws",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "socketio_vs_ws",
+      "exampleType": "bad",
+      "exampleText": "ws из коробки делает long-polling fallback как Socket.IO.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "emit_patterns",
+      "exampleType": "good",
+      "exampleText": "chat message: socket.to(room).emit — остальные видят, sender уже локально; system event user-joined: io.to(room).emit всем.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "emit_patterns",
+      "exampleType": "good",
+      "exampleText": "rooms — socket.join chat1; namespaces — io.of('/admin') отдельный канал для админки",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "emit_patterns",
+      "exampleType": "bad",
+      "exampleText": "socket.emit('chat', msg) рассылает сообщение всей комнате включая всех пользователей сервера.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "scaling_redis",
+      "exampleType": "good",
+      "exampleText": "PM2 cluster: без Redis adapter io.emit из worker 1 не дойдёт до сокетов на worker 2; createAdapter pub/sub синхронизирует.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "scaling_redis",
+      "exampleType": "good",
+      "exampleText": "10k ccu — redis adapter + sticky; на failover senior — streams/kafka для replay пропущенных events",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "scaling_redis",
+      "exampleType": "bad",
+      "exampleText": "Достаточно sticky sessions — Redis adapter лишний для multi-process Socket.IO.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Discord-style chat — WebSocket; internal dashboard refresh 30s — polling; push-only notifications — WS или SSE.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "простой crud rest без live — websocket не тащу",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Любой Express API обязан поднимать WebSocket даже без realtime требований.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "CORS на Server(server, { cors: { origin } }) — handshake cross-origin; io.use jwt; socket.on disconnect снимает listeners.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "new Server(app) — TypeError; на клиенте useEffect return () => socket.off('chat')",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Socket.IO CORS не настраиваю — после upgrade браузер всё равно пропустит handshake.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "expressjs-websocket-integration",
+    "apiUrl": "https://api.itlead.org/api/questions/expressjs-websocket-integration",
+    "pageUrl": "https://itlead.org/interview-questions/expressjs/expressjs-websocket-integration",
+    "difficulty": "SENIOR",
+    "titleEn": "How to integrate WebSocket with Express.js?",
+    "categorySlug": "expressjs",
+    "syncedAt": "2026-06-18T14:45:00.183Z"
+  }
+}

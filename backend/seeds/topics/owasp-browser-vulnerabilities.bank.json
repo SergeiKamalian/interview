@@ -1,0 +1,594 @@
+{
+  "topic": {
+    "code": "owasp_browser_vulnerabilities",
+    "name": "OWASP: уязвимости браузера",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Какие основные браузерные уязвимости OWASP (XSS, CSRF, clickjacking) и как от них защищаться на фронтенде и в веб-приложении?",
+    "shortAnswer": "XSS — злоумышленник внедряет JavaScript в DOM; браузер выполняет его с доступом к cookies и localStorage. Защита: textContent вместо innerHTML, DOMPurify, CSP с nonce. CSRF — браузер автоматически шлёт cookies на cross-origin POST; fix: SameSite=Strict и CSRF-токены. Clickjacking — прозрачный iframe поверх кнопки; fix: X-Frame-Options или CSP frame-ancestors. Session cookie: HttpOnly + Secure + SameSite=Strict.",
+    "idealAnswer": "OWASP browser vulnerabilities — клиентские уязвимости, которые эксплуатируются через браузер: кража cookies, hijack сессии, действия от имени пользователя. XSS: innerHTML передаёт строку HTML-парсеру → строятся узлы DOM, срабатывают onerror/onclick → скрипт в контексте origin с полным доступом к document.cookie и localStorage. textContent создаёт текстовый узел без парсинга — безопасно для отображения пользовательского ввода. Варианты XSS: Stored — payload в БД, срабатывает у всех посетителей; Reflected — в URL, сервер эхоит без экранирования; DOM-based — payload в location.hash, сервер не видит #, санитизация только на клиенте. CSRF: браузер прикрепляет cookies к любому запросу на домен, в т.ч. cross-origin POST с чужой страницы. SameSite=Strict блокирует cookies на cross-site запросах; для API с cross-origin — CSRF token в форме + проверка на сервере. GET не должен менять состояние; POST/PUT/DELETE — token или Strict. Clickjacking: страница жертвы в прозрачном iframe над «выиграй приз» → клик попадает на «подтвердить перевод». X-Frame-Options: DENY или CSP frame-ancestors 'none'. CSP ограничивает источники script-src; unsafe-inline обнуляет защиту — нужны nonce на каждый запрос. Типичные ошибки: сервер экранирует &lt;script&gt;, клиент делает innerHTML — парсер декодирует обратно; DOM XSS из hash без DOMPurify; HttpOnly без Secure на HTTP — MITM перехватит cookie; только Referer для CSRF — ненадёжно. React: dangerouslySetInnerHTML только с DOMPurify.sanitize; Vue v-html — тот же риск; Angular экранирует bindings, bypassSecurityTrustHtml — red flag. Express helmet ставит CSP/HSTS/X-Frame-Options. Контекстно-зависимое экранирование: HTML body, attribute, JS string, URL, CSS — разные правила; DOMPurify покрывает HTML, regex почти никогда. OWASP ZAP в CI для автоматического сканирования.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "xss_threat_model",
+      "title": "Понимает механизм XSS",
+      "expected": "Кандидат объясняет: XSS — инъекция скрипта в DOM; innerHTML парсит HTML и выполняет onerror/script; textContent безопасен; скрипт в origin имеет доступ к cookies и localStorage.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — innerHTML vs textContent и threat model",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "xss_threat_model",
+            "oftenConfusedWith": [
+              "xss_variants"
+            ],
+            "anchorTermsExpected": [
+              "innerHTML",
+              "textContent",
+              "HTML-парсер",
+              "cookie",
+              "localStorage",
+              "onerror"
+            ],
+            "anchorTermsWrongTopic": [
+              "только серверная санитизация",
+              "SameSite блокирует XSS"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "innerHTML",
+              "textContent"
+            ],
+            "ask": "чем innerHTML отличается от textContent при вставке пользовательского ввода"
+          }
+        ],
+        "mustConcepts": [
+          "XSS",
+          "innerHTML",
+          "textContent",
+          "HTML-парсер",
+          "парсер",
+          "onerror",
+          "script",
+          "cookie",
+          "localStorage",
+          "document.cookie",
+          "инъекц",
+          "DOM",
+          "выполн",
+          "origin",
+          "Same-Origin",
+          "текстовый узел",
+          "без парсинга"
+        ],
+        "falseClaims": [
+          "textContent парсит HTML как innerHTML",
+          "XSS работает только на сервере",
+          "Same-Origin Policy блокирует XSS-скрипт уже внутри страницы",
+          "innerHTML безопасен если сервер экранировал строку"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "xss_variants",
+      "title": "Различает Stored, Reflected и DOM-based XSS",
+      "expected": "Кандидат сравнивает три типа: stored в БД для всех пользователей; reflected в URL при клике жертвы; DOM-based в hash — сервер не видит payload.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "три варианта XSS — ключевой блок ITLead и follow-up вопрос",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "xss_threat_model",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "stored",
+              "reflected",
+              "DOM"
+            ],
+            "ask": "чем stored, reflected и DOM-based XSS отличаются по точке входа"
+          },
+          {
+            "match": [
+              "location.hash",
+              "hash",
+              "фрагмент"
+            ],
+            "ask": "почему DOM-based XSS обходит серверную санитизацию"
+          }
+        ],
+        "mustConcepts": [
+          "stored",
+          "храним",
+          "reflected",
+          "отражён",
+          "DOM-based",
+          "DOM XSS",
+          "база данных",
+          "БД",
+          "URL",
+          "query",
+          "параметр",
+          "location.hash",
+          "hash",
+          "фрагмент",
+          "сервер не видит",
+          "комментарий",
+          "масштаб"
+        ],
+        "falseClaims": [
+          "reflected и stored — одно и то же",
+          "DOM-based XSS виден серверу в HTTP-запросе",
+          "stored XSS срабатывает только у автора payload",
+          "reflected XSS не требует действия жертвы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "csrf_protection",
+      "title": "Знает CSRF и защиту",
+      "expected": "Кандидат объясняет: браузер шлёт cookies на cross-origin POST; SameSite=Strict блокирует; CSRF token для state-changing endpoints; GET не меняет состояние.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "CSRF — второй столп OWASP browser vulnerabilities",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "SameSite",
+              "Strict"
+            ],
+            "ask": "как SameSite=Strict блокирует CSRF без токена"
+          },
+          {
+            "match": [
+              "token",
+              "токен",
+              "POST"
+            ],
+            "ask": "когда нужен CSRF token помимо SameSite"
+          }
+        ],
+        "mustConcepts": [
+          "CSRF",
+          "cross-origin",
+          "кросс-домен",
+          "cookie",
+          "автоматич",
+          "credentials",
+          "SameSite",
+          "Strict",
+          "Lax",
+          "токен",
+          "token",
+          "POST",
+          "PUT",
+          "DELETE",
+          "state-changing",
+          "изменяет состояние",
+          "GET",
+          "форма",
+          "fetch",
+          "automatic cookie attach",
+          "cross-origin POST",
+          "Referer unreliable",
+          "X-Requested-With header"
+        ],
+        "falseClaims": [
+          "GET безопасен для удаления пользователя",
+          "проверка Referer всегда достаточна для CSRF",
+          "SameSite не влияет на CSRF",
+          "CSRF возможен только без cookies",
+          "GET transfer money ok",
+          "CSRF impossible with cookies"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "clickjacking_fix",
+      "title": "Знает clickjacking и защиту от iframe",
+      "expected": "Кандидат описывает: прозрачный iframe поверх кнопки; X-Frame-Options: DENY; CSP frame-ancestors 'none' как современная замена.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "clickjacking из таблицы attack overview",
+        "mustConcepts": [
+          "clickjacking",
+          "iframe",
+          "прозрач",
+          "overlay",
+          "наложен",
+          "X-Frame-Options",
+          "DENY",
+          "SAMEORIGIN",
+          "frame-ancestors",
+          "CSP",
+          "Content-Security-Policy",
+          "клик",
+          "жертва",
+          "transparent overlay",
+          "prize button trap",
+          "SAMEORIGIN framing",
+          "frame-ancestors none",
+          "DENY all frames"
+        ],
+        "falseClaims": [
+          "clickjacking — разновидность XSS с тем же fix",
+          "iframe всегда безопасен для встраивания чужих страниц",
+          "CSP script-src защищает от clickjacking",
+          "clickjacking = XSS same",
+          "iframe sandbox enough always"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "csp_and_sanitization",
+      "title": "Понимает CSP и санитизацию вывода",
+      "expected": "Кандидат: CSP script-src с nonce, не unsafe-inline; DOMPurify перед innerHTML/dangerouslySetInnerHTML; серверное экранирование бесполезно при client innerHTML.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "CSP + common mistakes — частая production-ошибка",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "CSP",
+              "nonce",
+              "unsafe-inline"
+            ],
+            "ask": "почему unsafe-inline обнуляет CSP и как работает nonce"
+          },
+          {
+            "match": [
+              "DOMPurify",
+              "dangerouslySetInnerHTML",
+              "v-html"
+            ],
+            "ask": "как безопасно рендерить user HTML в React/Vue"
+          }
+        ],
+        "mustConcepts": [
+          "CSP",
+          "Content-Security-Policy",
+          "nonce",
+          "unsafe-inline",
+          "script-src",
+          "DOMPurify",
+          "sanitize",
+          "санитиз",
+          "dangerouslySetInnerHTML",
+          "v-html",
+          "helmet",
+          "innerHTML",
+          "вывод",
+          "контекст",
+          "whitelist",
+          "белый список"
+        ],
+        "falseClaims": [
+          "script-src unsafe-inline безопасен с CSP",
+          "серверное &lt;script&gt; экранирование защищает при client innerHTML",
+          "CSP заменяет необходимость DOMPurify для user HTML",
+          "dangerouslySetInnerHTML безопасен если данные из своей БД"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "cookie_security",
+      "title": "Знает флаги безопасности cookie",
+      "expected": "Кандидат называет комбинацию HttpOnly + Secure + SameSite=Strict; HttpOnly не защищает от MITM без Secure на HTTPS.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Set-Cookie flags из common mistakes ITLead",
+        "mustConcepts": [
+          "HttpOnly",
+          "Secure",
+          "SameSite",
+          "Set-Cookie",
+          "session",
+          "сессия",
+          "MITM",
+          "HTTPS",
+          "HTTP",
+          "перехват",
+          "JavaScript",
+          "читать cookie",
+          "plain HTTP intercept",
+          "Secure HTTPS only",
+          "SameSite Strict CSRF",
+          "HttpOnly XSS read block",
+          "session hijack"
+        ],
+        "falseClaims": [
+          "HttpOnly защищает cookie от перехвата по сети",
+          "session cookie на HTTP безопасен с HttpOnly",
+          "Secure не обязателен при HTTPS",
+          "SameSite нужен только для CSRF, не для XSS",
+          "HttpOnly stops network sniff",
+          "HTTP session cookie ok"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки защиты",
+      "expected": "Кандидат: DOM XSS из location.hash; server escape + client innerHTML; контекстно-зависимое экранирование; GET не меняет state; JSONP callback whitelist.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "common mistakes и senior follow-up про context-aware escaping",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "location.hash",
+              "hash",
+              "DOM"
+            ],
+            "ask": "как защититься от XSS через URL fragment"
+          },
+          {
+            "match": [
+              "контекст",
+              "attribute",
+              "escaping"
+            ],
+            "ask": "почему одно экранирование не подходит для HTML, JS и URL"
+          }
+        ],
+        "mustConcepts": [
+          "location.hash",
+          "hash",
+          "фрагмент",
+          "сервер escape",
+          "client innerHTML",
+          "контекст",
+          "escaping",
+          "экранирован",
+          "HTML attribute",
+          "JavaScript string",
+          "URL",
+          "CSS",
+          "regex",
+          "GET state",
+          "JSONP",
+          "callback",
+          "whitelist",
+          "iptables UDP 443",
+          "Wireshark quic filter",
+          "load test h2 fallback",
+          "Cloudflare 0-RTT GET"
+        ],
+        "falseClaims": [
+          "один regex санитизатор покрывает все контексты",
+          "hash отправляется на сервер в HTTP-запросе",
+          "санитизация только на сервере достаточна при SPA",
+          "JSONP callback без whitelist безопасен",
+          "QUIC всегда быстрее на LAN",
+          "HPACK на h3 сервере ок"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "XSS: пользовательский ввод в DOM — через textContent или DOMPurify.sanitize перед innerHTML. CSP с nonce на каждый запрос, без unsafe-inline. CSRF: SameSite=Strict на session cookie + токен на POST. Clickjacking: frame-ancestors 'none'. Cookie: HttpOnly; Secure; SameSite=Strict.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Stored XSS в комментарии бьёт всех посетителей — DOMPurify на клиенте и сервере. Reflected — эхо query без escape. DOM-based — hash не уходит на сервер, читаю location.hash только через DOMPurify. CSRF: банк получает POST с cookie пока юзер на evil.com — Strict режет. innerHTML декодирует &lt;script&gt; обратно в тег.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В React dangerouslySetInnerHTML только с DOMPurify — имя prop намеренное. Express helmet ставит CSP и X-Frame-Options. Для Markdown: парс на сервере без raw HTML, на клиенте DOMPurify, CSP nonce. ZAP в CI ловит reflected XSS.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Санитизирую ввод на сервере — XSS невозможен. innerHTML с экранированными данными безопасен. CSP с unsafe-inline норм для legacy. GET /delete?id=1 — ок для удаления.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "HttpOnly достаточно, Secure не нужен на HTTP в dev. Referer header всегда есть — CSRF не страшен. Clickjacking лечится script-src CSP.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "DOM XSS невозможен — сервер фильтрует все URL. textContent и innerHTML одинаково парсят теги. dangerouslySetInnerHTML безопасен для контента из своей БД.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "xss_threat_model",
+      "exampleType": "good",
+      "exampleText": "innerHTML отдаёт строку HTML-парсеру — onerror выполняется, cookie утекает. textContent — литерал на экране, код не запускается.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "xss_threat_model",
+      "exampleType": "good",
+      "exampleText": "ну xss — вставили скрипт в dom, браузер выполнил в контексте сайта, document.cookie доступен",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "xss_threat_model",
+      "exampleType": "bad",
+      "exampleText": "textContent тоже парсит <img onerror> и выполняет JavaScript как innerHTML.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "xss_variants",
+      "exampleType": "good",
+      "exampleText": "Stored — script в БД в комментарии, все видят. Reflected — ?q=<script> в URL. DOM-based — #payload в hash, клиент пишет в innerHTML без сервера.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "xss_variants",
+      "exampleType": "good",
+      "exampleText": "stored самый опасный — масштабируется на всех юзеров без клика по ссылке",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "xss_variants",
+      "exampleType": "bad",
+      "exampleText": "DOM-based XSS сервер видит в query string и фильтрует на backend.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "csrf_protection",
+      "exampleType": "good",
+      "exampleText": "Жертва залогинена, evil.com шлёт POST на bank.com/transfer — браузер прикрепляет cookie. SameSite=Strict не шлёт cookie с чужого origin.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "csrf_protection",
+      "exampleType": "good",
+      "exampleText": "для api с cross-origin — lax + csrf token в форме, сервер сверяет перед transfer",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "csrf_protection",
+      "exampleType": "bad",
+      "exampleText": "GET /api/delete-user?id=5 — нормальный REST, CSRF не при чём.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "clickjacking_fix",
+      "exampleType": "good",
+      "exampleText": "Прозрачный iframe с bank.com поверх кнопки «приз» — клик попадает на confirm transfer. X-Frame-Options: DENY запрещает встраивание.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "clickjacking_fix",
+      "exampleType": "good",
+      "exampleText": "csp frame-ancestors none — современная замена x-frame-options",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "clickjacking_fix",
+      "exampleType": "bad",
+      "exampleText": "Clickjacking — это XSS через innerHTML, лечится DOMPurify.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "csp_and_sanitization",
+      "exampleType": "good",
+      "exampleText": "CSP script-src 'nonce-rAnd0m' — inline без nonce не выполняется. unsafe-inline отключает смысл CSP.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "csp_and_sanitization",
+      "exampleType": "good",
+      "exampleText": "dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(c.text) }} — onerror и javascript: вырезаны",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "csp_and_sanitization",
+      "exampleType": "bad",
+      "exampleText": "Сервер отдал &lt;script&gt; — безопасно вставить через innerHTML, браузер покажет текст.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "cookie_security",
+      "exampleType": "good",
+      "exampleText": "Set-Cookie: session=abc; HttpOnly; Secure; SameSite=Strict — JS не читает, только HTTPS, не уходит cross-site.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "cookie_security",
+      "exampleType": "good",
+      "exampleText": "httpOnly без secure на http — mitm всё равно перехватит сессию",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "cookie_security",
+      "exampleType": "bad",
+      "exampleText": "HttpOnly полностью защищает session cookie от перехвата в сети даже без HTTPS.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "location.hash → DOMPurify → innerHTML. Hash не в HTTP — серверная фильтрация бесполезна.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "контекстное экранирование: payload безопасен в html body но опасен в attr или js string — dompurify для html",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Один replace(/<script>/gi, '') на сервере закрывает XSS во всех контекстах включая hash и innerHTML.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "owasp-browser-vulnerabilities",
+    "apiUrl": "https://api.itlead.org/api/questions/owasp-browser-vulnerabilities",
+    "pageUrl": "https://itlead.org/interview-questions/general/owasp-browser-vulnerabilities",
+    "difficulty": "MIDDLE",
+    "titleEn": "OWASP browser vulnerabilities",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

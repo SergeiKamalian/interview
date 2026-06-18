@@ -1,0 +1,579 @@
+{
+  "topic": {
+    "code": "expressjs_database_patterns",
+    "name": "Паттерны интеграции БД в Express.js",
+    "skillCode": "expressjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Какие лучшие паттерны интеграции базы данных используют в Express.js?",
+    "shortAnswer": "Паттерны интеграции БД в Express.js определяют, где живёт SQL и как приложение общается с базой. Repository Pattern — дефолт для production: SQL в отдельных классах, pool инжектится через конструктор, unit-тесты без реальной БД. Direct Query подходит только для прототипов. ORM (Prisma, Sequelize) — schema-first и type safety; Service Layer добавляют, когда в маршрутах появляется бизнес-логика.",
+    "idealAnswer": "Express не навязывает способ работы с БД — выбор паттерна влияет на тестируемость, поддержку и скорость отладки. Direct Query: SQL прямо в route handler — быстро для POC, но на 50 маршрутах дублирование и grep по всему коду; тесты требуют реальную БД или сложный patching. Repository Pattern: SQL для сущности в одном классе, pool через constructor — меняешь запрос один раз, mock pool в тестах: { query: jest.fn().mockResolvedValue({ rows: [...] }) }. Это production default для большинства приложений. ORM: Prisma — type-safe client, schema-first, меньше контроля над SQL; Sequelize — legacy, associations; Knex — query builder + migrations, высокий контроль SQL. Service Layer поверх репозиториев: duplicate email check, welcome email, webhook — не в route и не в repository. Сравнение: Direct — минуты setup, poor testability; Repository — часы, excellent; ORM Prisma — type safety, low SQL control; Service+Repository — best testability при реальной business logic. Connection pooling: pool.query() → драйвер (pg, mysql2) берёт соединение из пула, async без блокировки других запросов; max: 20 — 21-й ждёт; connectionTimeoutMillis; утечка без client.release() навсегда уменьшает пул. Repository не меняет pooling — только оборачивает pool.query(). Типичные ошибки: (1) забыть client.release() — pool shrink; finally { client.release() }; (2) N+1 в цикле — 1 + N запросов, fix JOIN или eager loading; (3) SQL injection через string interpolation — parameterized $1; (4) нет statement_timeout — pool exhaustion на медленных отчётах; (5) app.listen без проверки БД — fail fast SELECT 1. Транзакции: client = pool.connect(), BEGIN, методы репозитория с client (не pool), COMMIT/ROLLBACK в finally + release; transferMoney пример — оба UPDATE атомарно. Read replicas (senior): отдельные пулы read/write, SELECT на replica, INSERT/UPDATE/DELETE на primary; replication lag — read-after-write на primary или eventual consistency. Production: Express+pg с Repository (Stripe, Airbnb); Prisma в стартапах; Sequelize legacy enterprise.",
+    "maxScore": 10,
+    "skills": ["expressjs", "javascript", "nodejs"]
+  },
+  "checkpoints": [
+    {
+      "key": "repository_pattern",
+      "title": "Понимает Repository Pattern",
+      "expected": "Кандидат объясняет: SQL в классе сущности, pool инжектится через constructor; mock pool в тестах без реальной БД; production default вместо SQL в route.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — Repository как production default",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "repository_pattern",
+            "oftenConfusedWith": ["pattern_selection", "service_layer"],
+            "anchorTermsExpected": [
+              "Repository",
+              "репозитор",
+              "constructor",
+              "inject",
+              "pool",
+              "mock",
+              "тест",
+              "SQL изолир"
+            ],
+            "anchorTermsWrongTopic": [
+              "ORM заменяет repository",
+              "repository это ORM",
+              "SQL только в route"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["Repository", "репозитор", "pool", "constructor"],
+            "ask": "почему обёртка pool.query() в класс упрощает unit-тесты"
+          }
+        ],
+        "mustConcepts": [
+          "Repository",
+          "репозитор",
+          "UserRepository",
+          "constructor",
+          "inject",
+          "pool",
+          "mock",
+          "jest.fn",
+          "SQL изолир",
+          "route handler",
+          "маршрут",
+          "тестируем",
+          "production default",
+          "dependency injection",
+          "класс",
+          "метод getAll",
+          "findById"
+        ],
+        "falseClaims": [
+          "Repository меняет результат запроса к БД",
+          "Repository обязателен даже для одноразовых скриптов",
+          "без Repository нельзя использовать connection pool",
+          "Repository и ORM — одно и то же"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "pattern_selection",
+      "title": "Выбирает паттерн по контексту",
+      "expected": "Кандидат сравнивает Direct Query (POC), Repository (production), ORM Prisma/Sequelize (schema, type safety), Knex (SQL + migrations), Service+Repository (business logic); знает trade-offs testability vs setup.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "when to use + comparison table ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "repository_pattern",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "pattern_selection",
+            "oftenConfusedWith": ["orm_options", "service_layer"],
+            "anchorTermsExpected": [
+              "Direct Query",
+              "Repository",
+              "ORM",
+              "Prisma",
+              "Sequelize",
+              "Knex",
+              "POC",
+              "production"
+            ],
+            "anchorTermsWrongTopic": [
+              "ORM всегда лучше Repository",
+              "Direct Query для production команды"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "Direct Query",
+          "прямой запрос",
+          "Repository",
+          "ORM",
+          "Prisma",
+          "Sequelize",
+          "Knex",
+          "Query Builder",
+          "Service Layer",
+          "POC",
+          "прототип",
+          "production",
+          "testability",
+          "SQL control",
+          "type safety",
+          "schema-first",
+          "legacy",
+          "migrations",
+          "comparison",
+          "trade-off"
+        ],
+        "falseClaims": [
+          "Direct Query — best practice для production с 2+ разработчиками",
+          "ORM всегда даёт полный контроль над SQL",
+          "Knex — это ORM без SQL",
+          "Service Layer заменяет Repository"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "connection_pooling",
+      "title": "Понимает connection pooling",
+      "expected": "Кандидат описывает: pool.query → драйвер pg/mysql2 → async без блокировки; max лимит, ожидание 21-го; connectionTimeoutMillis; утечка без release сжимает пул; Repository не меняет pooling.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "pool mechanics — частая production тема senior",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": ["pool", "max", "release", "утеч"],
+            "ask": "что происходит когда pool исчерпан и client.release() не вызван"
+          },
+          {
+            "match": ["pg", "mysql2", "драйвер", "async"],
+            "ask": "как pool.query обрабатывает запрос без блокировки других request"
+          }
+        ],
+        "mustConcepts": [
+          "connection pool",
+          "пул",
+          "pool.query",
+          "pg",
+          "mysql2",
+          "драйвер",
+          "max",
+          "connectionTimeoutMillis",
+          "client.release",
+          "release",
+          "утеч",
+          "leak",
+          "async",
+          "не блокир",
+          "соединен",
+          "ожидан",
+          "free up",
+          "освобод"
+        ],
+        "falseClaims": [
+          "Repository отключает connection pooling",
+          "pool.query блокирует весь Node.js event loop",
+          "без release соединение вернётся в пул автоматически",
+          "max в pool — необязательный параметр без последствий"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "db_common_mistakes",
+      "title": "Знает типичные ошибки работы с БД",
+      "expected": "Кандидат называет: забытый release; N+1 в цикле vs JOIN; SQL injection и parameterized queries; statement_timeout; fail-fast SELECT 1 при старте.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "5 common mistakes из ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "connection_pooling",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["N+1", "цикл", "JOIN"],
+            "ask": "как N+1 в цикле исправить одним JOIN или eager loading"
+          },
+          {
+            "match": ["injection", "инъек", "parameter", "$1"],
+            "ask": "почему string interpolation в SQL опасна и как parameterized query защищает"
+          },
+          {
+            "match": ["statement_timeout", "timeout", "408"],
+            "ask": "как медленный report может исчерпать pool без timeout"
+          }
+        ],
+        "mustConcepts": [
+          "client.release",
+          "finally",
+          "N+1",
+          "цикл",
+          "JOIN",
+          "json_agg",
+          "eager loading",
+          "SQL injection",
+          "инъек",
+          "parameterized",
+          "$1",
+          "string interpolation",
+          "statement_timeout",
+          "408",
+          "pool exhaustion",
+          "SELECT 1",
+          "fail fast",
+          "ECONNREFUSED",
+          "startup",
+          "process.exit"
+        ],
+        "falseClaims": [
+          "N+1 не проблема при 100 пользователях",
+          "parameterized queries не нужны для внутренних API",
+          "app.listen без проверки БД — нормальный production паттерн",
+          "statement_timeout замедляет все запросы навсегда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "service_layer",
+      "title": "Понимает Service Layer",
+      "expected": "Кандидат объясняет: сервис над репозиториями для business logic — duplicate email, welcome email, webhook; route только вызывает сервис и отвечает HTTP.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Service + Repository example ITLead",
+        "probeConceptGroups": [
+          {
+            "match": ["Service", "сервис", "business logic", "email"],
+            "ask": "когда добавлять Service Layer поверх репозиториев, а не расширять route"
+          }
+        ],
+        "mustConcepts": [
+          "Service Layer",
+          "UserService",
+          "business logic",
+          "бизнес-лог",
+          "duplicate email",
+          "welcome email",
+          "webhook",
+          "side effect",
+          "route",
+          "маршрут",
+          "репозитор",
+          "createUser",
+          "409",
+          "multi-step",
+          "границ",
+          "ответственност"
+        ],
+        "falseClaims": [
+          "вся логика должна быть в route handler",
+          "Repository должен отправлять email",
+          "Service Layer заменяет Repository и pool",
+          "CRUD всегда достаточно без Service"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "orm_options",
+      "title": "Знает ORM и query builder",
+      "expected": "Кандидат сравнивает Prisma (type-safe, schema-first), Sequelize (legacy associations), Knex (migrations + SQL control); упоминает N+1 с lazy loading в ORM.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "real-world usage + ORM N+1 follow-up ITLead",
+        "mustConcepts": [
+          "Prisma",
+          "Sequelize",
+          "Knex",
+          "TypeORM",
+          "ORM",
+          "type-safe",
+          "schema-first",
+          "lazy loading",
+          "eager loading",
+          "include",
+          "associations",
+          "legacy",
+          "migrations",
+          "NestJS",
+          "Bookshelf",
+          "Objection"
+        ],
+        "falseClaims": [
+          "ORM полностью исключает N+1",
+          "Prisma не поддерживает eager loading",
+          "Sequelize — рекомендуемый выбор для новых greenfield проектов всегда",
+          "Knex генерирует schema из decorators"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "transactions_replicas",
+      "title": "Знает транзакции и read replicas",
+      "expected": "Кандидат описывает: client + BEGIN/COMMIT/ROLLBACK + release; передача client в методы repo; read/write pools, replication lag, read-after-write.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "advanced transferMoney + senior replica follow-up ITLead",
+        "probeConceptGroups": [
+          {
+            "match": ["BEGIN", "COMMIT", "ROLLBACK", "transaction", "транзак"],
+            "ask": "как transferMoney гарантирует атомарность двух UPDATE"
+          },
+          {
+            "match": ["replica", "replication lag", "read-after-write", "primary"],
+            "ask": "проблема replication lag после write и как её смягчить"
+          }
+        ],
+        "mustConcepts": [
+          "transaction",
+          "транзак",
+          "BEGIN",
+          "COMMIT",
+          "ROLLBACK",
+          "client",
+          "pool.connect",
+          "transferMoney",
+          "атомар",
+          "консистент",
+          "read replica",
+          "replication lag",
+          "read-after-write",
+          "primary",
+          "write pool",
+          "read pool",
+          "eventual consistency",
+          "SELECT primary",
+          "INSERT UPDATE DELETE"
+        ],
+        "falseClaims": [
+          "два отдельных pool.query без транзакции атомарны",
+          "replica всегда возвращает свежие данные сразу после write",
+          "ROLLBACK не нужен если первый UPDATE успешен",
+          "транзакции возможны только через ORM"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Production default — Repository: UserRepository(pool), SQL в классе, mock pool в тестах. Direct Query только POC. Service Layer когда duplicate email + welcome email. pool.query async через pg; finally client.release(); parameterized $1 против injection; N+1 — JOIN вместо цикла.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На проекте: repositories/user.repository.js с inject pool, routes тонкие — userService.createUser. Prisma рассматривал для сложной schema, выбрали pg+Repository ради SQL control. Старт: pool.query('SELECT 1') до listen. Report route — statement_timeout 5s.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "transferMoney: connect, BEGIN, два UPDATE одним client, COMMIT или ROLLBACK, release в finally. Read replicas — отдельные пулы, после signup читаю с primary 2 сек из-за lag.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "SQL прямо в каждом app.get — так проще, Repository overengineering. pool.connect без release — Node сам вернёт соединение. WHERE name = '${req.query.name}' — быстрее чем placeholders.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "ORM решает всё — N+1 не бывает. app.listen сразу, если БД упала — узнаем на первом запросе, это нормально. Service Layer не нужен, email шлём из route после INSERT.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "100 users в цикле — по одному SELECT posts на user, 101 query это OK для PostgreSQL. Repository и ORM — синонимы, Prisma заменяет pooling.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "repository_pattern",
+      "exampleType": "good",
+      "exampleText": "UserRepository constructor(pool) — в тесте mockPool.query = jest.fn(), route тестирую без Postgres.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "repository_pattern",
+      "exampleType": "good",
+      "exampleText": "репозиторий не меняет sql результат — меняет что можно подменить pool в unit test",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "repository_pattern",
+      "exampleType": "bad",
+      "exampleText": "Repository — это когда ORM генерирует классы автоматически из schema.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "pattern_selection",
+      "exampleType": "good",
+      "exampleText": "POC — direct query; команда 3 dev + unit tests — Repository; сложные relations + TS — Prisma; legacy Sequelize associations.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "pattern_selection",
+      "exampleType": "good",
+      "exampleText": "Knex когда нужны migrations в коде и контроль SQL без full ORM",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "pattern_selection",
+      "exampleType": "bad",
+      "exampleText": "Direct Query в production — стандарт Stripe и Airbnb, Repository устарел.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "connection_pooling",
+      "exampleType": "good",
+      "exampleText": "max:20 — 21-й request ждёт free connection или падает по connectionTimeoutMillis",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "connection_pooling",
+      "exampleType": "good",
+      "exampleText": "забытый release после connect — каждый такой request навсегда минус одно соединение из пула",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "connection_pooling",
+      "exampleType": "bad",
+      "exampleText": "Repository создаёт свой отдельный pool на каждый HTTP request.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "db_common_mistakes",
+      "exampleType": "good",
+      "exampleText": "N+1: for user query posts — fix LEFT JOIN json_agg posts одним запросом",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "db_common_mistakes",
+      "exampleType": "good",
+      "exampleText": "startup: pool.query SELECT 1 then listen — fail fast ECONNREFUSED",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "db_common_mistakes",
+      "exampleType": "good",
+      "exampleText": "SET statement_timeout 5000 на client перед тяжёлым report — 408 вместо pool hang",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "db_common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "SQL injection только проблема PHP — в Node template strings безопасны.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "service_layer",
+      "exampleType": "good",
+      "exampleText": "UserService.createUser: findByEmail → 409, create, sendWelcome — route только res.status(201)",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "service_layer",
+      "exampleType": "good",
+      "exampleText": "одна и та же логика signup и admin create user — в сервис, не копировать в два route",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "service_layer",
+      "exampleType": "bad",
+      "exampleText": "duplicate check в route перед repo.create — Service Layer лишний слой абстракции.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "orm_options",
+      "exampleType": "good",
+      "exampleText": "Prisma include posts: true — eager loading против N+1 от lazy user.posts",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "orm_options",
+      "exampleType": "good",
+      "exampleText": "Sequelize legacy enterprise associations; greenfield часто Prisma или raw Repository",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "orm_options",
+      "exampleType": "bad",
+      "exampleText": "ORM user.posts в цикле — это просто property access, запросов в БД нет.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "transactions_replicas",
+      "exampleType": "good",
+      "exampleText": "transferMoney ROLLBACK если второй UPDATE fail — первый не остаётся списанным",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "transactions_replicas",
+      "exampleType": "good",
+      "exampleText": "write primary read replica — после register читаю profile с primary секунду из-за lag",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "transactions_replicas",
+      "exampleType": "bad",
+      "exampleText": "BEGIN/COMMIT не нужны — PostgreSQL сам откатит при ошибке между двумя query.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "expressjs-database-patterns",
+    "apiUrl": "https://api.itlead.org/api/questions/expressjs-database-patterns",
+    "pageUrl": "https://itlead.org/interview-questions/expressjs/expressjs-database-patterns",
+    "difficulty": "SENIOR",
+    "titleEn": "What are the best database integration patterns in Express.js?",
+    "categorySlug": "expressjs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

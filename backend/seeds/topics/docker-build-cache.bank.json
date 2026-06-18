@@ -1,0 +1,590 @@
+{
+  "topic": {
+    "code": "docker_build_cache",
+    "name": "Docker Build Cache",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работает Docker build cache и как им управлять?",
+    "shortAnswer": "Docker build cache сохраняет результат каждой инструкции Dockerfile, чтобы при пересборке переиспользовать слой при совпадении cache key. Ключ = digest предыдущего слоя + текст инструкции + (для COPY/ADD) digest копируемых файлов. Порядок от стабильного к волатильному критичен: один промах инвалидирует все шаги ниже. BuildKit cache mounts (`RUN --mount=type=cache`) хранят кэш между сборками вне слоёв образа.",
+    "idealAnswer": "Docker build cache — это разница между 60-секундной и 2-секундной пересборкой. После каждой инструкции Dockerfile Docker сохраняет получившийся слой в кэше. При rebuild для каждой инструкции вычисляется cache key: совпадение → слой переиспользуется; промах → инструкция выполняется заново и инвалидирует всё ниже по цепочке. Компоненты cache key: digest предыдущего слоя (цепочка важна), текст самой инструкции, для COPY/ADD — digest каждого копируемого файла, для RUN — только строка команды; Docker не анализирует, что команда реально делает или что изменилось во внешнем мире. Пример: FROM alpine → WORKDIR → COPY package.json → RUN npm ci кэшируются, пока package.json не менялся; COPY src/ инвалидируется при любом изменении файла в src/. Ключевой инсайт: COPY/ADD хешируют содержимое файлов, RUN — нет. `RUN apt-get install curl` даст cache hit даже если в upstream apt появилась новая версия curl. Оптимальный порядок: стабильные дорогие шаги (установка зависимостей) — выше, часто меняющийся source — ниже. Антипаттерн: COPY . . до RUN npm ci — любое изменение кода инвалидирует установку зависимостей. Правильно: COPY package*.json → RUN npm ci → COPY . . — при изменении только кода пересобирается последний COPY и ниже. BuildKit cache mounts (`RUN --mount=type=cache,target=/path`) персистят кэш пакетных менеджеров между сборками, не попадая в слой образа: pip `/root/.cache/pip`, npm `/root/.npm`, apt `/var/cache/apt`, Go `/go/pkg/mod`. В CI эфемерные runner не имеют локального кэша — нужен `docker buildx build --cache-from type=registry,ref=... --cache-to type=registry,ref=...,mode=max` или GitHub Actions `type=gha`. Обход: `--no-cache` (всё с нуля), `--pull` (перепроверить digest базового образа FROM; если digest тот же — FROM и ниже могут остаться cached), ARG CACHEBUST для точечной инвалидации с середины Dockerfile. Типичные ошибки: COPY . . перед install; apt-get update и apt-get install в разных RUN (update может закэшироваться, install — из stale package list); RUN curl ... | sh никогда не обновится, пока не изменится строка команды — нужен ARG с checksum. Управление: `docker system df`, `docker buildx du`, `docker builder prune`, `DOCKER_BUILDKIT=1 docker build --progress=plain` показывает CACHED vs RUN. Multi-stage: stage deps инвалидируется только при смене package*.json; cache mount npm переживает между сборками; изменения source пересобирают только build stage.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "cache_key_mechanism",
+      "title": "Понимает как вычисляется cache key",
+      "expected": "Кандидат объясняет компоненты cache key: digest предыдущего слоя, текст инструкции, для COPY/ADD — digest файлов, для RUN — только строка команды без анализа результата.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ядро темы — механизм cache key из ITLead TL;DR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "cache key",
+              "ключ кэш",
+              "digest",
+              "COPY",
+              "RUN"
+            ],
+            "ask": "чем отличается cache key для COPY и для RUN — что Docker хеширует"
+          }
+        ],
+        "mustConcepts": [
+          "cache key",
+          "ключ кэш",
+          "digest",
+          "предыдущ",
+          "слой",
+          "цепочк",
+          "инструкц",
+          "COPY",
+          "ADD",
+          "RUN",
+          "хеш",
+          "содержим",
+          "файл",
+          "строка команд",
+          "не анализ",
+          "не смотр",
+          "результат команды",
+          "байт",
+          "package.json"
+        ],
+        "falseClaims": [
+          "Docker хеширует результат выполнения RUN",
+          "cache key для RUN включает содержимое скачанных файлов",
+          "cache key не зависит от предыдущего слоя",
+          "COPY и RUN используют одинаковую логику cache key",
+          "изменение upstream apt автоматически инвалидирует RUN apt-get install"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "cache_invalidation_chain",
+      "title": "Понимает цепочку инвалидации",
+      "expected": "Кандидат объясняет: промах cache на любом шаге инвалидирует все последующие инструкции; digest предыдущего слоя входит в ключ следующего.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "цепочка digest — ключевой инсайт ITLead invalidation diagram",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "cache_key_mechanism",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "инвалид",
+              "miss",
+              "промах",
+              "ниже",
+              "цепоч"
+            ],
+            "ask": "что происходит со всеми шагами после COPY src/, если изменился один файл"
+          }
+        ],
+        "mustConcepts": [
+          "инвалид",
+          "invalidat",
+          "cache miss",
+          "промах",
+          "цепоч",
+          "digest",
+          "предыдущ",
+          "слой",
+          "ниже",
+          "последующ",
+          "пересобир",
+          "reuse",
+          "переиспольз",
+          "CACHED",
+          "hit"
+        ],
+        "falseClaims": [
+          "промах на одном шаге не влияет на шаги ниже",
+          "Docker кэширует каждый шаг независимо от предыдущих",
+          "изменение src/ не инвалидирует RUN npm ci выше по Dockerfile",
+          "CMD всегда кэшируется даже если предыдущий шаг пересобран"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "instruction_order",
+      "title": "Знает оптимальный порядок инструкций",
+      "expected": "Кандидат описывает паттерн deps first, source last: COPY package*.json → RUN install → COPY source; объясняет почему COPY . . до install — cache-killer.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "главный практический skill — 60s vs 2s rebuild из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "cache_invalidation_chain",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "instruction_order",
+            "oftenConfusedWith": [
+              "buildkit_cache_mounts"
+            ],
+            "anchorTermsExpected": [
+              "package.json",
+              "deps first",
+              "source last",
+              "COPY . .",
+              "npm ci",
+              "порядок"
+            ],
+            "anchorTermsWrongTopic": [
+              "cache mount заменяет порядок",
+              "multi-stage не нужен"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "COPY . .",
+              "npm ci",
+              "package"
+            ],
+            "ask": "почему COPY . . перед RUN npm ci убивает кэш на каждое изменение кода"
+          },
+          {
+            "match": [
+              "стабильн",
+              "волатильн",
+              "deps",
+              "source"
+            ],
+            "ask": "как упорядочить шаги от стабильных к часто меняющимся"
+          }
+        ],
+        "mustConcepts": [
+          "порядок",
+          "стабильн",
+          "волатильн",
+          "deps first",
+          "source last",
+          "package.json",
+          "package*.json",
+          "npm ci",
+          "COPY . .",
+          "до install",
+          "после install",
+          "cache-killer",
+          "60 секунд",
+          "2 секунд",
+          "requirements.txt",
+          "зависимост"
+        ],
+        "falseClaims": [
+          "порядок инструкций не влияет на cache hit rate",
+          "COPY . . перед install — нормальный паттерн для production",
+          "npm ci всегда кэшируется независимо от того, что скопировано выше",
+          "WORKDIR влияет на cache key сильнее чем COPY"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "buildkit_cache_mounts",
+      "title": "Знает BuildKit cache mounts",
+      "expected": "Кандидат объясняет RUN --mount=type=cache: кэш живёт вне слоя образа, персистит между сборками; отличает от обычных image layers; называет targets pip/npm/apt.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "BuildKit mounts — ключевое отличие от layer cache в ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "cache mount",
+              "type=cache",
+              "--mount"
+            ],
+            "ask": "чем cache mount отличается от обычного слоя образа"
+          },
+          {
+            "match": [
+              "pip",
+              "npm",
+              "apt",
+              "target="
+            ],
+            "ask": "типичные target paths для pip, npm, apt cache mounts"
+          }
+        ],
+        "mustConcepts": [
+          "BuildKit",
+          "cache mount",
+          "--mount=type=cache",
+          "target=",
+          "вне слоя",
+          "не часть образа",
+          "между сборк",
+          "pip",
+          "/root/.cache/pip",
+          "npm",
+          "/root/.npm",
+          "apt",
+          "/var/cache/apt",
+          "wheel",
+          "sharing=locked",
+          "docker/dockerfile",
+          "syntax="
+        ],
+        "falseClaims": [
+          "cache mount становится частью финального образа",
+          "cache mount и layer cache — одно и то же",
+          "BuildKit cache mounts работают без BuildKit",
+          "cache mount инвалидируется при каждом COPY source"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "ci_cache_sharing",
+      "title": "Понимает sharing кэша в CI",
+      "expected": "Кандидат объясняет: CI runner эфемерен — локального кэша нет; buildx --cache-from/--cache-to type=registry или GHA; cold runner прогревается из registry cache.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up Q про CI never hits cache из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "CI",
+              "runner",
+              "cache-from",
+              "registry"
+            ],
+            "ask": "почему CI build не hit cache без cache-from и как это исправить"
+          }
+        ],
+        "mustConcepts": [
+          "CI",
+          "runner",
+          "эфемерн",
+          "чист",
+          "buildx",
+          "cache-from",
+          "cache-to",
+          "type=registry",
+          "mode=max",
+          "registry",
+          "type=gha",
+          "GitHub Actions",
+          "build-push-action",
+          "холодн",
+          "warm",
+          "cross-runner",
+          "10 минут",
+          "90 секунд"
+        ],
+        "falseClaims": [
+          "CI runner сохраняет локальный Docker cache между job",
+          "type=local подходит для ephemeral CI runner",
+          "cache-from не нужен если Dockerfile оптимизирован",
+          "registry cache и layer cache в CI работают одинаково без настройки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки cache",
+      "expected": "Кандидат называет: COPY до install; apt-get update и install в разных RUN; RUN curl|sh не обновляется; bind mount vs COPY для dev; ARG SHA для принудительной инвалидации RUN.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Common mistakes блок ITLead — apt split RUN, RUN literal string",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "instruction_order",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "apt-get update",
+              "apt-get install",
+              "отдельн RUN"
+            ],
+            "ask": "почему apt-get update и install в разных RUN опасны для кэша"
+          },
+          {
+            "match": [
+              "curl",
+              "installer.sh",
+              "ARG",
+              "sha256"
+            ],
+            "ask": "как заставить RUN с curl пересобираться при смене installer"
+          }
+        ],
+        "mustConcepts": [
+          "COPY до install",
+          "apt-get update",
+          "apt-get install",
+          "один RUN",
+          "stale package list",
+          "curl",
+          "installer",
+          "литеральн",
+          "строка команд",
+          "ARG",
+          "INSTALLER_SHA",
+          "sha256sum",
+          "CACHEBUST",
+          "bind mount",
+          "dev",
+          "editor save",
+          "rm -rf /var/lib/apt/lists"
+        ],
+        "falseClaims": [
+          "apt-get update и install можно безопасно разнести по разным RUN",
+          "RUN curl | sh автоматически подхватывает новую версию скрипта",
+          "bind mount в Dockerfile решает проблему cache invalidation на каждый save",
+          "ARG CACHEBUST инвалидирует только FROM"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "cache_bypass_management",
+      "title": "Знает обход и управление кэшем",
+      "expected": "Кандидат называет --no-cache, --pull (только если digest FROM изменился), builder prune, buildx du, --progress=plain для отладки CACHED vs RUN.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "inspecting/management — бонус middle из ITLead",
+        "mustConcepts": [
+          "--no-cache",
+          "--pull",
+          "digest FROM",
+          "builder prune",
+          "buildx du",
+          "system df",
+          "progress=plain",
+          "CACHED",
+          "until=72h",
+          "BUILD_REV",
+          "build-arg"
+        ],
+        "falseClaims": [
+          "--pull всегда инвалидирует весь Dockerfile",
+          "--no-cache сохраняет cache mounts между сборками",
+          "builder prune удаляет только dangling images, не build cache"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Cache key = digest предыдущего слоя + текст инструкции. Для COPY package.json — hash файла; для RUN npm ci — только строка команды, Docker не знает что apt/npm обновились. Поэтому deps копирую первыми, source — в конце: смена кода не перезапускает npm ci. BuildKit mount type=cache для /root/.npm держит wheels вне слоя.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На CI runner кэша нет — buildx с cache-from/cache-to type=registry, ref myapp:cache. Локально COPY package*.json → npm ci → COPY . . — rebuild кода ~2 сек вместо минуты. apt update и install в одном RUN, иначе update закэшируется отдельно. Для curl installer добавляю ARG с SHA.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Промах на COPY src/ инвалидирует CMD ниже, но RUN npm ci выше остаётся CACHED если package.json не менялся. --pull перепроверяет FROM digest; если node:22-alpine тот же — цепочка intact. Отладка: DOCKER_BUILDKIT=1 docker build --progress=plain.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Docker кэширует по timestamp файлов. RUN apt-get install всегда подтягивает последнюю версию пакета из репозитория при cache hit.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "COPY . . в начале Dockerfile — best practice, порядок не важен. CI runner хранит build cache между pipeline автоматически.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Cache mount type=cache попадает в финальный образ и раздувает image size. --pull всегда пересобирает все слои с нуля.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "cache_key_mechanism",
+      "exampleType": "good",
+      "exampleText": "Для COPY Docker хеширует байты каждого файла; для RUN — только literal command string, результат выполнения не входит в key.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "cache_key_mechanism",
+      "exampleType": "good",
+      "exampleText": "ну ключ — digest прошлого слоя плюс текст инструкции, для copy ещё hash файлов",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "cache_key_mechanism",
+      "exampleType": "bad",
+      "exampleText": "RUN npm ci cache key включает содержимое node_modules после установки.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "cache_invalidation_chain",
+      "exampleType": "good",
+      "exampleText": "Изменился один файл в src/ — COPY src/ miss, и все инструкции ниже пересобираются, потому что digest цепочки сбился.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "cache_invalidation_chain",
+      "exampleType": "good",
+      "exampleText": "cache hit на FROM и WORKDIR, miss на COPY — RUN npm ci тоже miss, хотя package.json не менялся",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "cache_invalidation_chain",
+      "exampleType": "bad",
+      "exampleText": "CMD кэшируется независимо — промах на COPY src/ не влияет на последующие шаги.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "instruction_order",
+      "exampleType": "good",
+      "exampleText": "COPY package*.json → RUN npm ci → COPY . . — при правке одного ts-файла пересобирается только COPY и дальше, npm ci остаётся CACHED.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "instruction_order",
+      "exampleType": "good",
+      "exampleText": "стабильное сверху: requirements.txt + pip install, волатильное снизу: COPY app code",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "instruction_order",
+      "exampleType": "bad",
+      "exampleText": "COPY . . сразу после FROM — нормально, Docker умный и не перезапускает npm ci без нужды.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "buildkit_cache_mounts",
+      "exampleType": "good",
+      "exampleText": "RUN --mount=type=cache,target=/root/.cache/pip — wheels живут в отдельном cache store, не в layer; второй build с тем же requirements.txt быстрее.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "buildkit_cache_mounts",
+      "exampleType": "good",
+      "exampleText": "npm mount /root/.npm — слой чистый, кэш пакетов переживает rebuild",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "buildkit_cache_mounts",
+      "exampleType": "bad",
+      "exampleText": "Cache mount записывает /root/.npm прямо в финальный образ как обычный RUN layer.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "ci_cache_sharing",
+      "exampleType": "good",
+      "exampleText": "GitHub Actions: cache-from/cache-to type=gha mode=max в build-push-action — runner эфемерен, registry/GHA хранит cache между job.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "ci_cache_sharing",
+      "exampleType": "good",
+      "exampleText": "buildx --cache-to type=registry,ref=myapp:cache,mode=max — следующий runner читает --cache-from того же ref",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "ci_cache_sharing",
+      "exampleType": "bad",
+      "exampleText": "Оптимизированный Dockerfile достаточен — CI автоматически reuse layer cache с предыдущего pipeline на том же runner forever.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "apt-get update && apt-get install в одном RUN — иначе update закэшируется, install тянет пакеты из stale list.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "curl installer.sh | sh — строка RUN не меняется, скрипт на сервере обновился — слой stale; добавляю ARG INSTALLER_SHA.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "RUN apt-get update отдельно от install — так проще читать Dockerfile и cache безопасен.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "cache_bypass_management",
+      "exampleType": "good",
+      "exampleText": "docker build --no-cache — полный rebuild; --pull только если digest FROM изменился; docker builder prune -af чистит build cache.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "cache_bypass_management",
+      "exampleType": "good",
+      "exampleText": "ARG CACHEBUST=$(date +%s) с середины Dockerfile — инвалидирую только нижнюю половину",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "cache_bypass_management",
+      "exampleType": "bad",
+      "exampleText": "--pull гарантированно инвалидирует все слои даже если base image digest тот же.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-build-cache",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-build-cache",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-build-cache",
+    "difficulty": "MIDDLE",
+    "titleEn": "How does Docker build cache work and how to manage it?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

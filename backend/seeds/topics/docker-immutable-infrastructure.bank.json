@@ -1,0 +1,527 @@
+{
+  "topic": {
+    "code": "docker_immutable_infrastructure",
+    "name": "Immutable infrastructure с Docker",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое immutable infrastructure и как Docker помогает её реализовать?",
+    "shortAnswer": "Immutable infrastructure — после деплоя runtime-инстанс никогда не меняют in-place: обновления делают через сборку нового артефакта (image) и замену старого контейнера. В Docker image read-only, контейнеры дёшево пересоздавать; состояние (БД, файлы, сессии) живёт снаружи — в volumes или managed-сервисах.",
+    "idealAnswer": "Immutable infrastructure — философия деплоя: развернув runtime-инстанс, его **никогда не модифицируют на месте**. Патчи, конфиги и обновления — через **новый артефакт** (image, VM, контейнер) и замену старого. Mutable-подход: SSH, apt upgrade, правка конфигов на диске — «snowflake servers», drift между staging и prod. Immutable: «релиз = image tag 1.7.3», все контейнеры из одного digest, конфиги через env или mount при старте, новая версия = новый image + redeploy — «phoenix servers». Docker естественно поддерживает immutability: image read-only, container = disposable instance, redeploy = stop + start нового. Состояние **обязательно вынести наружу**: бинарник и runtime — в image; env-специфичные конфиги — env vars или mounted files; secrets — Vault, AWS Secrets Manager, Docker Secrets; user data и БД — managed DB или persistent volume; uploads — S3; logs — Loki/ELK/CloudWatch; sessions — Redis/JWT, не in-memory одного контейнера. Данные на writable layer контейнера ломают модель — при замене всё теряется. Преимущества: reproducibility (dev = staging = prod), easy rollback (deploy предыдущего tag), no config drift, auditability (digest → git SHA через build labels), дисциплина CI вместо «починил по SSH». Trade-offs: upfront cost externalization, solid CI pipeline, image size влияет на redeploy, cold-start без warm cache. Паттерны: blue-green (blue v1, green v2, flip LB), canary (10% на v2), rolling update (Swarm/K8s заменяет tasks). Pinning по digest (`image@sha256:...`) — tag можно перезаписать, digest нет. Антипаттерны: `docker exec` + vi config (fix исчезнет при restart), данные в writable layer, переиспользование `:latest` в prod, config baked в image (`COPY config/prod.yaml`), hot-reload через exec в prod. Volumes — mutable state, это OK для externalized data, но migration может corrupt данные для следующего deploy. Restart контейнера допустим — не меняет image. Immutable достижима и без контейнеров (AMI, Packer, Terraform), но Docker делает rebuild+redeploy быстрым и дешёвым.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "immutable_definition",
+      "title": "Понимает immutable vs mutable",
+      "expected": "Кандидат объясняет: immutable — после деплоя инстанс не патчат in-place, изменения через замену новым артефактом; mutable — SSH, apt, правка конфигов на диске, drift и snowflake servers.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — замена instance вместо patch in-place",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "immutable_definition",
+            "oftenConfusedWith": [
+              "docker_immutable_model",
+              "benefits_rollback"
+            ],
+            "anchorTermsExpected": [
+              "immutable",
+              "mutable",
+              "замен",
+              "не модифиц",
+              "in-place",
+              "snowflake",
+              "phoenix",
+              "drift"
+            ],
+            "anchorTermsWrongTopic": [
+              "restart ломает immutable",
+              "immutable только Kubernetes",
+              "mutable это Docker по умолчанию"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "immutable",
+              "mutable",
+              "snowflake",
+              "phoenix"
+            ],
+            "ask": "чем mutable-подход с SSH и patch отличается от immutable с заменой артефакта"
+          }
+        ],
+        "mustConcepts": [
+          "immutable",
+          "mutable",
+          "неизменяем",
+          "in-place",
+          "patch",
+          "патч",
+          "замен",
+          "артефакт",
+          "snowflake",
+          "phoenix",
+          "drift",
+          "дрейф",
+          "SSH",
+          "apt",
+          "конфиг на диске",
+          "идентичн",
+          "reproduc"
+        ],
+        "falseClaims": [
+          "immutable означает что контейнер нельзя перезапустить",
+          "mutable и immutable дают одинаковый drift",
+          "immutable = никогда не обновлять сервер",
+          "immutable достижима только с Kubernetes"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "docker_immutable_model",
+      "title": "Знает модель Docker: image и redeploy",
+      "expected": "Кандидат описывает: image = unit of deploy (read-only артефакт), container = disposable instance; новая версия = новый tag + redeploy; без apt-get upgrade и SSH-fix на running container.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "связка Docker и immutability — ключ ITLead TL;DR",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "immutable_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "image",
+              "container",
+              "redeploy",
+              "tag"
+            ],
+            "ask": "как в Docker выглядит обновление версии приложения без patch running container"
+          }
+        ],
+        "mustConcepts": [
+          "image",
+          "container",
+          "read-only",
+          "артефакт",
+          "tag",
+          "redeploy",
+          "stop",
+          "replace",
+          "замен",
+          "disposable",
+          "одноразов",
+          "docker build",
+          "docker push",
+          "compose pull",
+          "up -d",
+          "kubectl set image",
+          "без apt",
+          "без SSH"
+        ],
+        "falseClaims": [
+          "docker exec для правки config — нормальный prod-паттерн",
+          "apt-get upgrade в running container соответствует immutable",
+          "image можно менять после запуска контейнера",
+          "container и image — одно и то же mutable-хранилище"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "externalized_state",
+      "title": "Понимает внешнее состояние",
+      "expected": "Кандидат перечисляет что внутри image (binary, runtime), что снаружи (DB, secrets, uploads, logs, sessions); writable layer контейнера не для persistent data.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "externalization — обязательное условие immutability из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "volume",
+              "DATABASE_URL",
+              "secret",
+              "S3"
+            ],
+            "ask": "куда выносить БД, secrets и uploads при immutable Docker"
+          },
+          {
+            "match": [
+              "writable layer",
+              "persistent",
+              "Redis",
+              "session"
+            ],
+            "ask": "почему in-memory sessions и данные на writable layer ломают immutable"
+          }
+        ],
+        "mustConcepts": [
+          "external",
+          "внешн",
+          "state",
+          "состоян",
+          "volume",
+          "persistent",
+          "DATABASE_URL",
+          "Redis",
+          "secret",
+          "Vault",
+          "S3",
+          "object storage",
+          "log aggregator",
+          "Loki",
+          "CloudWatch",
+          "session",
+          "JWT",
+          "writable layer",
+          "managed",
+          "RDS",
+          "env var",
+          "mount"
+        ],
+        "falseClaims": [
+          "все данные можно хранить внутри контейнера при immutable",
+          "volume делает контейнер полностью immutable без mutable state",
+          "secrets должны bake-иться в Dockerfile",
+          "logs в файле внутри контейнера — OK для prod immutable"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "benefits_rollback",
+      "title": "Знает преимущества и rollback",
+      "expected": "Кандидат называет: reproducibility, no config drift, auditability (digest → git SHA), easy rollback через deploy предыдущего tag; упоминает trade-off — cost externalization и solid CI.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "wins, rollback и audit — ключевая ценность immutable из ITLead",
+        "mustConcepts": [
+          "reproduc",
+          "воспроизвод",
+          "rollback",
+          "откат",
+          "drift",
+          "audit",
+          "digest",
+          "git SHA",
+          "build label",
+          "docker inspect",
+          "старый tag",
+          "identical",
+          "bit-identical",
+          "CI",
+          "trade-off",
+          "cold-start"
+        ],
+        "falseClaims": [
+          "rollback при immutable сложнее чем при mutable SSH",
+          "один tag всегда гарантирует один и тот же digest",
+          "immutable убирает необходимость CI",
+          "config drift неизбежен даже при immutable"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "deployment_patterns",
+      "title": "Связывает с blue-green, canary, rolling",
+      "expected": "Кандидат объясняет: blue-green — два окружения, flip traffic; canary — постепенная замена реплик; rolling update — по одной замене tasks; все assume identical immutable replicas.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "deployment patterns из examples ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "blue-green",
+              "canary",
+              "rolling"
+            ],
+            "ask": "как blue-green или canary работают с immutable containers"
+          }
+        ],
+        "mustConcepts": [
+          "blue-green",
+          "canary",
+          "rolling",
+          "rolling update",
+          "load balancer",
+          "traffic flip",
+          "replica",
+          "реплик",
+          "Swarm",
+          "Kubernetes",
+          "docker service update",
+          "замен",
+          "идентичн",
+          "digest",
+          "sha256"
+        ],
+        "falseClaims": [
+          "blue-green требует mutable patch на месте",
+          "canary = in-place upgrade running container",
+          "rolling update меняет файлы внутри старого контейнера",
+          "digest pinning не нужен в production"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "anti_patterns_mistakes",
+      "title": "Знает антипаттерны и типичные ошибки",
+      "expected": "Кандидат называет: docker exec + vi config, данные на writable layer, `:latest` в prod, config baked в image, hot-reload через exec; volumes — mutable state, migration corruption.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "anti-patterns и common mistakes — частые prod-ошибки ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "externalized_state",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "docker exec",
+              "vi",
+              "SSH"
+            ],
+            "ask": "почему правка config через docker exec ломает immutable"
+          },
+          {
+            "match": [
+              "latest",
+              "COPY config",
+              "volume",
+              "migration"
+            ],
+            "ask": "типичные ошибки: latest tag, prod config в Dockerfile, volume corruption"
+          }
+        ],
+        "mustConcepts": [
+          "docker exec",
+          "anti-pattern",
+          "антипаттерн",
+          "writable layer",
+          "latest",
+          "semver",
+          "git SHA",
+          "COPY config",
+          "baked",
+          "hot-reload",
+          "volume",
+          "migration",
+          "corrupt",
+          "portable",
+          "run-time",
+          "mount",
+          "env-inject",
+          "fix в repo",
+          "rebuild",
+          "redeploy"
+        ],
+        "falseClaims": [
+          "docker exec fix сохраняется после restart контейнера",
+          "latest tag безопасен для production deploy",
+          "COPY prod.yaml в image — portable across environments",
+          "volume полностью immutable и не требует осторожности"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Immutable — после деплоя контейнер не трогаем: новая версия = docker build, push tag, compose pull && up -d. БД и Redis снаружи через DATABASE_URL. Откат — deploy предыдущего tag 1.7.2. Не делаем docker exec vi config.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Mutable — ssh prod, правим yaml, restart; через год prod-1 и prod-4 разъехались. Immutable — image 1.7.4 один digest везде, blue-green: green подняли, LB переключили, blue убили. Secrets из Vault mount, не в image.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Image read-only артефакт, container disposable. State external: S3 для uploads, Loki для logs, sessions в Redis. Pin digest sha256 в prod manifest. Rolling update в Swarm — каждый task новый container из нового image.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Immutable infrastructure — это когда контейнер никогда не перезапускаем. Все данные храним внутри контейнера, при обновлении делаем apt upgrade внутри running container.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В prod деплоим :latest, конфиг копируем COPY config/prod.yaml в Dockerfile — так portable. Если баг — docker exec bash и vi /etc/api/config.yaml, быстрее чем CI.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Blue-green требует mutable patch на каждом сервере. Volume делает контейнер полностью immutable, migration на volume не может corrupt данные.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "immutable_definition",
+      "exampleType": "good",
+      "exampleText": "Immutable — замена целого instance новым артефактом; mutable — patch in-place, snowflake servers и drift.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "immutable_definition",
+      "exampleType": "good",
+      "exampleText": "ну immutable — не лезем ssh править сервер, а собираем новый image и меняем контейнер целиком",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "immutable_definition",
+      "exampleType": "bad",
+      "exampleText": "Immutable значит сервер живёт вечно без изменений; restart контейнера нарушает immutability.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "docker_immutable_model",
+      "exampleType": "good",
+      "exampleText": "Image — unit of deploy, read-only; update = build tag 1.7.4, push, kubectl set image или compose up -d. Running container не патчим.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "docker_immutable_model",
+      "exampleType": "good",
+      "exampleText": "контейнер одноразовый, image артефакт из ci — redeploy stop+start нового, без apt внутри",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "docker_immutable_model",
+      "exampleType": "bad",
+      "exampleText": "В Docker по умолчанию mutable: docker exec и apt upgrade — recommended prod workflow.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "externalized_state",
+      "exampleType": "good",
+      "exampleText": "Binary в image; DATABASE_URL, REDIS_URL, S3_BUCKET — env; DB на RDS, не в compose service db если disposable app.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "externalized_state",
+      "exampleType": "good",
+      "exampleText": "сессии в redis, логи в cloudwatch, uploads в s3 — иначе при replace container всё потеряем",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "externalized_state",
+      "exampleType": "bad",
+      "exampleText": "User uploads и SQLite можно держать на writable layer контейнера — immutable это не мешает.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "benefits_rollback",
+      "exampleType": "good",
+      "exampleText": "Reproducibility: tag 1.7.3 одинаков в dev/staging/prod. Rollback — deploy 1.7.2 одной командой. Audit через digest → git SHA label.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "benefits_rollback",
+      "exampleType": "good",
+      "exampleText": "нет config drift, откат старым tag проще чем восстанавливать ssh-patched сервер",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "benefits_rollback",
+      "exampleType": "bad",
+      "exampleText": "Immutable усложняет rollback — нужно вручную откатывать каждый патч по SSH.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "deployment_patterns",
+      "exampleType": "good",
+      "exampleText": "Blue-green: app-blue на 1.0, app-green на 2.0, flip LB, stop blue. Canary — 9× v1, 1× v2, постепенная замена. Swarm rolling — fresh container из нового image.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "deployment_patterns",
+      "exampleType": "good",
+      "exampleText": "canary 10% traffic на новый digest, если метрики ок — rolling replace остальных реплик",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "deployment_patterns",
+      "exampleType": "bad",
+      "exampleText": "Rolling update — это apt upgrade внутри каждого running container без замены image.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "anti_patterns_mistakes",
+      "exampleType": "good",
+      "exampleText": "docker exec vi config — BAD: fix пропадёт при restart, drift от image. Prod config — mount/env, не COPY prod.yaml. Не deploy :latest.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "anti_patterns_mistakes",
+      "exampleType": "good",
+      "exampleText": "volume — mutable state, ok для data, но migration может corrupt — treat осторожно; hot-reload через exec только dev",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "anti_patterns_mistakes",
+      "exampleType": "bad",
+      "exampleText": "docker exec для hotfix в prod — best practice immutable; fix останется навсегда даже после redeploy.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "docker-immutable-infrastructure",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-immutable-infrastructure",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-immutable-infrastructure",
+    "difficulty": "MIDDLE",
+    "titleEn": "Immutable infrastructure with Docker explained",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

@@ -1,0 +1,511 @@
+{
+  "topic": {
+    "code": "expressjs_logging_morgan_winston",
+    "name": "Логирование в Express.js (Morgan, Winston)",
+    "skillCode": "expressjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как реализовать логирование в Express.js с Morgan и Winston?",
+    "shortAnswer": "Morgan — middleware для автоматического логирования HTTP-запросов и ответов; Winston — библиотека для явных логов приложения (ошибки, бизнес-события). Morgan через app.use() на каждый запрос; Winston через logger.info()/error() там, где нужно. В production обычно оба вместе.",
+    "idealAnswer": "Логирование в Express.js разделяет две задачи: Morgan фиксирует HTTP-трафик, Winston — события внутри приложения. Morgan — middleware: app.use(morgan('combined')) перехватывает каждый запрос без кода в route handlers; после res.on('finish') пишет method, url, status, response time и size — финальный status известен только когда ответ отправлен. Winston — явные вызовы logger.info(), logger.error(), logger.debug(); без вызова ничего не логируется. createLogger с level, format (json в production, simple в dev), transports (Console, File, DailyRotateFile, CloudWatch). Morgan отвечает «какой HTTP-трафик пришёл»; Winston — «что сделал код». Когда что: Morgan only — простые API/dev; Winston only — CLI, background jobs без HTTP; оба — типичный production. Production: winston-daily-rotate-file; Morgan stream в Winston для единого файла; request ID (UUID) в middleware + morgan.token + logger.child({ requestId }); skip health check: morgan('combined', { skip: (req) => req.path === '/health' }). Типичные ошибки: логировать password/token в morgan token body; sync: true на File transport блокирует event loop; всё на info включая errors — при level:'error' ошибки теряются; createLogger на каждый request → EMFILE; не вызывать logger.close() на SIGTERM — буфер не сбросится. Winston transports async по умолчанию; при высоком RPS — morgan('tiny'), sampling skip, Pino вместо Winston, логи reverse proxy. Docker/K8s — stdout, платформа роутит в ELK/Datadog. Distributed tracing: request ID через headers во все микросервисы.",
+    "maxScore": 10,
+    "skills": ["expressjs", "javascript", "nodejs"]
+  },
+  "checkpoints": [
+    {
+      "key": "morgan_winston_roles",
+      "title": "Различает Morgan и Winston",
+      "expected": "Кандидат объясняет: Morgan — автоматический HTTP request/response logger (middleware); Winston — application logger с явными вызовами для ошибок, бизнес-логики и отладки; разные задачи, в production часто оба.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — две библиотеки, две роли",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "morgan_winston_roles",
+            "oftenConfusedWith": ["morgan_middleware", "winston_application"],
+            "anchorTermsExpected": [
+              "Morgan",
+              "Winston",
+              "HTTP",
+              "middleware",
+              "явн",
+              "автомат",
+              "request",
+              "application"
+            ],
+            "anchorTermsWrongTopic": [
+              "Morgan логирует ошибки приложения",
+              "Winston заменяет Morgan для HTTP"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["Morgan", "Winston", "разниц"],
+            "ask": "чем Morgan отличается от Winston и когда нужны оба"
+          }
+        ],
+        "mustConcepts": [
+          "Morgan",
+          "Winston",
+          "HTTP",
+          "request",
+          "response",
+          "middleware",
+          "application",
+          "автомат",
+          "явн",
+          "logger.info",
+          "app.use",
+          "трафик",
+          "бизнес",
+          "ошибк",
+          "разные задачи",
+          "production оба"
+        ],
+        "falseClaims": [
+          "Morgan и Winston делают одно и то же",
+          "Winston автоматически логирует каждый HTTP-запрос",
+          "Morgan вызывают вручную в каждом route handler",
+          "достаточно только Morgan для production-отладки бизнес-логики"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "morgan_middleware",
+      "title": "Настраивает Morgan как middleware",
+      "expected": "Кандидат: app.use(morgan('dev'|'combined'|'tiny')); форматы dev/combined/tiny; custom morgan.token; skip для /health; zero logging code в handlers.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый setup из quick example ITLead",
+        "probeConceptGroups": [
+          {
+            "match": ["morgan", "combined", "dev", "skip"],
+            "ask": "как подключить Morgan и исключить health check из логов"
+          }
+        ],
+        "mustConcepts": [
+          "app.use",
+          "morgan",
+          "combined",
+          "dev",
+          "tiny",
+          "middleware",
+          "token",
+          "skip",
+          "health",
+          "/health",
+          "формат",
+          "автомат",
+          "без кода в route"
+        ],
+        "falseClaims": [
+          "Morgan подключается только внутри GET handler",
+          "формат morgan нельзя кастомизировать",
+          "skip не работает для фильтрации путей"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "winston_application",
+      "title": "Настраивает Winston для приложения",
+      "expected": "Кандидат: winston.createLogger на уровне модуля; level, format.json/simple, transports File/Console; logger.info/error/debug по severity; один экземпляр на приложение.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Winston config + transports — ключ middle",
+        "probeConceptGroups": [
+          {
+            "match": ["createLogger", "transport", "format"],
+            "ask": "как настроить Winston: level, format json vs simple, transports"
+          },
+          {
+            "match": ["info", "error", "debug", "level"],
+            "ask": "какие уровни логирования и зачем error отдельно от info"
+          }
+        ],
+        "mustConcepts": [
+          "createLogger",
+          "winston",
+          "level",
+          "info",
+          "error",
+          "debug",
+          "format.json",
+          "format.simple",
+          "transport",
+          "File",
+          "Console",
+          "timestamp",
+          "модул",
+          "один раз",
+          "reuse",
+          "logger.info",
+          "logger.error"
+        ],
+        "falseClaims": [
+          "createLogger нужно вызывать в каждом request handler",
+          "format.simple лучше для production агрегации логов",
+          "Winston без transport всё равно пишет в файл автоматически"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "morgan_response_cycle",
+      "title": "Понимает цикл Morgan и res.on('finish')",
+      "expected": "Кандидат: Morgan ждёт завершения ответа через res.on('finish'); status code и размер ответа доступны только после send; не блокирует request.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "follow-up Q из ITLead — почему finish",
+        "probeConceptGroups": [
+          {
+            "match": ["finish", "status", "response"],
+            "ask": "почему Morgan логирует после finish, а не при входе запроса"
+          }
+        ],
+        "mustConcepts": [
+          "finish",
+          "res.on",
+          "status code",
+          "response size",
+          "после ответа",
+          "не блокир",
+          "status",
+          "размер",
+          "отправлен",
+          "HTTP status"
+        ],
+        "falseClaims": [
+          "Morgan пишет лог сразу при получении запроса со status 200",
+          "Morgan блокирует handler до записи лога",
+          "status code известен до начала обработки route"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "logging_mistakes",
+      "title": "Знает типичные ошибки логирования",
+      "expected": "Кандидат: не логировать password/token в body token; не sync:true на File; правильные levels (error для ошибок); один logger на модуль; skip health checks.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "5 common mistakes из ITLead — production-critical",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "winston_application",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["password", "token", "sensitive", "body"],
+            "ask": "как не залогировать пароли и токены через Morgan custom token"
+          },
+          {
+            "match": ["sync", "EMFILE", "createLogger"],
+            "ask": "почему createLogger на каждый request опасен"
+          }
+        ],
+        "mustConcepts": [
+          "password",
+          "token",
+          "sensitive",
+          "фильтр",
+          "sync: true",
+          "async",
+          "event loop",
+          "level error",
+          "info для ошибок",
+          "createLogger на запрос",
+          "EMFILE",
+          "file descriptor",
+          "skip health",
+          "/health",
+          "шум"
+        ],
+        "falseClaims": [
+          "можно логировать req.body целиком в production",
+          "sync: true на File transport безопасен для latency",
+          "logger.info для database connection failed — норма при level error в prod",
+          "новый logger на request — OK при высоком трафике"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "production_patterns",
+      "title": "Знает production-паттерны",
+      "expected": "Кандидат: DailyRotateFile; Morgan stream в Winston; request ID + morgan.token + logger.child; logger.close на SIGTERM; json format; stdout в Docker/K8s.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "production examples ITLead — rotation, correlation",
+        "probeConceptGroups": [
+          {
+            "match": ["request-id", "uuid", "child", "correlat"],
+            "ask": "как связать логи Morgan и Winston одним request ID"
+          },
+          {
+            "match": ["SIGTERM", "close", "rotate"],
+            "ask": "ротация логов и graceful shutdown с logger.close"
+          }
+        ],
+        "mustConcepts": [
+          "DailyRotateFile",
+          "rotate",
+          "stream",
+          "morganStream",
+          "request ID",
+          "uuid",
+          "morgan.token",
+          "logger.child",
+          "requestId",
+          "SIGTERM",
+          "logger.close",
+          "stdout",
+          "Docker",
+          "Kubernetes",
+          "ELK",
+          "Datadog",
+          "distributed tracing"
+        ],
+        "falseClaims": [
+          "Morgan и Winston нельзя объединить в один поток логов",
+          "logger.close не нужен при SIGTERM",
+          "request ID только в Morgan без Winston child"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда Morgan / Winston / оба",
+      "expected": "Кандидат: Morgan only — простые API, dev; Winston only — без HTTP; оба — production; multiple transports для Datadog/CloudWatch; при 100k RPS — tiny, sampling, Pino, proxy logs.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "when to use + senior follow-up bonus",
+        "mustConcepts": [
+          "Morgan only",
+          "Winston only",
+          "оба",
+          "dev",
+          "production",
+          "CLI",
+          "background",
+          "sampling",
+          "Pino",
+          "Nginx",
+          "CloudWatch",
+          "multiple transports"
+        ],
+        "falseClaims": [
+          "в production всегда достаточно только Morgan",
+          "Winston нужен только для CLI без Express"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "app.use(morgan('combined', { skip: (req) => req.path === '/health' })) — HTTP автоматически. const logger = winston.createLogger({ level: 'info', format: winston.format.json(), transports: [new winston.transports.File({ filename: 'app.log' })] }) — один раз на модуль. В route: logger.info('Fetching user', { userId: req.params.id }). Morgan после finish даёт status и время; Winston — бизнес-событие.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Production: DailyRotateFile 14 дней, Morgan stream в Winston — один grep на инцидент. Middleware ставит req.id = uuid(), morgan.token('request-id'), req.logger = logger.child({ requestId: req.id }). Ошибки — logger.error со stack, не info. SIGTERM → logger.close() перед exit.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Morgan = камера на входе — каждый GET/POST. Winston = блокнот разработчика — пишу только когда нужно. Dev: morgan('dev') + Console simple. Prod: combined + json в файл и CloudWatch transport.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Winston сам логирует все HTTP-запросы как Morgan. Достаточно app.use(morgan('combined')) — бизнес-события и stack trace ошибок тоже попадут автоматически.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "morgan.token('body', req => JSON.stringify(req.body)) — так вижу всё в логах. createLogger внутри каждого handler — так конфиг свежий. File transport с sync: true — точно ничего не потеряю.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Database connection failed логирую через logger.info — в production level error отфильтрует шум, ошибки всё равно видны. Health check каждые 5 секунд в combined — норм, диск большой.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "morgan_winston_roles",
+      "exampleType": "good",
+      "exampleText": "Morgan — middleware, HTTP traffic автоматом. Winston — logger.info/error по событию в коде. Оба в prod: Morgan GET /users 200 5ms, Winston {\"message\":\"Order created\"}.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "morgan_winston_roles",
+      "exampleType": "good",
+      "exampleText": "ну morgan как охранная камера на каждый запрос, winston — когда сам хочешь что-то записать про бизнес",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "morgan_winston_roles",
+      "exampleType": "bad",
+      "exampleText": "Morgan и Winston — одна библиотека, Winston просто новее Morgan.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "morgan_middleware",
+      "exampleType": "good",
+      "exampleText": "app.use(morgan('dev')) в начале stack — zero строк логирования в handlers.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "morgan_middleware",
+      "exampleType": "good",
+      "exampleText": "skip: req => req.path === '/health' — мониторинг не засоряет combined",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "morgan_middleware",
+      "exampleType": "bad",
+      "exampleText": "Morgan вызываю morgan('combined')(req,res) внутри каждого route — так гибче.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "winston_application",
+      "exampleType": "good",
+      "exampleText": "const logger = createLogger({ level: 'info', format: combine(timestamp(), json()), transports: [Console, File] }) — module scope.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "winston_application",
+      "exampleType": "good",
+      "exampleText": "login — info, DB fail — error, cache miss — debug. prod level error режет debug/info шум.",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "winston_application",
+      "exampleType": "bad",
+      "exampleText": "Каждый POST создаёт свой createLogger — так изолированные логи на request.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "morgan_response_cycle",
+      "exampleType": "good",
+      "exampleText": "Morgan на res.on('finish') — status 500 виден только когда handler уже ответил.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "morgan_response_cycle",
+      "exampleType": "good",
+      "exampleText": "логирует после отправки ответа, не блокирует обработку запроса",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "morgan_response_cycle",
+      "exampleType": "bad",
+      "exampleText": "Morgan пишет status сразу при app.use до вызова next() — всегда 200.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "logging_mistakes",
+      "exampleType": "good",
+      "exampleText": "morgan token body: деструктурирую password, token — в лог только safe fields.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "logging_mistakes",
+      "exampleType": "good",
+      "exampleText": "без sync:true на File — async по умолчанию, event loop не стоит на диске",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "logging_mistakes",
+      "exampleType": "bad",
+      "exampleText": "JSON.stringify(req.body) в morgan token — удобно для дебага auth endpoints с паролями.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "production_patterns",
+      "exampleType": "good",
+      "exampleText": "const stream = { write: msg => logger.http(msg.trim()) }; morgan('combined', { stream }) — HTTP и app в одном файле.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "production_patterns",
+      "exampleType": "good",
+      "exampleText": "req.id uuid, X-Request-ID header, req.logger.child — один поиск в ELK на инцидент",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "production_patterns",
+      "exampleType": "bad",
+      "exampleText": "При SIGTERM сразу process.exit — буфер Winston сам допишется.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Простой internal API dev — morgan dev enough. Order service prod — morgan combined + winston errors + CloudWatch transport.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "100k rps — morgan tiny + sample 10% или логи только с nginx",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Background worker без HTTP — ставлю Morgan combined на всякий случай.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "expressjs-logging-morgan-winston",
+    "apiUrl": "https://api.itlead.org/api/questions/expressjs-logging-morgan-winston",
+    "pageUrl": "https://itlead.org/interview-questions/expressjs/expressjs-logging-morgan-winston",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to implement logging in Express.js (Morgan, Winston)?",
+    "categorySlug": "expressjs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

@@ -1,0 +1,493 @@
+{
+  "topic": {
+    "code": "docker_environment_variables",
+    "name": "Переменные окружения в Docker",
+    "skillCode": "docker",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Как использовать переменные окружения в Docker?",
+    "shortAnswer": "В Docker есть четыре способа задать переменные окружения: `ENV` в Dockerfile, `-e KEY=value` при `docker run`, `--env-file file.env` и `environment:` / `env_file:` в Compose. `ENV` запекается в image и виден в history/inspect; `-e` и env-файлы — runtime per-container. `ARG` — только на этапе build, не живёт в runtime. Секреты в env в production не хранить: они видны в `docker inspect`, process list и логах — использовать BuildKit secret mounts или внешние secret managers.",
+    "idealAnswer": "Переменные окружения — способ передать runtime-конфигурацию приложению внутри контейнера. Четыре места с разным scope: `ENV` в Dockerfile — часть image, видна в `docker history` и `docker inspect` навсегда, подходит для non-secret дефолтов (NODE_ENV, PORT); override при запуске: `docker run -e PORT=8080`. `-e KEY=value` на `docker run` — per-container, не в image; `-e API_KEY` без значения читает из shell хоста; `--env-file .env` — bulk, формат KEY=VALUE без кавычек и shell expansion. Compose: `environment:` (map или list с `${VAR}` / `${VAR:-default}`) и `env_file:` — runtime в проекте; `.env` рядом с compose.yaml — для interpolation при парсинге YAML (Compose itself), это не то же самое что `env_file:` который передаёт vars в контейнер. Приоритет Compose: env_file < environment в service < shell env; для `docker run`: `-e` побеждает Dockerfile `ENV`. `ARG` vs `ENV`: ARG — build-time only, через `--build-arg`, после build пропадает; ENV — runtime в image и контейнере; паттерн ARG BUILD_VERSION → ENV APP_VERSION=$BUILD_VERSION. Секреты не в env: `docker inspect` plain text, `ps auxe`, `/proc/1/environ`, логи фреймворков, наследование дочерним процессам. Альтернативы: BuildKit `--mount=type=secret`, Swarm/K8s secrets как файлы, Vault/AWS Secrets Manager; для local dev — `.env.local` вне git. Типичные ошибки: `ENV DB_PASSWORD` в Dockerfile; кавычки в .env становятся частью значения; путаница Compose `.env` (YAML interpolation) и `env_file:` (container env); попытка runtime interpolation в Dockerfile ENV — только build-time context, для runtime — entrypoint script. Twelve-factor: config через env; prod secrets — mounted files, не raw env. Проверка: `docker exec <name> env`. Пустое `-e DEBUG=` — не unset, а `\"\"`.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "env_four_ways",
+      "title": "Знает четыре способа задать env",
+      "expected": "Кандидат перечисляет: ENV в Dockerfile, `-e` на docker run, `--env-file`, Compose `environment:` и `env_file:`; понимает разный scope и что secrets не в image history.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — четыре механизма и их различие",
+        "mustConcepts": [
+          "ENV",
+          "Dockerfile",
+          "-e",
+          "docker run",
+          "--env-file",
+          "environment",
+          "env_file",
+          "Compose",
+          "четыре способа",
+          "runtime",
+          "image",
+          "scope",
+          "конфигурац",
+          "переменные окружения",
+          "KEY=VALUE",
+          "не секреты в image"
+        ],
+        "falseClaims": [
+          "в Docker только один способ задать env — через Dockerfile",
+          "Compose environment и Dockerfile ENV работают одинаково по scope",
+          "env_file в Compose запекает значения в image",
+          "docker run не может override ENV из Dockerfile"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "env_in_dockerfile",
+      "title": "Понимает ENV в Dockerfile",
+      "expected": "Кандидат объясняет: ENV — часть image, дефолты для всех запусков; override через `-e`; видно в history и inspect; секреты не запекать.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "запечённый в image defaults — ключевое отличие от -e",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "env_four_ways",
+            "floorFraction": 0.45
+          }
+        ],
+        "mustConcepts": [
+          "ENV",
+          "Dockerfile",
+          "часть image",
+          "запечен",
+          "дефолт",
+          "override",
+          "-e",
+          "docker history",
+          "docker inspect",
+          "NODE_ENV",
+          "PORT",
+          "multi-line ENV",
+          "не секрет",
+          "навсегда в image"
+        ],
+        "falseClaims": [
+          "ENV в Dockerfile виден только в runtime, не в image layers",
+          "ENV нельзя override при docker run",
+          "ENV подходит для паролей и API keys",
+          "docker history не показывает ENV значения"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "docker_run_env",
+      "title": "Знает -e и --env-file на docker run",
+      "expected": "Кандидат описывает: `-e KEY=value` per-container; `-e KEY` без value — из shell хоста; `--env-file` bulk; формат файла KEY=VALUE, комментарии #, без кавычек.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый runtime механизм из ITLead",
+        "mustConcepts": [
+          "-e",
+          "docker run",
+          "--env-file",
+          "per-container",
+          "не в image",
+          "pass-through",
+          "из shell",
+          "export",
+          "KEY=VALUE",
+          "комментар",
+          "без кавычек",
+          "без shell expansion",
+          "bulk",
+          "несколько -e"
+        ],
+        "falseClaims": [
+          "-e записывает переменные в image layers",
+          "--env-file выполняет shell expansion как bash source",
+          "без value в -e KEY переменная всегда пустая",
+          "docker run не поддерживает несколько -e"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "compose_env",
+      "title": "Понимает Compose environment и env_file",
+      "expected": "Кандидат описывает: `environment:` map/list с `${VAR}` и `${VAR:-default}`; `env_file:` передаёт vars в контейнер; `.env` для Compose interpolation ≠ `env_file:`; приоритет env_file < environment < shell.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Compose interpolation и два разных .env — частая junior ошибка",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "interpolation",
+              "${VAR}",
+              ".env",
+              "env_file"
+            ],
+            "ask": "чем отличается .env для Compose interpolation от env_file: в compose.yaml"
+          },
+          {
+            "match": [
+              "приоритет",
+              "precedence",
+              "override"
+            ],
+            "ask": "что побеждает если одна переменная задана в env_file, environment и shell"
+          }
+        ],
+        "mustConcepts": [
+          "environment:",
+          "env_file:",
+          "Compose",
+          "interpolation",
+          "${VAR}",
+          "${VAR:-default}",
+          "map form",
+          "list form",
+          "compose.yaml",
+          ".env",
+          "YAML parse",
+          "парсинг",
+          "контейнер",
+          "приоритет",
+          "env_file меньше environment",
+          "shell env",
+          "пустое значение",
+          "DEBUG="
+        ],
+        "falseClaims": [
+          ".env рядом с compose.yaml всегда передаётся в контейнер автоматически",
+          "env_file и environment в Compose — одно и то же",
+          "interpolation ${VAR} работает внутри running container без Compose parse",
+          "environment в service не override env_file"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "arg_vs_env",
+      "title": "Отличает ARG и ENV",
+      "expected": "Кандидат объясняет: ARG — build-time, `--build-arg`, пропадает после build; ENV — runtime в image; паттерн копирования ARG→ENV для runtime доступа.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ARG≠env var — типичное заблуждение из ITLead",
+        "mustConcepts": [
+          "ARG",
+          "ENV",
+          "build-time",
+          "runtime",
+          "--build-arg",
+          "docker build",
+          "пропадает",
+          "после build",
+          "APP_VERSION",
+          "BUILD_VERSION",
+          "копируй ARG в ENV",
+          "FROM node:${NODE_VERSION}",
+          "build context",
+          "не env var"
+        ],
+        "falseClaims": [
+          "ARG доступен в running container как process.env",
+          "ENV работает только на этапе docker build",
+          "ARG и ENV взаимозаменяемы",
+          "--build-arg передаёт переменную в runtime без ENV"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "secrets_not_in_env",
+      "title": "Понимает почему секреты не в env",
+      "expected": "Кандидат называет утечки: inspect, ps auxe, /proc/environ, логи; альтернативы: BuildKit secret mount, Swarm/K8s secrets как файлы, Vault; не plain env_file с secrets в prod.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "security pitfall — inspect и process list из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "inspect",
+              "ps auxe",
+              "environ",
+              "утечк"
+            ],
+            "ask": "где видны env vars контейнера помимо приложения"
+          },
+          {
+            "match": [
+              "BuildKit",
+              "secret mount",
+              "Swarm",
+              "Vault"
+            ],
+            "ask": "как безопасно передать npm token или DB password при build и в prod"
+          }
+        ],
+        "mustConcepts": [
+          "секрет",
+          "не в env",
+          "docker inspect",
+          "plain text",
+          "ps auxe",
+          "/proc",
+          "environ",
+          "логи",
+          "наследован",
+          "дочерн",
+          "BuildKit",
+          "secret mount",
+          "run/secrets",
+          "Swarm secret",
+          "K8s secret",
+          "Vault",
+          "Secrets Manager",
+          "не в image layers",
+          "production",
+          "mounted file"
+        ],
+        "falseClaims": [
+          "env vars в Docker безопасны для секретов в production",
+          "docker inspect не показывает environment variables",
+          "секреты в ENV не видны другим процессам на хосте",
+          "BuildKit secret mount оставляет secret в финальном image layer"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с env",
+      "expected": "Кандидат называет: пароль в ENV Dockerfile; кавычки в .env — literal; путаница Compose .env vs env_file; runtime interpolation в Dockerfile ENV — только build-time, для runtime entrypoint.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Common mistakes блок ITLead — quoting и scope",
+        "mustConcepts": [
+          "кавычки",
+          "literal",
+          "не shell",
+          "DB_PASSWORD в ENV",
+          "WRONG",
+          "Compose .env",
+          "env_file разный scope",
+          "runtime interpolation",
+          "entrypoint",
+          "shell wrapper",
+          "build-time context",
+          "ENV DEBUG=",
+          "пустое не unset",
+          "docker exec env"
+        ],
+        "falseClaims": [
+          "в Docker .env кавычки работают как в bash",
+          "ENV PATH=$PATH:/app/bin — пример runtime interpolation из другого контейнера",
+          "-e DEBUG= полностью unset переменную как undefined в Node",
+          "пароль в ENV Dockerfile безопасен если image private"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Четыре способа: ENV в Dockerfile для дефолтов NODE_ENV/PORT; docker run -e и --env-file для runtime; Compose environment: и env_file:. ARG только на build, секреты не в env — inspect и ps видят plain text.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В Dockerfile ENV PORT=3000 — дефолт в image. На prod docker run -e PORT=8080 override. Пароль postgres через Compose ${DB_PASSWORD} в environment, не ENV в Dockerfile. npm token — BuildKit --secret, не ENV NPM_TOKEN.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну env в compose: .env для ${TAG} при парсинге yaml, env_file .env.app идёт в контейнер. кавычки в .env не нужны — станут частью значения. arg на build, env на runtime",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Секреты кладу в ENV Dockerfile — image private, никто не увидит. ARG и ENV одно и то же, --build-arg доступен в process.env в runtime.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": ".env с VAR=\"value\" — норм, Docker как bash раскроет кавычки. Compose .env и env_file: — одна механика, всё летит в контейнер при up.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker inspect не показывает env. Для runtime config пишу ENV DEBUG=$LOG_LEVEL из другого контейнера — Dockerfile сам подтянет.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "env_four_ways",
+      "exampleType": "good",
+      "exampleText": "ENV Dockerfile, -e/--env-file на run, Compose environment и env_file — четыре места с разным scope.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "env_four_ways",
+      "exampleType": "good",
+      "exampleText": "дефолты в image через ENV, override per-container через -e, bulk через --env-file",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "env_four_ways",
+      "exampleType": "bad",
+      "exampleText": "В Docker env только через Dockerfile ENV, docker run не меняет переменные.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "env_in_dockerfile",
+      "exampleType": "good",
+      "exampleText": "ENV NODE_ENV=production в Dockerfile — в image history; docker run -e PORT=8080 override PORT, NODE_ENV остаётся production.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "env_in_dockerfile",
+      "exampleType": "good",
+      "exampleText": "дефолты в Dockerfile ENV, но пароли туда никогда — видно в inspect и history",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "env_in_dockerfile",
+      "exampleType": "bad",
+      "exampleText": "ENV DB_PASSWORD=hunter2 в Dockerfile — норм для prod, override на run стирает из layers.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "docker_run_env",
+      "exampleType": "good",
+      "exampleText": "docker run -e DB_HOST=db -e DB_PORT=5432; export API_KEY && docker run -e API_KEY — pass-through из shell.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "docker_run_env",
+      "exampleType": "good",
+      "exampleText": "docker run --env-file .env — KEY=VALUE без кавычек, # комментарии",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "docker_run_env",
+      "exampleType": "bad",
+      "exampleText": "--env-file выполняет source .env в bash с expansion $(pwd).",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "compose_env",
+      "exampleType": "good",
+      "exampleText": "environment: POSTGRES_PASSWORD: ${DB_PASSWORD}; env_file: .env.app — разные scope. ${DB_NAME:-app} default если unset.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "compose_env",
+      "exampleType": "good",
+      "exampleText": ".env для Compose interpolation TAG=v1.2.3; env_file передаёт FEATURE_X в api container. приоритет: env_file < environment < shell",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "compose_env",
+      "exampleType": "bad",
+      "exampleText": "Файл .env рядом compose.yaml автоматически env_file для всех сервисов — interpolation и container env одно.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "arg_vs_env",
+      "exampleType": "good",
+      "exampleText": "docker build --build-arg BUILD_VERSION=1.2.3; ARG только build; ENV APP_VERSION=$BUILD_VERSION — runtime видит версию.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "arg_vs_env",
+      "exampleType": "good",
+      "exampleText": "ARG NODE_VERSION в FROM node:${NODE_VERSION} — build-time; после build ARG BUILD_VERSION пропал без ENV",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "arg_vs_env",
+      "exampleType": "bad",
+      "exampleText": "В running container читаю process.env.BUILD_VERSION из --build-arg без ENV в Dockerfile.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "secrets_not_in_env",
+      "exampleType": "good",
+      "exampleText": "DB_PASSWORD в -e виден docker inspect и ps auxe; prod — Swarm/K8s secret как файл, BuildKit --secret для npmrc, не ENV.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "secrets_not_in_env",
+      "exampleType": "good",
+      "exampleText": "RUN --mount=type=secret,id=npmrc npm ci — token не в image layer. Vault/Secrets Manager при старте приложения.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "secrets_not_in_env",
+      "exampleType": "bad",
+      "exampleText": "Секреты в env безопасны — docker inspect доступен только root, приложение не логирует env.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "В .env VAR=value with spaces без кавычек; VAR=\"quoted\" — кавычки literal. Compose .env ≠ env_file:.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "runtime config из другого контейнера — entrypoint script, не ENV=$OTHER в Dockerfile. docker exec api env — проверка effective env.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "-e DEBUG= unset как undefined в Node; кавычки в .env Docker убирает как bash.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-environment-variables",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-environment-variables",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-environment-variables",
+    "difficulty": "JUNIOR",
+    "titleEn": "How to use environment variables in Docker?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T20:00:00.000Z"
+  }
+}

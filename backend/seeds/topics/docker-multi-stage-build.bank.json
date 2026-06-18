@@ -1,0 +1,574 @@
+{
+  "topic": {
+    "code": "docker_multi_stage_build",
+    "name": "Multi-stage Docker build",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое multi-stage Docker build и зачем он нужен?",
+    "shortAnswer": "Multi-stage build — несколько блоков `FROM` в одном Dockerfile: ранние стейджи собирают артефакт с полным toolchain, финальный стейдж копирует только результат через `COPY --from=<stage>`. Build-зависимости (npm, компиляторы, исходники) не попадают в production-образ.",
+    "idealAnswer": "Multi-stage build — стандартный способ собирать маленькие и безопасные Docker-образы: идея «build heavy, ship light». В одном Dockerfile несколько блоков `FROM` — каждый это отдельный стейдж. Стейджи именуют `AS <name>`, артефакты переносят `COPY --from=<name>`. Финальный образ — последний стейдж (если не указан `--target`). Типичный паттерн: стейдж 1 — полный SDK (Node, Go compiler); стейдж 2 — минимальный runtime (nginx:alpine, distroless, scratch). Single-stage с node:22 и всем toolchain даёт 600–900 MB; multi-stage с nginx для статики — 25–30 MB; Go binary в scratch — 5–15 MB. Меньше образ → быстрее pull, меньше attack surface, меньше CVE для сканирования. `COPY --from=build /app/dist ...` берёт файлы из filesystem стейджа build; без `--from` COPY читает build context (ошибка: dist/ на хосте). Можно `COPY --from=alpine:3.21` из внешнего образа. Ссылки по индексу `--from=0` возможны, но имена читабельнее. `docker build --target build` останавливается на named-стейдже — удобно для CI-тестов до финальной сборки. Паттерны: Go CGO_ENABLED=0 → scratch; React/Vue build → nginx; Node server → distroless/nodejs после npm prune --omit=dev; three-stage build→test→runtime. Ошибки: копировать dist/ из context вместо `--from=build`; тащить curl/vim/git в runtime «на всякий случай»; копировать node_modules с dev-deps; `FROM node:latest` без pin. BuildKit параллелит независимые стейджи; стейджи с `COPY --from=other` ждут other. Senior: scan-стейдж с Trivy между build и runtime, `--target scan` в CI как security gate. Multi-stage vs несколько Dockerfile: один файл, один docker build, общий cache — современная норма.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "multi_stage_definition",
+      "title": "Понимает суть multi-stage build",
+      "expected": "Кандидат объясняет: несколько `FROM` в одном Dockerfile; `AS <name>` для именования; `COPY --from=<name>` переносит артефакты между стейджами; toolchain остаётся в builder, в финале только runtime.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — несколько FROM и COPY --from",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "multi_stage_definition",
+            "oftenConfusedWith": [
+              "copy_from_stages",
+              "common_patterns"
+            ],
+            "anchorTermsExpected": [
+              "FROM",
+              "AS",
+              "COPY --from",
+              "стейдж",
+              "stage",
+              "несколько",
+              "toolchain",
+              "артефакт"
+            ],
+            "anchorTermsWrongTopic": [
+              "docker compose",
+              "volume mount",
+              "multi-arch только"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "FROM",
+              "стейдж",
+              "stage",
+              "multi-stage"
+            ],
+            "ask": "как устроен Dockerfile с двумя FROM и зачем AS build"
+          }
+        ],
+        "mustConcepts": [
+          "multi-stage",
+          "несколько FROM",
+          "стейдж",
+          "stage",
+          "AS",
+          "именован",
+          "COPY --from",
+          "артефакт",
+          "toolchain",
+          "build stage",
+          "runtime stage",
+          "один Dockerfile",
+          "build heavy",
+          "ship light",
+          "финальн",
+          "последн"
+        ],
+        "falseClaims": [
+          "multi-stage требует несколько Dockerfile",
+          "каждый FROM создаёт отдельный тегируемый образ в registry",
+          "COPY без --from берёт файлы из предыдущего стейджа автоматически",
+          "multi-stage это только для Go",
+          "все стейджи попадают в финальный образ целиком"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "size_security_benefits",
+      "title": "Знает зачем: размер и безопасность",
+      "expected": "Кандидат называет: меньший образ (600 MB → 25–30 MB типично), быстрее pull, меньше attack surface и CVE; build-deps не ship в prod.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "why it matters — цифры и security из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "multi_stage_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "размер",
+              "MB",
+              "attack",
+              "CVE",
+              "pull"
+            ],
+            "ask": "какой выигрыш по размеру и безопасности даёт multi-stage vs single-stage node"
+          }
+        ],
+        "mustConcepts": [
+          "меньш",
+          "размер",
+          "MB",
+          "600",
+          "25",
+          "30",
+          "attack surface",
+          "поверхн",
+          "безопас",
+          "CVE",
+          "pull",
+          "быстр",
+          "node_modules",
+          "не ship",
+          "не попада",
+          "production",
+          "supply-chain",
+          "сканир"
+        ],
+        "falseClaims": [
+          "multi-stage не влияет на размер образа",
+          "single-stage и multi-stage одинаковы по pull time",
+          "больше слоёв всегда значит больший attack surface в runtime",
+          "dev-зависимости безопасно оставлять в prod-образе",
+          "multi-stage только для экономии диска на CI, не для prod"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "copy_from_stages",
+      "title": "Понимает COPY --from и ссылки на стейджи",
+      "expected": "Кандидат различает: `COPY --from=build` — из filesystem стейджа; без `--from` — из build context; можно `--from=alpine:3.21` или по индексу `--from=0`.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "частая ошибка — путать context и stage filesystem",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "COPY --from",
+              "build context",
+              "context"
+            ],
+            "ask": "чем COPY dist/ отличается от COPY --from=build /app/dist"
+          },
+          {
+            "match": [
+              "external",
+              "alpine",
+              "индекс",
+              "--from=0"
+            ],
+            "ask": "можно ли COPY --from из внешнего образа или по номеру стейджа"
+          }
+        ],
+        "mustConcepts": [
+          "COPY --from",
+          "build context",
+          "контекст",
+          "filesystem",
+          "стейдж",
+          "named",
+          "имя",
+          "build",
+          "без --from",
+          "external",
+          "внешн",
+          "образ",
+          "индекс",
+          "--from=0",
+          "dist/",
+          "артефакт"
+        ],
+        "falseClaims": [
+          "COPY всегда берёт файлы из предыдущего стейджа",
+          "COPY --from работает только с последним стейджем",
+          "нельзя COPY --from из образа alpine в registry",
+          "build context и stage filesystem одно и то же",
+          "COPY --from=build требует volume mount"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "build_target_flag",
+      "title": "Знает финальный стейдж и --target",
+      "expected": "Кандидат объясняет: финальный образ — последний FROM; `docker build --target <name>` останавливается на named-стейдже; промежуточные стейджи в cache, не в image list.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up Q из ITLead — final stage и CI",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "--target",
+              "финальн",
+              "последн"
+            ],
+            "ask": "как Docker выбирает финальный стейдж и зачем --target test в CI"
+          }
+        ],
+        "mustConcepts": [
+          "--target",
+          "финальн",
+          "последн",
+          "last stage",
+          "FROM",
+          "останов",
+          "промежут",
+          "cache",
+          "build cache",
+          "tag",
+          "image list",
+          "CI",
+          "test stage",
+          "build stage"
+        ],
+        "falseClaims": [
+          "Docker всегда собирает все стейджи в один финальный образ",
+          "--target создаёт отдельный Dockerfile",
+          "промежуточные стейджи автоматически пушатся в registry",
+          "финальный стейдж всегда первый FROM",
+          "--target игнорирует зависимости COPY --from"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_patterns",
+      "title": "Знает типичные паттерны",
+      "expected": "Кандидат называет паттерны: Go/scratch; Node build + nginx для статики; distroless для Node server; three-stage build→test→runtime.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common patterns из ITLead — scratch, nginx, distroless",
+        "mustConcepts": [
+          "scratch",
+          "Go",
+          "golang",
+          "CGO_ENABLED=0",
+          "nginx",
+          "alpine",
+          "distroless",
+          "nodejs22",
+          "React",
+          "Vue",
+          "static",
+          "npm run build",
+          "build test runtime",
+          "three-stage",
+          "npm prune"
+        ],
+        "falseClaims": [
+          "scratch-образ содержит shell и apt",
+          "distroless включает bash для отладки",
+          "для React SPA нужен node runtime в финальном образе",
+          "Go binary нельзя положить в scratch",
+          "nginx stage обязан содержать node_modules"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: COPY без --from из context; debug-tools в runtime; dev-deps в node_modules; `FROM node:latest` без pin.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — production pitfalls middle+",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "dist/",
+              "без --from",
+              "context"
+            ],
+            "ask": "почему COPY dist/ в nginx-стейдже часто ломает сборку"
+          },
+          {
+            "match": [
+              "dev",
+              "prune",
+              "node_modules"
+            ],
+            "ask": "как не тащить TypeScript и jest в runtime node_modules"
+          }
+        ],
+        "mustConcepts": [
+          "COPY dist",
+          "без --from",
+          "build context",
+          "curl",
+          "vim",
+          "git",
+          "debug",
+          "runtime bloat",
+          "dev deps",
+          "npm prune",
+          "omit=dev",
+          "latest",
+          "pin",
+          "верси",
+          "node:latest",
+          "apk add",
+          "production"
+        ],
+        "falseClaims": [
+          "можно безопасно COPY dist/ из laptop context в CI",
+          "curl и vim в prod nginx — нормальная практика",
+          "devDependencies не влияют на размер runtime образа",
+          "latest tag не мешает воспроизводимости multi-stage",
+          "multi-stage автоматически удаляет dev-deps"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "buildkit_ci",
+      "title": "Знает BuildKit и CI-практики",
+      "expected": "Кандидат упоминает: BuildKit параллелит независимые стейджи; один Dockerfile для test/prod через --target; опционально scan-стейдж (Trivy) как security gate.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Real-world + follow-up — BuildKit parallel, scan stage",
+        "mustConcepts": [
+          "BuildKit",
+          "параллел",
+          "concurrent",
+          "зависим",
+          "COPY --from",
+          "CI",
+          "--target test",
+          "Trivy",
+          "scan",
+          "security",
+          "CVE",
+          "buildx",
+          "multi-arch",
+          "один Dockerfile"
+        ],
+        "falseClaims": [
+          "стейджи Docker всегда выполняются строго последовательно",
+          "security scan обязан быть в runtime-образе",
+          "multi-stage несовместим с docker buildx",
+          "BuildKit отключает layer cache между стейджами",
+          "для CI нужны отдельные Dockerfile на каждый стейдж"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Multi-stage — несколько FROM в одном Dockerfile. В build-стейдже npm ci и npm run build, потом nginx:alpine и COPY --from=build /app/dist. Node и node_modules не попадают в prod — образ ~25 MB вместо 600 MB, быстрее pull и меньше CVE.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для SPA: node:22-alpine AS build → dist, финал nginx копирует только dist через --from=build. Для Go — CGO_ENABLED=0, scratch, бинарь ~10 MB. В CI docker build --target test гоняет npm test до prod-образа. Dev-deps режу npm prune --omit=dev в build-стейдже.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "COPY --from=build берёт из filesystem стейджа, без --from — из build context на хосте. Финальный образ — последний FROM, --target останавливает раньше. BuildKit параллелит независимые стейджи.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Multi-stage — это когда пишешь два Dockerfile и docker compose их связывает. COPY dist/ в nginx-стейдже берёт файлы из предыдущего стейджа автоматически.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Размер образа одинаковый — multi-stage только для красоты. В runtime nginx ставлю curl vim git на всякий случай и копирую все node_modules с devDependencies.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "FROM node:latest AS build — версия не важна. Промежуточные стейджи все пушатся в registry как отдельные prod-образы.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "multi_stage_definition",
+      "exampleType": "good",
+      "exampleText": "Несколько FROM: build AS build с toolchain, runtime COPY --from=build только артефакт.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "multi_stage_definition",
+      "exampleType": "good",
+      "exampleText": "ну это несколько стейджей в одном dockerfile, as build и copy --from=build, компиляторы не едут в прод",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "multi_stage_definition",
+      "exampleType": "bad",
+      "exampleText": "Multi-stage — один FROM, но много RUN слоёв для оптимизации cache.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "size_security_benefits",
+      "exampleType": "good",
+      "exampleText": "Single node:600+ MB, nginx multi-stage ~25 MB — быстрый pull на сотнях нод, меньше attack surface без npm и исходников.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "size_security_benefits",
+      "exampleType": "good",
+      "exampleText": "toolchain не ship → меньше пакетов для CVE scan, distroless/scratch ещё тоньше",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "size_security_benefits",
+      "exampleType": "bad",
+      "exampleText": "Multi-stage нужен только чтобы ускорить npm ci на CI, на безопасность не влияет.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "copy_from_stages",
+      "exampleType": "good",
+      "exampleText": "COPY --from=build /app/dist — из стейджа; COPY dist/ — из build context, dist должен лежать на хосте.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "copy_from_stages",
+      "exampleType": "good",
+      "exampleText": "можно copy --from=alpine:3.21 /etc/passwd или по индексу --from=0, но имена читабельнее",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "copy_from_stages",
+      "exampleType": "bad",
+      "exampleText": "COPY без --from автоматически копирует из последнего завершённого стейджа.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "build_target_flag",
+      "exampleType": "good",
+      "exampleText": "Финал — последний FROM; docker build --target test останавливается на test-стейдже для CI.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "build_target_flag",
+      "exampleType": "good",
+      "exampleText": "промежуточные стейджи в build cache, в docker images только финальный tag",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "build_target_flag",
+      "exampleType": "bad",
+      "exampleText": "--target собирает все стейджи после указанного и мержит их в один образ.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_patterns",
+      "exampleType": "good",
+      "exampleText": "Go: golang AS build → scratch с бинарём; React: node build → nginx alpine; Node API: distroless после prune.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_patterns",
+      "exampleType": "good",
+      "exampleText": "three-stage: build, from build as test npm test, nginx runtime copy --from=build dist",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_patterns",
+      "exampleType": "bad",
+      "exampleText": "Для static React в финале обязателен node:22 с полным npm для serve.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Ошибка: COPY dist/ без --from — в CI нет dist на хосте. Правильно: COPY --from=build /app/dist.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "не apk add curl в nginx prod; dev deps — npm prune --omit=dev до copy node_modules; pin node:22.11-alpine не latest",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "В runtime nginx добавляю git и jest для отладки — multi-stage всё равно маленький.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "buildkit_ci",
+      "exampleType": "good",
+      "exampleText": "BuildKit параллелит стейджи без COPY --from друг от друга; scan stage Trivy с --target scan в CI перед prod.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "buildkit_ci",
+      "exampleType": "good",
+      "exampleText": "один dockerfile: --target test в pipeline, финальный build для deploy, buildx для arm",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "buildkit_ci",
+      "exampleType": "bad",
+      "exampleText": "BuildKit запрещает multi-stage — нужен legacy builder.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-multi-stage-build",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-multi-stage-build",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-multi-stage-build",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is a multi-stage Docker build and why use it?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

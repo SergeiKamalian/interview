@@ -1,0 +1,550 @@
+{
+  "topic": {
+    "code": "docker_ci_cd_pipeline",
+    "name": "Docker в CI/CD pipeline",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как практически использовать Docker в CI/CD pipeline?",
+    "shortAnswer": "Стандартный pipeline: checkout → сборка образа с cache → тесты внутри образа → сканирование CVE → тег по commit SHA + semver → push в registry → deploy. Образ — единый build-артефакт: build once, promote в staging и prod без пересборки. Кэш (GHA/registry/S3), тег по SHA или digest, подпись Cosign.",
+    "idealAnswer": "Docker в CI/CD превращает коммит в задеплоенный контейнер. Стандартная форма pipeline: checkout кода → setup Docker (BuildKit, buildx для multi-arch) → build образа с cache-from предыдущих сборок → test внутри образа (multi-stage --target test или docker run) → scan на CVE (Trivy, grype, Snyk; fail на HIGH/CRITICAL) → tag commit SHA + branch + semver → push в registry (Docker Hub, ECR, GHCR) → sign (Cosign) → deploy по новому тегу или digest. Критический принцип: build once, deploy everywhere — тот же образ идёт CI → staging → prod; отдельная «prod-сборка» недопустима, иначе вы не тестируете то, что шиппите. Без cache-from каждый job стартует холодным; backends: type=gha (встроен в GitHub Actions), type=registry (портативно между CI и репо), type=s3 (self-hosted/AWS). Тегирование: SHA — якорь воспроизводимости; semver для людей; latest — tip main, не для prod; pr-1234 — review apps. Prod деплоит SHA или @sha256:digest, не mutable latest. Multi-stage Dockerfile: deps → test (npm test) → build → runtime; CI валидирует --target test, в registry пушится runtime. Сканирование: trivy-action с exit-code 1, исключения в .trivyignore; опционально scan stage в Dockerfile. Типичные ошибки: отдельный build для staging и prod (drift); забытый cache (8 мин → 90 сек); latest в prod; секреты в ARG (видны в history) — нужен BuildKit --mount=type=secret; npm test на хосте вместо образа. buildx даёт multi-arch, secret mounts, продвинутый cache. PR-билды пушат в pr-N tag для review apps. Валидация prod = CI: pin digest из docker push output в deploy manifest + Cosign verify при admission. Варианты: GitLab DinD, Jenkins buildx, CircleCI setup_remote_docker. Promotion — retag того же digest, не rebuild.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "pipeline_shape",
+      "title": "Знает стандартную форму Docker CI/CD pipeline",
+      "expected": "Кандидат перечисляет этапы: checkout → setup Docker/buildx → build с cache → test в образе → scan CVE → tag → push registry → sign → deploy; образ как build-артефакт.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — полная цепочка из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "checkout",
+              "build",
+              "test",
+              "scan",
+              "push",
+              "deploy"
+            ],
+            "ask": "опиши полный pipeline от коммита до deploy с Docker"
+          }
+        ],
+        "mustConcepts": [
+          "checkout",
+          "build",
+          "test",
+          "scan",
+          "tag",
+          "push",
+          "deploy",
+          "registry",
+          "build-артефакт",
+          "образ",
+          "BuildKit",
+          "buildx",
+          "GHCR",
+          "ECR",
+          "Docker Hub",
+          "Cosign",
+          "CVE",
+          "Trivy",
+          "pipeline",
+          "этап"
+        ],
+        "falseClaims": [
+          "в CI достаточно только docker build без push и deploy",
+          "тесты и scan необязательны перед push в registry",
+          "deploy всегда пересобирает образ на сервере",
+          "образ не является основным артефактом CI/CD"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "build_once_promote",
+      "title": "Понимает build once, promote everywhere",
+      "expected": "Кандидат объясняет: один build в CI → тот же образ в staging и prod; promotion через tag/digest, не отдельная prod-сборка; иначе drift и нет гарантии что тестировали.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "критический принцип из TL;DR ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "pipeline_shape",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "build_once_promote",
+            "oftenConfusedWith": [
+              "tagging_strategy"
+            ],
+            "anchorTermsExpected": [
+              "build once",
+              "один build",
+              "тот же образ",
+              "staging",
+              "prod",
+              "promote",
+              "не пересобира"
+            ],
+            "anchorTermsWrongTopic": [
+              "отдельный prod build",
+              "rebuild для prod",
+              "разные образы staging и prod"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "build once",
+              "promote",
+              "staging",
+              "prod"
+            ],
+            "ask": "почему нельзя собирать отдельный образ для production"
+          }
+        ],
+        "mustConcepts": [
+          "build once",
+          "promote",
+          "один образ",
+          "тот же",
+          "staging",
+          "prod",
+          "drift",
+          "пересборк",
+          "не rebuild",
+          "протестиров",
+          "ship",
+          "артефакт",
+          "retag",
+          "promotion"
+        ],
+        "falseClaims": [
+          "для prod нужна отдельная сборка с другими флагами",
+          "staging и prod могут безопасно использовать разные build",
+          "promotion — это rebuild с prod-конфигом",
+          "docker tag создаёт новый образ с другим содержимым"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "cache_strategy",
+      "title": "Знает стратегии кэширования сборки",
+      "expected": "Кандидат описывает cache-from/cache-to; backends GHA, registry, S3; без cache холодный старт; mode=max; ускорение повторных билдов.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "cache backend — главное отличие между командами в ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "cache-from",
+              "cache-to",
+              "gha",
+              "registry"
+            ],
+            "ask": "какие cache backend используешь и чем registry cache отличается от GHA"
+          }
+        ],
+        "mustConcepts": [
+          "cache-from",
+          "cache-to",
+          "BuildKit",
+          "buildx",
+          "type=gha",
+          "type=registry",
+          "type=s3",
+          "mode=max",
+          "холодн",
+          "base image",
+          "повторн",
+          "ускорен",
+          "слой",
+          "layer",
+          "registry cache",
+          "портатив"
+        ],
+        "falseClaims": [
+          "Docker всегда кэширует слои между CI job без настройки",
+          "cache-to без cache-from достаточен для ускорения",
+          "GHA cache работает между разными репозиториями без ограничений",
+          "удаление cache не влияет на время сборки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "tagging_strategy",
+      "title": "Понимает стратегию тегирования и pinning",
+      "expected": "Кандидат называет: SHA для воспроизводимости, semver для релизов, latest для non-prod, pr-N для PR; prod pin SHA или digest, не mutable latest.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "tagging table из ITLead",
+        "mustConcepts": [
+          "commit SHA",
+          "semver",
+          "latest",
+          "pr-",
+          "digest",
+          "sha256",
+          "воспроизводим",
+          "mutable",
+          "pin",
+          "prod",
+          "tag",
+          "якорь",
+          "review app",
+          "не latest в prod"
+        ],
+        "falseClaims": [
+          "latest в prod безопасен если main стабилен",
+          "SHA tag и digest всегда указывают на разные образы",
+          "semver minor tag гарантирует неизменность patch",
+          "тегирование не влияет на reproducibility deploy"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "multistage_testing",
+      "title": "Тестирует внутри образа (multi-stage)",
+      "expected": "Кандидат объясняет: multi-stage с test target; docker build --target test или docker run образа; тест-среда = prod OS/libs; не npm test на хосте.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "multi-stage Dockerfile и follow-up Q из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "multi-stage",
+              "--target test",
+              "внутри образа"
+            ],
+            "ask": "где запускать тесты — в образе или на CI runner host и почему"
+          }
+        ],
+        "mustConcepts": [
+          "multi-stage",
+          "test target",
+          "--target test",
+          "docker run",
+          "внутри образа",
+          "npm test",
+          "runtime stage",
+          "deps",
+          "build stage",
+          "среда",
+          "OS",
+          "библиотек",
+          "host",
+          "runner",
+          "то что шиппим"
+        ],
+        "falseClaims": [
+          "npm test на хосте CI эквивалентен тесту в production-образе",
+          "multi-stage обязательно пушит test stage в registry",
+          "docker run тестирует другую среду чем deploy",
+          "test stage и runtime stage должны быть одним FROM"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "vuln_scanning_signing",
+      "title": "Знает scan и подпись образа",
+      "expected": "Кандидат упоминает Trivy/grype/Snyk с fail на HIGH/CRITICAL; Cosign sign по digest; digest в deploy manifest; .trivyignore для исключений.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "scan + sign шаги из GitHub Actions примера",
+        "mustConcepts": [
+          "Trivy",
+          "grype",
+          "Snyk",
+          "CVE",
+          "HIGH",
+          "CRITICAL",
+          "exit-code",
+          "Cosign",
+          "sign",
+          "digest",
+          "sha256",
+          "trivyignore",
+          "уязвим",
+          "скан",
+          "подпис",
+          "Sigstore"
+        ],
+        "falseClaims": [
+          "scan после deploy достаточен для security gate",
+          "Cosign подписывает tag, а не digest",
+          "HIGH CVE можно игнорировать в CI без политики",
+          "подпись образа заменяет vulnerability scan"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки Docker CI/CD",
+      "expected": "Кандидат называет: rebuild per env, забытый cache, latest в prod, секреты в ARG, тесты на host; правильно — build once + tag, cache-from, SHA/digest, BuildKit secret mount.",
+      "score": 2,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — частые production anti-patterns",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "build_once_promote",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ARG",
+              "secret",
+              "build-arg"
+            ],
+            "ask": "почему нельзя передавать NPM token через ARG и как правильно"
+          },
+          {
+            "match": [
+              "latest",
+              "prod",
+              "staging build"
+            ],
+            "ask": "что не так с отдельным docker build для staging и prod"
+          }
+        ],
+        "mustConcepts": [
+          "rebuild",
+          "per environment",
+          "cache",
+          "latest",
+          "prod",
+          "ARG",
+          "secret mount",
+          "BuildKit",
+          "--mount=type=secret",
+          "image history",
+          "host test",
+          "drift",
+          "8 минут",
+          "90 секунд",
+          "docker tag",
+          "build once"
+        ],
+        "falseClaims": [
+          "BUILD_TOKEN в ARG безопасен — слои приватные",
+          "latest в prod гарантирует последний протестированный образ",
+          "без cache-from сборка всё равно быстрая на любом CI",
+          "два docker build для staging и prod — нормальная практика"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Checkout → buildx с cache-from type=gha → push с тегом ${{ github.sha }} → docker run образ npm test → Trivy HIGH/CRITICAL exit 1 → cosign sign по digest → staging и prod деплоят тот же @sha256, без rebuild.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Образ — единый артефакт: CI собрал api:abc123, staging взял его, после QA promote retag в 1.2.3 — digest тот же. Cache registry между GitLab и Jenkins. Секреты npm через --mount=type=secret, не ARG.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Multi-stage: deps → test (npm test) → runtime. В PR пушу pr-456 для review app, в main — SHA + latest. Prod только pin digest из build output, не latest.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Делаю docker build -t myapp:staging и отдельно docker build -t myapp:prod — так prod получает оптимизированный образ. В prod деплою latest с main.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Тесты гоняю npm test на runner до build — быстрее. Секреты передаю ARG BUILD_TOKEN, cache не нужен, Docker сам всё кэширует.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Scan Trivy после deploy в prod, HIGH можно игнорировать. Cosign подписывает latest tag, digest в манифест не пишу.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "pipeline_shape",
+      "exampleType": "good",
+      "exampleText": "Полный цикл: checkout, setup-buildx, build-push с cache, test в образе, trivy scan, push GHCR, cosign, kubectl set image по digest.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "pipeline_shape",
+      "exampleType": "good",
+      "exampleText": "ну стандартно — собрал образ, прогнал тесты и скан, запушил с sha, задеплоил",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "pipeline_shape",
+      "exampleType": "bad",
+      "exampleText": "CI/CD с Docker — это только docker build на сервере при каждом git pull, без registry и без scan.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "build_once_promote",
+      "exampleType": "good",
+      "exampleText": "Build once: myreg/api:abc123 из CI → staging deploy abc123 → после QA prod deploy тот же abc123 или retag в semver, digest не меняется.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "build_once_promote",
+      "exampleType": "good",
+      "exampleText": "пересборка для прода — drift, ты не тестировал то что шиппишь; promotion это смена указателя deploy, не новый build",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "build_once_promote",
+      "exampleType": "bad",
+      "exampleText": "Для production делаю отдельный docker build с NODE_ENV=production — staging образ другой и это нормально.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "cache_strategy",
+      "exampleType": "good",
+      "exampleText": "cache-from/cache-to type=gha mode=max — повторные билды ~90 сек вместо 8 мин; для портативности между CI — type=registry ref myapp:cache.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "cache_strategy",
+      "exampleType": "good",
+      "exampleText": "без cache-from каждый job тянет base image с нуля; на self-hosted runner кладу cache в S3 bucket",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "cache_strategy",
+      "exampleType": "bad",
+      "exampleText": "BuildKit кэширует автоматически между разными workflow и репозиториями, cache-to настраивать не надо.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "tagging_strategy",
+      "exampleType": "good",
+      "exampleText": "SHA — якорь воспроизводимости, semver 1.2.3 для релиза, pr-1234 для review; prod kubectl set image @sha256 из build digest.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "tagging_strategy",
+      "exampleType": "good",
+      "exampleText": "latest только для dev, в проде pin sha или digest — mutable tag = сюрприз при rollout",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "tagging_strategy",
+      "exampleType": "bad",
+      "exampleText": "В production всегда myorg/api:latest — так всегда свежий main без лишних тегов.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "multistage_testing",
+      "exampleType": "good",
+      "exampleText": "Dockerfile: deps → test (RUN npm test) → runtime; CI docker build --target test, в registry пушу только runtime.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "multistage_testing",
+      "exampleType": "good",
+      "exampleText": "после push делаю docker run --rm image:sha npm test — тестирую ровно то что задеплоим, не runner host",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "multistage_testing",
+      "exampleType": "bad",
+      "exampleText": "npm test на GitHub runner до docker build — ок, версии node и alpine те же что в контейнере всегда.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "vuln_scanning_signing",
+      "exampleType": "good",
+      "exampleText": "trivy-action severity HIGH,CRITICAL exit-code 1; cosign sign ghcr.io/repo@digest; digest пишу в deploy manifest для prod.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "vuln_scanning_signing",
+      "exampleType": "good",
+      "exampleText": "исключения CVE в .trivyignore с обоснованием; подпись по digest, не по mutable tag",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "vuln_scanning_signing",
+      "exampleType": "bad",
+      "exampleText": "Scan делаю раз в месяц вручную, в CI не блокирую билд на CVE. Cosign не нужен если private registry.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Антипаттерны: два build staging/prod, latest в prod, ARG для токена, тесты на host. Фикс: один build + tag many, cache-from, secret mount, test в образе.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "RUN --mount=type=secret,id=npmrc npm ci — токен не попадает в layer history; build once docker tag для staging label",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Для ускорения пропускаю cache и делаю отдельный prod build с --no-cache — так prod чище и безопаснее.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-in-ci-cd-pipeline",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-in-ci-cd-pipeline",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-in-ci-cd-pipeline",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to use Docker in a CI/CD pipeline?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

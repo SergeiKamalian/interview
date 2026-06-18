@@ -1,0 +1,355 @@
+{
+  "topic": {
+    "code": "expressjs_async_handling",
+    "name": "Async/await в обработчиках Express.js",
+    "skillCode": "expressjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как правильно обрабатывать async/await в route handlers Express.js?",
+    "shortAnswer": "Express 4 не перехватывает rejected Promise из async-обработчиков — ошибка не попадает в error middleware. Оборачивайте каждый async handler и middleware в asyncHandler: Promise.resolve(fn(...)).catch(next). Альтернатива — try/catch + next(err) или express-async-errors; в Express 5 async-ошибки пробрасываются нативно.",
+    "idealAnswer": "Express создан до async/await и синхронно вызывает middleware: при reject Promise попадает в microtask queue уже после выхода из try/catch Express. Unhandled rejection не доходит до error middleware — процесс падает или Node выдаёт warning. Решение — asyncHandler: (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next). Оборачивать нужно и route handlers, и async middleware. try/catch + next(err) — когда нужно трансформировать ошибку перед передачей. express-async-errors патчит Express один раз при импорте. Express 5 (RC) ловит async rejections без обёртки. Fire-and-forget Promise без await/asyncHandler не перехватывается — нужен .catch с логированием. Node 20+ не отменяет необходимость обёртки в Express 4. После res.json() next() вызывать не нужно.",
+    "maxScore": 10,
+    "skills": [
+      "expressjs",
+      "javascript",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "async_rejection_problem",
+      "title": "Понимает проблему async rejections",
+      "expected": "Кандидат объясняет: Express 4 не ловит rejected Promise из async handler; ошибка обходит error middleware; unhandled rejection крашит процесс.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ядро — почему async ломает встроенную обработку ошибок",
+        "mustConcepts": [
+          "async",
+          "await",
+          "Promise",
+          "reject",
+          "rejection",
+          "microtask",
+          "error middleware",
+          "unhandled",
+          "Express 4",
+          "не ловит",
+          "обходит",
+          "синхронн",
+          "try/catch"
+        ],
+        "falseClaims": [
+          "Express 4 автоматически ловит все async ошибки",
+          "новый Node.js исправляет проблему без обёртки",
+          "async ошибки всегда попадают в error middleware",
+          "Promise rejection безопасен в Express 4"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "probeConceptGroups": [
+          {
+            "match": [
+              "reject",
+              "Promise",
+              "microtask"
+            ],
+            "ask": "почему Express не видит rejected Promise из async handler"
+          }
+        ],
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "async_handler_wrapper",
+      "title": "Знает паттерн asyncHandler",
+      "expected": "Кандидат описывает обёртку Promise.resolve(fn(...)).catch(next); понимает зачем Promise.resolve для смешанного sync/async кода.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "основной fix — catch(next) на цепочке Promise",
+        "mustConcepts": [
+          "asyncHandler",
+          "Promise.resolve",
+          "catch",
+          "next(err)",
+          "next",
+          "обёртк",
+          "wrapper",
+          "перехват",
+          "forward",
+          "переда"
+        ],
+        "falseClaims": [
+          "asyncHandler нужен только для sync handlers",
+          "достаточно fn(...).catch(next) без Promise.resolve",
+          "catch без next отправит ошибку клиенту напрямую"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "async_rejection_problem",
+            "floorFraction": 0.45
+          }
+        ]
+      }
+    },
+    {
+      "key": "try_catch_vs_wrapper",
+      "title": "Различает try/catch и asyncHandler",
+      "expected": "Кандидат: asyncHandler — для типового случая; try/catch + next(err) — когда нужно обогатить или залогировать ошибку перед передачей.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "когда трансформировать ошибку вручную",
+        "mustConcepts": [
+          "try/catch",
+          "next(err)",
+          "трансформ",
+          "обогат",
+          "лог",
+          "asyncHandler",
+          "типовой"
+        ],
+        "falseClaims": [
+          "try/catch всегда лучше asyncHandler",
+          "asyncHandler нельзя использовать в middleware"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "middleware_and_alternatives",
+      "title": "Оборачивает async middleware; знает альтернативы",
+      "expected": "Кандидат: async middleware тоже нужно оборачивать; упоминает express-async-errors или Express 5 native support.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "частая ошибка — обернуть routes, забыть middleware",
+        "mustConcepts": [
+          "middleware",
+          "async middleware",
+          "express-async-errors",
+          "monkey-patch",
+          "Express 5",
+          "native",
+          "оборачив"
+        ],
+        "falseClaims": [
+          "async middleware ловится Express автоматически",
+          "express-async-errors меняет синтаксис routes",
+          "Express 5 stable в production без проверки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "fire_and_forget",
+      "title": "Знает про fire-and-forget Promise",
+      "expected": "Кандидат: Promise без await вне scope asyncHandler; нужен явный .catch с логированием, иначе unhandled rejection.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "sendEmail без await — типичный production баг",
+        "mustConcepts": [
+          "fire-and-forget",
+          "await",
+          "sendEmail",
+          "без await",
+          "лог",
+          "catch",
+          "unhandled",
+          "scope"
+        ],
+        "falseClaims": [
+          "asyncHandler ловит все Promise в handler включая fire-and-forget",
+          "fire-and-forget безопасен если не await"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Типичные ошибки async в Express",
+      "expected": "Кандидат: next() после res.json(); забытый wrapper на middleware; silent .catch; ожидание что Node version решает проблему.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "mistakes из ITLead — частые на middle+",
+        "mustConcepts": [
+          "next после res.json",
+          "res.json",
+          "ответ отправлен",
+          "silent catch",
+          "глотает",
+          "middleware без wrapper"
+        ],
+        "falseClaims": [
+          "next() после res.json() обязателен",
+          "Node 22 делает asyncHandler ненужным в Express 4"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Express 4 не видит reject из async handler — нужен asyncHandler с .catch(next). Оборачиваю и routes, и async middleware. Fire-and-forget sendEmail ловлю отдельным .catch с logger.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну async в express — обязательно wrapper, иначе promise reject улетает мимо error middleware и сервер падает",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Promise.resolve(fn(req,res,next)).catch(next) — стандарт; try/catch когда надо кастомный DatabaseError кинуть в next",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "async/await в express работает как в обычном js — express сам всё ловит",
+      "sortOrder": 3
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "достаточно async (req,res)=>{ await db() } без wrapper, error middleware поймает",
+      "sortOrder": 4
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Reject из await User.findAll() в Express 4 не попадает в error middleware — microtask после выхода из sync try/catch Express.",
+      "sortOrder": 10,
+      "checkpointKey": "async_rejection_problem"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "express не ловит promise reject из async route — unhandled rejection",
+      "sortOrder": 11,
+      "checkpointKey": "async_rejection_problem"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Express 4 автоматически передаёт async ошибки в app.use((err,...))",
+      "sortOrder": 12,
+      "checkpointKey": "async_rejection_problem"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "const asyncHandler = fn => (req,res,next) => Promise.resolve(fn(req,res,next)).catch(next)",
+      "sortOrder": 13,
+      "checkpointKey": "async_handler_wrapper"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "wrapper: promise.resolve + catch next — стандарт для всех async routes",
+      "sortOrder": 14,
+      "checkpointKey": "async_handler_wrapper"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "asyncHandler нужен только если в handler больше одного await",
+      "sortOrder": 15,
+      "checkpointKey": "async_handler_wrapper"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "try/catch + next(new DatabaseError) когда надо обогатить ошибку; asyncHandler для boilerplate-free routes.",
+      "sortOrder": 16,
+      "checkpointKey": "try_catch_vs_wrapper"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "wrapper для простых кейсов, try catch если трансформирую err",
+      "sortOrder": 17,
+      "checkpointKey": "try_catch_vs_wrapper"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "try/catch и asyncHandler нельзя смешивать",
+      "sortOrder": 18,
+      "checkpointKey": "try_catch_vs_wrapper"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "app.use(asyncHandler(async (req,res,next)=>{ req.user=await find(); next(); })) — middleware тоже оборачиваю.",
+      "sortOrder": 19,
+      "checkpointKey": "middleware_and_alternatives"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "express-async-errors один require — без wrapper на каждый route; express 5 rc — native",
+      "sortOrder": 20,
+      "checkpointKey": "middleware_and_alternatives"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "middleware async ловится express без wrapper",
+      "sortOrder": 21,
+      "checkpointKey": "middleware_and_alternatives"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "sendEmail(user.email).catch(err => logger.error) — без await wrapper не видит rejection.",
+      "sortOrder": 22,
+      "checkpointKey": "fire_and_forget"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "fire and forget — отдельный catch, не полагаюсь на asyncHandler",
+      "sortOrder": 23,
+      "checkpointKey": "fire_and_forget"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "asyncHandler поймает sendEmail() даже без await",
+      "sortOrder": 24,
+      "checkpointKey": "fire_and_forget"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Не вызываю next() после res.json(); не глотаю .catch(()=>{}); не забываю wrapper на auth middleware.",
+      "sortOrder": 25,
+      "checkpointKey": "common_mistakes"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "после res.json next не нужен; node 20 не чинит express 4 async",
+      "sortOrder": 26,
+      "checkpointKey": "common_mistakes"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "next() после res.json() обязателен для корректного pipeline",
+      "sortOrder": 27,
+      "checkpointKey": "common_mistakes"
+    }
+  ],
+  "itlead": {
+    "slug": "expressjs-async-handling",
+    "apiUrl": "https://api.itlead.org/api/questions/expressjs-async-handling",
+    "pageUrl": "https://itlead.org/interview-questions/expressjs/expressjs-async-handling",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to handle async/await in Express.js route handlers?",
+    "categorySlug": "expressjs",
+    "syncedAt": "2026-06-18T14:43:55.091Z"
+  }
+}

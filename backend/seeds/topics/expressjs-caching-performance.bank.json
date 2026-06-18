@@ -1,0 +1,541 @@
+{
+  "topic": {
+    "code": "expressjs_caching_performance",
+    "name": "Кеширование и производительность в Express.js",
+    "skillCode": "expressjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как реализовать кеширование в Express.js для повышения производительности?",
+    "shortAnswer": "Кеширование в Express.js сохраняет результаты дорогих операций (запросы к БД, внешние API) и отдаёт сохранённую копию на повторные запросы, снижая latency и нагрузку на сервер. Три слоя: in-process (node-cache), распределённый кеш (Redis) и HTTP-заголовки для браузера и CDN. node-cache — для одного инстанса; Redis — для production за load balancer; Cache-Control и ETag — для клиентского кеша.",
+    "idealAnswer": "Кеширование хранит результат дорогих операций и возвращает сохранённую копию вместо повторного вычисления. Три слоя: in-process memory (node-cache), distributed cache (Redis) и HTTP cache headers для браузеров и CDN. node-cache — самый быстрый (без сети), но пропадает при рестарте процесса и не шарится между инстансами за load balancer. Redis — отдельный сервис, общий для всех Node-инстансов, переживает рестарты, нативный TTL; trade-off — сетевой round-trip 1–2 ms локально, 5–15 ms в облаке. Типичный middleware: ключ req.originalUrl, на hit — res.json(cached) без handler; на miss — перехват res.json, сохранение body при status 2xx, затем originalJson(body). TTL стартуют короткие (30–60 с) и увеличивают по частоте изменений данных. HTTP-слой: Cache-Control public/private max-age; ETag + If-None-Match → 304 без тела — экономит bandwidth на config/reference data. Инвалидация — главный источник production-багов: любой write (POST, PUT, PATCH, не только POST) должен удалять stale ключи; для пагинации — pattern invalidation через SCAN, не KEYS. Кешировать: результаты DB, external API, агрегации. Не кешировать: auth tokens, realtime prices/inventory, user-specific без userId в ключе. Типичные ошибки: req.path вместо req.originalUrl (теряет query), кеширование 500, нет fallback при падении Redis, redis.keys() в production. User-specific: ключ cache:${originalUrl}:${user.id}. max-age — все кеши; s-maxage — только shared (CDN). GraphQL — кеш по hash запроса, не URL. Cold start после deploy — warmup script или принять медленные первые запросы.",
+    "maxScore": 10,
+    "skills": ["expressjs", "javascript", "nodejs"]
+  },
+  "checkpoints": [
+    {
+      "key": "caching_layers",
+      "title": "Понимает три слоя кеширования",
+      "expected": "Кандидат называет: in-process (node-cache), distributed (Redis), HTTP headers для браузера/CDN; объясняет зачем каждый слой.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — три слоя из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "caching_layers",
+            "oftenConfusedWith": ["memory_vs_redis", "http_cache_headers"],
+            "anchorTermsExpected": [
+              "node-cache",
+              "Redis",
+              "Cache-Control",
+              "CDN",
+              "in-process",
+              "HTTP",
+              "три слоя"
+            ],
+            "anchorTermsWrongTopic": [
+              "только Redis достаточно",
+              "HTTP headers заменяют server cache"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["node-cache", "Redis", "Cache-Control"],
+            "ask": "зачем три слоя кеширования и когда какой применять"
+          }
+        ],
+        "mustConcepts": [
+          "node-cache",
+          "Redis",
+          "Cache-Control",
+          "CDN",
+          "in-process",
+          "in-memory",
+          "distributed",
+          "HTTP header",
+          "браузер",
+          "серверный кеш",
+          "TTL",
+          "слой",
+          "performance",
+          "latency"
+        ],
+        "falseClaims": [
+          "достаточно только HTTP headers без server-side cache",
+          "node-cache заменяет Redis в production multi-instance",
+          "кеширование — только для статики",
+          "CDN и Redis — одно и то же"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "memory_vs_redis",
+      "title": "Сравнивает node-cache и Redis",
+      "expected": "Кандидат: node-cache быстрее, но не шарится и теряется при рестарте; Redis общий для инстансов, переживает рестарт; dev node-cache / prod Redis за единым интерфейсом.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевой trade-off single vs multi-instance",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "caching_layers",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "memory_vs_redis",
+            "oftenConfusedWith": ["caching_layers"],
+            "anchorTermsExpected": [
+              "load balancer",
+              "PM2 cluster",
+              "рестарт",
+              "round-trip",
+              "shared"
+            ],
+            "anchorTermsWrongTopic": [
+              "node-cache шарится между инстансами",
+              "Redis быстрее node-cache всегда"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "node-cache",
+          "Redis",
+          "рестарт",
+          "load balancer",
+          "PM2",
+          "cluster",
+          "инстанс",
+          "shared",
+          "round-trip",
+          "network",
+          "dev",
+          "production",
+          "интерфейс",
+          "единый"
+        ],
+        "falseClaims": [
+          "node-cache работает между несколькими Node-процессами",
+          "Redis не нужен если один сервер — навсегда",
+          "in-memory кеш переживает deploy без потерь",
+          "Redis всегда медленнее любого DB query"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "cache_middleware",
+      "title": "Реализует cache middleware",
+      "expected": "Кандидат описывает: ключ req.originalUrl, hit → res.json без handler; miss → wrap res.json, cache.set при 2xx, TTL; X-Cache HIT/MISS для отладки.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Quick example — перехват res.json",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": ["res.json", "originalJson", "middleware"],
+            "ask": "как middleware перехватывает res.json и сохраняет body до отправки"
+          },
+          {
+            "match": ["req.originalUrl", "cache key"],
+            "ask": "почему ключ кеша — req.originalUrl, а не req.path"
+          }
+        ],
+        "mustConcepts": [
+          "middleware",
+          "req.originalUrl",
+          "cache hit",
+          "cache miss",
+          "res.json",
+          "originalJson",
+          "bind",
+          "cache.set",
+          "cache.get",
+          "TTL",
+          "stdTTL",
+          "handler",
+          "skip",
+          "X-Cache",
+          "statusCode",
+          "2xx"
+        ],
+        "falseClaims": [
+          "middleware всегда вызывает handler даже при cache hit",
+          "можно кешировать без перехвата res.json",
+          "req.path достаточен как ключ кеша",
+          "кешировать нужно все status codes включая 500"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "http_cache_headers",
+      "title": "Настраивает Cache-Control и ETag",
+      "expected": "Кандидат: public/private max-age для CDN и браузера; ETag + If-None-Match → 304 без тела; max-age vs s-maxage; private для user-specific.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "HTTP layer + ETag example ITLead",
+        "probeConceptGroups": [
+          {
+            "match": ["ETag", "304", "If-None-Match"],
+            "ask": "как ETag экономит bandwidth на повторных запросах"
+          },
+          {
+            "match": ["max-age", "s-maxage", "public", "private"],
+            "ask": "разница max-age и s-maxage для CDN vs browser"
+          }
+        ],
+        "mustConcepts": [
+          "Cache-Control",
+          "max-age",
+          "s-maxage",
+          "public",
+          "private",
+          "no-cache",
+          "ETag",
+          "If-None-Match",
+          "304",
+          "CDN",
+          "браузер",
+          "bandwidth",
+          "etag",
+          "hash"
+        ],
+        "falseClaims": [
+          "ETag всегда заменяет server-side Redis cache",
+          "private данные можно кешировать на CDN с public",
+          "304 отправляет полное тело ответа",
+          "max-age и s-maxage всегда одинаковы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "cache_invalidation",
+      "title": "Инвалидирует кеш при записи",
+      "expected": "Кандидат: POST/PUT/PATCH удаляют stale ключи; pattern invalidation для pagination; SCAN вместо KEYS в production; cold start / warmup.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "invalidation — главный production pain ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "caching_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["POST", "PUT", "PATCH", "invalidate", "del"],
+            "ask": "какие write-операции должны очищать кеш и почему не только POST"
+          },
+          {
+            "match": ["SCAN", "keys", "pattern", "pagination"],
+            "ask": "как инвалидировать paginated routes без redis.keys()"
+          }
+        ],
+        "mustConcepts": [
+          "invalidation",
+          "инвалидац",
+          "cache.del",
+          "redis.del",
+          "POST",
+          "PUT",
+          "PATCH",
+          "stale",
+          "pattern",
+          "SCAN",
+          "scanStream",
+          "keys",
+          "pagination",
+          "warmup",
+          "cold start",
+          "deploy"
+        ],
+        "falseClaims": [
+          "достаточно инвалидировать только при POST",
+          "TTL всегда заменяет явную инвалидацию",
+          "redis.keys() безопасен в production",
+          "после deploy кеш автоматически прогревается"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "what_to_cache",
+      "title": "Знает что кешировать и что нет",
+      "expected": "Кандидат: кешировать DB queries, external API, aggregations; не кешировать auth tokens, realtime data, user-specific без userId в ключе; GraphQL — по hash запроса.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "what to cache table ITLead",
+        "probeConceptGroups": [
+          {
+            "match": ["user", "userId", "cache key"],
+            "ask": "как безопасно кешировать user-specific данные"
+          }
+        ],
+        "mustConcepts": [
+          "DB query",
+          "external API",
+          "aggregation",
+          "auth token",
+          "realtime",
+          "inventory",
+          "price",
+          "user-specific",
+          "userId",
+          "cache key",
+          "GraphQL",
+          "query hash",
+          "expensive"
+        ],
+        "falseClaims": [
+          "можно кешировать JWT и session tokens",
+          "user profile без userId в ключе — безопасно",
+          "realtime inventory counts — хороший кандидат для long TTL",
+          "GraphQL кешируют по URL как REST"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "caching_mistakes",
+      "title": "Знает типичные ошибки кеширования",
+      "expected": "Кандидат: req.path vs originalUrl; кеш 500; нет Redis fallback (try-catch + next()); PUT/PATCH без invalidation; redis.keys() блокирует event loop.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "common mistakes + graceful degradation ITLead",
+        "mustConcepts": [
+          "req.path",
+          "req.originalUrl",
+          "query params",
+          "500",
+          "error response",
+          "redis.keys",
+          "SCAN",
+          "event loop",
+          "PUT",
+          "PATCH",
+          "try-catch",
+          "fallback",
+          "next()",
+          "Redis down"
+        ],
+        "falseClaims": [
+          "req.path и originalUrl дают один ключ для разных query",
+          "кешировать 500 — нормально на 5 минут",
+          "KEYS * безопасен при тысячах ключей",
+          "если Redis упал — API должен возвращать 503"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Три слоя: node-cache middleware на /api/products с TTL 300 с, Redis в prod за LB, Cache-Control public max-age для CDN. Ключ req.originalUrl — query учитывается. POST/PUT/PATCH — cache.del и redis.del. Redis read в try-catch, при fail — next() без падения API.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Middleware перехватывает res.json: hit — сразу json из кеша, miss — сохраняем body только при 2xx. Dev — node-cache, prod — ioredis с setex. ETag на /api/config: If-None-Match совпал — 304 без тела. User profile — private no-cache или ключ с userId.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Публичный каталог — Redis TTL 5–10 мин + CDN первый слой. Инвалидация pattern через scanStream, не keys(). GraphQL — hash запроса как ключ. Cold deploy — warmup бьёт критичные endpoints.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Кеширую по req.path — category=shoes и category=hats одна запись. 500 тоже кладу в кеш на 5 минут. Redis упал — возвращаю 503 всем.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "node-cache на трёх инстансах за nginx — общий кеш, всё ок. Инвалидирую только POST, PUT/PATCH не трогаю. keys('cache:/api/products*') в production — быстро и просто.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "User-specific /api/profile кеширую один ключ на всех — экономия памяти. JWT кладу в Redis с TTL час. Realtime stock count — TTL 10 минут достаточно.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "caching_layers",
+      "exampleType": "good",
+      "exampleText": "node-cache in-process, Redis distributed, Cache-Control — клиентский слой для CDN и браузера",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "caching_layers",
+      "exampleType": "good",
+      "exampleText": "три уровня: сервер память, сервер redis, http headers — каждый для своего случая",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "caching_layers",
+      "exampleType": "bad",
+      "exampleText": "HTTP Cache-Control полностью заменяет server-side кеш — Redis не нужен.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "memory_vs_redis",
+      "exampleType": "good",
+      "exampleText": "node-cache быстрее но локален; Redis — shared за load balancer, переживает рестарт",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "memory_vs_redis",
+      "exampleType": "good",
+      "exampleText": "dev node-cache, prod redis — один интерфейс, переключение одной строкой",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "memory_vs_redis",
+      "exampleType": "bad",
+      "exampleText": "PM2 cluster mode — node-cache общий между воркерами автоматически.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "cache_middleware",
+      "exampleType": "good",
+      "exampleText": "const key = req.originalUrl; hit → res.json(hit); wrap res.json, cache.set при 2xx",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "cache_middleware",
+      "exampleType": "good",
+      "exampleText": "X-Cache HIT/MISS header — видно hit rate при load test",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "cache_middleware",
+      "exampleType": "bad",
+      "exampleText": "Ключ req.path — query string не важен для кеша продуктов.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "http_cache_headers",
+      "exampleType": "good",
+      "exampleText": "public max-age=300 для каталога; private no-cache для /api/profile после auth",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "http_cache_headers",
+      "exampleType": "good",
+      "exampleText": "ETag + If-None-Match → 304, config object не летит повторно",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "http_cache_headers",
+      "exampleType": "bad",
+      "exampleText": "304 Not Modified отправляет полный JSON body как обычно.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "cache_invalidation",
+      "exampleType": "good",
+      "exampleText": "POST create — del cache:/api/products; PUT update — тоже del; paginated — scanStream pattern",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "cache_invalidation",
+      "exampleType": "good",
+      "exampleText": "после deploy warmup script бьёт /api/products и /api/config",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "cache_invalidation",
+      "exampleType": "bad",
+      "exampleText": "TTL 5 минут — явная инвалидация не нужна, stale данные сами уйдут.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "what_to_cache",
+      "exampleType": "good",
+      "exampleText": "DB SELECT products, external weather API — да; auth token, live price — нет",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "what_to_cache",
+      "exampleType": "good",
+      "exampleText": "user cache key: cache:${originalUrl}:${req.user.id}",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "what_to_cache",
+      "exampleType": "bad",
+      "exampleText": "/api/profile один ключ для всех пользователей — норм для internal API.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "caching_mistakes",
+      "exampleType": "good",
+      "exampleText": "originalUrl не path; только 2xx в кеш; SCAN не KEYS",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "caching_mistakes",
+      "exampleType": "good",
+      "exampleText": "catch redis.get → next(); PUT/PATCH тоже invalidation",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "caching_mistakes",
+      "exampleType": "bad",
+      "exampleText": "redis.keys блокирует только на dev — в prod тоже ok. Redis timeout — 503.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "expressjs-caching-performance",
+    "apiUrl": "https://api.itlead.org/api/questions/expressjs-caching-performance",
+    "pageUrl": "https://itlead.org/interview-questions/expressjs/expressjs-caching-performance",
+    "difficulty": "SENIOR",
+    "titleEn": "How to implement caching in Express.js for better performance?",
+    "categorySlug": "expressjs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

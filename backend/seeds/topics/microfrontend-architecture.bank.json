@@ -1,0 +1,673 @@
+{
+  "topic": {
+    "code": "microfrontend_architecture",
+    "name": "Архитектура микрофронтендов",
+    "skillCode": "javascript",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое архитектура микрофронтендов и как она работает?",
+    "shortAnswer": "Архитектура микрофронтендов разбивает frontend на независимые деплоябельные микро-приложения под отдельными командами, которые композируются в один UI в runtime. Основные инструменты — Module Federation (Webpack 5) и single-spa. Применять когда 3+ команд нужны независимые релизы; для команд до 20 разработчиков обычно избыточна.",
+    "idealAnswer": "Микрофронтенды (microfrontend architecture) делят frontend на несколько независимых web-приложений, каждое под отдельной командой; они загружаются и композируются в единый UI в runtime через shell-приложение. Аналогия Lego: каждая команда строит и деплоит свой блок; shell собирает их без пересборки всего проекта. В монолите все команды делят один репозиторий, одну сборку и один деплой — CSS одной команды ломает кнопки другой, апдейт зависимостей ломает тесты соседей. MF разрывает эту связку на уровне инфраструктуры: свой bundle, свой CI/CD, свой ритм релизов; Team A может перейти на React 18 без ожидания миграции Team B с Angular. Подходы интеграции: (1) runtime Module Federation (Webpack 5) — shell декларирует remotes по URL, shared deps как singletons, независимый deploy; (2) runtime single-spa — framework-agnostic оркестратор с lifecycle bootstrap/mount/unmount и activity function; (3) iframes — полная изоляция, но postMessage, routing и a11y сложнее; (4) build-time npm-пакеты — теряется независимый deploy. Когда использовать: 3+ команд без координации релизов, чёткие бизнес-домены (каталог, checkout, аккаунт), поэтапная миграция legacy, разные стеки. Не использовать: <20 dev, MVP, статический контент, когда монорепо с модульными границами даёт 80% независимости за 20% цены. Браузер: shell HTML → SystemJS/ES modules dynamic import → каждый MF регистрирует lifecycle → на смене route mount активных и unmount неактивных. CSS-изоляция: Shadow DOM или CSS Modules. Коммуникация: Custom Events на window, BroadcastChannel для cross-origin/iframe; не window.userState. Типичные ошибки: глобальный CSS каскадирует между MF; React без singleton в MF — 5 копий bundle; прямая манипуляция DOM другого MF; пропуск unmount → утечки listeners. Shared React: Module Federation shared: { react: { singleton: true, strictVersion: true } }. Performance runtime composition: +200–500ms на extra JS round trips; modulepreload и lazy routes. State без глобального Redux: BroadcastChannel, URL params, минимальный shared module через MF. Senior migration: legacy route через iframe/reverse proxy, новый MF за feature flag, single-spa import maps для swap URL без redeploy. SSR: shell SSR + hydration map, MF SSR chunks через ESI на CDN, Podium; чаще CSR с SSR per MF где нужен SEO/FCP. Примеры: Netflix 100+ MF single-spa, IKEA MF catalog, Spotify MF + RxJS singleton, Zalando Luigi 200+ MF.",
+    "maxScore": 10,
+    "skills": [
+      "javascript",
+      "typescript",
+      "react"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "mf_definition",
+      "title": "Понимает микрофронтенды",
+      "expected": "Кандидат объясняет: frontend разбит на независимые micro-apps под разными командами; shell композирует их в один UI в runtime; независимый develop/test/deploy.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — независимые MF и shell composition",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "mf_definition",
+            "oftenConfusedWith": [
+              "integration_approaches",
+              "vs_monolith"
+            ],
+            "anchorTermsExpected": [
+              "микрофронтенд",
+              "microfrontend",
+              "shell",
+              "runtime",
+              "независим",
+              "композиц"
+            ],
+            "anchorTermsWrongTopic": [
+              "монорепо это MF",
+              "npm package = microfrontend",
+              "SSR shell только"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "shell",
+              "runtime",
+              "микрофронтенд"
+            ],
+            "ask": "что делает shell и чем MF отличается от обычного модульного SPA"
+          }
+        ],
+        "mustConcepts": [
+          "микрофронтенд",
+          "microfrontend",
+          "micro-app",
+          "shell",
+          "оболочк",
+          "runtime",
+          "независим",
+          "отдельн команд",
+          "композиц",
+          "единый UI",
+          "deploy",
+          "деплой",
+          "независим релиз",
+          "микро-застосунок",
+          "Lego",
+          "собирает"
+        ],
+        "falseClaims": [
+          "микрофронтенды — просто разбиение кода в одном репозитории",
+          "shell и MF деплоятся всегда вместе в одном bundle",
+          "microfrontend = microservice на backend",
+          "MF не требует runtime composition"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "vs_monolith",
+      "title": "Отличает от монолита",
+      "expected": "Кандидат сравнивает: монолит — один repo/build/deploy, CSS и deps связаны; MF — свой bundle, cadence, registry; одна команда не блокирует другую.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевой trade-off независимости vs операционная сложность",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "mf_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "vs_monolith",
+            "oftenConfusedWith": [
+              "when_to_use"
+            ],
+            "anchorTermsExpected": [
+              "монолит",
+              "monolith",
+              "один репозиторий",
+              "независим deploy",
+              "CSS каскад"
+            ],
+            "anchorTermsWrongTopic": [
+              "монорепо всегда монолит",
+              "MF без CI/CD"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "монолит",
+          "monolith",
+          "один repo",
+          "один build",
+          "один deploy",
+          "связан",
+          "каскад CSS",
+          "зависимост",
+          "bundle",
+          "cadence",
+          "релиз",
+          "registry",
+          "React 18",
+          "Angular",
+          "разные стеки",
+          "не ждать"
+        ],
+        "falseClaims": [
+          "в монолите команды деплоят независимо как в MF",
+          "MF убирает все проблемы shared dependencies",
+          "монолит всегда хуже MF для любого размера команды"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "integration_approaches",
+      "title": "Знает подходы интеграции",
+      "expected": "Кандидат описывает: Module Federation remotes/shared singletons; single-spa lifecycle; iframes изоляция; build-time npm — без независимого deploy.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "четыре подхода из ITLead — production выбор senior",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "mf_definition",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Module Federation",
+              "remoteEntry",
+              "singleton"
+            ],
+            "ask": "как shell подключает remote MF через Module Federation"
+          },
+          {
+            "match": [
+              "single-spa",
+              "bootstrap",
+              "mount",
+              "unmount"
+            ],
+            "ask": "lifecycle single-spa и activity function"
+          },
+          {
+            "match": [
+              "iframe",
+              "npm",
+              "build-time"
+            ],
+            "ask": "trade-off iframes vs runtime composition vs npm packages"
+          }
+        ],
+        "mustConcepts": [
+          "Module Federation",
+          "Webpack 5",
+          "remote",
+          "remoteEntry",
+          "shared",
+          "singleton",
+          "single-spa",
+          "bootstrap",
+          "mount",
+          "unmount",
+          "activity function",
+          "iframe",
+          "postMessage",
+          "build-time",
+          "npm package",
+          "runtime",
+          "независим deploy",
+          "System.import"
+        ],
+        "falseClaims": [
+          "build-time npm даёт независимый deploy как MF",
+          "iframes — лучший default для всех MF",
+          "Module Federation работает только с React",
+          "single-spa требует один фреймворк"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Когда использовать / не использовать",
+      "expected": "Кандидат называет: 3+ команд, домены, legacy migration, разные стеки — использовать; <20 dev, MVP, статика, хороший монорепо — пропустить.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use таблица ITLead",
+        "mustConcepts": [
+          "3+ команд",
+          "независим релиз",
+          "домен",
+          "каталог",
+          "checkout",
+          "legacy",
+          "миграц",
+          "разные стеки",
+          "20 разработчик",
+          "MVP",
+          "старт",
+          "статик",
+          "монорепо",
+          "80%",
+          "инфраструктур",
+          "CI/CD",
+          "мониторинг"
+        ],
+        "falseClaims": [
+          "MF нужен для любого SPA больше 5 страниц",
+          "команда 10 dev всегда выигрывает от MF",
+          "монорепо не даёт модульных границ",
+          "MF не имеет операционной цены"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "browser_composition",
+      "title": "Как браузер композирует MF",
+      "expected": "Кандидат описывает: shell HTML → dynamic import → lifecycle register → route change mount/unmount; CSS Shadow DOM или Modules.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "browser flow из ITLead — mount/unmount lifecycle",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "mount",
+              "unmount",
+              "lifecycle"
+            ],
+            "ask": "что происходит при навигации — mount и unmount MF"
+          }
+        ],
+        "mustConcepts": [
+          "shell HTML",
+          "SystemJS",
+          "ES module",
+          "dynamic import",
+          "System.import",
+          "lifecycle",
+          "mount",
+          "unmount",
+          "route",
+          "маршрут",
+          "window.location",
+          "оркестратор",
+          "Shadow DOM",
+          "CSS Modules",
+          "изоляц",
+          "стил"
+        ],
+        "falseClaims": [
+          "все MF всегда mounted и никогда unmount",
+          "shell пересобирается при каждом deploy remote MF",
+          "CSS всегда изолирован без Shadow DOM или Modules"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Типичные ошибки",
+      "expected": "Кандидат называет: global CSS leak; React без singleton; window.userState race; DOM другого MF; пропуск unmount и listener leaks.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes ITLead — production pitfalls senior",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "browser_composition",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "CSS",
+              "!important",
+              "каскад"
+            ],
+            "ask": "как global CSS одного MF ломает другой"
+          },
+          {
+            "match": [
+              "React",
+              "singleton",
+              "пять раз"
+            ],
+            "ask": "почему React загружается несколько раз и как singleton в MF"
+          },
+          {
+            "match": [
+              "unmount",
+              "listener",
+              "утечк"
+            ],
+            "ask": "что происходит если не реализовать unmount cleanup"
+          }
+        ],
+        "mustConcepts": [
+          "global CSS",
+          "каскад",
+          "!important",
+          "CSS Modules",
+          "Shadow DOM",
+          "React",
+          "singleton",
+          "дубликат",
+          "130kb",
+          "window.userState",
+          "race condition",
+          "DOM",
+          "innerHTML",
+          "unmount",
+          "listener",
+          "таймер",
+          "утечк",
+          "cleanup",
+          "навигац"
+        ],
+        "falseClaims": [
+          "global .btn стили безопасны между MF",
+          "каждый MF может трогать root DOM соседа",
+          "unmount опционален если MF редко скрывается",
+          "window globals — нормальный shared store между MF"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "communication_shared_deps",
+      "title": "Коммуникация и shared deps",
+      "expected": "Кандидат объясняет: Custom Events, BroadcastChannel; MF shared singleton React strictVersion; не глобальный Redux; modulepreload для perf.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up Q shared deps и state sync ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "BroadcastChannel",
+              "CustomEvent"
+            ],
+            "ask": "как MF общаются без window.userState"
+          },
+          {
+            "match": [
+              "strictVersion",
+              "requiredVersion"
+            ],
+            "ask": "как выровнять версии React между remotes"
+          }
+        ],
+        "mustConcepts": [
+          "CustomEvent",
+          "Custom Events",
+          "dispatchEvent",
+          "BroadcastChannel",
+          "postMessage",
+          "cross-origin",
+          "singleton",
+          "strictVersion",
+          "requiredVersion",
+          "shared",
+          "Redux",
+          "URL param",
+          "modulepreload",
+          "200-500",
+          "lazy",
+          "channel.close"
+        ],
+        "falseClaims": [
+          "глобальный Redux store — best practice для всех MF",
+          "BroadcastChannel работает между разными origin без postMessage",
+          "разные версии React в MF безопасны без fallback bundle"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "migration_ssr_senior",
+      "title": "Миграция и SSR (senior)",
+      "expected": "Кандидат упоминает: feature flag + import maps swap; legacy iframe/proxy; SSR shell + ESI/Podium per MF; CSR default с SSR где SEO/FCP.",
+      "score": 1,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Senior follow-up migration и SSR из ITLead",
+        "mustConcepts": [
+          "feature flag",
+          "import map",
+          "legacy",
+          "iframe",
+          "reverse proxy",
+          "rollback",
+          "SSR",
+          "ESI",
+          "Edge-Side",
+          "Podium",
+          "hydration map",
+          "CDN",
+          "CSR",
+          "SEO",
+          "FCP",
+          "Netflix",
+          "IKEA",
+          "Spotify",
+          "Zalando",
+          "Luigi"
+        ],
+        "falseClaims": [
+          "миграция на MF требует big-bang rewrite",
+          "SSR всех MF mandatory с первого дня",
+          "import map swap требует redeploy shell"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Микрофронтенды — независимые micro-apps под разными командами: shell в runtime подгружает remote bundles через Module Federation или single-spa, mount/unmount по маршруту. Shared React — singleton в webpack shared. Коммуникация — BroadcastChannel, не window.userState. Global CSS без Modules — типичная ошибка.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "У нас 4 команд на каталог, checkout, аккаунт и shell. MF через single-spa: navbar React всегда mounted, dashboard Vue только на /dash. CSS Modules в каждом MF. При миграции checkout legacy Angular и новый React MF на одном route — feature flag + import map, rollback без redeploy shell.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Module Federation: shell remotes cart@remoteEntry.js, lazy import cart/CartWidget в Suspense — Vue виджет в React дереве. strictVersion на react — если версии разъехались, видим второй bundle и чиним. SSR только на catalog MF через ESI, остальное CSR.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Микрофронтенды — когда каждый компонент в отдельном npm пакете и shell пересобирается при каждом обновлении. Общий state — window.userState между MF.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "MF нужен для стартапа с 8 разработчиками. Global .btn { color: red !important } в MF — норм, соседние MF не пострадают. Unmount не нужен — SPA всегда держит всё в DOM.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "iframes — единственный правильный способ MF. Build-time npm integration даёт независимый deploy как Netflix. SSR всех MF с первого дня обязателен.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "mf_definition",
+      "exampleType": "good",
+      "exampleText": "MF — несколько независимых frontend apps, shell композирует в один UI в runtime, каждая команда деплоит свой bundle.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "mf_definition",
+      "exampleType": "good",
+      "exampleText": "ну как lego блоки — каждая команда свой кусок, shell собирает без пересборки всего приложения",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "mf_definition",
+      "exampleType": "bad",
+      "exampleText": "Микрофронтенд — просто feature folder в монорепо с lazy routes.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "vs_monolith",
+      "exampleType": "good",
+      "exampleText": "В монолите один deploy блокирует всех; в MF Team A шипит React 18 пока Team B на Angular — CSS одного не каскадирует в другой при правильной изоляции.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "vs_monolith",
+      "exampleType": "good",
+      "exampleText": "монолит — shared repo и friday no deploy; mf — свой ci/cd и registry на каждый micro-app",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "vs_monolith",
+      "exampleType": "bad",
+      "exampleText": "Монолит и MF одинаковы по независимости релизов — разница только в названии.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "integration_approaches",
+      "exampleType": "good",
+      "exampleText": "Production default — Module Federation remotes + shared singletons; single-spa для heterogeneous stacks; iframes только для sandbox third-party; npm build-time — без independent deploy.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "integration_approaches",
+      "exampleType": "good",
+      "exampleText": "shell webpack remotes cart@localhost:3002/remoteEntry.js; single-spa registerApplication с activeWhen pathname /dash",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "integration_approaches",
+      "exampleType": "bad",
+      "exampleText": "Все MF должны быть в iframes. npm packages — главный способ независимого deploy в production.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "3+ команд, чёткие домены catalog/checkout — MF; 15 dev MVP — монорепо; 50+ dev cross-team deploys weekly — MF оправдан.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "legacy монолит заменяем по секциям — mf; статический блог — не mf",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "MF всегда лучше монолита для любого React приложения.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "browser_composition",
+      "exampleType": "good",
+      "exampleText": "Браузер грузит shell → System.import remote bundle → на /dash mount Vue MF, unmount при уходе; navbar React остаётся mounted.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "browser_composition",
+      "exampleType": "good",
+      "exampleText": "оркестратор смотрит location, mount активных mf, unmount неактивных; css modules или shadow dom",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "browser_composition",
+      "exampleType": "bad",
+      "exampleText": "Все MF монтируются один раз при загрузке и никогда размонтируются.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": ".btn !important в global CSS — красные кнопки во всех MF; fix — CSS Modules. React без singleton — 5x bundle. Пропуск unmount — listener leak на каждой навигации.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "window.userState race между mf; document.getElementById соседа innerHTML = '' ломает unmount lifecycle",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Shared mutable window store — recommended pattern. Unmount cleanup optional для SPA.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "communication_shared_deps",
+      "exampleType": "good",
+      "exampleText": "Login в navbar: BroadcastChannel postMessage user-login; dashboard subscribe; channel.close на unmount. React shared singleton strictVersion.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "communication_shared_deps",
+      "exampleType": "good",
+      "exampleText": "custom event user-login на window; cart count — минимальный shared module через mf, не глобальный redux",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "communication_shared_deps",
+      "exampleType": "bad",
+      "exampleText": "Один Redux store на window для всех MF — best practice. BroadcastChannel работает cross-origin без postMessage.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "migration_ssr_senior",
+      "exampleType": "good",
+      "exampleText": "Legacy checkout + new React MF same route: feature flag, import map swap URL — rollback без redeploy. SSR catalog chunk через ESI на CDN, Podium pattern.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "migration_ssr_senior",
+      "exampleType": "good",
+      "exampleText": "начинаем csr, ssr per mf только где seo/fcp; netflix single-spa 100+ mf как референс",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "migration_ssr_senior",
+      "exampleType": "bad",
+      "exampleText": "Миграция на MF только big-bang rewrite. SSR всех MF mandatory day one.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "microfrontend-architecture",
+    "apiUrl": "https://api.itlead.org/api/questions/microfrontend-architecture",
+    "pageUrl": "https://itlead.org/interview-questions/architecture/microfrontend-architecture",
+    "difficulty": "SENIOR",
+    "titleEn": "Microfrontend architecture",
+    "categorySlug": "architecture",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

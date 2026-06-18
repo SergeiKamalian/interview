@@ -1,0 +1,629 @@
+{
+  "topic": {
+    "code": "services_dependency_injection_angular",
+    "name": "Сервисы и dependency injection в Angular",
+    "skillCode": "angular",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое сервисы в Angular и как работает dependency injection?",
+    "shortAnswer": "Сервис — это @Injectable-класс с переиспользуемой логикой (HTTP, состояние, валидация). DI автоматически передаёт экземпляры в компоненты через параметры конструктора или inject() — без ручного new. @Injectable({ providedIn: 'root' }) создаёт один singleton на приложение и tree-shakable по умолчанию.",
+    "idealAnswer": "Сервис в Angular — обычный класс с декоратором @Injectable, инкапсулирующий логику, общую для нескольких компонентов: HTTP-запросы, бизнес-правила, логирование, состояние. Dependency Injection — механизм, который автоматически доставляет экземпляры сервисов в компоненты и другие сервисы через параметры конструктора или функцию inject(), без вызовов new ServiceName() в коде приложения. UserService не вызывает new HttpClient(), компонент не вызывает new UserService() — инжектор читает типы параметров и подставляет готовые экземпляры. DI нужен для тестируемости и гибкости: в TestBed достаточно providers: [{ provide: UserService, useValue: mock }] — компонент не меняется. Инжекторы образуют дерево: root при bootstrap, ниже module и component injectors. При запросе токена Angular поднимается по дереву, пока не найдёт provider. @Injectable({ providedIn: 'root' }) — один app-wide singleton, lazy, tree-shakable. Component providers: [SomeService] в @Component — новый экземпляр для поддерева компонента, уничтожается с компонентом. Lazy-модуль получает child injector; services в providers lazy-модуля изолированы в этой ветке. Три способа регистрации: providedIn: 'root' (самый частый), providers на компоненте (изоляция scope), InjectionToken для значений не-классов (API_URL). Типы провайдеров: useClass (подмена класса), useValue (константа), useFactory (сборка с runtime config, deps), useExisting (alias токена). Angular 14+: inject() в инициализаторах полей — предпочтительный стиль в standalone; constructor injection тоже валиден. TypeScript emitDecoratorMetadata записывает design:paramtypes — инжектор использует конструктор класса как токен без строковых идентификаторов. Типичные ошибки: @Injectable() без providedIn и без providers → NullInjectorError; new DataService() в компоненте — обходит DI, ломает тесты и цепочку зависимостей; циклическая зависимость AuthService ↔ UserService — extract third service или lazy inject() в методе; сервис с component-only state в root — state течёт между view; два provider на один токен в одном инжекторе — последний побеждает. Real-world: HttpClient через provideHttpClient(), MatDialog/Store/Firestore как injectable сервисы, Nx generator ставит providedIn: 'root' по умолчанию.",
+    "maxScore": 10,
+    "skills": [
+      "angular",
+      "typescript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "service_and_di_basics",
+      "title": "Понимает сервис и суть DI",
+      "expected": "Кандидат объясняет: сервис — @Injectable-класс с shared logic; DI автоматически передаёт экземпляры в constructor/inject(); нигде new ServiceName(); DI для тестируемости и гибкости.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — сервис + DI без new из ITLead TL;DR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "service_and_di_basics",
+            "oftenConfusedWith": [
+              "injector_tree_basics"
+            ],
+            "anchorTermsExpected": [
+              "@Injectable",
+              "сервис",
+              "DI",
+              "dependency injection",
+              "constructor",
+              "inject()",
+              "без new",
+              "shared logic"
+            ],
+            "anchorTermsWrongTopic": [
+              "NgModule обязателен для каждого сервиса",
+              "DI только для HttpClient",
+              "сервис это pipe"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "@Injectable",
+              "сервис",
+              "DI"
+            ],
+            "ask": "зачем выносить логику в сервис и чем DI лучше ручного new"
+          }
+        ],
+        "mustConcepts": [
+          "@Injectable",
+          "сервис",
+          "service",
+          "DI",
+          "dependency injection",
+          "внедрен",
+          "зависимост",
+          "shared logic",
+          "переиспольз",
+          "HTTP",
+          "состоян",
+          "constructor",
+          "inject()",
+          "без new",
+          "автоматич",
+          "тестируем",
+          "TestBed",
+          "mock"
+        ],
+        "falseClaims": [
+          "компонент должен вызывать new UserService() для получения сервиса",
+          "DI существует только ради HttpClient",
+          "сервис без @Injectable всегда работает как singleton",
+          "@Injectable автоматически регистрирует сервис без providedIn или providers"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "injector_tree_basics",
+      "title": "Знает дерево инжекторов и резолюцию",
+      "expected": "Кандидат описывает: дерево Injector (root → module → component); walk-up при запросе токена; providedIn: 'root' — один singleton; component providers — scope поддерева; emitDecoratorMetadata/design:paramtypes как токен.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "how injector resolves + providedIn root из ITLead Theory",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "service_and_di_basics",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "injector_tree_basics",
+            "oftenConfusedWith": [
+              "providing_services"
+            ],
+            "anchorTermsExpected": [
+              "Injector",
+              "дерев",
+              "root",
+              "walk up",
+              "providedIn: 'root'",
+              "singleton",
+              "component providers"
+            ],
+            "anchorTermsWrongTopic": [
+              "Angular ищет только в root без подъёма",
+              "lazy module не создаёт child injector",
+              "providedIn root создаёт экземпляр на каждый компонент"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Injector",
+              "дерев",
+              "root"
+            ],
+            "ask": "как Angular ищет provider при inject(UserService) — откуда начинает и куда идёт"
+          },
+          {
+            "match": [
+              "providedIn",
+              "root",
+              "tree-shak"
+            ],
+            "ask": "чем providedIn: 'root' отличается от providers в NgModule lazy-модуля"
+          }
+        ],
+        "mustConcepts": [
+          "Injector",
+          "инжектор",
+          "дерев",
+          "root injector",
+          "module injector",
+          "component injector",
+          "walk up",
+          "вверх",
+          "providedIn: 'root'",
+          "singleton",
+          "tree-shak",
+          "lazy",
+          "child injector",
+          "design:paramtypes",
+          "emitDecoratorMetadata",
+          "токен",
+          "NullInjectorError",
+          "bootstrap"
+        ],
+        "falseClaims": [
+          "Angular резолвит зависимости только из root без обхода дерева",
+          "providedIn: 'root' создаёт новый экземпляр на каждый компонент",
+          "lazy-loaded module делит тот же module-scoped instance с eager module автоматически",
+          "для DI нужны строковые идентификаторы вместо типов класса"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "providing_services",
+      "title": "Знает три способа регистрации сервисов",
+      "expected": "Кандидат перечисляет: providedIn: 'root' (app singleton); providers в @Component (scope поддерева, destroy с компонентом); InjectionToken + provide/useValue для не-классов; правило: логика в 2+ компонентах → сервис.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "three patterns + decision rule из ITLead Providing services",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "injector_tree_basics",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "providedIn",
+              "Component.providers",
+              "InjectionToken"
+            ],
+            "ask": "когда FormStateService в providers checkout-компонента, а когда providedIn root"
+          },
+          {
+            "match": [
+              "API_URL",
+              "InjectionToken",
+              "useValue"
+            ],
+            "ask": "как зарегистрировать строку API URL через InjectionToken"
+          }
+        ],
+        "mustConcepts": [
+          "providedIn: 'root'",
+          "providers",
+          "@Component",
+          "component-scoped",
+          "поддерев",
+          "destroy",
+          "уничтож",
+          "InjectionToken",
+          "API_URL",
+          "useValue",
+          "inject(API_URL)",
+          "singleton",
+          "изоляц",
+          "FormStateService",
+          "CartService",
+          "checkout",
+          "2+ компонент",
+          "decision rule"
+        ],
+        "falseClaims": [
+          "InjectionToken нужен только для multi-providers",
+          "component providers доступны всему приложению как root singleton",
+          "providedIn: 'root' нельзя tree-shake если сервис не inject",
+          "логика одного компонента всегда должна быть в root service"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "provider_types",
+      "title": "Знает типы провайдеров",
+      "expected": "Кандидат объясняет useClass (подмена класса), useValue (константа/mock), useFactory (сборка с deps и runtime config), useExisting (alias); пример factory logger с prefix.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "таблица provider types + factory example ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "providing_services",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useFactory",
+              "deps"
+            ],
+            "ask": "когда useFactory с deps лучше useClass для LoggerService с prefix"
+          },
+          {
+            "match": [
+              "useValue",
+              "mock",
+              "TestBed"
+            ],
+            "ask": "как useValue помогает подменить сервис в тесте"
+          }
+        ],
+        "mustConcepts": [
+          "useClass",
+          "useValue",
+          "useFactory",
+          "useExisting",
+          "provide",
+          "deps",
+          "factory",
+          "фабрик",
+          "alias",
+          "псевдоним",
+          "mock",
+          "констант",
+          "ConsoleLogger",
+          "FileLogger",
+          "FEATURE_LOGGER",
+          "prefix",
+          "runtime config",
+          "подмен"
+        ],
+        "falseClaims": [
+          "useExisting создаёт новый экземпляр класса",
+          "useFactory не может принимать зависимости через deps",
+          "useValue подходит только для примитивов, не для mock-объектов",
+          "useClass и useExisting делают одно и то же без разницы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "inject_function",
+      "title": "Знает функцию inject()",
+      "expected": "Кандидат описывает: inject() из @angular/core (Angular 14+); работает в field initializer; альтернатива constructor injection; предпочтителен в standalone; оба стиля валидны, важна консистентность в проекте.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Modern inject() section ITLead",
+        "mustConcepts": [
+          "inject()",
+          "inject(",
+          "@angular/core",
+          "field initializer",
+          "инициализатор",
+          "поле",
+          "constructor injection",
+          "конструктор",
+          "standalone",
+          "Angular 14",
+          "private userService",
+          "без constructor block",
+          "альтернатив"
+        ],
+        "falseClaims": [
+          "inject() работает только внутри constructor",
+          "constructor injection устарел и запрещён",
+          "inject() нельзя использовать с InjectionToken",
+          "inject() создаёт новый экземпляр сервиса вне DI"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки DI",
+      "expected": "Кандидат называет: @Injectable() без регистрации → NullInjectorError; new DataService() обходит DI; circular dependency Auth↔User; component state в root → bleed; duplicate provider last wins.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — scoping чаще всего",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "providing_services",
+            "floorFraction": 0.4
+          },
+          {
+            "checkpointKey": "injector_tree_basics",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "NullInjectorError",
+              "providedIn",
+              "providers"
+            ],
+            "ask": "почему @Injectable() без providedIn даёт NullInjectorError и как исправить"
+          },
+          {
+            "match": [
+              "new DataService",
+              "circular",
+              "циклич"
+            ],
+            "ask": "чем плох new DataService() в компоненте и как лечить circular dependency"
+          },
+          {
+            "match": [
+              "root",
+              "component level",
+              "state bleed",
+              "scope"
+            ],
+            "ask": "почему checkout state в providedIn root течёт между разными checkout-сессиями"
+          }
+        ],
+        "mustConcepts": [
+          "NullInjectorError",
+          "No provider",
+          "providedIn",
+          "providers",
+          "new DataService",
+          "обход DI",
+          "circular dependency",
+          "циклич",
+          "Cannot instantiate cyclic",
+          "lazy inject",
+          "третий сервис",
+          "state bleed",
+          "root",
+          "component level",
+          "scope",
+          "override",
+          "последний побежда",
+          "duplicate provider",
+          "HttpClient"
+        ],
+        "falseClaims": [
+          "NullInjectorError означает только опечатку в имени класса",
+          "new DataService() в компоненте — нормальный паттерн если нужен HttpClient",
+          "circular dependency решается двумя providedIn: 'root'",
+          "два provider на один токен в одном инжекторе выбрасывают ошибку всегда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "di_testing",
+      "title": "Умеет мокать сервис в TestBed",
+      "expected": "Кандидат описывает: providers: [{ provide: UserService, useValue: mock }] в TestBed.configureTestingModule; компонент получает mock; TestBed.inject(UserService) для assert.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up Q mock + What DI solves из ITLead",
+        "mustConcepts": [
+          "TestBed",
+          "configureTestingModule",
+          "provide",
+          "useValue",
+          "mock",
+          "TestBed.inject",
+          "getUsers",
+          "of([])",
+          "компонент не меня",
+          "unit test"
+        ],
+        "falseClaims": [
+          "для mock нужно переписывать constructor компонента",
+          "TestBed не может подменить providedIn: 'root' сервис",
+          "useClass обязателен для mock, useValue не работает",
+          "mock сервиса требует изменения production кода компонента"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Сервис — @Injectable-класс с HTTP и бизнес-логикой. DI передаёт UserService в constructor компонента — без new. providedIn: 'root' — один singleton на приложение. Для checkout FormStateService кладу в providers компонента, чтобы state не тек между сессиями.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "UserService inject HttpClient через constructor; компонент inject UserService. Инжектор walk-up по дереву. InjectionToken API_URL для строки конфига. В тестах useValue mock в TestBed — компонент не трогаю.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну сервис это shared logic, angular сам подставляет в конструктор. root — на всё приложение, providers на checkout — только там. inject() в полях удобнее в standalone. new DataService — плохо, NullInjector если забыл providedIn",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Сервис создаю через new UserService() в ngOnInit — так проще. DI нужен только для pipes. providedIn root и component providers всегда один экземпляр.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "@Injectable() без providedIn автоматически регистрируется в root. Circular dependency лечится вторым new. InjectionToken — это deprecated NgModule API.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Mock в тестах — переписываю компонент и подставляю fake class. inject() заменяет DI и создаёт сервисы вручную. Lazy module не имеет своего injector.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "service_and_di_basics",
+      "exampleType": "good",
+      "exampleText": "@Injectable сервис держит getUsers(); компонент constructor(private userService: UserService) — Angular резолвит, без new. DI для mock в TestBed.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "service_and_di_basics",
+      "exampleType": "good",
+      "exampleText": "shared logic в сервис, di автоматом в конструктор или inject(), тестируемость — одна строка mock в providers",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "service_and_di_basics",
+      "exampleType": "bad",
+      "exampleText": "Каждый компонент вызывает new UserService() и new HttpClient() — стандартный Angular-паттерн.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "injector_tree_basics",
+      "exampleType": "good",
+      "exampleText": "Injector — дерево от root bootstrap; запрос UserService идёт вверх до provider. providedIn: 'root' — один instance, tree-shakable.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "injector_tree_basics",
+      "exampleType": "good",
+      "exampleText": "lazy module — child injector; providers модуля изолированы. emitDecoratorMetadata → design:paramtypes как token класса",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "injector_tree_basics",
+      "exampleType": "bad",
+      "exampleText": "Angular всегда берёт сервис только из root injector без walk-up. providedIn root создаёт экземпляр на каждый inject().",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "providing_services",
+      "exampleType": "good",
+      "exampleText": "AuthService providedIn: 'root'. CheckoutComponent providers: [FormStateService] — один instance для address-form child. API_URL InjectionToken + useValue в bootstrap.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "providing_services",
+      "exampleType": "good",
+      "exampleText": "логика в двух компонентах — сервис root; state только checkout — providers на компоненте, уничтожится с ним",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "providing_services",
+      "exampleType": "bad",
+      "exampleText": "FormStateService с providedIn root для checkout wizard — правильная изоляция сессий. InjectionToken только для классов-сервисов.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "provider_types",
+      "exampleType": "good",
+      "exampleText": "useClass: FileLogger вместо ConsoleLogger. useValue для feature flag. useFactory с deps создаёт Logger с prefix '[Feature]'. useExisting — alias токена.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "provider_types",
+      "exampleType": "good",
+      "exampleText": "factory logger: deps [LoggerService], в factory настраиваю prefix — runtime config, не useClass",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "provider_types",
+      "exampleType": "bad",
+      "exampleText": "useFactory не принимает deps. useExisting создаёт второй независимый singleton. useValue нельзя для mock-объекта.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "inject_function",
+      "exampleType": "good",
+      "exampleText": "private userService = inject(UserService); private apiUrl = inject(API_URL); — field initializer, без constructor block в standalone.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "inject_function",
+      "exampleType": "good",
+      "exampleText": "inject() и constructor injection оба ок, в проекте один стиль — чаще inject в новых standalone компонентах",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "inject_function",
+      "exampleType": "bad",
+      "exampleText": "inject() deprecated, только constructor injection с Angular 17+. inject() нельзя с InjectionToken.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "@Injectable() без providedIn → NullInjectorError; fix providedIn root или providers. new DataService() — untestable, цепочка HttpClient вручную. Auth↔User circular — третий сервис или inject в методе.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "checkout cart state в root — bleed между пользователями; нужен component providers. два provider одного токена — последний wins при merge modules",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "NullInjectorError только из-за typo. new DataService() норм если передать HttpClient вручную. Circular dependency решается @Optional() без рефакторинга.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "di_testing",
+      "exampleType": "good",
+      "exampleText": "TestBed.configureTestingModule({ providers: [{ provide: UserService, useValue: { getUsers: () => of([]) } }] }); TestBed.inject(UserService) в assert.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "di_testing",
+      "exampleType": "good",
+      "exampleText": "mock через useValue в providers — компонент не меняю, получает fake getUsers",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "di_testing",
+      "exampleType": "bad",
+      "exampleText": "Чтобы протестировать компонент с UserService, переписываю его constructor на optional параметры.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "services-and-dependency-injection-in-angular",
+    "apiUrl": "https://api.itlead.org/api/questions/services-and-dependency-injection-in-angular",
+    "pageUrl": "https://itlead.org/interview-questions/angular/services-and-dependency-injection-in-angular",
+    "difficulty": "MIDDLE",
+    "titleEn": "Services and dependency injection in Angular",
+    "categorySlug": "angular",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

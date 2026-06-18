@@ -1,0 +1,471 @@
+{
+  "topic": {
+    "code": "overlay2_storage_driver",
+    "name": "overlay2 storage driver",
+    "skillCode": "docker",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое overlay2 storage driver и когда его менять?",
+    "shortAnswer": "overlay2 — default storage driver на Linux, использует kernel OverlayFS: N read-only image layers + 1 writable container layer через copy-on-write. Менять только для ZFS/btrfs snapshot, fuse-overlayfs rootless, или legacy devicemapper. Смена wipes /var/lib/docker.",
+    "idealAnswer": "overlay2 = OverlayFS + Docker. lowerdir (image layers) + upperdir (container writes) + workdir + merged view. Write: new file in upper; modify lower → copy-up entire file. Disk: /var/lib/docker/overlay2/, layer sharing via docker system df -v. Default с Docker 17.06+, ext4/xfs ftype=1. Альтернативы: btrfs/zfs для snapshot; fuse-overlayfs rootless; devicemapper deprecated; vfs без COW. Смена: stop docker, daemon.json storage-driver, rm -rf /var/lib/docker, restore from backup. Ошибки: switch без wipe; xfs ftype=0; loopback devicemapper; volumes отдельны от driver. Heavy writes → volumes/bind mounts bypass driver.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "overlay2_definition",
+      "title": "Определяет overlay2 и OverlayFS",
+      "expected": "Кандидат: overlay2 — default storage driver на Linux; kernel OverlayFS; N read-only layers + 1 writable container layer.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR overlay2",
+        "mustConcepts": [
+          "overlay2",
+          "OverlayFS",
+          "storage driver",
+          "default",
+          "Linux",
+          "kernel",
+          "read-only",
+          "writable",
+          "container layer",
+          "union mount",
+          "copy-on-write",
+          "COW",
+          "17.06",
+          "ext4",
+          "xattrs"
+        ],
+        "falseClaims": [
+          "overlay2 устарел",
+          "overlay2 не использует kernel",
+          "container layer read-only",
+          "overlay = overlay2"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "overlayfs_mechanism",
+      "title": "Описывает lowerdir/upperdir/merged",
+      "expected": "Кандидат: lowerdir=image layers, upperdir=writable changes, workdir, merged=container view; read top-down, write to upperdir.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "How OverlayFS works",
+        "mustConcepts": [
+          "lowerdir",
+          "upperdir",
+          "workdir",
+          "merged",
+          "whiteout",
+          "copy-up",
+          "stack",
+          "read",
+          "write",
+          "upper",
+          "lower",
+          "opaque",
+          "xattr",
+          "diff",
+          "link"
+        ],
+        "falseClaims": [
+          "merged writable напрямую",
+          "delete удаляет lower layer",
+          "whiteout не существует",
+          "workdir виден контейнеру"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "cow_performance",
+      "title": "Понимает copy-on-write и производительность",
+      "expected": "Кандидат: modify lower file → copy entire file to upper; 5GB touch = 5GB copy; reads near-native; heavy writes → volumes/bind mounts.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "COW performance",
+        "mustConcepts": [
+          "copy-on-write",
+          "copy-up",
+          "5GB",
+          "modify",
+          "lower",
+          "upper",
+          "read",
+          "write",
+          "volume",
+          "bind mount",
+          "bypass",
+          "storage driver",
+          "performance",
+          "pages",
+          "lazy"
+        ],
+        "falseClaims": [
+          "COW не копирует файлы",
+          "modify 1 byte копирует 1 byte",
+          "overlay2 медленный на read",
+          "volumes не обходят driver"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_change",
+      "title": "Знает когда менять driver",
+      "expected": "Кандидat: ZFS/btrfs если уже используете; fuse-overlayfs для rootless; devicemapper legacy; 99% оставить overlay2.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "When to change driver",
+        "mustConcepts": [
+          "btrfs",
+          "zfs",
+          "fuse-overlayfs",
+          "rootless",
+          "devicemapper",
+          "vfs",
+          "99%",
+          "overlay2",
+          "snapshot",
+          "RHEL",
+          "CentOS 7",
+          "deprecated",
+          "kernel 5.13",
+          "user namespace"
+        ],
+        "falseClaims": [
+          "всегда менять на btrfs",
+          "devicemapper рекомендуется",
+          "overlay2 не default",
+          "fuse-overlayfs быстрее overlay2"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "check_and_disk",
+      "title": "Проверяет driver и disk usage",
+      "expected": "Кандидat: docker info Storage Driver; docker system df -v; layer sharing — 100 nginx = nginx_size + 100*upper, не 100*nginx.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Check and disk space",
+        "mustConcepts": [
+          "docker info",
+          "Storage Driver",
+          "Backing Filesystem",
+          "d_type",
+          "ftype=1",
+          "xfs",
+          "system df",
+          "shared",
+          "prunable",
+          "layer sharing",
+          "MergedDir",
+          "inspect"
+        ],
+        "falseClaims": [
+          "docker info не показывает driver",
+          "100 containers = 100x image size",
+          "xfs ftype=0 ok для overlay2"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "switch_procedure",
+      "title": "Знает процедуру смены driver",
+      "expected": "Кандидat: destructive — wipe /var/lib/docker; stop daemon; storage-driver в daemon.json; backup images/volumes first.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Switching driver procedure",
+        "mustConcepts": [
+          "destructive",
+          "/var/lib/docker",
+          "wipe",
+          "daemon.json",
+          "storage-driver",
+          "systemctl stop",
+          "docker save",
+          "backup",
+          "downtime",
+          "data-root",
+          "metadata"
+        ],
+        "falseClaims": [
+          "можно сменить driver без wipe",
+          "images сохраняются при смене",
+          "switch без downtime"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидat: switch без wipe; xfs без ftype=1; loopback devicemapper; путать storage driver с volumes.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes",
+        "mustConcepts": [
+          "wipe",
+          "ftype=1",
+          "loopback",
+          "devicemapper",
+          "volumes",
+          "/var/lib/docker/volumes",
+          "corrupt",
+          "reformat",
+          "confus",
+          "graph driver",
+          "layers vs volumes"
+        ],
+        "falseClaims": [
+          "volumes зависят от storage driver",
+          "loopback devicemapper ok для prod",
+          "switch driver сохраняет containers"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "metacopy",
+      "title": "Понимает metacopy (упоминание)",
+      "expected": "Кандидat: metacopy=on — copy-up только metadata chmod/chown без data; off по умолчанию.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "metacopy follow-up",
+        "mustConcepts": [
+          "metacopy",
+          "metadata",
+          "chmod",
+          "chown",
+          "copy-up",
+          "hardlink",
+          "compatibility",
+          "permission"
+        ],
+        "falseClaims": [
+          "metacopy включён по умолчанию",
+          "metacopy копирует весь файл"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "overlay2 = OverlayFS: lowerdir image layers + upperdir writable. Copy-up при modify lower file. Default на Linux.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "99% оставить overlay2. Менять для ZFS/btrfs или rootless fuse-overlayfs. Switch wipes /var/lib/docker.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Heavy file writes → volumes/bind mounts, не полагаться на copy-up overlay2.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "overlay и overlay2 одинаковы",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "можно сменить driver без удаления /var/lib/docker",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "storage driver управляет named volumes",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "lowerdir+upperdir+merged",
+      "sortOrder": 10,
+      "checkpointKey": "overlayfs_mechanism"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "whiteout для delete",
+      "sortOrder": 11,
+      "checkpointKey": "overlayfs_mechanism"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "delete стирает lower",
+      "sortOrder": 42,
+      "checkpointKey": "overlayfs_mechanism"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "99% overlay2",
+      "sortOrder": 14,
+      "checkpointKey": "when_to_change"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "btrfs/zfs/fuse-overlayfs ниши",
+      "sortOrder": 15,
+      "checkpointKey": "when_to_change"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "всегда zfs",
+      "sortOrder": 46,
+      "checkpointKey": "when_to_change"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "stop docker, wipe /var/lib/docker, daemon.json",
+      "sortOrder": 18,
+      "checkpointKey": "switch_procedure"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "backup docker save first",
+      "sortOrder": 19,
+      "checkpointKey": "switch_procedure"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "switch без downtime",
+      "sortOrder": 50,
+      "checkpointKey": "switch_procedure"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Определяет overlay2 и OverlayFS»: Кандидат: overlay2 — default storage driver на Linux; kernel OverlayFS; N read-only layers + 1 writable container layer.…",
+      "sortOrder": 51,
+      "checkpointKey": "overlay2_definition"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Определяет overlay2 и OverlayFS»: Кандидат: overlay2 — default storage driver на Linux; kernel OverlayFS; N read-only layers + 1 writable container layer.…",
+      "sortOrder": 52,
+      "checkpointKey": "overlay2_definition"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Неверно: overlay2 устарел",
+      "sortOrder": 40,
+      "checkpointKey": "overlay2_definition"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Понимает copy-on-write и производительность»: Кандидат: modify lower file → copy entire file to upper; 5GB touch = 5GB copy; reads near-native; heavy writes → volumes…",
+      "sortOrder": 53,
+      "checkpointKey": "cow_performance"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Понимает copy-on-write и производительность»: Кандидат: modify lower file → copy entire file to upper; 5GB touch = 5GB copy; reads near-native; heavy writes → volumes…",
+      "sortOrder": 54,
+      "checkpointKey": "cow_performance"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Неверно: COW не копирует файлы",
+      "sortOrder": 41,
+      "checkpointKey": "cow_performance"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Проверяет driver и disk usage»: Кандидat: docker info Storage Driver; docker system df -v; layer sharing — 100 nginx = nginx_size + 100*upper, не 100*ng…",
+      "sortOrder": 55,
+      "checkpointKey": "check_and_disk"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Проверяет driver и disk usage»: Кандидat: docker info Storage Driver; docker system df -v; layer sharing — 100 nginx = nginx_size + 100*upper, не 100*ng…",
+      "sortOrder": 56,
+      "checkpointKey": "check_and_disk"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Неверно: docker info не показывает driver",
+      "sortOrder": 42,
+      "checkpointKey": "check_and_disk"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает типичные ошибки»: Кандидat: switch без wipe; xfs без ftype=1; loopback devicemapper; путать storage driver с volumes.…",
+      "sortOrder": 57,
+      "checkpointKey": "common_mistakes"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает типичные ошибки»: Кандидat: switch без wipe; xfs без ftype=1; loopback devicemapper; путать storage driver с volumes.…",
+      "sortOrder": 58,
+      "checkpointKey": "common_mistakes"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Неверно: volumes зависят от storage driver",
+      "sortOrder": 43,
+      "checkpointKey": "common_mistakes"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Понимает metacopy (упоминание)»: Кандидat: metacopy=on — copy-up только metadata chmod/chown без data; off по умолчанию.…",
+      "sortOrder": 59,
+      "checkpointKey": "metacopy"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Понимает metacopy (упоминание)»: Кандидat: metacopy=on — copy-up только metadata chmod/chown без data; off по умолчанию.…",
+      "sortOrder": 60,
+      "checkpointKey": "metacopy"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Неверно: metacopy включён по умолчанию",
+      "sortOrder": 44,
+      "checkpointKey": "metacopy"
+    }
+  ],
+  "itlead": {
+    "slug": "overlay2-storage-driver",
+    "categorySlug": "docker",
+    "apiUrl": "https://api.itlead.org/api/questions/overlay2-storage-driver",
+    "pageUrl": "https://itlead.org/interview-questions/docker/overlay2-storage-driver",
+    "difficulty": "SENIOR",
+    "titleEn": "What is the overlay2 storage driver and when to change it?",
+    "syncedAt": "2026-06-18T14:47:42.000Z"
+  }
+}

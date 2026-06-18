@@ -1,0 +1,394 @@
+{
+  "topic": {
+    "code": "dangling_images_cleanup",
+    "name": "Dangling images и очистка",
+    "skillCode": "docker",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Что такое dangling Docker images и как их удалить?",
+    "shortAnswer": "Dangling image — образ без тега, на который не указывает другой образ как parent; обычно это предыдущий build, потерявший tag при повторной сборке с тем же именем. Занимают диск и не нужны. Смотреть: `docker images -f dangling=true`; удалять безопасно: `docker image prune` (только dangling) или `docker image prune -a` (ещё и неиспользуемые tagged образы).",
+    "idealAnswer": "Dangling images накапливаются при частых сборках — это не баг и не corruption, а побочный эффект работы тегов. Dangling image — образ без тега (REPOSITORY и TAG = `<none>`), на который не ссылается другой образ как parent; доступен только по digest или IMAGE ID. Появляются чаще всего при повторном `docker build -t myapp:1.0` — новый build забирает tag, старый остаётся без тега; также при `docker pull nginx:latest` когда upstream обновил latest; при multi-stage/failed builds (legacy builder оставляет больше мусора; BuildKit с Docker 23+ чище). В `docker images` видны как `<none>:<none>`. Безопасно удалять — ничто на них не ссылается, `docker run <image-id>` всё ещё работает, но для продакшена они просто мусор на диске. Dangling ≠ unused: dangling — без тега; unused — с тегом, но без running container; обычный `docker image prune` удаляет только dangling; `docker image prune -a` — ещё и unused tagged. Команды по возрастанию агрессии: `docker image prune` / `docker image prune -f` — только dangling; `docker image prune -a` — dangling + unused tagged; `docker system prune` — контейнеры, dangling images, сети, build cache; `docker system prune -a --volumes` — всё неиспользуемое включая named volumes (опасно на prod). Фильтры: `--filter 'until=24h'`. Перед чисткой: `docker system df` показывает reclaimable space. На dev — weekly `docker system prune -f`; на CI — post-job `docker container prune -f && docker image prune -f`; на prod — scheduled prune с фильтром until, без `--volumes` без проверки. Типичные ошибки: путать `prune` и `prune -a` (удалит nginx:1.27 без контейнера); `system prune --volumes` на prod при остановленной БД; думать что dangling = corrupt; `prune -a` во время активного CI build. Альтернатива: `docker images -f dangling=true -q | xargs docker rmi` — эквивалент prune.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "dangling_definition",
+      "title": "Определяет dangling image",
+      "expected": "Кандидат объясняет: образ без тега (`<none>:<none>`), без parent-ссылок; обычно предыдущий build после повторного tag; занимает диск, безопасно удалять.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR ITLead — определение dangling",
+        "mustConcepts": [
+          "dangling",
+          "без тега",
+          "untagged",
+          "<none>",
+          "REPOSITORY",
+          "TAG",
+          "digest",
+          "IMAGE ID",
+          "parent",
+          "родител",
+          "предыдущ",
+          "build",
+          "сборк",
+          "tag",
+          "тег",
+          "диск",
+          "безопасн",
+          "удал",
+          "corruption",
+          "не баг"
+        ],
+        "falseClaims": [
+          "dangling image — повреждённый или битый образ",
+          "dangling images нельзя удалять — сломается Docker",
+          "dangling — это образ с тегом latest без контейнера",
+          "dangling появляются только при virus или corruption диска"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "dangling_vs_unused",
+      "title": "Отличает dangling от unused",
+      "expected": "Кандидат сравнивает: dangling — без тега; unused — с тегом, но без running container; `docker image prune` только dangling; `-a` ещё удаляет unused tagged.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "таблица Dangling vs unused — частая путаница junior",
+        "mustConcepts": [
+          "dangling",
+          "unused",
+          "неиспольз",
+          "тег",
+          "tagged",
+          "без тега",
+          "container",
+          "контейнер",
+          "running",
+          "prune",
+          "prune -a",
+          "-a",
+          "удал",
+          "ссылк",
+          "reference"
+        ],
+        "falseClaims": [
+          "dangling и unused — одно и то же",
+          "docker image prune удаляет все образы без running container",
+          "unused образ всегда без тега",
+          "tagged образ с nginx:1.27 удалит обычный prune без -a"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "how_dangling_appear",
+      "title": "Знает как появляются dangling",
+      "expected": "Кандидат называет: повторный build с тем же tag; re-pull с тем же tag; failed build; multi-stage (legacy builder); BuildKit оставляет меньше мусора.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "How dangling images appear из ITLead",
+        "mustConcepts": [
+          "docker build",
+          "build",
+          "сборк",
+          "повтор",
+          "тот же tag",
+          "re-pull",
+          "pull",
+          "latest",
+          "multi-stage",
+          "failed build",
+          "ошибк",
+          "промежуточ",
+          "BuildKit",
+          "legacy builder",
+          "tag reuse"
+        ],
+        "falseClaims": [
+          "dangling появляются только при docker rm container",
+          "dangling создаёт docker run, а не docker build",
+          "BuildKit всегда оставляет больше dangling чем legacy builder"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "cleanup_prune_commands",
+      "title": "Знает команды очистки",
+      "expected": "Кандидат называет `docker image prune` для dangling; `-f` без подтверждения; `-a` для unused tagged; может упомянуть `docker system prune` и фильтры until.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "главный практический ответ на вопрос «как удалить»",
+        "mustConcepts": [
+          "docker image prune",
+          "prune",
+          "prune -f",
+          "-f",
+          "prune -a",
+          "-a",
+          "dangling",
+          "удал",
+          "очист",
+          "docker system prune",
+          "filter",
+          "until",
+          "reclaimed",
+          "место",
+          "диск"
+        ],
+        "falseClaims": [
+          "dangling удаляют только через docker rmi без prune",
+          "docker image prune удаляет running containers",
+          "docker image prune -a удаляет только dangling без tagged",
+          "docker system prune всегда удаляет named volumes по умолчанию"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат предупреждает: `prune -a` удалит pulled tagged без контейнера; `--volumes` на prod опасен; dangling не corrupt; не чистить mid-build на CI.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes ITLead — prune vs -a, volumes, CI",
+        "falseClaimCapFraction": 0,
+        "mustConcepts": [
+          "prune -a",
+          "prune",
+          "разниц",
+          "tagged",
+          "unused",
+          "volumes",
+          "--volumes",
+          "prod",
+          "production",
+          "named volume",
+          "БД",
+          "database",
+          "corrupt",
+          "поврежд",
+          "CI",
+          "build cache",
+          "mid-build",
+          "агрессив"
+        ],
+        "falseClaims": [
+          "docker image prune и prune -a делают одно и то же",
+          "system prune --volumes безопасен на prod если контейнер остановлен",
+          "dangling images повреждены и опасны для запуска",
+          "можно безопасно запускать prune -a --volumes на prod без проверки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "list_and_inspect",
+      "title": "Умеет просмотреть и оценить диск",
+      "expected": "Кандидат называет `docker images -f dangling=true`; `docker system df` для reclaimable space; может упомянуть `docker rmi` для точечного удаления.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "list/inspect перед prune из ITLead examples",
+        "mustConcepts": [
+          "docker images",
+          "dangling=true",
+          "-f dangling",
+          "фильтр",
+          "docker system df",
+          "df",
+          "reclaimable",
+          "освобод",
+          "размер",
+          "SIZE",
+          "docker rmi",
+          "rmi",
+          "IMAGE ID",
+          "перед prune",
+          "inspect"
+        ],
+        "falseClaims": [
+          "dangling нельзя отфильтровать — только вручную по всему списку",
+          "docker system df показывает только containers без images",
+          "docker rmi удаляет только dangling автоматически без указания id"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Dangling image — образ без тега (`<none>:<none>`), обычно старый build после повторного `docker build -t myapp:1.0`. Смотреть: `docker images -f dangling=true`. Удалить безопасно: `docker image prune -f`. Это не corruption — просто мусор на диске. `prune -a` агрессивнее: удалит и tagged образы без running container.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "когда два раза собрал с одним тегом — первый образ висит dangling. `docker image prune` чистит только их. unused — это когда tag есть, но контейнер не запущен; для них нужен `-a`. перед чисткой `docker system df` — видно сколько места вернётся",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Dangling — untagged image без parent-ссылок. Появляются при tag reuse, pull latest или failed build. `docker image prune` — рутина на dev/CI. На prod не трогаю `--volumes` — можно снести БД volume.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Dangling — битые образы после сбоя Docker daemon, их нельзя удалять prune. `docker image prune -a` удаляет только dangling, tagged nginx остаётся всегда.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Dangling и unused — одно и то же. Чтобы почистить диск, всегда `docker system prune -af --volumes` на production без проверки.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Dangling images появляются только когда удаляешь container. Их смотрят через docker ps -a. Удаляют docker stop.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "dangling_definition",
+      "exampleType": "good",
+      "exampleText": "Dangling — образ без тега, REPOSITORY и TAG `<none>`, часто предыдущая сборка после повторного build с тем же именем. Занимает диск, безопасно удалить через prune.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "dangling_definition",
+      "exampleType": "good",
+      "exampleText": "это не баг — просто старый image потерял tag когда новый build занял myapp:1.0. висит на диске как <none>:<none>",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "dangling_definition",
+      "exampleType": "bad",
+      "exampleText": "Dangling image — corrupted layer, Docker помечает как broken и prune их не трогает.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "dangling_vs_unused",
+      "exampleType": "good",
+      "exampleText": "Dangling — без тега. Unused — tagged (nginx:1.27), но нет running container. `docker image prune` — только dangling; `-a` ещё снесёт unused tagged.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "dangling_vs_unused",
+      "exampleType": "good",
+      "exampleText": "pull nginx:latest месяц назад, контейнер не запускал — это unused not dangling. обычный prune его не удалит",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "dangling_vs_unused",
+      "exampleType": "bad",
+      "exampleText": "Unused — это `<none>:<none>` в docker images. prune -a удаляет только dangling.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "how_dangling_appear",
+      "exampleType": "good",
+      "exampleText": "Два раза `docker build -t myapp:1.0` — первый образ dangling. Ещё re-pull nginx:latest и failed build оставляют untagged слои.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "how_dangling_appear",
+      "exampleType": "good",
+      "exampleText": "часто после rebuild с тем же tag. multi-stage на legacy builder тоже. buildkit с 23 docker меньше мусора оставляет",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "how_dangling_appear",
+      "exampleType": "bad",
+      "exampleText": "Dangling создаёт только docker rm -f container, build тут ни при чём.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "cleanup_prune_commands",
+      "exampleType": "good",
+      "exampleText": "`docker image prune -f` — удаляет все dangling без подтверждения. `-a` — ещё unused tagged. `docker system prune` шире: контейнеры, сети, cache.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "cleanup_prune_commands",
+      "exampleType": "good",
+      "exampleText": "на CI после job: container prune && image prune -f. фильтр `--filter until=24h` если не всё сразу",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "cleanup_prune_commands",
+      "exampleType": "bad",
+      "exampleText": "Dangling чистят docker volume prune. image prune удаляет running containers.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Не путать prune и prune -a: второй удалит pulled node:22 без контейнера — потом снова качать 200MB. На prod никогда `--volumes` без проверки — БД volume может быть unmounted.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "dangling не corrupt — можно даже docker run по image id. не гоняй prune -a посреди CI build — cache пострадает",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "prune и prune -a идентичны. system prune --volumes на prod безопасен если postgres контейнер stopped на deploy.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "list_and_inspect",
+      "exampleType": "good",
+      "exampleText": "`docker images -f dangling=true` — список dangling. `docker system df` — сколько reclaimable у images/containers/cache. Точечно: `docker rmi <id>`.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "list_and_inspect",
+      "exampleType": "good",
+      "exampleText": "сначала df — видишь 6GB reclaimable images, потом image prune -af. xargs rmi эквивалент prune но старый способ",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "list_and_inspect",
+      "exampleType": "bad",
+      "exampleText": "Dangling смотрят только docker ps. df показывает volumes без images.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "dangling-images-cleanup",
+    "apiUrl": "https://api.itlead.org/api/questions/dangling-images-cleanup",
+    "pageUrl": "https://itlead.org/interview-questions/docker/dangling-images-cleanup",
+    "difficulty": "JUNIOR",
+    "titleEn": "What are dangling Docker images and how to remove them?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

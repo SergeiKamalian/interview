@@ -1,0 +1,367 @@
+{
+  "topic": {
+    "code": "share_data_between_containers",
+    "name": "Обмен данными между контейнерами",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как делиться данными между Docker контейнерами?",
+    "shortAnswer": "Файлы — shared named volume в оба контейнера. RPC/HTTP — Docker network по имени сервиса. Broadcast — Redis/Kafka queue. Read-only config — bind-mount :ro или docker config.",
+    "idealAnswer": "Три паттерна: 1) Named volume — docker volume create shared, -v shared:/data в writer и reader; concurrent writes — app coordination (atomic mv, single-writer). 2) Network — api → http://worker:5000, expose, Compose DNS. Лучше чем file-as-message. 3) Queue — Redis producer/worker replicas. 4) Read-only config bind :ro или Swarm configs. --volumes-from legacy — avoid. Ошибки: shared volume для RPC; bind mount /home/user not portable; UID mismatch; RW для readers use :ro. Sidecar: app writes logs, fluentd reads :ro.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "three_patterns",
+      "title": "Различает три паттерна обмена данными",
+      "expected": "Кандидat: files=shared volume; RPC=network; broadcast=queue (Redis/Kafka).",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR three patterns",
+        "mustConcepts": [
+          "volume",
+          "network",
+          "queue",
+          "Redis",
+          "Kafka",
+          "RabbitMQ",
+          "RPC",
+          "HTTP",
+          "файлы",
+          "сообщения",
+          "broadcast",
+          "паттерн",
+          "access pattern",
+          " три"
+        ],
+        "falseClaims": [
+          "volume для всего",
+          "network только для files",
+          "queue для read-only config"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "shared_volume",
+      "title": "Знает shared named volume",
+      "expected": "Кандидat: docker volume create; -v shared:/data в оба; concurrent writes need coordination.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Pattern 1 named volume",
+        "mustConcepts": [
+          "named volume",
+          "docker volume create",
+          "-v shared",
+          "/data",
+          "mount",
+          "both containers",
+          "same files",
+          "read-mostly",
+          "single-writer",
+          "persistent",
+          "docker run"
+        ],
+        "falseClaims": [
+          "default bridge shares volumes auto",
+          "volume locks writes",
+          "anonymous volume for sharing"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "network_rpc",
+      "title": "Предпочитает network для service-to-service",
+      "expected": "Кandidat: WORKER_URL http://worker:5000; expose; лучше чем file-as-message для RPC.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Pattern 2 network RPC",
+        "mustConcepts": [
+          "network",
+          "HTTP",
+          "gRPC",
+          "worker:5000",
+          "DNS",
+          "expose",
+          "service name",
+          "Compose",
+          "API contract",
+          "cross-host",
+          "overlay",
+          "file-as-message wrong"
+        ],
+        "falseClaims": [
+          "shared file лучше HTTP",
+          "network не span hosts",
+          "expose публикует на host"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "message_queue",
+      "title": "Знает message queue паттерн",
+      "expected": "Кandidat: Redis/RabbitMQ/Kafka; producer push, workers pull; fan-out, at-least-once.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Pattern 3 message queue",
+        "mustConcepts": [
+          "Redis",
+          "RabbitMQ",
+          "Kafka",
+          "NATS",
+          "producer",
+          "worker",
+          "replicas",
+          "fan-out",
+          "async",
+          "queue",
+          "pull",
+          "push",
+          "at-least-once",
+          "ordering"
+        ],
+        "falseClaims": [
+          "Redis только cache not queue",
+          "queue для static config",
+          "single consumer only"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "concurrent_access",
+      "title": "Понимает concurrent access pitfalls",
+      "expected": "Кandidat: atomic write tmp+mv; flock; single-writer; queue/DB instead of shared mutable files.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Concurrent access",
+        "mustConcepts": [
+          "atomic",
+          "tmp.json",
+          "mv",
+          "flock",
+          "single-writer",
+          "race",
+          "partial write",
+          "JSON parse",
+          "coordination",
+          "read-only",
+          ":ro",
+          "UID",
+          "permissions",
+          "umask"
+        ],
+        "falseClaims": [
+          "OS serializes cross-container writes",
+          "shared volume auto-locks",
+          "concurrent write safe default"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кandidat: volume for RPC; bind mount not portable; UID mismatch; RW everywhere; --volumes-from legacy.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes",
+        "mustConcepts": [
+          "file-as-message",
+          "bind mount",
+          "portable",
+          "UID 1000",
+          "permissions",
+          "volumes-from",
+          "legacy",
+          "read-only readers",
+          ":ro",
+          "architectural smell",
+          "owner"
+        ],
+        "falseClaims": [
+          "--volumes-from recommended",
+          "bind mount portable multi-host",
+          "UID не matter"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Файлы — named volume в оба. RPC — http://worker:5000 по Docker DNS. Broadcast — Redis queue.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Concurrent writes: atomic tmp+mv или single-writer. Queue/DB для mutable state.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Sidecar: app пишет logs volume, fluentd читает :ro. --volumes-from legacy.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "shared volume автоматически lock'ит writes",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "bind mount portable на multi-host",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "file-as-message лучше HTTP для RPC",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "docker volume create + mount both",
+      "sortOrder": 10,
+      "checkpointKey": "shared_volume"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "same /data files",
+      "sortOrder": 11,
+      "checkpointKey": "shared_volume"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "auto lock",
+      "sortOrder": 42,
+      "checkpointKey": "shared_volume"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "http://worker:5000 DNS",
+      "sortOrder": 14,
+      "checkpointKey": "network_rpc"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "не file-as-message",
+      "sortOrder": 15,
+      "checkpointKey": "network_rpc"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "files better than HTTP",
+      "sortOrder": 46,
+      "checkpointKey": "network_rpc"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "atomic mv tmp.json",
+      "sortOrder": 18,
+      "checkpointKey": "concurrent_access"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "single-writer convention",
+      "sortOrder": 19,
+      "checkpointKey": "concurrent_access"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "OS serializes",
+      "sortOrder": 50,
+      "checkpointKey": "concurrent_access"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Различает три паттерна обмена данными»: Кандидat: files=shared volume; RPC=network; broadcast=queue (Redis/Kafka).…",
+      "sortOrder": 51,
+      "checkpointKey": "three_patterns"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Различает три паттерна обмена данными»: Кандидat: files=shared volume; RPC=network; broadcast=queue (Redis/Kafka).…",
+      "sortOrder": 52,
+      "checkpointKey": "three_patterns"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Неверно: volume для всего",
+      "sortOrder": 40,
+      "checkpointKey": "three_patterns"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает message queue паттерн»: Кandidat: Redis/RabbitMQ/Kafka; producer push, workers pull; fan-out, at-least-once.…",
+      "sortOrder": 53,
+      "checkpointKey": "message_queue"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает message queue паттерн»: Кandidat: Redis/RabbitMQ/Kafka; producer push, workers pull; fan-out, at-least-once.…",
+      "sortOrder": 54,
+      "checkpointKey": "message_queue"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Неверно: Redis только cache not queue",
+      "sortOrder": 41,
+      "checkpointKey": "message_queue"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает типичные ошибки»: Кandidat: volume for RPC; bind mount not portable; UID mismatch; RW everywhere; --volumes-from legacy.…",
+      "sortOrder": 55,
+      "checkpointKey": "common_mistakes"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает типичные ошибки»: Кandidat: volume for RPC; bind mount not portable; UID mismatch; RW everywhere; --volumes-from legacy.…",
+      "sortOrder": 56,
+      "checkpointKey": "common_mistakes"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Неверно: --volumes-from recommended",
+      "sortOrder": 42,
+      "checkpointKey": "common_mistakes"
+    }
+  ],
+  "itlead": {
+    "slug": "share-data-between-containers",
+    "categorySlug": "docker",
+    "apiUrl": "https://api.itlead.org/api/questions/share-data-between-containers",
+    "pageUrl": "https://itlead.org/interview-questions/docker/share-data-between-containers",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to share data between Docker containers?",
+    "syncedAt": "2026-06-18T14:47:42.000Z"
+  }
+}

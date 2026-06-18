@@ -1,0 +1,627 @@
+{
+  "topic": {
+    "code": "docker_namespaces_cgroups",
+    "name": "Linux namespaces и cgroups в Docker",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое Linux namespaces и cgroups в Docker и как они делают контейнеры возможными?",
+    "shortAnswer": "Linux namespaces изолируют то, что процесс видит (PID, mount points, сеть и т.д.). cgroups ограничивают то, что процесс может потреблять (CPU, память, I/O). Вместе они делают контейнеры возможными — контейнер это процесс с применёнными namespaces и cgroups. Docker в основном оборачивает настройку этих kernel-фич для процессов.",
+    "idealAnswer": "Linux namespaces и cgroups — два kernel-механизма, без которых контейнеров не существует: без них есть только процессы, с ними — контейнеры. Docker — инструмент массовой настройки этих возможностей. Namespaces отвечают на вопрос «что процесс видит?»: семь типов — PID (свой PID 1), mount (своё дерево файлов), network (интерфейсы, порты, routing), IPC (shared memory, semaphores), UTS (hostname), user (UID/GID с remapping), cgroup (вид корня cgroups v2). Создаются через unshare(2) или clone(2); в контейнере видны в /proc/self/ns — разные inode от хоста = разные namespaces. cgroups отвечают «сколько процесс может использовать?»: в v2 (unified hierarchy) контроллеры cpu, memory, io, pids, rdma, hugetlb. Docker переводит --memory, --cpus в файлы /sys/fs/cgroup/... (memory.max, cpu.max). Концептуально контейнер: unshare() для namespaces + запись cgroup + pivot_root/chroot в rootfs + exec() бинарника. Flow docker run --memory=256m --cpus=1: CLI → containerd → runc → unshare(CLONE_NEW{PID,NS,NET,IPC,UTS,USER,CGROUP}) → write cgroup files → pivot_root в image rootfs → exec(your-binary). User namespace — security frontier: без userns-remap root внутри = root на хосте (если не ограничен capabilities); userns-remap в daemon.json мапит root контейнера на не-root UID хоста — escape не даёт root на хосте. cgroups v1 — отдельные иерархии на контроллер; v2 — единая иерархия, проще и современнее (Fedora, Debian 11+, Ubuntu 22+). Проверка: stat -fc %T /sys/fs/cgroup → cgroup2fs = v2. Типичные ошибки: namespaces сами по себе не непроницаемая security boundary — нужны capabilities drop, seccomp, read-only rootfs или microVM (Kata/Firecracker); cgroups лимитируют память, но при превышении OOM-kill и exit 137; --user 1000:1000 ≠ userns-remap (разные ручки); в K8s pod может shareProcessNamespace, в plain Docker два docker run всегда разные PID namespaces. Оба механизма Linux-only — Docker на Mac/Windows крутит Linux VM. unshare CLI — простейшая демо «контейнер руками». cgroups vs ulimits: ulimits per-process через setrlimit, cgroups — на дерево процессов иерархически. Отладка: lsns, nsenter, cat /proc/<pid>/cgroup.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "namespaces_vs_cgroups",
+      "title": "Различает namespaces и cgroups",
+      "expected": "Кандидат объясняет: namespaces изолируют видимость (что процесс видит); cgroups ограничивают потребление ресурсов (CPU, память, I/O); вместе они образуют контейнер; Docker настраивает kernel-фичи.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — visibility vs consumption",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "namespaces_vs_cgroups",
+            "oftenConfusedWith": [
+              "cgroups_limits",
+              "seven_namespace_types"
+            ],
+            "anchorTermsExpected": [
+              "namespaces",
+              "cgroups",
+              "видим",
+              "изоляц",
+              "лимит",
+              "ресурс",
+              "visibility",
+              "consumption"
+            ],
+            "anchorTermsWrongTopic": [
+              "namespaces лимитируют CPU",
+              "cgroups скрывают сеть",
+              "Docker создаёт VM"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "namespaces",
+              "cgroups",
+              "изоляц",
+              "лимит"
+            ],
+            "ask": "чем namespaces отличаются от cgroups — что каждый контролирует"
+          }
+        ],
+        "mustConcepts": [
+          "namespaces",
+          "cgroups",
+          "изоляц",
+          "видим",
+          "лимит",
+          "ресурс",
+          "CPU",
+          "памят",
+          "memory",
+          "контейнер",
+          "процесс",
+          "kernel",
+          "Docker",
+          "обёртк",
+          "настрой",
+          "visibility",
+          "consumption",
+          "что видит",
+          "что использует"
+        ],
+        "falseClaims": [
+          "namespaces и cgroups делают одно и то же",
+          "cgroups изолируют сеть от процесса",
+          "namespaces ограничивают RAM",
+          "контейнер — это виртуальная машина с guest OS",
+          "Docker не использует kernel namespaces"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "seven_namespace_types",
+      "title": "Знает семь типов namespaces",
+      "expected": "Кандидат перечисляет PID, mount (mnt), network (net), IPC, UTS, user, cgroup; понимает что PID даёт свой PID 1, net — свои интерфейсы/порты, mount — своё дерево файлов.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "таблица семи типов — ядро ITLead Theory",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "namespaces_vs_cgroups",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "PID",
+              "mount",
+              "network",
+              "IPC",
+              "UTS",
+              "user",
+              "cgroup"
+            ],
+            "ask": "назови все семь типов namespaces и что каждый изолирует"
+          }
+        ],
+        "mustConcepts": [
+          "PID",
+          "mount",
+          "mnt",
+          "network",
+          "net",
+          "IPC",
+          "UTS",
+          "user",
+          "cgroup",
+          "hostname",
+          "PID 1",
+          "интерфейс",
+          "порт",
+          "routing",
+          "shared memory",
+          "semaphore",
+          "UID",
+          "GID",
+          "unshare",
+          "clone",
+          "семь"
+        ],
+        "falseClaims": [
+          "в Docker только три namespace: PID, net и mount",
+          "UTS namespace изолирует CPU",
+          "user namespace заменяет cgroups",
+          "IPC namespace управляет сетевыми портами",
+          "cgroup namespace относится только к cgroups v1"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "cgroups_limits",
+      "title": "Понимает лимиты cgroups",
+      "expected": "Кандидат называет контроллеры cpu, memory, io, pids; знает что --memory и --cpus мапятся в /sys/fs/cgroup (memory.max, cpu.max); kernel enforce, Docker только задаёт параметры.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "resource control — вторая половина контейнера",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "memory.max",
+              "--memory",
+              "cpu.max",
+              "--cpus"
+            ],
+            "ask": "как docker run --memory=256m и --cpus=0.5 отражаются в cgroup файлах"
+          }
+        ],
+        "mustConcepts": [
+          "cgroups",
+          "memory",
+          "cpu",
+          "io",
+          "pids",
+          "memory.max",
+          "cpu.max",
+          "--memory",
+          "--cpus",
+          "/sys/fs/cgroup",
+          "контроллер",
+          "лимит",
+          "OOM",
+          "I/O",
+          "bandwidth",
+          "IOPS",
+          "quota",
+          "period",
+          "enforce",
+          "kernel"
+        ],
+        "falseClaims": [
+          "Docker сам ограничивает CPU без участия kernel cgroups",
+          "--memory задаёт лимит только в dockerd, kernel не знает",
+          "cgroups v2 не поддерживает memory limits",
+          "cgroups ограничивают только CPU, не память",
+          "флаги --cpus работают только в Kubernetes"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "docker_run_mechanism",
+      "title": "Описывает механизм docker run",
+      "expected": "Кандидат описывает цепочку: containerd → runc → unshare namespaces → запись cgroup → pivot_root в rootfs → exec бинарника; контейнер = процесс в изолированном «мире».",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "полный flow unshare+cgroups+pivot_root+exec — ключ middle",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "namespaces_vs_cgroups",
+            "floorFraction": 0.4
+          },
+          {
+            "checkpointKey": "cgroups_limits",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "unshare",
+              "pivot_root",
+              "runc",
+              "exec"
+            ],
+            "ask": "что runc делает при docker run — по шагам от unshare до exec"
+          },
+          {
+            "match": [
+              "containerd",
+              "runc"
+            ],
+            "ask": "кто создаёт namespaces и пишет cgroup files при docker run"
+          }
+        ],
+        "mustConcepts": [
+          "docker run",
+          "containerd",
+          "runc",
+          "unshare",
+          "CLONE_NEW",
+          "pivot_root",
+          "chroot",
+          "rootfs",
+          "exec",
+          "cgroup files",
+          "write",
+          "namespaces",
+          "cgroups",
+          "PID 1",
+          "образ",
+          "слой",
+          "OCI",
+          "процесс"
+        ],
+        "falseClaims": [
+          "docker run создаёт полноценную VM с guest kernel",
+          "runc только скачивает образ, namespaces не трогает",
+          "pivot_root и chroot — одно и то же для контейнера не важно",
+          "exec запускается до создания namespaces",
+          "Docker daemon напрямую вызывает unshare без runc"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "namespace_verification",
+      "title": "Умеет проверять изоляцию",
+      "expected": "Кандидат знает /proc/self/ns, lsns, nsenter; разные inode = разные namespaces; демо: на хосте сотни процессов, в контейнере ps видит только свои (PID namespace).",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "практическая верификация из ITLead examples",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "/proc/self/ns",
+              "lsns",
+              "inode"
+            ],
+            "ask": "как проверить что контейнер в отдельных namespaces от хоста"
+          }
+        ],
+        "mustConcepts": [
+          "/proc/self/ns",
+          "lsns",
+          "nsenter",
+          "inode",
+          "ps",
+          "PID namespace",
+          "хост",
+          "контейнер",
+          "изоляц",
+          "сравн",
+          "разные",
+          "демо",
+          "wc -l",
+          "процесс"
+        ],
+        "falseClaims": [
+          "одинаковые inode в /proc/self/ns означают изоляцию",
+          "контейнер видит все процессы хоста по умолчанию",
+          "lsns показывает только cgroups, не namespaces",
+          "nsenter нельзя использовать для входа в namespace контейнера"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные заблуждения",
+      "expected": "Кандидат объясняет: namespaces не равны security boundary (нужны capabilities, seccomp, userns); OOM → exit 137; --user ≠ userns-remap; K8s shareProcessNamespace vs отдельные docker run.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes ITLead — отличает зрелого middle",
+        "falseClaimCapFraction": 0,
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "common_mistakes",
+            "oftenConfusedWith": [
+              "cgroups_limits"
+            ],
+            "anchorTermsExpected": [
+              "security",
+              "seccomp",
+              "capabilities",
+              "userns-remap",
+              "--user",
+              "137",
+              "OOM"
+            ],
+            "anchorTermsWrongTopic": [
+              "namespaces полностью защищают от escape",
+              "--user включает userns-remap автоматически"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "--user",
+              "userns-remap",
+              "root"
+            ],
+            "ask": "чем --user 1000:1000 отличается от userns-remap в daemon.json"
+          },
+          {
+            "match": [
+              "OOM",
+              "137",
+              "memory"
+            ],
+            "ask": "что происходит когда контейнер превышает memory limit cgroup"
+          }
+        ],
+        "mustConcepts": [
+          "security boundary",
+          "capabilities",
+          "seccomp",
+          "CAP_SYS_ADMIN",
+          "escape",
+          "userns-remap",
+          "--user",
+          "root",
+          "OOM",
+          "137",
+          "exit code",
+          "Kata",
+          "Firecracker",
+          "microVM",
+          "shareProcessNamespace",
+          "Kubernetes",
+          "pod",
+          "read-only",
+          "multi-tenant"
+        ],
+        "falseClaims": [
+          "namespaces сами по себе непроницаемы для escape",
+          "OOM в контейнере не убивает процесс",
+          "--user 1000:1000 даёт такую же изоляцию как userns-remap",
+          "два docker run контейнера делят PID namespace по умолчанию",
+          "cgroups предотвращают OOM-kill на хосте всегда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "cgroups_v1_linux",
+      "title": "Знает cgroups v1/v2 и Linux-only",
+      "expected": "Кандидат сравнивает v1 (отдельные иерархии) и v2 (unified hierarchy); знает что namespaces/cgroups Linux-only; Docker Desktop на Mac/Windows — Linux VM; unshare — ручная сборка контейнера.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "v1/v2 и платформенный контекст — follow-up ITLead",
+        "mustConcepts": [
+          "cgroups v1",
+          "cgroups v2",
+          "unified hierarchy",
+          "legacy",
+          "cgroup2fs",
+          "tmpfs",
+          "Linux-only",
+          "Linux VM",
+          "Mac",
+          "Windows",
+          "Docker Desktop",
+          "unshare",
+          "ulimits",
+          "setrlimit",
+          "per-process",
+          "иерарх",
+          "контроллер",
+          "LXC"
+        ],
+        "falseClaims": [
+          "namespaces работают нативно на Windows без VM",
+          "cgroups v1 и v2 одинаковы по структуре иерархии",
+          "ulimits заменяют cgroups для multi-tenant",
+          "Docker на Mac использует Windows containers под капотом",
+          "cgroups v2 не поддерживается современным Docker"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Namespaces — что процесс видит: свой PID 1, свою сеть, свой mount. cgroups — сколько может жрать: --memory=256m пишет memory.max, --cpus=0.5 — cpu.max. Docker через runc делает unshare, настраивает cgroup, pivot_root в rootfs и exec. Без kernel-фич контейнера нет — только процесс.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Семь namespaces: pid, mnt, net, ipc, uts, user, cgroup. Внутри alpine ls -la /proc/self/ns — inode другие чем на хосте. memory-greedy контейнер с --memory=64m получит OOM-kill и exit 137. userns-remap сильнее чем --user: root внутри на хосте не-root UID.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "docker run --cpus=1 --memory=256m: containerd → runc → unshare всех namespace → write cgroup → pivot_root → exec. На Mac весь стек в Linux VM — namespaces linux-specific. cgroups v2 unified hierarchy, stat -fc %T /sys/fs/cgroup покажет cgroup2fs.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Namespaces ограничивают CPU и RAM, cgroups скрывают сеть. Контейнер — это lightweight VM с отдельным kernel. Docker на Mac создаёт namespaces нативно в macOS kernel.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Namespaces — полная security boundary, escape невозможен. --user 1000:1000 и userns-remap одно и то же. OOM в контейнере просто warning, процесс продолжает работать.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В Docker три namespace: network, pid и filesystem. cgroups v1 и v2 не отличаются. unshare — это Docker CLI команда для pull образов.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "namespaces_vs_cgroups",
+      "exampleType": "good",
+      "exampleText": "namespaces = visibility/isolation (что видит процесс); cgroups = resource control (CPU, RAM, I/O). Контейнер — процесс с обоими.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "namespaces_vs_cgroups",
+      "exampleType": "good",
+      "exampleText": "ну namespaces прячут pid и сеть, cgroups режут память и cpu — docker это обёртка над kernel",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "namespaces_vs_cgroups",
+      "exampleType": "bad",
+      "exampleText": "cgroups изолируют mount points, namespaces лимитируют memory.max — они взаимозаменяемы.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "seven_namespace_types",
+      "exampleType": "good",
+      "exampleText": "PID — свой pid 1; mnt — своё дерево; net — интерфейсы и порты; ipc — shm; uts — hostname; user — uid mapping; cgroup — вид cgroups v2.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "seven_namespace_types",
+      "exampleType": "good",
+      "exampleText": "семь штук через unshare/clone: pid mnt net ipc uts user cgroup — docker создаёт все при старте",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "seven_namespace_types",
+      "exampleType": "bad",
+      "exampleText": "Есть только PID и network namespace, остальное deprecated в Docker.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "cgroups_limits",
+      "exampleType": "good",
+      "exampleText": "--memory=256m → memory.max=268435456; --cpus=0.5 → cpu.max 50000 100000. Kernel enforce, docker только параметры.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "cgroups_limits",
+      "exampleType": "good",
+      "exampleText": "контроллеры cpu memory io pids — dd жрёт ram, cgroup убивает на лимите",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "cgroups_limits",
+      "exampleType": "bad",
+      "exampleText": "Docker daemon сам считает CPU usage и kill процесс без cgroups kernel.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "docker_run_mechanism",
+      "exampleType": "good",
+      "exampleText": "runc: unshare(CLONE_NEW*) → write memory.max/cpu.max → pivot_root в image rootfs → exec CMD как PID 1.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "docker_run_mechanism",
+      "exampleType": "good",
+      "exampleText": "containerd зовёт runc, runc one-shot настраивает namespaces+cgroups+rootfs и exec, сам выходит",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "docker_run_mechanism",
+      "exampleType": "bad",
+      "exampleText": "docker run сначала exec бинарник, потом optionally добавляет namespaces если указан флаг.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "namespace_verification",
+      "exampleType": "good",
+      "exampleText": "ls -la /proc/self/ns в контейнере vs хост — разные inode. ps -ef | wc -l: хост 300+, контейнер 2.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "namespace_verification",
+      "exampleType": "good",
+      "exampleText": "lsns показывает namespaces процесса; nsenter чтобы зайти в namespace контейнера с хоста",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "namespace_verification",
+      "exampleType": "bad",
+      "exampleText": "Если inode в /proc/self/ns совпадают — контейнер изолирован. Контейнер по умолчанию видит все процессы хоста.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Namespaces hide, не stop escape — нужны dropped caps, seccomp, userns-remap. OOM → 137. --user меняет uid внутри, userns-remap мапит на хост.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "k8s shareProcessNamespace:true — pod делит pid ns; два docker run — всегда разные pid namespace",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Namespaces достаточно для multi-tenant без seccomp. --user 1000 автоматически включает userns-remap.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "cgroups_v1_linux",
+      "exampleType": "good",
+      "exampleText": "v1 — /sys/fs/cgroup/memory отдельно от cpu; v2 — unified hierarchy. Mac/Windows — Linux VM. unshare --pid --fork — контейнер руками.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "cgroups_v1_linux",
+      "exampleType": "good",
+      "exampleText": "ulimits per-process setrlimit, cgroups на дерево — современный ответ для tenant limits",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "cgroups_v1_linux",
+      "exampleType": "bad",
+      "exampleText": "Docker Desktop на Mac использует native macOS cgroups. v1 и v2 — одна иерархия.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-namespaces-cgroups",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-namespaces-cgroups",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-namespaces-cgroups",
+    "difficulty": "MIDDLE",
+    "titleEn": "What are Linux namespaces and cgroups in Docker?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T21:00:00.000Z"
+  }
+}

@@ -1,0 +1,509 @@
+{
+  "topic": {
+    "code": "docker_overlay_network",
+    "name": "Docker overlay network",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое Docker overlay network и когда она нужна?",
+    "shortAnswer": "Overlay network — виртуальная L2-сеть поверх IP underlay (VXLAN), которая связывает контейнеры на разных Docker-хостах так, будто они в одной LAN. Нужна для Docker Swarm-сервисов на нескольких нодах; на одном хосте достаточно bridge.",
+    "idealAnswer": "Docker overlay network решает задачу «как контейнер на хосте A достучится до контейнера на хосте B». Это виртуальная L2-сеть поверх существующей IP-сети: трафик контейнеров инкапсулируется в VXLAN (UDP, порт 4789) и передаётся между хостами по underlay IP. У overlay своё IP-пространство (например 10.0.0.0/24), у хостов — отдельные адреса underlay (192.168.1.0/24). Без overlay контейнер на node-1 не имеет маршрута к контейнеру на node-2; с overlay пакеты туннелируются через VXLAN. Overlay — функция Docker Swarm: сначала `docker swarm init`, иначе `docker network create --driver overlay` падает с «not a swarm manager». Типичный сценарий: init на manager, workers join по токену, `docker network create --driver overlay --attachable appnet`, `docker service create --name api --network appnet --replicas 5 myapp` — реплики на разных нодах видят друг друга по имени сервиса. На overlay работает встроенный Swarm DNS (127.0.0.11): имя сервиса резолвится в virtual IP, IPVS на каждой ноде балансирует между healthy-репликами; контейнеры не знают, на каком физическом хосте какая реплика. Флаг `--attachable` нужен, если к overlay должны подключаться и standalone `docker run`, не только Swarm services; без него `docker run --network myoverlay` не сработает. Шифрование: `--opt encrypted` добавляет AES-GCM/IPsec ESP между нодами — полезно при недоверенном underlay (межрегиональный WAN), с заметной CPU-стоимостью на high-throughput. Когда нужен overlay: Swarm-сервисы на нескольких нодах, service-to-service через VPN между дата-центрами, любой кейс где bridge одного хоста недостаточен. Когда не нужен: один Docker host (bridge проще и быстрее), Kubernetes (свои CNI — Calico, Flannel, Cilium, не Docker overlay), внешний интернет (NAT не зависит от типа сети — overlay для container-to-container). Типичные ошибки: overlay без Swarm; забытый `--attachable`; firewall блокирует UDP 4789, TCP/UDP 7946 (gossip), TCP 2377 (manager API); overlay на single host — лишний VXLAN overhead без выгоды. Overlay vs bridge: bridge — single-host Linux bridge; overlay — multi-host L2 через IP underlay. Swarm автоматически создаёт overlay `ingress` для routing mesh: при `-p 80:80` каждая нода слушает :80 и форвардит трафик через overlay к реплике; caveat — DNAT может скрыть source IP клиента, для реальных IP — `--publish mode=host`.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "overlay_definition",
+      "title": "Понимает что такое overlay и зачем multi-host",
+      "expected": "Кандидат объясняет: overlay — виртуальная L2-сеть поверх IP underlay; контейнеры на разных хостах общаются как в одной LAN; без overlay нет маршрута между нодами; нужен для cross-host Swarm.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы из TL;DR — multi-host L2 поверх underlay",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "overlay",
+              "multi-host",
+              "несколько хост",
+              "разные нод"
+            ],
+            "ask": "чем overlay решает проблему связи контейнеров на разных машинах"
+          }
+        ],
+        "mustConcepts": [
+          "overlay",
+          "multi-host",
+          "несколько хост",
+          "разные нод",
+          "виртуальн",
+          "L2",
+          "underlay",
+          "контейнер",
+          "одна LAN",
+          "cross-host",
+          "Swarm",
+          "связь между хостами",
+          "маршрут",
+          "VXLAN",
+          "инкапсуляц"
+        ],
+        "falseClaims": [
+          "overlay работает на одном хосте так же просто как bridge без Swarm",
+          "overlay нужен для доступа контейнеров в интернет",
+          "overlay заменяет bridge на single host с выигрышем в производительности",
+          "overlay — это обычный bridge Docker на одной машине"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "vxlan_encapsulation",
+      "title": "Знает как работает VXLAN-инкапсуляция",
+      "expected": "Кандидат описывает: пакет контейнера оборачивается в UDP (4789), летит по underlay IP хоста-назначения; у overlay своё IP-пространство, у хостов — отдельное underlay.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "How VXLAN encapsulation works из ITLead theory",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "VXLAN",
+              "UDP",
+              "4789",
+              "underlay"
+            ],
+            "ask": "как пакет контейнера доходит от node-1 к node-2 через VXLAN"
+          }
+        ],
+        "mustConcepts": [
+          "VXLAN",
+          "инкапсуляц",
+          "UDP",
+          "4789",
+          "underlay",
+          "overlay IP",
+          "10.0.0",
+          "хост eth0",
+          "unwrap",
+          "туннел",
+          "destination host",
+          "IP-пространство",
+          "RFC 7348",
+          "Virtual eXtensible LAN"
+        ],
+        "falseClaims": [
+          "VXLAN инкапсулирует трафик в TCP, не UDP",
+          "контейнеры используют underlay IP напрямую без отдельного overlay space",
+          "VXLAN работает только внутри одного хоста",
+          "overlay и underlay — одно и то же IP-пространство"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "swarm_requirement",
+      "title": "Понимает зависимость от Docker Swarm",
+      "expected": "Кандидат объясняет: overlay требует Swarm (`docker swarm init`); без manager `docker network create --driver overlay` ошибка; типичный flow init → join → create network → service.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Swarm prerequisite — базовый механизм из quick example",
+        "mustConcepts": [
+          "docker swarm init",
+          "swarm join",
+          "swarm manager",
+          "not a swarm manager",
+          "--driver overlay",
+          "network create",
+          "worker",
+          "manager",
+          "2377",
+          "join token",
+          "advertise-addr",
+          "docker service create",
+          "replicas"
+        ],
+        "falseClaims": [
+          "overlay можно создать без Swarm на обычном docker daemon",
+          "docker compose up автоматически создаёт overlay между хостами",
+          "overlay работает в standalone Docker без cluster mode",
+          "swarm init нужен только для шифрования overlay"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "service_discovery_lb",
+      "title": "Знает DNS и балансировку на overlay",
+      "expected": "Кандидат описывает: Swarm embedded DNS (127.0.0.11); имя сервиса → virtual IP; IPVS распределяет между репликами; ping api round-robin по healthy replicas.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Service discovery on overlay — ключевой middle+ блок",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "DNS",
+              "127.0.0.11",
+              "virtual IP",
+              "IPVS"
+            ],
+            "ask": "как контейнер на appnet находит сервис api с репликами на разных нодах"
+          }
+        ],
+        "mustConcepts": [
+          "embedded DNS",
+          "127.0.0.11",
+          "virtual IP",
+          "VIP",
+          "IPVS",
+          "load balanc",
+          "балансир",
+          "service name",
+          "имя сервиса",
+          "replica",
+          "реплик",
+          "nslookup",
+          "routing mesh",
+          "healthy"
+        ],
+        "falseClaims": [
+          "на overlay нужно знать IP каждой реплики вручную",
+          "Swarm DNS не работает на overlay, только на bridge",
+          "имя сервиса резолвится в IP конкретного контейнера, не VIP",
+          "балансировка между репликами только через внешний load balancer"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда overlay нужна и когда нет",
+      "expected": "Кандидат различает: multi-host Swarm — overlay; single host — bridge; Kubernetes — CNI, не Docker overlay; интернет через NAT не требует overlay.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "When you need / do NOT need overlay из ITLead",
+        "confusionPairs": [
+          {
+            "checkpointKey": "when_to_use",
+            "oftenConfusedWith": [
+              "overlay_definition"
+            ],
+            "anchorTermsExpected": [
+              "single host",
+              "bridge",
+              "Kubernetes",
+              "CNI",
+              "multi-host",
+              "Swarm"
+            ],
+            "anchorTermsWrongTopic": [
+              "overlay для интернета",
+              "K8s использует Docker overlay"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "single host",
+          "один хост",
+          "bridge",
+          "multi-host",
+          "несколько нод",
+          "Kubernetes",
+          "CNI",
+          "Calico",
+          "Flannel",
+          "Cilium",
+          "NAT",
+          "интернет",
+          "container-to-container",
+          "VPN",
+          "datacenter",
+          "multi-region"
+        ],
+        "falseClaims": [
+          "overlay всегда лучше bridge даже на одном хосте",
+          "Kubernetes pod networking — это Docker overlay",
+          "overlay нужен чтобы контейнер вышел в интернет",
+          "на single host overlay даёт тот же DNS что bridge без overhead"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с overlay",
+      "expected": "Кандидат называет: overlay без Swarm; без `--attachable` для docker run; firewall блокирует 4789/7946/2377; overlay на single host — лишний overhead; overlay vs bridge путаница.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — самый весомый pitfall-блок ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "attachable",
+              "docker run"
+            ],
+            "ask": "почему standalone docker run не подключается к overlay без --attachable"
+          },
+          {
+            "match": [
+              "4789",
+              "7946",
+              "firewall",
+              "security group"
+            ],
+            "ask": "какие порты underlay firewall должен пропускать для Swarm overlay"
+          }
+        ],
+        "mustConcepts": [
+          "attachable",
+          "--attachable",
+          "docker run",
+          "standalone",
+          "not a swarm manager",
+          "4789",
+          "7946",
+          "2377",
+          "firewall",
+          "security group",
+          "gossip",
+          "single host",
+          "overhead",
+          "VXLAN encap",
+          "bridge достаточно",
+          "debug container"
+        ],
+        "falseClaims": [
+          "docker run всегда может подключиться к любому overlay network",
+          "overlay на одном хосте быстрее bridge",
+          "Swarm работает без открытых портов между нодами",
+          "firewall между нодами не влияет на overlay если SSH открыт"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "encrypted_overlay",
+      "title": "Знает про шифрованный overlay",
+      "expected": "Кандидат упоминает `--opt encrypted`, AES-GCM/IPsec между нодами; полезно на недоверенном underlay; есть CPU cost на high-throughput.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Encrypted overlays — бонус middle из ITLead",
+        "mustConcepts": [
+          "encrypted",
+          "--opt encrypted",
+          "AES-GCM",
+          "IPsec",
+          "ESP",
+          "untrusted underlay",
+          "WAN",
+          "cross-region",
+          "CPU cost",
+          "шифрован"
+        ],
+        "falseClaims": [
+          "overlay всегда шифруется по умолчанию без флагов",
+          "--opt encrypted шифрует только трафик контейнеров в интернет",
+          "шифрование overlay бесплатно по CPU на любой нагрузке"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Overlay — multi-host сеть через VXLAN: контейнеры на node-1 и node-2 в одной appnet, общаются по имени сервиса. Нужен Swarm: init, join workers, `docker network create --driver overlay --attachable appnet`. На одном хосте bridge достаточно — overlay лишний overhead.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Пакет 10.0.0.5→10.0.0.6 оборачивается в UDP 4789, летит по underlay 192.168.1.10→.20. Swarm DNS даёт VIP api, IPVS балансирует 5 реплик. Для debug `docker run` — overlay с `--attachable`. Межрегион — `--opt encrypted`.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну overlay когда swarm на нескольких машинах — vxlan туннель между хостами. без swarm init не создать. k8s свой cni, не docker overlay. firewall udp 4789 открыть",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Overlay — это bridge на одном хосте, только с другим именем. Создаю `docker network create overlay` без Swarm — работает для compose multi-host.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Overlay нужна чтобы контейнер вышел в интернет. На Kubernetes использую Docker overlay вместо CNI. VXLAN инкапсулирует в TCP 2377.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "На single host всегда overlay — быстрее bridge. `docker run --network myoverlay` работает без `--attachable`. Firewall между нодами не важен для overlay.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "overlay_definition",
+      "exampleType": "good",
+      "exampleText": "Overlay связывает контейнеры на разных Docker-хостах в одну виртуальную L2 — без неё нет маршрута cross-node.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "overlay_definition",
+      "exampleType": "good",
+      "exampleText": "multi-host swarm сервисы — overlay, контейнеры видят друг друга как в одной lan",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "overlay_definition",
+      "exampleType": "bad",
+      "exampleText": "Overlay — сеть для публикации портов контейнера в интернет через NAT.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "vxlan_encapsulation",
+      "exampleType": "good",
+      "exampleText": "Container packet → VXLAN UDP 4789 → underlay IP хоста → unwrap на destination node.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "vxlan_encapsulation",
+      "exampleType": "good",
+      "exampleText": "у overlay своё 10.0.0.0/24, у хостов underlay 192.168.1.x — разные пространства",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "vxlan_encapsulation",
+      "exampleType": "bad",
+      "exampleText": "VXLAN передаёт container IP напрямую по eth0 без обёртки, underlay и overlay — одна подсеть.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "swarm_requirement",
+      "exampleType": "good",
+      "exampleText": "Сначала `docker swarm init --advertise-addr`, workers `swarm join`, потом `network create --driver overlay`.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "swarm_requirement",
+      "exampleType": "good",
+      "exampleText": "без swarm manager overlay create падает — это swarm feature",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "swarm_requirement",
+      "exampleType": "bad",
+      "exampleText": "Overlay создаётся обычным `docker network create bridge` на каждом хосте отдельно.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "service_discovery_lb",
+      "exampleType": "good",
+      "exampleText": "nslookup api на appnet → VIP 10.0.1.5; IPVS на ноде распределяет между healthy replicas.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "service_discovery_lb",
+      "exampleType": "good",
+      "exampleText": "из любого контейнера на overlay ping api — dns 127.0.0.11, не нужно знать на какой ноде реплика",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "service_discovery_lb",
+      "exampleType": "bad",
+      "exampleText": "На overlay каждая реплика имеет свой DNS-запись api-1, api-2 — VIP не используется.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Swarm на 3 нодах — overlay для api↔db. Один хост dev — bridge. K8s prod — Calico/Flannel, не Docker overlay.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "overlay для container-to-container между dc по vpn, не для выхода в интернет",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Всегда overlay, bridge устарел. Kubernetes использует встроенный Docker overlay driver.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Debug: `docker network create --driver overlay --attachable appnet` — иначе только services. Security group: UDP 4789, TCP/UDP 7946, TCP 2377.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "overlay на одном ноуте для demo — можно, но vxlan overhead без выгоды, bridge проще",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Swarm overlay работает если между нодами закрыт UDP 4789 — VXLAN обходит firewall автоматически.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "encrypted_overlay",
+      "exampleType": "good",
+      "exampleText": "`--opt encrypted` — AES-GCM между нодами на untrusted WAN; для обычного RPC ok, на high-throughput заметен CPU.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "encrypted_overlay",
+      "exampleType": "good",
+      "exampleText": "межрегион swarm — secure-net с encrypted, ipsec esp между хостами",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "encrypted_overlay",
+      "exampleType": "bad",
+      "exampleText": "Overlay шифруется всегда, флаг encrypted не нужен и не влияет на производительность.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-overlay-network",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-overlay-network",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-overlay-network",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is a Docker overlay network and when do you need it?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T20:00:00.000Z"
+  }
+}

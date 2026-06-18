@@ -1,0 +1,578 @@
+{
+  "topic": {
+    "code": "docker_no_space_left",
+    "name": "No space left on device в Docker",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как исправить ошибку «no space left on device» на Docker-хосте?",
+    "shortAnswer": "Сначала диагностика: `docker system df` и `du -sh /var/lib/docker` — понять, что съедает место (образы, volumes, build cache, логи). Затем targeted prune: `docker image prune -af`, `docker builder prune -af`, `docker container prune -f`, `docker volume prune -f`. Агрессивно `docker system prune -af --volumes` — только в dev/CI, в prod volumes проверять вручную. Долгосрочно: ротация логов в `daemon.json` (`max-size`, `max-file`), отдельный partition для `/var/lib/docker`, cron на prune.",
+    "idealAnswer": "«No space left on device» — самая частая боль Docker в production: накапливаются образы, build cache, логи контейнеров без лимита, volumes переживают удалённые контейнеры. Всё хранится под `/var/lib/docker` (или `data-root` из daemon.json): overlay2 (слои образов + writable layers), containers/<id> (метаданные + json-file логи), volumes, image metadata, buildkit cache. Типичное распределение: 30–50% образы, 20–40% orphan volumes, 10–20% логи, 5–20% build cache. Диагностика: `sudo du -sh /var/lib/docker`, `docker system df` (колонка RECLAIMABLE — первая цель), `docker system df -v` для детализации. Безопасный quick win: `docker system prune -f` — stopped containers, dangling images, unused networks, build cache; без `--volumes`. Агрессивно: `docker system prune -af --volumes` — все неиспользуемые образы (не только dangling) и volumes не примонтированные ни в один контейнер; опасно в prod, если volume кратковременно detached при пересоздании сервиса. Targeted: `docker image prune -f` (только dangling) vs `-af` (все неиспользуемые tagged); `docker container prune -f`; `docker volume prune -f`; `docker builder prune -af` или `--filter until=168h`; `docker network prune -f`. Логи — тихий убийца: json-file driver без лимита, один chatty контейнер может заполнить `<id>-json.log` десятками GB, при этом `docker system df` может не показать аномалию. Проверка размеров: du по `/var/lib/docker/containers/$c/$c-json.log`. Экстренно: `sudo truncate -s 0 ...-json.log` без рестарта. Постоянно: в `/etc/docker/daemon.json` log-opts `max-size: 100m`, `max-file: 3`, restart docker; существующие контейнеры сохраняют старый config до пересоздания. В prod — log-shipper (Fluentd, Loki, syslog). Перенос data-root на больший диск: stop docker, rsync, symlink или `data-root` в daemon.json, verify `docker info`. Cron: ежедневный container/image/builder prune без `--volumes`. При build ошибка часто от BuildKit cache или маленького `/tmp` — `docker builder prune -af`, `TMPDIR=/var/tmp docker build`. Когда prune мало помогает: исчерпаны inodes (`df -i`), open file handles держат удалённые файлы (restart daemon), volume active и огромный внутри (inspect через alpine du), devicemapper snapshots — миграция на overlay2. Типичные ошибки: `prune --volumes` в prod вслепую; забыть `-a` на image prune (tagged unused остаются); игнор логов; `/var/lib/docker` на маленьком OS partition без мониторинга. Prune не трогает running containers, mounted volumes, используемые образы.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "diagnosis_first",
+      "title": "Диагностирует перед очисткой",
+      "expected": "Кандидат называет: `docker system df` (RECLAIMABLE), `docker system df -v`, `du -sh /var/lib/docker`; не начинает слепой prune без понимания источника.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — diagnose before prune",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "diagnosis_first",
+            "oftenConfusedWith": [
+              "prune_commands"
+            ],
+            "anchorTermsExpected": [
+              "docker system df",
+              "RECLAIMABLE",
+              "du",
+              "/var/lib/docker",
+              "диагност"
+            ],
+            "anchorTermsWrongTopic": [
+              "сразу prune -af",
+              "только restart docker"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "docker system df",
+              "RECLAIMABLE",
+              "диагност"
+            ],
+            "ask": "какой командой смотрите breakdown по images/volumes/build cache и что значит RECLAIMABLE"
+          }
+        ],
+        "mustConcepts": [
+          "docker system df",
+          "RECLAIMABLE",
+          "диагност",
+          "сначала",
+          "du",
+          "/var/lib/docker",
+          "df -v",
+          "verbose",
+          "breakdown",
+          "категор",
+          "Images",
+          "Volumes",
+          "Build Cache",
+          "где место",
+          "перед prune"
+        ],
+        "falseClaims": [
+          "можно сразу prune без диагностики",
+          "docker system df показывает размер логов контейнеров точно",
+          "df -h корня достаточно без docker system df",
+          "RECLAIMABLE — это только dangling images"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "space_sources",
+      "title": "Знает источники расхода диска",
+      "expected": "Кандидат перечисляет: overlay2/слои образов, stopped containers, dangling/unused images, anonymous/named volumes, build cache (BuildKit), json-file логи в containers/<id>; всё под /var/lib/docker или data-root.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "структура /var/lib/docker из ITLead Theory",
+        "mustConcepts": [
+          "/var/lib/docker",
+          "data-root",
+          "overlay2",
+          "image layers",
+          "слои",
+          "volumes",
+          "build cache",
+          "buildkit",
+          "container logs",
+          "json-file",
+          "stopped containers",
+          "dangling",
+          "anonymous volume",
+          "writable layer"
+        ],
+        "falseClaims": [
+          "Docker хранит образы только в registry, локально ничего нет",
+          "логи контейнеров не занимают место на диске хоста",
+          "build cache не влияет на диск",
+          "volumes всегда удаляются вместе с контейнером"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "prune_commands",
+      "title": "Знает команды prune и флаги",
+      "expected": "Кандидат различает: `docker system prune -f` vs `-af --volumes`; targeted image/container/volume/builder/network prune; без `-a` на image prune удаляются только dangling; prune не трогает active resources.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "targeted vs aggressive — ключевой operational skill",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "diagnosis_first",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "prune",
+              "image prune",
+              "builder prune"
+            ],
+            "ask": "чем отличается docker image prune -f от -af и когда нужен docker builder prune"
+          },
+          {
+            "match": [
+              "--volumes",
+              "volume prune"
+            ],
+            "ask": "когда безопасно docker system prune --volumes, а когда только volume prune после проверки"
+          }
+        ],
+        "mustConcepts": [
+          "docker system prune",
+          "image prune",
+          "container prune",
+          "volume prune",
+          "builder prune",
+          "network prune",
+          "-a",
+          "-af",
+          "--volumes",
+          "dangling",
+          "unused",
+          "stopped",
+          "active",
+          "running",
+          "не трогает",
+          "targeted",
+          "filter until"
+        ],
+        "falseClaims": [
+          "prune удаляет running containers",
+          "image prune без -a удаляет все неиспользуемые tagged образы",
+          "docker system prune -af --volumes безопасен в production всегда",
+          "prune и docker rm делают одно и то же для одного контейнера"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "container_logs",
+      "title": "Понимает проблему логов контейнеров",
+      "expected": "Кандидат объясняет: json-file без лимита растёт в `<id>-json.log`; truncate для экстренной очистки; daemon.json `max-size`/`max-file`; log-shipper в prod; логи могут заполнить диск при нормальном docker system df.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "silent killer из ITLead — частая prod-ошибка",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "space_sources",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "json-file",
+              "лог",
+              "log"
+            ],
+            "ask": "как найти контейнер с огромным логом и как обрезать без рестарта"
+          },
+          {
+            "match": [
+              "max-size",
+              "max-file",
+              "daemon.json"
+            ],
+            "ask": "как настроить ротацию логов в daemon.json и когда она применится к существующим контейнерам"
+          }
+        ],
+        "mustConcepts": [
+          "json-file",
+          "лог",
+          "log",
+          "-json.log",
+          "containers",
+          "truncate",
+          "max-size",
+          "max-file",
+          "daemon.json",
+          "log-opts",
+          "log-driver",
+          "ротац",
+          "chatty",
+          "без лимита",
+          "Fluentd",
+          "Loki",
+          "syslog",
+          "log-shipper"
+        ],
+        "falseClaims": [
+          "docker system df всегда показывает полный размер логов",
+          "логи хранятся только внутри контейнера, не на хосте",
+          "daemon.json log-opts сразу применяется к уже запущенным контейнерам",
+          "truncate лога требует docker restart контейнера"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: `prune --volumes` в prod при detached volume; забыть `-a` на image prune; игнор логов; /var/lib/docker на маленьком OS partition без alerting; проверять volume перед удалением (`docker volume ls`, alpine ls).",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — prod pitfalls",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "prune_commands",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "--volumes",
+              "prod",
+              "production"
+            ],
+            "ask": "почему prune --volumes опасен при пересоздании сервиса в production"
+          },
+          {
+            "match": [
+              "-a",
+              "dangling",
+              "tagged"
+            ],
+            "ask": "почему image prune -f без -a не освобождает tagged unused образы"
+          }
+        ],
+        "mustConcepts": [
+          "--volumes",
+          "prod",
+          "production",
+          "detached",
+          "пересоздан",
+          "-a",
+          "dangling",
+          "tagged",
+          "unused image",
+          "игнор",
+          "лог",
+          "OS partition",
+          "мониторинг",
+          "alerting",
+          "volume ls",
+          "inspect",
+          "backup",
+          "alpine"
+        ],
+        "falseClaims": [
+          "prune --volumes в prod всегда безопасен если контейнер stopped",
+          "image prune -f удаляет все старые tagged образы",
+          "логи никогда не причина no space left",
+          "отдельный partition для docker не нужен на сервере с 25GB диска"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "long_term_hygiene",
+      "title": "Знает долгосрочную гигиену",
+      "expected": "Кандидат упоминает: log rotation в daemon.json; отдельный partition или data-root на больший диск; cron prune (container/image/builder без --volumes); alerting disk > 70%; CI — hourly builder prune.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "long-term hygiene из TL;DR и Real-world usage",
+        "mustConcepts": [
+          "daemon.json",
+          "log rotation",
+          "ротац",
+          "partition",
+          "data-root",
+          "rsync",
+          "cron",
+          "cron.daily",
+          "alerting",
+          "70%",
+          "мониторинг",
+          "CI",
+          "periodic",
+          "weekly",
+          "hourly",
+          "builder prune"
+        ],
+        "falseClaims": [
+          "достаточно одного ручного prune раз в год",
+          "cron с --volumes безопасен без проверки volumes",
+          "перенос data-root не требует остановки dockerd",
+          "log rotation в daemon.json работает без restart docker"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "when_prune_insufficient",
+      "title": "Когда prune не помогает",
+      "expected": "Кандидат называет: исчерпаны inodes (`df -i`); open file handles после удаления (restart daemon); volume active и огромный внутри; ошибка при build — BuildKit cache или маленький `/tmp`; orphaned overlay2; devicemapper → overlay2.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "edge cases из When prune does not help",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "inode",
+              "df -i"
+            ],
+            "ask": "диск вроде не полный, но no space — как проверить inodes"
+          },
+          {
+            "match": [
+              "build",
+              "BuildKit",
+              "/tmp"
+            ],
+            "ask": "no space during docker build — что проверить кроме image prune"
+          }
+        ],
+        "mustConcepts": [
+          "inode",
+          "df -i",
+          "open file",
+          "file handle",
+          "restart daemon",
+          "active volume",
+          "volume in use",
+          "alpine du",
+          "build",
+          "BuildKit",
+          "/tmp",
+          "TMPDIR",
+          "overlay2",
+          "orphan",
+          "devicemapper",
+          "du -sh"
+        ],
+        "falseClaims": [
+          "если docker system df показывает reclaimable, prune всегда освободит столько же",
+          "inodes и blocks — одно и то же",
+          "active volume можно удалить через volume prune",
+          "ошибка при build всегда из-за финального образа, не cache"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Сначала `docker system df` — volumes 38GB reclaimable, images 24GB. Targeted: `docker volume prune -f` после `docker volume ls` и проверки незнакомых. Логи: du по json.log, truncate runaway. В daemon.json max-size 100m. Cron без --volumes.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На CI хосте build cache 80GB — `docker builder prune --filter until=72h`. В prod не трогаю --volumes вслепую: сервис пересоздаётся, volume кратко detached — prune его снесёт. Image prune всегда с -af, иначе tagged остаются.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Диск полный, df показывает место есть — проверяю inodes df -i. Или один chatty сервис забил 50GB json.log, system df норм. Перенёс /var/lib/docker на отдельный диск через data-root.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Сразу `docker system prune -af --volumes` на production без проверки — running не пострадают, значит безопасно всегда.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "`docker image prune -f` удалит все старые образы. Логи внутри контейнера, на хост не влияют. Диагностика не нужна — prune сам разберётся.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Если docker system df мало reclaimable, значит диск полный не из-за Docker — inodes и логи не проверяю.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "diagnosis_first",
+      "exampleType": "good",
+      "exampleText": "`docker system df` и `-v` — смотрю RECLAIMABLE по images/volumes/cache, потом du /var/lib/docker.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "diagnosis_first",
+      "exampleType": "good",
+      "exampleText": "ну сначала df docker system, понять куда 87G ушло, не слепой prune",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "diagnosis_first",
+      "exampleType": "bad",
+      "exampleText": "Сразу prune -af, docker system df только для отчёта после очистки.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "space_sources",
+      "exampleType": "good",
+      "exampleText": "Место: overlay2 слои, orphan volumes, buildkit cache, json-file логи в containers/<id> — всё под /var/lib/docker.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "space_sources",
+      "exampleType": "good",
+      "exampleText": "обычно volumes и images жрут больше всего, плюс build cache на CI",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "space_sources",
+      "exampleType": "bad",
+      "exampleText": "Docker на диске хранит только running containers, образы только в Hub.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "prune_commands",
+      "exampleType": "good",
+      "exampleText": "Targeted: image prune -af, builder prune -af, container prune -f. Агрессивно system prune -af --volumes — только dev. Без -a image prune — только dangling.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "prune_commands",
+      "exampleType": "good",
+      "exampleText": "prune не трогает running и mounted volumes; builder prune --filter until=168h на CI",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "prune_commands",
+      "exampleType": "bad",
+      "exampleText": "docker rm и docker container prune — одно и то же для всех stopped. Prune убьёт running если диск полный.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "container_logs",
+      "exampleType": "good",
+      "exampleText": "Chatty app забил json.log — du по containers/$id, truncate -s 0. В daemon.json max-size 100m, max-file 3, restart docker.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "container_logs",
+      "exampleType": "good",
+      "exampleText": "в проде логи в Loki, на хосте rotation чтобы json-file не рос бесконечно",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "container_logs",
+      "exampleType": "bad",
+      "exampleText": "docker system df покажет 50GB логов, truncate требует docker restart контейнера.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "В prod не делаю --volumes вслепую: volume detached при recreate — prune удалит. Image prune без -a оставляет tagged unused.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "перед volume prune — docker volume ls, alpine ls /data, backup если надо",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "prune --volumes на prod ок, running защищены значит volumes тоже всегда.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "long_term_hygiene",
+      "exampleType": "good",
+      "exampleText": "Отдельный partition для data-root, cron daily container+image+builder prune без volumes, alerting >70% disk.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "long_term_hygiene",
+      "exampleType": "good",
+      "exampleText": "daemon.json rotation + weekly prune cron, на CI builder hourly",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "long_term_hygiene",
+      "exampleType": "bad",
+      "exampleText": "Раз в год ручной prune достаточно, cron с --volumes без проверки норм.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "when_prune_insufficient",
+      "exampleType": "good",
+      "exampleText": "df -i — inodes кончились. Или open handles — restart dockerd. При build — builder prune и проверить /tmp, TMPDIR=/var/tmp.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "when_prune_insufficient",
+      "exampleType": "good",
+      "exampleText": "volume active но 40GB внутри — alpine du, prune skip; сравниваю du /var/lib/docker/* с system df",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "when_prune_insufficient",
+      "exampleType": "bad",
+      "exampleText": "Если prune мало забрал — значит Docker не виноват, inodes и build cache не смотрю.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-no-space-left",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-no-space-left",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-no-space-left",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to fix 'no space left on device' on a Docker host?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

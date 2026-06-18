@@ -1,0 +1,463 @@
+{
+  "topic": {
+    "code": "what_is_dockerfile",
+    "name": "Что такое Dockerfile",
+    "skillCode": "docker",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Что такое Dockerfile и как он используется?",
+    "shortAnswer": "Dockerfile — текстовый файл с инструкциями сборки образа, которые Docker читает сверху вниз. Каждая нетривиальная инструкция создаёт слой; `docker build` выполняет рецепт и даёт image. Порядок важен: стабильные шаги (зависимости) раньше, часто меняющийся код — позже, чтобы кэш переиспользовался.",
+    "idealAnswer": "Dockerfile — plain text рецепт сборки Docker image: инструкции `FROM`, `WORKDIR`, `COPY`, `RUN`, `ENV`, `EXPOSE`, `USER`, `CMD`, `ENTRYPOINT`, `ARG`. Docker читает сверху вниз; каждая инструкция = слой с кэшем. `docker build -t myapp:1.0 .` запускает build context. Ключевые инструкции: `FROM` — базовый image; `COPY` предпочтительнее `ADD` (без сюрпризов с URL/tar); `RUN` — build-time команды; `ENV` — runtime vars в image; `EXPOSE` — документация порта; `USER` — не root; `CMD` — default process (override `docker run`); `ENTRYPOINT` — фиксированная программа, `CMD` — default args; `ARG` — build-time, пропадает после build. CMD vs ENTRYPOINT: CMD alone полностью заменяется `docker run`; ENTRYPOINT+CMD — args заменяются, entrypoint остаётся. Cache order: сначала `COPY package*.json` + `RUN npm ci`, потом `COPY . .` — изменение кода не инвалидирует install. Multi-stage: build stage (toolchain) → runtime stage (только артефакты) — меньше image, меньше attack surface. Ошибки: root в финальном stage; без `.dockerignore` — `COPY . .` тащит node_modules/.git; несколько `RUN` без cleanup — слои с мусором (удаление в следующем RUN не убирает из предыдущего слоя); `ADD` вместо `COPY`. Real-world: CI `docker build`, buildx multi-arch, distroless/scratch final stage, BuildKit `# syntax=docker/dockerfile:1.7` и cache mounts. Секреты на build: BuildKit `--mount=type=secret`, не `ARG` с паролями.",
+    "maxScore": 10,
+    "skills": ["docker"]
+  },
+  "checkpoints": [
+    {
+      "key": "dockerfile_definition",
+      "title": "Понимает что такое Dockerfile",
+      "expected": "Кандидат объясняет: plain text рецепт, top-to-bottom, инструкции создают слои, docker build → image.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — рецепт, слои, docker build",
+        "probeConceptGroups": [
+          {
+            "match": ["docker build", "рецепт", "слой"],
+            "ask": "чем Dockerfile отличается от docker-compose.yml и что делает docker build"
+          }
+        ],
+        "mustConcepts": [
+          "Dockerfile",
+          "plain text",
+          "текстовый",
+          "инструкц",
+          "сверху вниз",
+          "top-to-bottom",
+          "слой",
+          "layer",
+          "docker build",
+          "image",
+          "образ",
+          "рецепт",
+          "build context",
+          "FROM",
+          "кэш",
+          "cache hit",
+          "не JSON",
+          "не YAML"
+        ],
+        "falseClaims": [
+          "Dockerfile это JSON или YAML",
+          "docker build не использует Dockerfile",
+          "слои не кэшируются при rebuild",
+          "Dockerfile выполняется в runtime контейнера",
+          "Dockerfile и docker-compose — одно и то же"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "key_instructions",
+      "title": "Знает ключевые инструкции",
+      "expected": "Кандидат перечисляет FROM, WORKDIR, COPY, RUN, ENV, EXPOSE, USER, CMD, ENTRYPOINT, ARG и их назначение.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "таблица Key instructions из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "dockerfile_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["COPY", "ADD", "EXPOSE"],
+            "ask": "чем COPY отличается от ADD и что реально делает EXPOSE"
+          }
+        ],
+        "mustConcepts": [
+          "FROM",
+          "WORKDIR",
+          "COPY",
+          "RUN",
+          "ENV",
+          "EXPOSE",
+          "USER",
+          "CMD",
+          "ENTRYPOINT",
+          "ARG",
+          "ADD",
+          "базовый image",
+          "build-time",
+          "runtime",
+          "prefer COPY",
+          "документация",
+          "не root",
+          "build-arg",
+          "рабочая директория"
+        ],
+        "falseClaims": [
+          "EXPOSE автоматически публикует порт на хост",
+          "RUN выполняется при старте контейнера",
+          "ADD и COPY всегда эквивалентны",
+          "ENV доступен только на этапе build",
+          "ARG сохраняется в runtime контейнера"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "build_cache_order",
+      "title": "Понимает кэш и порядок инструкций",
+      "expected": "Кандидат объясняет: слои кэшируются по instruction+input; deps до source; COPY package.json перед npm ci.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Build cache and instruction order — частая junior тема",
+        "probeConceptGroups": [
+          {
+            "match": ["COPY", "npm ci", "кэш"],
+            "ask": "почему COPY . . перед npm ci замедляет rebuild"
+          },
+          {
+            "match": ["стабильн", "часто меняющ"],
+            "ask": "какие шаги ставить раньше, а какие позже для cache hit"
+          }
+        ],
+        "mustConcepts": [
+          "кэш",
+          "cache",
+          "порядок",
+          "package.json",
+          "package*.json",
+          "npm ci",
+          "COPY . .",
+          "invalidate",
+          "инвалид",
+          "стабильн",
+          "часто меняющ",
+          "пересборк",
+          "rebuild",
+          "слой",
+          "instruction",
+          "input",
+          "cache hit",
+          "зависимост"
+        ],
+        "falseClaims": [
+          "порядок инструкций не влияет на скорость build",
+          "изменение любого файла не трогает кэш npm install",
+          "Docker пересобирает все слои каждый раз",
+          "кэш работает только для FROM"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "cmd_vs_entrypoint",
+      "title": "Отличает CMD, ENTRYPOINT и RUN",
+      "expected": "Кандидат: CMD override полностью docker run; ENTRYPOINT фиксирован, CMD — default args; RUN — build-time.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "CMD vs ENTRYPOINT vs RUN из ITLead follow-up",
+        "confusionPairs": [
+          {
+            "checkpointKey": "cmd_vs_entrypoint",
+            "oftenConfusedWith": ["key_instructions"],
+            "anchorTermsExpected": [
+              "RUN build",
+              "CMD runtime",
+              "ENTRYPOINT",
+              "docker run",
+              "override"
+            ],
+            "anchorTermsWrongTopic": [
+              "RUN при старте",
+              "CMD создаёт слой build"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["RUN", "CMD", "ENTRYPOINT"],
+            "ask": "что выполняется при docker build, а что при docker run"
+          }
+        ],
+        "mustConcepts": [
+          "CMD",
+          "ENTRYPOINT",
+          "RUN",
+          "build-time",
+          "runtime",
+          "override",
+          "docker run",
+          "default args",
+          "exec form",
+          "shell form",
+          "сборк",
+          "старт",
+          "контейнер",
+          "замен",
+          "фиксирован"
+        ],
+        "falseClaims": [
+          "RUN и CMD выполняются в одно время",
+          "ENTRYPOINT нельзя override",
+          "CMD всегда остаётся при docker run с аргументами",
+          "RUN выполняется при каждом docker start"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "multi_stage_builds",
+      "title": "Понимает multi-stage builds",
+      "expected": "Кандидат описывает: build stage с toolchain, runtime stage только с артефактами; COPY --from=build.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "multi-stage — smaller safer images",
+        "probeConceptGroups": [
+          {
+            "match": ["multi-stage", "COPY --from", "scratch"],
+            "ask": "что попадает в финальный image при multi-stage build"
+          }
+        ],
+        "mustConcepts": [
+          "multi-stage",
+          "AS build",
+          "COPY --from",
+          "runtime stage",
+          "build stage",
+          "toolchain",
+          "node_modules",
+          "dist",
+          "attack surface",
+          "scratch",
+          "distroless",
+          "артефакт",
+          "финальный image",
+          "nginx",
+          "slim",
+          "меньше"
+        ],
+        "falseClaims": [
+          "multi-stage увеличивает финальный image",
+          "все stage попадают в финальный image",
+          "multi-stage не уменьшает attack surface",
+          "COPY --from копирует весь build stage"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки Dockerfile",
+      "expected": "Кандидат: root USER; без dockerignore; несколько RUN без cleanup; ADD вместо COPY; секреты в ARG.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Common mistakes блок ITLead",
+        "probeConceptGroups": [
+          {
+            "match": ["RUN", "apt", "слой"],
+            "ask": "почему rm в отдельном RUN не убирает файлы из image"
+          }
+        ],
+        "mustConcepts": [
+          "USER node",
+          "non-root",
+          "root",
+          "dockerignore",
+          "COPY . .",
+          "node_modules",
+          ".git",
+          "несколько RUN",
+          "apt cache",
+          "rm -rf",
+          "ADD",
+          "секрет",
+          "BuildKit secret",
+          "ARG leak",
+          "слой",
+          "cleanup"
+        ],
+        "falseClaims": [
+          "root container безопасен если image private",
+          "удаление файлов в следующем RUN убирает их из image",
+          "ARG безопасен для паролей",
+          ".dockerignore не влияет на build context"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Dockerfile — текстовый рецепт: FROM, COPY package.json, RUN npm ci, COPY код, USER node, CMD. docker build создаёт image со слоями. deps раньше кода — кэш.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Multi-stage: node build → nginx runtime с dist. ENTRYPOINT для CLI, CMD для сервиса. EXPOSE только документация, порт публикует docker run -p.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну dockerfile это инструкции сверху вниз, каждая строка слой. build context точка, .dockerignore обязателен чтобы node_modules не улетели в daemon",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Dockerfile в JSON, RUN выполняется при docker run, EXPOSE открывает порт на хост автоматически.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "COPY . . перед npm ci — норм, кэш всё равно сработает. ADD всегда лучше COPY.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Секреты в ARG на build — безопасно, они не попадают в image history.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "dockerfile_definition",
+      "exampleType": "good",
+      "exampleText": "Текстовый рецепт сверху вниз: docker build -t app:1.0 . собирает image из слоёв инструкций.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "dockerfile_definition",
+      "exampleType": "good",
+      "exampleText": "рецепт сборки, не runtime config. build читает Dockerfile из context root",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "dockerfile_definition",
+      "exampleType": "bad",
+      "exampleText": "Dockerfile выполняется каждый раз при docker start контейнера.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "key_instructions",
+      "exampleType": "good",
+      "exampleText": "FROM node:22-alpine, WORKDIR /app, COPY, RUN npm ci, ENV NODE_ENV=production, USER node, CMD node server.js",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "key_instructions",
+      "exampleType": "good",
+      "exampleText": "COPY для файлов, ADD только для tar/url. ARG на build, ENV на runtime",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "key_instructions",
+      "exampleType": "bad",
+      "exampleText": "RUN — команда при старте контейнера, как CMD.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "build_cache_order",
+      "exampleType": "good",
+      "exampleText": "Сначала COPY package*.json + RUN npm ci, потом COPY . . — правка server.js не перезапускает npm ci.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "build_cache_order",
+      "exampleType": "good",
+      "exampleText": "кэш по instruction+input, дорогие стабильные шаги раньше, код в конце",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "build_cache_order",
+      "exampleType": "bad",
+      "exampleText": "Порядок COPY и RUN не влияет на cache hit rate.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "cmd_vs_entrypoint",
+      "exampleType": "good",
+      "exampleText": "ENTRYPOINT echo + CMD hello; docker run myimg bye → echo bye. CMD alone полностью заменяется.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "cmd_vs_entrypoint",
+      "exampleType": "good",
+      "exampleText": "RUN — build layer, CMD/ENTRYPOINT — default process при start",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "cmd_vs_entrypoint",
+      "exampleType": "bad",
+      "exampleText": "RUN и CMD делают одно и то же на этапе runtime.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "multi_stage_builds",
+      "exampleType": "good",
+      "exampleText": "FROM golang AS build → FROM scratch COPY --from=build /out/server — только бинарь в финале.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "multi_stage_builds",
+      "exampleType": "good",
+      "exampleText": "node build stage, nginx runtime — node_modules не в prod image",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "multi_stage_builds",
+      "exampleType": "bad",
+      "exampleText": "Multi-stage копирует все stage в финальный image автоматически.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "USER node перед CMD; один RUN с && rm apt cache; .dockerignore для node_modules",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "секреты через BuildKit --mount=type=secret, не ENV/ARG с токеном",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Три отдельных RUN apt-get — норм, rm в третьем убирает cache из image.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "what-is-dockerfile",
+    "apiUrl": "https://api.itlead.org/api/questions/what-is-dockerfile",
+    "pageUrl": "https://itlead.org/interview-questions/docker/what-is-dockerfile",
+    "difficulty": "JUNIOR",
+    "titleEn": "What is a Dockerfile?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T22:30:00.000Z"
+  }
+}

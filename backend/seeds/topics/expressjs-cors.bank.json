@@ -1,0 +1,497 @@
+{
+  "topic": {
+    "code": "expressjs_cors",
+    "name": "CORS в Express.js",
+    "skillCode": "expressjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое CORS и как настроить его в Express.js?",
+    "shortAnswer": "CORS (Cross-Origin Resource Sharing) — браузерная политика, блокирующая запросы JavaScript к другому origin, если сервер не вернул нужные заголовки Access-Control-*. В Express.js стандартный способ — пакет cors: app.use(cors({ origin, allowedHeaders, credentials })). Ключевое правило: origin: '*' с credentials: true браузер отклоняет — нужен точный origin при куках и Authorization.",
+    "idealAnswer": "CORS — механизм безопасности браузера (Same-Origin Policy), а не сервера. JavaScript на странице с одного origin не может читать ответ API с другого, пока сервер явно не разрешит через Access-Control-Allow-Origin и связанные заголовки. Postman и curl CORS не проверяют — ошибки видны только в браузере. Origin = протокол + домен + порт; http vs https, myapp.com vs api.myapp.com, :3000 vs :4000, localhost vs 127.0.0.1 — разные origin. В Express: npm-пакет cors, app.use(cors()) без опций — Allow-Origin: * и автоматическая обработка OPTIONS preflight. Production: origin: 'https://myapp.com', methods, allowedHeaders: ['Content-Type', 'Authorization'], credentials: true для кук/JWT, maxAge для кеша preflight. Непростые запросы (Authorization, PUT/DELETE, custom headers) вызывают preflight — браузер сначала шлёт OPTIONS с Access-Control-Request-Method/Headers; без корректного ответа основной запрос не уйдёт. cors() обрабатывает preflight автоматически; ручной middleware требует req.method === 'OPTIONS'. Типичные ошибки: origin: '*' + credentials: true (запрещено спекой); app.use(cors()) после routes — заголовки не попадут в ответ; нет Authorization в allowedHeaders — preflight падает; localhost и 127.0.0.1 — разные origin в dev. Cookies: credentials: true на сервере + fetch credentials: 'include' на клиенте — обе стороны обязаны. Несколько фронтендов: массив origin или callback (origin, cb) с проверкой allowed.includes(o); при credentials нужен один exact origin в ответе, не wildcard. Dev — cors() без опций; один фронт — строка origin; публичный API без auth — origin: true (reflect), без credentials. Отладка: DevTools Network — failed OPTIONS, Console «No Access-Control-Allow-Origin».",
+    "maxScore": 10,
+    "skills": ["expressjs", "javascript", "nodejs"]
+  },
+  "checkpoints": [
+    {
+      "key": "cors_definition",
+      "title": "Понимает суть CORS",
+      "expected": "Кандидат объясняет: CORS — политика браузера; блокирует cross-origin запросы без Access-Control-* заголовков; Postman/curl не проверяют; Same-Origin Policy.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — browser vs server enforcement",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "cors_definition",
+            "oftenConfusedWith": ["preflight_mechanism"],
+            "anchorTermsExpected": [
+              "браузер",
+              "Same-Origin",
+              "Access-Control",
+              "Postman",
+              "не сервер"
+            ],
+            "anchorTermsWrongTopic": [
+              "CORS настраивает nginx только",
+              "preflight это CORS целиком"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["CORS", "браузер", "Postman"],
+            "ask": "почему Postman работает, а fetch из браузера падает с CORS"
+          }
+        ],
+        "mustConcepts": [
+          "CORS",
+          "Cross-Origin",
+          "браузер",
+          "Same-Origin",
+          "Access-Control-Allow-Origin",
+          "Access-Control",
+          "политик",
+          "безопасност",
+          "Postman",
+          "curl",
+          "не проверя",
+          "JavaScript",
+          "заголовк",
+          "разреш"
+        ],
+        "falseClaims": [
+          "CORS проверяет сервер, а не браузер",
+          "Postman тоже блокирует CORS как браузер",
+          "CORS нужен только для production",
+          "без CORS сервер не примет запрос вообще"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "origin_definition",
+      "title": "Знает что такое origin",
+      "expected": "Кандидат: origin = протокол + домен + порт; http/https, поддомены, порты, localhost vs 127.0.0.1 — разные origin.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "what counts as different origin из ITLead",
+        "mustConcepts": [
+          "origin",
+          "протокол",
+          "домен",
+          "порт",
+          "http",
+          "https",
+          "поддомен",
+          "localhost",
+          "127.0.0.1",
+          "разные origin",
+          "myapp.com",
+          ":3000",
+          ":4000"
+        ],
+        "falseClaims": [
+          "localhost и 127.0.0.1 — один origin для браузера",
+          "порт не входит в origin",
+          "http и https — один origin"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "cors_express_config",
+      "title": "Настраивает cors в Express",
+      "expected": "Кандидат: пакет cors, app.use(cors()) до routes; production options: origin, methods, allowedHeaders, credentials, maxAge; middleware order.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "quick example + production config ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "cors_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["app.use", "cors", "middleware"],
+            "ask": "почему cors middleware должен быть до регистрации routes"
+          }
+        ],
+        "mustConcepts": [
+          "cors",
+          "app.use",
+          "express",
+          "middleware",
+          "до routes",
+          "origin",
+          "methods",
+          "allowedHeaders",
+          "maxAge",
+          "npm",
+          "Access-Control-Allow-Origin",
+          "OPTIONS",
+          "production",
+          "dev"
+        ],
+        "falseClaims": [
+          "cors() после app.get — нормальный порядок",
+          "Express встроенно настраивает CORS без пакета",
+          "cors() без опций подходит для production с cookies"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "preflight_mechanism",
+      "title": "Понимает preflight OPTIONS",
+      "expected": "Кандидат: preflight — автоматический OPTIONS перед non-simple запросами; Authorization/PUT/DELETE; Access-Control-Request-*; без ответа основной запрос не идёт.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "how preflight works — частая middle тема",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": ["preflight", "OPTIONS", "Authorization"],
+            "ask": "когда браузер шлёт preflight и что сервер должен вернуть"
+          },
+          {
+            "match": ["simple", "non-simple", "PUT", "DELETE"],
+            "ask": "чем simple запрос отличается от non-simple"
+          }
+        ],
+        "mustConcepts": [
+          "preflight",
+          "OPTIONS",
+          "non-simple",
+          "simple",
+          "Authorization",
+          "Access-Control-Request-Method",
+          "Access-Control-Request-Headers",
+          "Access-Control-Allow-Methods",
+          "Access-Control-Allow-Headers",
+          "PUT",
+          "DELETE",
+          "автоматическ",
+          "до основного"
+        ],
+        "falseClaims": [
+          "GET всегда требует preflight",
+          "preflight отправляет клиентский код вручную",
+          "cors пакет не обрабатывает OPTIONS",
+          "Authorization — simple header без preflight"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "credentials_cookies",
+      "title": "Настраивает credentials и cookies",
+      "expected": "Кандидат: credentials: true + exact origin (не *); fetch credentials: 'include'; callback для нескольких origin; !origin guard для server-to-server.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "production cookie auth + multi-origin ITLead",
+        "probeConceptGroups": [
+          {
+            "match": ["credentials", "cookies", "include"],
+            "ask": "что нужно на сервере и клиенте чтобы куки проходили cross-origin"
+          },
+          {
+            "match": ["callback", "несколько", "multi"],
+            "ask": "как разрешить несколько origin при credentials: true"
+          }
+        ],
+        "mustConcepts": [
+          "credentials",
+          "credentials: true",
+          "credentials: 'include'",
+          "cookies",
+          "куки",
+          "exact origin",
+          "не wildcard",
+          "callback",
+          "allowedOrigins",
+          "!origin",
+          "httpOnly",
+          "JWT",
+          "auth"
+        ],
+        "falseClaims": [
+          "origin: '*' работает с credentials: true",
+          "достаточно credentials на сервере без include на клиенте",
+          "static string origin покрывает все фронтенды с cookies"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "cors_mistakes",
+      "title": "Знает типичные ошибки CORS",
+      "expected": "Кандидат: * + credentials; cors после routes; missing Authorization в allowedHeaders; localhost vs 127.0.0.1; блокировка запросов без Origin в callback.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — Stack Overflow top issues",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "preflight_mechanism",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["allowedHeaders", "Authorization"],
+            "ask": "почему preflight падает если Authorization не в allowedHeaders"
+          }
+        ],
+        "mustConcepts": [
+          "origin: '*'",
+          "credentials: true",
+          "после routes",
+          "allowedHeaders",
+          "Authorization",
+          "localhost",
+          "127.0.0.1",
+          "!origin",
+          "health check",
+          "CI",
+          "middleware order",
+          "Stack Overflow"
+        ],
+        "falseClaims": [
+          "можно безопасно комбинировать * и credentials",
+          "Authorization не требует preflight",
+          "allowedHeaders необязателен если origin указан"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "cors_when_debug",
+      "title": "Выбирает стратегию и отладку",
+      "expected": "Кандидат: dev cors() vs prod explicit; origin true для public API; DevTools OPTIONS; NestJS/Next.js упоминание опционально.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "when to use + debug follow-ups бонус",
+        "mustConcepts": [
+          "dev",
+          "production",
+          "origin: true",
+          "reflect",
+          "DevTools",
+          "Network",
+          "OPTIONS",
+          "кеш",
+          "maxAge",
+          "proxy",
+          "CRA"
+        ],
+        "falseClaims": [
+          "CORS ошибку можно исправить только на frontend",
+          "opaque response подходит для JSON API"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "CORS — браузер блокирует cross-origin fetch без Access-Control-Allow-Origin. В Express: app.use(cors({ origin: 'https://myapp.com', allowedHeaders: ['Content-Type', 'Authorization'], credentials: true })) до routes. Authorization триггерит preflight OPTIONS — cors пакет отвечает автоматически.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Dev — app.use(cors()). Prod с JWT: exact origin, credentials: true, клиент fetch credentials: 'include'. Несколько фронтов — callback проверяет allowedOrigins, !origin для Postman/health checks. localhost:3000 и 127.0.0.1:3000 — оба в whitelist.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Origin = scheme + host + port. Postman CORS не проверяет — поэтому API «работает» в Postman и падает в Chrome. В Network смотрю failed OPTIONS и No Access-Control-Allow-Origin.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "CORS настраиваю на nginx, Express не при чём. Postman и браузер одинаково проверяют origin.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "cors({ origin: '*', credentials: true }) — так отправляю куки с любого сайта. Routes регистрирую до app.use(cors()) — порядок не важен.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Authorization simple header — allowedHeaders не нужен. localhost и 127.0.0.1 один origin, достаточно одного в config.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "cors_definition",
+      "exampleType": "good",
+      "exampleText": "CORS — браузерная Same-Origin Policy; сервер отдаёт Access-Control-* чтобы разрешить чтение ответа JS.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "cors_definition",
+      "exampleType": "good",
+      "exampleText": "ну cors — это когда браузер режет запросы на другой домен, postman вообще плевать",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "cors_definition",
+      "exampleType": "bad",
+      "exampleText": "CORS — серверный firewall, без него Express не примет HTTP запрос.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "origin_definition",
+      "exampleType": "good",
+      "exampleText": "https://myapp.com и http://myapp.com — разные origin; api.myapp.com тоже другой.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "origin_definition",
+      "exampleType": "good",
+      "exampleText": "порт входит: :3000 и :4000 — разные origin даже на одном хосте",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "origin_definition",
+      "exampleType": "bad",
+      "exampleText": "Origin — это только доменное имя, протокол и порт не считаются.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "cors_express_config",
+      "exampleType": "good",
+      "exampleText": "app.use(cors(corsOptions)) первым; production origin + methods + maxAge 86400 для кеша preflight.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "cors_express_config",
+      "exampleType": "good",
+      "exampleText": "cors() без args — Allow-Origin * и auto OPTIONS, только для локалки",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "cors_express_config",
+      "exampleType": "bad",
+      "exampleText": "app.get('/api', handler); app.use(cors()) — так норм, Express добавит headers retroactively.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "preflight_mechanism",
+      "exampleType": "good",
+      "exampleText": "POST с Authorization — браузер сначала OPTIONS, сервер Allow-Methods/Allow-Headers, потом реальный POST.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "preflight_mechanism",
+      "exampleType": "good",
+      "exampleText": "PUT DELETE custom headers — non-simple, preflight обязателен",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "preflight_mechanism",
+      "exampleType": "bad",
+      "exampleText": "Preflight — это когда frontend сам шлёт два fetch подряд вручную.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "credentials_cookies",
+      "exampleType": "good",
+      "exampleText": "credentials: true + origin: 'https://myapp.com'; React fetch credentials: 'include' — иначе cookie не едет.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "credentials_cookies",
+      "exampleType": "good",
+      "exampleText": "multi-origin: origin callback, if (!origin) cb(null,true) для s2s, иначе allowed.includes",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "credentials_cookies",
+      "exampleType": "bad",
+      "exampleText": "С credentials достаточно origin: '*' — браузер разрешит куки.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "cors_mistakes",
+      "exampleType": "good",
+      "exampleText": "allowedHeaders без Authorization — классический fail preflight на login API.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "cors_mistakes",
+      "exampleType": "good",
+      "exampleText": "whitelist ['http://localhost:3000','http://127.0.0.1:3000'] — dev ловушка",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "cors_mistakes",
+      "exampleType": "bad",
+      "exampleText": "* + credentials — spec allows it, Chrome bug if fails.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "cors_when_debug",
+      "exampleType": "good",
+      "exampleText": "public read-only API — origin: true reflect, без credentials. Debug — Network OPTIONS status 0.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "cors_when_debug",
+      "exampleType": "good",
+      "exampleText": "CRA proxy в dev, express cors в prod — типичный split",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "cors_when_debug",
+      "exampleType": "bad",
+      "exampleText": "CORS чинится disable-web-security в Chrome — норм для prod debug.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "expressjs-cors",
+    "apiUrl": "https://api.itlead.org/api/questions/expressjs-cors",
+    "pageUrl": "https://itlead.org/interview-questions/expressjs/expressjs-cors",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is CORS and how to configure it in Express.js?",
+    "categorySlug": "expressjs",
+    "syncedAt": "2026-06-18T16:30:00.000Z"
+  }
+}

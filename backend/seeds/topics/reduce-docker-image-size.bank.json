@@ -1,0 +1,369 @@
+{
+  "topic": {
+    "code": "reduce_docker_image_size",
+    "name": "Уменьшение размера Docker образа",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как уменьшить размер Docker образа?",
+    "shortAnswer": "Пять техник: multi-stage + slim base (alpine/distroless/scratch), single RUN с cleanup cache, .dockerignore, --no-install-recommends и --omit=dev. Аудит: docker history или dive.",
+    "idealAnswer": "1) Multi-stage: build в node:22-alpine, final nginx:alpine — 1.2GB→30MB. 2) Base: alpine 7MB, distroless 20MB, scratch 0. Caveat: musl vs glibc для NumPy. 3) Single RUN: apt update && install && rm lists в одном layer — иначе cache в layer навсегда. 4) .dockerignore: .git, node_modules. 5) npm ci --omit=dev, apt --no-install-recommends. Inspect: docker history, dive. Ошибки: ADD bigfile + rm next layer — data остаётся; apt recommended; node:latest 1GB vs node:22-alpine 200MB. Go: FROM scratch + -ldflags -s -w.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "five_techniques",
+      "title": "Называет пять ключевых техник",
+      "expected": "Кандидat: multi-stage, smaller base, single RUN+cleanup, .dockerignore, omit dev deps.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR five techniques",
+        "mustConcepts": [
+          "multi-stage",
+          "alpine",
+          "distroless",
+          "scratch",
+          "dockerignore",
+          "RUN cleanup",
+          "omit dev",
+          "slim",
+          "размер",
+          "пять",
+          "technique",
+          "base image",
+          "no-install-recommends",
+          "dive"
+        ],
+        "falseClaims": [
+          "сжатие файлов уменьшает image",
+          "latest всегда smallest",
+          "одна техника достаточна"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "multistage_build",
+      "title": "Понимает multi-stage build",
+      "expected": "Кандидat: toolchain в build stage, только артефакт в final; node:22 1.2GB → nginx:alpine 30MB для static.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Multi-stage biggest win",
+        "mustConcepts": [
+          "multi-stage",
+          "AS build",
+          "COPY --from",
+          "toolchain",
+          "артефакт",
+          "build stage",
+          "runtime stage",
+          "nginx:alpine",
+          "1.2 GB",
+          "30 MB",
+          "node_modules",
+          "dist",
+          "отброс"
+        ],
+        "falseClaims": [
+          "multi-stage увеличивает размер",
+          "COPY --from копирует весь build stage",
+          "multi-stage только для Go"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "base_image_choice",
+      "title": "Выбирает base image",
+      "expected": "Кандидat: debian slim → alpine → distroless → scratch; musl caveat для Alpine; python ML → slim not alpine.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Base image options",
+        "mustConcepts": [
+          "alpine",
+          "distroless",
+          "scratch",
+          "debian-slim",
+          "bookworm-slim",
+          "musl",
+          "glibc",
+          "NumPy",
+          "MKL",
+          "busybox",
+          "shell",
+          "7-8 MB",
+          "2 MB",
+          "node:22-alpine"
+        ],
+        "falseClaims": [
+          "Alpine всегда лучше",
+          "distroless имеет shell",
+          "scratch для Node apps",
+          "debian slim больше alpine всегда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "run_cleanup_layers",
+      "title": "Объединяет RUN и чистит cache",
+      "expected": "Кандидat: один RUN с && rm -rf; apt lists в том же layer; delete в следующем layer не уменьшает image.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Single RUN cleanup",
+        "mustConcepts": [
+          "RUN",
+          "&&",
+          "rm -rf",
+          "apt lists",
+          "layer",
+          "immutable",
+          "whiteout",
+          "apk --no-cache",
+          "pip --no-cache-dir",
+          "npm cache clean",
+          "same step",
+          "312MB"
+        ],
+        "falseClaims": [
+          "rm в следующем RUN удаляет из image",
+          "layers mutable",
+          "apt cache не в layer"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "dockerignore",
+      "title": "Знает .dockerignore",
+      "expected": "Кандидat: .git, node_modules, dist, .env — уменьшает context и COPY bloat.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "dockerignore",
+        "mustConcepts": [
+          "dockerignore",
+          "node_modules",
+          ".git",
+          "build context",
+          "COPY . .",
+          "dist",
+          ".env",
+          "coverage",
+          "gigabyte",
+          "daemon",
+          "cache",
+          "lockfile"
+        ],
+        "falseClaims": [
+          "dockerignore не влияет на COPY",
+          "node_modules нужен в context",
+          ".git ускоряет build"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидat: add в one layer delete in next; apt без --no-install-recommends; Debian когда Alpine ok; pin latest.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes",
+        "mustConcepts": [
+          "ADD",
+          "delete layer",
+          "no-install-recommends",
+          "recommended",
+          "latest",
+          "node:latest",
+          "1 GB",
+          "dive",
+          "history",
+          "immutable",
+          "whiteout",
+          "debug symbols"
+        ],
+        "falseClaims": [
+          "delete в layer 2 уменьшает image",
+          "apt recommended нужны",
+          "latest = smallest"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Multi-stage — biggest win: build stage с toolchain, final slim base. Static site: nginx:alpine 30MB.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Один RUN с rm apt lists — иначе cache в layer навсегда. dive/docker history для bloat.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": ".dockerignore + granular COPY package*.json. Alpine caveat: musl для native modules.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "rm -rf в следующем RUN уменьшает image",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Alpine всегда для Python ML",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Docker layers сжимаются при delete",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "COPY --from=build только dist",
+      "sortOrder": 10,
+      "checkpointKey": "multistage_build"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "1.2GB→30MB static",
+      "sortOrder": 11,
+      "checkpointKey": "multistage_build"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "multi-stage увеличивает size",
+      "sortOrder": 42,
+      "checkpointKey": "multistage_build"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "apt && rm lists same RUN",
+      "sortOrder": 14,
+      "checkpointKey": "run_cleanup_layers"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "layers immutable",
+      "sortOrder": 15,
+      "checkpointKey": "run_cleanup_layers"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "rm next layer ok",
+      "sortOrder": 46,
+      "checkpointKey": "run_cleanup_layers"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "alpine/distroless/scratch по needs",
+      "sortOrder": 18,
+      "checkpointKey": "base_image_choice"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "musl caveat NumPy",
+      "sortOrder": 19,
+      "checkpointKey": "base_image_choice"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Alpine всегда",
+      "sortOrder": 50,
+      "checkpointKey": "base_image_choice"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Называет пять ключевых техник»: Кандидat: multi-stage, smaller base, single RUN+cleanup, .dockerignore, omit dev deps.…",
+      "sortOrder": 51,
+      "checkpointKey": "five_techniques"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Называет пять ключевых техник»: Кандидat: multi-stage, smaller base, single RUN+cleanup, .dockerignore, omit dev deps.…",
+      "sortOrder": 52,
+      "checkpointKey": "five_techniques"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Неверно: сжатие файлов уменьшает image",
+      "sortOrder": 40,
+      "checkpointKey": "five_techniques"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает .dockerignore»: Кандидat: .git, node_modules, dist, .env — уменьшает context и COPY bloat.…",
+      "sortOrder": 53,
+      "checkpointKey": "dockerignore"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает .dockerignore»: Кандидat: .git, node_modules, dist, .env — уменьшает context и COPY bloat.…",
+      "sortOrder": 54,
+      "checkpointKey": "dockerignore"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Неверно: dockerignore не влияет на COPY",
+      "sortOrder": 41,
+      "checkpointKey": "dockerignore"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает типичные ошибки»: Кандидat: add в one layer delete in next; apt без --no-install-recommends; Debian когда Alpine ok; pin latest.…",
+      "sortOrder": 55,
+      "checkpointKey": "common_mistakes"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает типичные ошибки»: Кандидat: add в one layer delete in next; apt без --no-install-recommends; Debian когда Alpine ok; pin latest.…",
+      "sortOrder": 56,
+      "checkpointKey": "common_mistakes"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Неверно: delete в layer 2 уменьшает image",
+      "sortOrder": 42,
+      "checkpointKey": "common_mistakes"
+    }
+  ],
+  "itlead": {
+    "slug": "reduce-docker-image-size",
+    "categorySlug": "docker",
+    "apiUrl": "https://api.itlead.org/api/questions/reduce-docker-image-size",
+    "pageUrl": "https://itlead.org/interview-questions/docker/reduce-docker-image-size",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to reduce the size of a Docker image?",
+    "syncedAt": "2026-06-18T14:47:42.000Z"
+  }
+}

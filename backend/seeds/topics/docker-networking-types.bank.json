@@ -1,0 +1,539 @@
+{
+  "topic": {
+    "code": "docker_networking_types",
+    "name": "Типы сетей Docker",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работает Docker networking и какие типы сетей существуют?",
+    "shortAnswer": "Docker создаёт виртуальные сети; контейнеры подключаются к ним и получают внутренний IP. Шесть встроенных драйверов: `bridge` (дефолт, один хост), `host` (без изоляции), `none` (без сети), `overlay` (multi-host через VXLAN, Swarm), `macvlan` / `ipvlan` (контейнер как устройство на физическом LAN). Для ~95% single-host — user-defined bridge с DNS по имени; для multi-host — overlay.",
+    "idealAnswer": "Docker networking — слой, который определяет, как контейнеры достигают друг друга и внешний мир. Docker создаёт виртуальные сети; контейнеры attach к сети и получают внутренний IP. Шесть встроенных драйверов покрывают все типовые кейсы — выбор по топологии, не по привычке. **`bridge` (default):** виртуальный L2-bridge на одном хосте; контейнеры на приватной подсети (например 172.17.0.0/16). Default `bridge` (docker0) — без DNS по имени, только deprecated `--link`; избегать. **User-defined bridge** (`docker network create mynet`) — DNS по имени контейнера, всегда предпочтительнее; Compose создаёт user-defined bridge на проект автоматически. Публикация портов `-p` — iptables NAT/DNAT с хоста на IP контейнера. **`host`:** контейнер делит network namespace хоста — без NAT, без port mapping, без отдельного IP; nginx слушает host:80 напрямую; `-p` игнорируется; быстрее, но без изоляции. **`none`:** только loopback `lo`, без внешней сети — batch jobs, ручная настройка post-factum. **`overlay`:** multi-host через VXLAN в Swarm-кластере; контейнеры на разных нодах как в одном LAN; требует `docker swarm init`; без Swarm — ошибка; Kubernetes использует CNI (Calico, Flannel), не Docker overlay. **`macvlan`:** контейнер получает свой MAC на физическом LAN, выглядит как отдельное устройство; для legacy, whitelist по IP/MAC; в cloud (AWS/GCP/Azure) часто не работает — hypervisor блокирует чужие MAC. **`ipvlan`:** как macvlan, но контейнеры делят MAC хоста — лучше при ограничениях MAC (port-security, cloud). **Embedded DNS:** на user-defined bridge и overlay — nameserver `127.0.0.11` в resolv.conf; имена контейнеров резолвятся в текущие IP (меняются при рестарте). Команды: `docker network ls/inspect/create/rm/connect/disconnect/prune`. Типичные ошибки: default bridge и ожидание DNS по имени; `-p` на host network; `localhost` для связи между контейнерами; overlay без Swarm. Real-world: Compose — user-defined bridge + service DNS; single-host prod — явная сеть, внутренние сервисы без publish; Swarm — overlay; performance bare metal — host; LAN integration — macvlan. Контейнер может быть на нескольких сетях (`docker network connect`). K8s networking ≠ Docker networking.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "network_drivers_overview",
+      "title": "Знает шесть встроенных драйверов",
+      "expected": "Кандидат перечисляет bridge, host, none, overlay, macvlan, ipvlan; объясняет что Docker создаёт виртуальные сети и выбор драйвера — по топологии (single-host vs multi-host vs LAN).",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — шесть драйверов и выбор по топологии",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "bridge",
+              "overlay",
+              "host",
+              "none"
+            ],
+            "ask": "какой драйвер для single-host приложения, какой для multi-host Swarm"
+          }
+        ],
+        "mustConcepts": [
+          "шесть",
+          "6",
+          "драйвер",
+          "driver",
+          "bridge",
+          "host",
+          "none",
+          "overlay",
+          "macvlan",
+          "ipvlan",
+          "виртуальн",
+          "сеть",
+          "внутренн",
+          "IP",
+          "тополог",
+          "single-host",
+          "multi-host",
+          "docker network ls",
+          "встроенн"
+        ],
+        "falseClaims": [
+          "в Docker только один тип сети — bridge",
+          "overlay работает на single-host без Swarm так же как bridge",
+          "host и bridge дают одинаковую изоляцию",
+          "macvlan — дефолтный драйвер для docker run"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "user_defined_bridge",
+      "title": "Понимает user-defined bridge и DNS",
+      "expected": "Кандидат объясняет: user-defined bridge (`docker network create`) даёт DNS по имени контейнера; default bridge (docker0) — без DNS, deprecated; Compose создаёт user-defined bridge автоматически; для app-стеков всегда предпочтительнее.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "главный практический выбор — DNS по имени vs default bridge",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "network_drivers_overview",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "user_defined_bridge",
+            "oftenConfusedWith": [
+              "embedded_dns"
+            ],
+            "anchorTermsExpected": [
+              "user-defined",
+              "docker network create",
+              "DNS по имени",
+              "default bridge",
+              "docker0"
+            ],
+            "anchorTermsWrongTopic": [
+              "127.0.0.11 без user-defined",
+              "default bridge резолвит db"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "default bridge",
+              "docker0",
+              "user-defined"
+            ],
+            "ask": "почему на default bridge ping db по имени не работает, а на mynet работает"
+          }
+        ],
+        "mustConcepts": [
+          "user-defined",
+          "docker network create",
+          "mynet",
+          "DNS",
+          "имя контейнера",
+          "container name",
+          "default bridge",
+          "docker0",
+          "без DNS",
+          "deprecated",
+          "--link",
+          "Compose",
+          "автоматическ",
+          "предпочт",
+          "ping db",
+          "резолв"
+        ],
+        "falseClaims": [
+          "default bridge резолвит контейнеры по имени как user-defined",
+          "DNS по имени работает на docker0 из коробки",
+          "docker network create не меняет поведение DNS",
+          "Compose не создаёт user-defined bridge"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "bridge_host_none",
+      "title": "Различает bridge, host и none",
+      "expected": "Кандидат сравнивает: bridge — свой network namespace и IP, NAT через хост; host — общий namespace хоста, без NAT и `-p`; none — только lo, без внешней сети.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "три базовых режима single-host — изоляция vs performance",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "host",
+              "bridge",
+              "NAT"
+            ],
+            "ask": "чем `--network host` отличается от bridge с `-p`"
+          }
+        ],
+        "mustConcepts": [
+          "bridge",
+          "host",
+          "none",
+          "network namespace",
+          "изоляц",
+          "NAT",
+          "port mapping",
+          "-p",
+          "loopback",
+          "lo",
+          "общий namespace",
+          "без изоляц",
+          "performance",
+          "overhead",
+          "172.17",
+          "приватн",
+          "subnet"
+        ],
+        "falseClaims": [
+          "host network всё равно применяет -p для port mapping",
+          "none даёт доступ к docker0",
+          "bridge и host дают контейнеру один и тот же IP хоста",
+          "host mode создаёт отдельный IP контейнера"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "overlay_multihost",
+      "title": "Понимает overlay для multi-host",
+      "expected": "Кандидат объясняет: overlay через VXLAN связывает Docker-хосты в Swarm; нужен swarm manager; без Swarm — ошибка; Kubernetes использует CNI, не Docker overlay.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "multi-host топология — overlay + Swarm из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "overlay",
+              "Swarm",
+              "VXLAN"
+            ],
+            "ask": "можно ли создать overlay network без docker swarm init"
+          }
+        ],
+        "mustConcepts": [
+          "overlay",
+          "VXLAN",
+          "multi-host",
+          "Swarm",
+          "swarm manager",
+          "docker swarm init",
+          "attachable",
+          "несколько нод",
+          "node",
+          "encapsul",
+          "Kubernetes",
+          "CNI",
+          "Calico",
+          "Flannel",
+          "не Docker overlay"
+        ],
+        "falseClaims": [
+          "overlay работает на обычном docker run без Swarm",
+          "Kubernetes использует Docker overlay driver",
+          "overlay заменяет bridge на single-host",
+          "docker network create --driver overlay всегда успешен"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "embedded_dns",
+      "title": "Знает встроенный DNS Docker",
+      "expected": "Кандидат описывает: на user-defined bridge и overlay — nameserver 127.0.0.11; resolv.conf в контейнере; имена резолвятся в текущие IP; IP могут меняться при рестарте.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "механизм DNS из ITLead — 127.0.0.11",
+        "mustConcepts": [
+          "127.0.0.11",
+          "embedded DNS",
+          "встроенн",
+          "resolv.conf",
+          "nameserver",
+          "nslookup",
+          "резолв",
+          "имя",
+          "текущ",
+          "IP меня",
+          "рестарт",
+          "одна сеть",
+          "user-defined",
+          "overlay"
+        ],
+        "falseClaims": [
+          "DNS в Docker — это /etc/hosts на хост-машине",
+          "127.0.0.11 работает на default bridge",
+          "IP контейнера стабилен навсегда, DNS не нужен",
+          "resolv.conf указывает на 8.8.8.8 по умолчанию в user-defined bridge"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "macvlan_ipvlan",
+      "title": "Понимает macvlan и ipvlan",
+      "expected": "Кандидат объясняет: macvlan — свой MAC на физическом LAN, контейнер как отдельное устройство; ipvlan — общий MAC хоста, IP-уровень; для legacy/whitelist; в cloud часто не работает.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "редкие драйверы — LAN integration из ITLead",
+        "mustConcepts": [
+          "macvlan",
+          "ipvlan",
+          "MAC",
+          "физическ",
+          "LAN",
+          "parent",
+          "eth0",
+          "subnet",
+          "gateway",
+          "legacy",
+          "whitelist",
+          "license",
+          "cloud",
+          "AWS",
+          "hypervisor",
+          "port-security",
+          "свой IP"
+        ],
+        "falseClaims": [
+          "macvlan работает в AWS/GCP так же как на bare metal",
+          "macvlan и bridge + -p дают одинаковый внешний IP контейнера",
+          "ipvlan даёт каждому контейнеру свой MAC",
+          "macvlan — рекомендуемый дефолт для web-приложений"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: default bridge без DNS; `-p` игнорируется на host; localhost между контейнерами; overlay без Swarm; hardcode IP вместо имени; команды inspect/connect для отладки.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — частые production/debug ошибки",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "user_defined_bridge",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "localhost",
+              "default bridge"
+            ],
+            "ask": "почему api не достаёт db через localhost:5432"
+          },
+          {
+            "match": [
+              "host",
+              "-p"
+            ],
+            "ask": "работает ли -p 8080:80 при --network host"
+          }
+        ],
+        "mustConcepts": [
+          "default bridge",
+          "DNS пада",
+          "localhost",
+          "сам контейнер",
+          "host",
+          "-p игнор",
+          "overlay без Swarm",
+          "swarm manager",
+          "docker network inspect",
+          "connect",
+          "disconnect",
+          "hardcode IP",
+          "имя сервиса",
+          "Compose DNS",
+          "не localhost"
+        ],
+        "falseClaims": [
+          "localhost между контейнерами на одной сети — нормальный паттерн",
+          "-p на host network меняет порт nginx",
+          "overlay можно создать на standalone Docker без ошибки",
+          "default bridge и user-defined bridge одинаковы для DNS"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Шесть драйверов: bridge (дефолт single-host), host (без изоляции), none, overlay (Swarm multi-host), macvlan/ipvlan для LAN. Для стека — user-defined bridge: `docker network create appnet`, контейнеры резолвят друг друга по имени через 127.0.0.11. Default bridge без DNS — избегать.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Compose сам делает user-defined bridge — db:5432 из api работает. На prod single-host явная сеть, внутренние сервисы без -p, наружу только nginx. Multi-host Swarm — overlay. Performance на bare metal иногда --network host, но -p тогда бесполезен.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну bridge по умолчанию — docker0, имён не резолвит. mynet через network create — ping db ок. host — nginx сразу на 80 хоста. overlay только со swarm init",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В Docker одна сеть bridge, overlay для локальной разработки. Default bridge резолвит контейнеры по имени как Compose. На host network -p 8080:80 пробрасывает порт.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Между api и db на default bridge подключаюсь localhost:5432 — один хост же. Overlay создаю на обычном docker без Swarm для multi-container. Kubernetes использует Docker overlay.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "macvlan — лучший выбор для любого web в AWS. resolv.conf в контейнере всегда 8.8.8.8. IP контейнера после рестарта не меняется, DNS не нужен.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "network_drivers_overview",
+      "exampleType": "good",
+      "exampleText": "bridge, host, none, overlay, macvlan, ipvlan — выбор по топологии: один хост → user-defined bridge, Swarm cluster → overlay.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "network_drivers_overview",
+      "exampleType": "good",
+      "exampleText": "docker network ls показывает bridge/host/none по умолчанию; для app — create mynet",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "network_drivers_overview",
+      "exampleType": "bad",
+      "exampleText": "В Docker только bridge и host, остальные — плагины сторонних вендоров.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "user_defined_bridge",
+      "exampleType": "good",
+      "exampleText": "docker network create mynet; api и db на mynet — ping db резолвится; default bridge так не умеет.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "user_defined_bridge",
+      "exampleType": "good",
+      "exampleText": "Compose project_default — user-defined bridge, поэтому service name DNS «просто работает»",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "user_defined_bridge",
+      "exampleType": "bad",
+      "exampleText": "docker run без --network уже даёт DNS по имени контейнера на docker0.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "bridge_host_none",
+      "exampleType": "good",
+      "exampleText": "bridge — свой namespace и IP, NAT наружу; host — тот же stack что у хоста, -p игнор; none — только lo.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "bridge_host_none",
+      "exampleType": "good",
+      "exampleText": "--network host nginx на 80 хоста напрямую, без port mapping overhead",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "bridge_host_none",
+      "exampleType": "bad",
+      "exampleText": "host mode всё равно создаёт 172.17.x.x IP и применяет -p как bridge.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "overlay_multihost",
+      "exampleType": "good",
+      "exampleText": "overlay + VXLAN связывает ноды Swarm; docker network create --driver overlay после swarm init.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "overlay_multihost",
+      "exampleType": "good",
+      "exampleText": "K8s — CNI Calico/Flannel, не Docker overlay driver",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "overlay_multihost",
+      "exampleType": "bad",
+      "exampleText": "overlay на single docker desktop заменяет bridge для dev compose.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "embedded_dns",
+      "exampleType": "good",
+      "exampleText": "resolv.conf → nameserver 127.0.0.11; nslookup db на user-defined bridge даёт текущий IP.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "embedded_dns",
+      "exampleType": "good",
+      "exampleText": "после рестарта контейнера IP сменился — DNS всё ещё резолвит db в новый адрес",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "embedded_dns",
+      "exampleType": "bad",
+      "exampleText": "127.0.0.11 — это loopback контейнера, DNS не используется.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "macvlan_ipvlan",
+      "exampleType": "good",
+      "exampleText": "macvlan — свой MAC на LAN для legacy whitelist; ipvlan — общий MAC, лучше в cloud с port-security.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "macvlan_ipvlan",
+      "exampleType": "good",
+      "exampleText": "bridge + -p снаружи виден IP хоста; macvlan — свой IP контейнера на подсети офиса",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "macvlan_ipvlan",
+      "exampleType": "bad",
+      "exampleText": "macvlan в AWS EC2 работает из коробки как на домашнем роутере.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Фикс DNS: network create mynet, не default bridge. localhost внутри api — не путь к db. host + -p — бессмысленно.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "overlay без swarm init — ошибка not a swarm manager; для отладки network inspect appnet",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Два контейнера на default bridge — ping db по имени должен работать, проблема в firewall хоста.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-networking-types",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-networking-types",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-networking-types",
+    "difficulty": "MIDDLE",
+    "titleEn": "How does Docker networking work and what network types exist?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T20:00:00.000Z"
+  }
+}

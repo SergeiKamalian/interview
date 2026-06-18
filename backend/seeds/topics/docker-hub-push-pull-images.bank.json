@@ -1,0 +1,397 @@
+{
+  "topic": {
+    "code": "docker_hub_push_pull_images",
+    "name": "Push и pull образов на Docker Hub",
+    "skillCode": "docker",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Как загрузить (push) и скачать (pull) Docker-образы на Docker Hub?",
+    "shortAnswer": "Базовый цикл — четыре команды: один раз `docker login`, `docker tag` чтобы дать образу имя `username/repo:tag`, `docker push` для загрузки и `docker pull` для скачивания с другой машины. Имя образа должно начинаться с вашего Docker Hub username или организации. Для входа используйте personal access token (PAT), а не пароль аккаунта.",
+    "idealAnswer": "Push и pull на Docker Hub — базовый workflow обмена образами между машинами и CI. Полный цикл: `docker build -t myapp:1.0 .` → `docker tag myapp:1.0 youruser/myapp:1.0` → `docker login -u youruser` (PAT вместо пароля) → `docker push youruser/myapp:1.0` → на другой машине `docker pull youruser/myapp:1.0`. Формат имени: `[docker.io/]<namespace>/<repo>:<tag>`. `docker.io/` — registry по умолчанию; `<namespace>` — username или org на Docker Hub; `<repo>` создаётся автоматически при первом push; `<tag>` — версия (`1.0`, `latest` по умолчанию если опущен). Без namespace (`docker push myapp:1.0`) Docker пытается пушить в official `library/` — получите `access denied`. `docker tag` не копирует байты — добавляет alias на тот же image ID; один образ может иметь много тегов. Аутентификация: PAT (read-only / read-write / read-write-delete) вместо пароля аккаунта — scope, revoke без смены пароля, отдельные токены на CI/ноутбук. В CI — secrets, никогда в git/Dockerfile. После `docker login` credentials в `~/.docker/config.json` (`auths` → base64); на macOS/Windows — credential helper (osxkeychain, desktop), на Linux без helper — `chmod 600`. Типичные ошибки: push без namespace prefix; login паролем вместо PAT; только `:latest` без версионного тега (потребители не могут pin); anonymous pull rate limit в CI (100 pulls / 6h per IP) — лечится `docker login` в pipeline или registry mirror. В production pin на SHA-tag или версию, не только latest. GitHub Actions: `docker/login-action` + `docker/build-push-action` с tags `latest` и `${{ github.sha }}`. Private repo — те же команды, visibility в UI; free tier — один private repo. Multi-arch: `docker buildx build --platform linux/amd64,linux/arm64 -t youruser/myapp:1.0 --push .` — manifest list под одним tag. Безопасность CI: `--password-stdin` или login-action, не `docker login -p $TOKEN` (history, ps aux).",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "basic_workflow",
+      "title": "Знает базовый цикл login / tag / push / pull",
+      "expected": "Кандидат перечисляет четыре команды: build/tag с namespace, docker login один раз, docker push для upload, docker pull на другой машине; понимает полный loop sharing образа.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — четыре команды покрывают 99% кейсов",
+        "mustConcepts": [
+          "docker login",
+          "docker tag",
+          "docker push",
+          "docker pull",
+          "build",
+          "upload",
+          "download",
+          "скач",
+          "загруз",
+          "цикл",
+          "workflow",
+          "другая машина",
+          "sharing",
+          "обмен",
+          "namespace",
+          "youruser/myapp"
+        ],
+        "falseClaims": [
+          "docker push работает без docker login для private и push в свой namespace",
+          "docker pull требует tag с namespace только для private образов",
+          "docker tag копирует слои образа на диск заново",
+          "достаточно docker push без предварительного docker tag"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "image_naming",
+      "title": "Понимает формат имени образа и tagging",
+      "expected": "Кандидат объясняет формат `<namespace>/<repo>:<tag>`, docker.io по умолчанию, namespace = username/org, без prefix — library (official), tag по умолчанию latest; docker tag — alias на тот же image ID.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Image naming and tagging из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "namespace",
+              "repo",
+              "tag",
+              "library"
+            ],
+            "ask": "что означает youruser/myapp:1.0 и почему nginx:1.27 без prefix — official image"
+          }
+        ],
+        "mustConcepts": [
+          "namespace",
+          "repo",
+          "tag",
+          "docker.io",
+          "registry",
+          "username",
+          "организац",
+          "library",
+          "official",
+          "latest",
+          "image ID",
+          "alias",
+          "docker tag",
+          "не копирует байты",
+          "много тегов",
+          "формат имени"
+        ],
+        "falseClaims": [
+          "можно push в library/ namespace без прав Docker Inc",
+          "docker tag создаёт новый образ с другим содержимым",
+          "без указания tag всегда используется имя образа без версии и pull не работает",
+          "namespace необязателен при push в свой Docker Hub аккаунт"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "pat_authentication",
+      "title": "Использует PAT вместо пароля аккаунта",
+      "expected": "Кандидат объясняет: PAT с scope (read/write/delete), revoke без смены пароля, отдельные токены на машины; в CI — secrets, не commit; пароль аккаунта — плохая практика.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Authentication: use a PAT из ITLead",
+        "mustConcepts": [
+          "PAT",
+          "personal access token",
+          "токен",
+          "не пароль",
+          "scope",
+          "read-only",
+          "read-write",
+          "revoke",
+          "отозв",
+          "CI secrets",
+          "не commit",
+          "не Dockerfile",
+          "hub.docker.com/settings",
+          "blast radius",
+          "ротац"
+        ],
+        "falseClaims": [
+          "пароль аккаунта безопаснее PAT для CI",
+          "PAT нельзя отозвать без смены пароля",
+          "можно хранить Docker Hub token в репозитории для удобства CI",
+          "docker login принимает только пароль аккаунта, не token"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "credentials_storage",
+      "title": "Знает где хранятся credentials после login",
+      "expected": "Кандидат называет `~/.docker/config.json`, auths/base64; credential helper на macOS/Windows (keychain); на Linux без helper — chmod 600; не светить token в логах.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Where credentials live из ITLead",
+        "mustConcepts": [
+          "config.json",
+          "~/.docker",
+          "auths",
+          "base64",
+          "credential helper",
+          "credsStore",
+          "osxkeychain",
+          "keychain",
+          "chmod 600",
+          "Linux",
+          "index.docker.io",
+          "после login"
+        ],
+        "falseClaims": [
+          "docker login не сохраняет credentials между сессиями",
+          "токен всегда лежит plaintext в config.json на Mac",
+          "credentials хранятся только в переменных окружения",
+          "logout не удаляет запись из config.json"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки push/pull",
+      "expected": "Кандидат называет: push без namespace → access denied; пароль вместо PAT; только latest без version tag; anonymous pull rate limit в CI; правильно — tag с username, оба тега или --all-tags, docker login в CI.",
+      "score": 2.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — missing namespace, latest-only, rate limits",
+        "mustConcepts": [
+          "access denied",
+          "без namespace",
+          "library",
+          "latest",
+          "version tag",
+          "pin",
+          "rate limit",
+          "toomanyrequests",
+          "anonymous",
+          "CI",
+          "docker login в pipeline",
+          "all-tags",
+          "--all-tags",
+          "youruser/",
+          "версионн"
+        ],
+        "falseClaims": [
+          "access denied при push всегда значит неверный пароль, не missing namespace",
+          "latest достаточно для production pin без version tag",
+          "anonymous pull в CI без лимитов на shared IP",
+          "docker push myapp:1.0 работает если образ локально так назван"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "ci_and_real_world",
+      "title": "Понимает CI-паттерн и real-world usage",
+      "expected": "Кандидат упоминает GitHub Actions login-action/build-push-action, SHA-tag для reproducibility, private repo visibility, опционально buildx multi-arch или --password-stdin в self-hosted CI.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Real-world usage + GitHub Actions example из ITLead",
+        "mustConcepts": [
+          "GitHub Actions",
+          "login-action",
+          "build-push-action",
+          "secrets",
+          "github.sha",
+          "SHA tag",
+          "reproducibility",
+          "private repo",
+          "buildx",
+          "multi-arch",
+          "password-stdin",
+          "masked secrets",
+          "colleague pull",
+          "PR image"
+        ],
+        "falseClaims": [
+          "в GitHub Actions docker push работает без login step если runner на ubuntu",
+          "private образ push требует других команд чем public",
+          "buildx обязателен для обычного push одной архитектуры",
+          "docker login -p $TOKEN безопасен для CI"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Собрал myapp:1.0, делаю `docker tag myapp:1.0 youruser/myapp:1.0`, `docker login` с PAT, `docker push youruser/myapp:1.0`. Коллега на другой машине — `docker pull youruser/myapp:1.0`. Без namespace push в library и будет access denied.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В CI: docker/login-action с secrets, build-push-action пушит `youruser/myapp:latest` и `youruser/myapp:${{ github.sha }}`. Prod деплою по SHA-tag. Перед pull base images логиню runner — иначе toomanyrequests на shared IP.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну login один раз, tag с username, push — pull на другой тачке. токен из hub settings, не пароль. latest и 1.0 оба тегну, можно --all-tags",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Делаю `docker push myapp:1.0` — образ же локально так называется, namespace не нужен. В CI токен кладу в Dockerfile ENV для автологина.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Достаточно пушить только :latest — версии не нужны, потребители всегда тянут latest. Anonymous pull в GitHub Actions без лимитов.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker login -u user -p $TOKEN в shell script — удобно для CI. PAT и пароль аккаунта одно и то же по безопасности.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "basic_workflow",
+      "exampleType": "good",
+      "exampleText": "build → tag youruser/myapp:1.0 → login → push → pull на другом хосте — полный sharing loop.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "basic_workflow",
+      "exampleType": "good",
+      "exampleText": "login один раз до logout, потом push/pull без повторного ввода credentials",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "basic_workflow",
+      "exampleType": "bad",
+      "exampleText": "docker pull с Docker Hub не требует docker login никогда, даже для private образов.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "image_naming",
+      "exampleType": "good",
+      "exampleText": "youruser/myapp:1.0 — namespace/repo:tag; nginx:1.27 без prefix это library/nginx official.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "image_naming",
+      "exampleType": "good",
+      "exampleText": "docker tag не двигает слои — второй tag на тот же image id, push --all-tags если несколько labels",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "image_naming",
+      "exampleType": "bad",
+      "exampleText": "mycompany/api без tag — pull невозможен, Docker не поддерживает implicit latest.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "pat_authentication",
+      "exampleType": "good",
+      "exampleText": "PAT read-write из hub settings/security, вставляю при docker login вместо пароля; отзываю токен CI без смены пароля аккаунта.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "pat_authentication",
+      "exampleType": "good",
+      "exampleText": "отдельный PAT на ноут и на runner, scope read-only где только pull",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "pat_authentication",
+      "exampleType": "bad",
+      "exampleText": "В репозиторий коммичу DOCKER_TOKEN — так проще настроить Actions.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "credentials_storage",
+      "exampleType": "good",
+      "exampleText": "После login credentials в ~/.docker/config.json; на Mac credsStore osxkeychain, raw token не в файле.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "credentials_storage",
+      "exampleType": "good",
+      "exampleText": "на linux без helper — chmod 600 config.json, auths с base64 username:PAT",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "credentials_storage",
+      "exampleType": "bad",
+      "exampleText": "docker login ничего не пишет на диск — каждый push спрашивает пароль заново.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "push myapp:1.0 без youruser/ → access denied в library; фикс — docker tag youruser/myapp:1.0.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "ERROR toomanyrequests в CI — логиню runner перед pull; authenticated limit выше anonymous 100/6h",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Пушу только latest — version pin не нужен, потребители сами разберутся когда образ изменится.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "ci_and_real_world",
+      "exampleType": "good",
+      "exampleText": "login-action@v3 + build-push-action с latest и commit SHA; prod helm values на SHA-tag.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "ci_and_real_world",
+      "exampleType": "good",
+      "exampleText": "echo $TOKEN | docker login -u user --password-stdin — не светит token в history и ps",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "ci_and_real_world",
+      "exampleType": "bad",
+      "exampleText": "Private repo push через docker push-private, обычный push только для public.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "docker-hub-push-pull-images",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-hub-push-pull-images",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-hub-push-pull-images",
+    "difficulty": "JUNIOR",
+    "titleEn": "How to push and pull images on Docker Hub?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T20:00:00.000Z"
+  }
+}

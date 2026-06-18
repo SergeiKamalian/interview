@@ -1,0 +1,620 @@
+{
+  "topic": {
+    "code": "expressjs_testing",
+    "name": "Тестирование Express.js приложения",
+    "skillCode": "expressjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как тестировать Express.js приложение?",
+    "shortAnswer": "Тестирование Express — автоматические HTTP-проверки маршрутов через Supertest и Jest. Экспортируй app без listen(), чтобы Supertest поднял in-memory сервер; мокай слой БД для скорости, интеграционными тестами прогоняй полную цепочку middleware.",
+    "idealAnswer": "Тестирование Express.js — автоматические проверки routes, middleware и handlers через Supertest: симулирует HTTP-запросы к live app instance без реального сервера на порту. Ключевая структура: разделить app.js (export app, без listen()) и server.js (app.listen). Supertest импортирует app, через http.createServer() поднимает in-memory сервер на случайном порту, прогоняет запрос через реальный router и middleware stack, после теста вызывает server.close(). Unit-тесты вызывают handler напрямую с mock req/res — быстро, но пропускают middleware. Integration-тесты с Supertest проходят полный app.use() chain — так идёт production traffic; большинство Express-багов ловятся только интеграционно. Когда что: один route — Supertest + assert status/body; middleware chain (auth, logging, validation) — integration; DB route — jest.mock() на service layer + Supertest; protected routes — реальный JWT в Authorization header; E2E user flows — Cypress/Playwright, не Supertest; CI/CD — Supertest без live ports. Стратегия БД: начать с mock service layer (быстро, высокая изоляция); затем in-memory SQLite для критичных путей; dedicated test DB и Docker — медленнее, но реалистичнее. Типичные ошибки: app.listen() в app.js → EADDRINUSE или второй порт; отсутствие await на Supertest → ложные green tests; async handler без 4-arg error middleware → hanging socket и timeout; тест handler в обход auth middleware; реальная shared БД → flaky order-dependent suite. request(app) создаёт временный сервер на тест; request(server) — к уже запущенному на реальном порту (редко). Внешние HTTP — nock перехватывает на уровне Node http. Middleware в изоляции — минимальный Express app только с этим middleware + Supertest. Микросервисная стратегия: ~60% unit на handlers, ~30% integration Supertest + mocked Redis, ~10% contract Pact.js; factory functions вместо fixtures; --maxWorkers для параллелизма.",
+    "maxScore": 10,
+    "skills": [
+      "expressjs",
+      "javascript",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "supertest_basics",
+      "title": "Понимает Supertest и базовый паттерн",
+      "expected": "Кандидат объясняет: Supertest — fake HTTP client; request(app).get/post; assert status, headers, body; in-memory server без app.listen(3000).",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — Supertest как основной инструмент",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "supertest_basics",
+            "oftenConfusedWith": [
+              "supertest_internals",
+              "app_server_split"
+            ],
+            "anchorTermsExpected": [
+              "Supertest",
+              "request(app)",
+              "status",
+              "body",
+              "in-memory",
+              "без listen"
+            ],
+            "anchorTermsWrongTopic": [
+              "Cypress для unit route",
+              "supertest запускает порт 3000"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Supertest",
+              "request(app)"
+            ],
+            "ask": "как выглядит минимальный тест GET /users с Supertest и Jest"
+          }
+        ],
+        "mustConcepts": [
+          "Supertest",
+          "supertest",
+          "request(app)",
+          "HTTP client",
+          "status code",
+          "статус",
+          "response body",
+          "тело ответа",
+          "expect",
+          "Jest",
+          "in-memory",
+          "в памяти",
+          "без порта",
+          "GET",
+          "POST",
+          ".expect(",
+          "res.status",
+          "res.body"
+        ],
+        "falseClaims": [
+          "Supertest требует запущенный сервер на порту 3000",
+          "Supertest не парсит JSON автоматически",
+          "для теста route достаточно вызвать handler без HTTP",
+          "Supertest заменяет Jest"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "app_server_split",
+      "title": "Разделяет app.js и server.js",
+      "expected": "Кандидат: app.js экспортирует Express без listen(); server.js импортирует app и вызывает listen(); иначе EADDRINUSE или Supertest биндит второй порт.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "структурное изменение из TL;DR — без него тесты не работают",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "supertest_basics",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "app.js",
+              "server.js",
+              "listen"
+            ],
+            "ask": "почему listen() нельзя оставлять в app.js при Supertest"
+          }
+        ],
+        "mustConcepts": [
+          "app.js",
+          "server.js",
+          "module.exports",
+          "экспорт",
+          "listen",
+          "без listen",
+          "EADDRINUSE",
+          "раздел",
+          "split",
+          "import app",
+          "require('./app')",
+          "порт",
+          "второй сервер"
+        ],
+        "falseClaims": [
+          "Supertest работает нормально если app.js вызывает listen(3000)",
+          "можно тестировать только server.js с listen",
+          "module.exports не нужен — достаточно глобального app"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "unit_vs_integration",
+      "title": "Отличает unit и integration тесты",
+      "expected": "Кандидат: unit — mock req/res, handler напрямую, быстро, без middleware; integration — Supertest через полный stack app.use(); integration ловит баги middleware и порядка.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Key difference ITLead — trade-off скорость vs реализм",
+        "confusionPairs": [
+          {
+            "checkpointKey": "unit_vs_integration",
+            "oftenConfusedWith": [
+              "supertest_basics"
+            ],
+            "anchorTermsExpected": [
+              "unit",
+              "integration",
+              "mock req",
+              "middleware stack",
+              "полный chain"
+            ],
+            "anchorTermsWrongTopic": [
+              "unit тест всегда лучше integration",
+              "integration не нужен для Express"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "unit test",
+          "юнит",
+          "integration test",
+          "интеграц",
+          "mock req",
+          "mock res",
+          "handler напрямую",
+          "middleware stack",
+          "app.use",
+          "полный chain",
+          "production traffic",
+          "быстро",
+          "реализм",
+          "пропускает middleware"
+        ],
+        "falseClaims": [
+          "unit test на handler покрывает auth middleware",
+          "integration тесты всегда медленнее и бесполезны",
+          "Supertest — это unit test без HTTP"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "supertest_internals",
+      "title": "Знает как работает Supertest внутри",
+      "expected": "Кандидат: request(app) → http.createServer(app) → random high port → реальный router/middleware → server.close(); request(app) vs request(server).",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "How Supertest works internally — senior depth",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "request(app)",
+              "request(server)"
+            ],
+            "ask": "разница request(app) и request(server)"
+          }
+        ],
+        "mustConcepts": [
+          "http.createServer",
+          "случайн",
+          "random port",
+          "high port",
+          "server.close",
+          "закрывает сервер",
+          "request(app)",
+          "request(server)",
+          "реальный router",
+          "socket",
+          "без network I/O",
+          "временный сервер"
+        ],
+        "falseClaims": [
+          "Supertest всегда биндит порт 3000",
+          "request(server) предпочтительнее для integration",
+          "Supertest не проходит реальный middleware stack"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "test_db_strategy",
+      "title": "Выбирает стратегию тестовой БД",
+      "expected": "Кандидат: mock service layer первым; in-memory SQLite для критичных путей; избегать shared real DB; jest.mock на db/service; trade-off speed/isolation/realism.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Test database strategy таблица ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "mock",
+              "jest.mock",
+              "SQLite"
+            ],
+            "ask": "с чего начать мокирование БД в Express route tests"
+          }
+        ],
+        "mustConcepts": [
+          "mock service",
+          "jest.mock",
+          "service layer",
+          "in-memory SQLite",
+          "SQLite",
+          "test DB",
+          "Docker",
+          "изоляц",
+          "flaky",
+          "order-dependent",
+          "shared DB",
+          "скорость",
+          "реализм",
+          "factory"
+        ],
+        "falseClaims": [
+          "в тестах лучше использовать production БД для реализма",
+          "mock service layer не нужен если есть test DB",
+          "один dirty record не ломает другие тесты"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки Express-тестов",
+      "expected": "Кандидат называет: listen в app.js; missing await на Supertest; async без 4-arg error middleware → timeout; real shared DB; handler без auth chain.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — частые production false positives",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "app_server_split",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "await",
+              "async",
+              "Promise"
+            ],
+            "ask": "почему тест без await на request(app) даёт ложный green"
+          },
+          {
+            "match": [
+              "error middleware",
+              "4-argument",
+              "err, req, res, next"
+            ],
+            "ask": "что происходит если async route throw без global error handler"
+          }
+        ],
+        "mustConcepts": [
+          "await",
+          "async test",
+          "Promise",
+          "false positive",
+          "ложный green",
+          "error middleware",
+          "4-argument",
+          "err req res next",
+          "timeout",
+          "hanging socket",
+          "unhandled",
+          "listen в app",
+          "EADDRINUSE",
+          "shared DB",
+          "flaky",
+          "auth middleware",
+          "handler напрямую"
+        ],
+        "falseClaims": [
+          "await на Supertest не обязателен — Jest сам дождётся",
+          "async throw в route всегда даёт 500 без error middleware",
+          "тест handler с mockUser покрывает JWT auth",
+          "real DB в тестах — нормальная практика"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "protected_routes_testing",
+      "title": "Тестирует защищённые маршруты через полный chain",
+      "expected": "Кандидат: jwt.sign в тесте; Authorization Bearer header; Supertest через app с auth middleware; mock service для DB; assert 201/500 с error handler.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Advanced example ITLead — auth + mocked service + errors",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "JWT",
+              "Authorization",
+              "Bearer"
+            ],
+            "ask": "как протестировать GET /profile с auth middleware"
+          }
+        ],
+        "mustConcepts": [
+          "JWT",
+          "jwt.sign",
+          "Authorization",
+          "Bearer",
+          "protected",
+          "auth middleware",
+          "полный chain",
+          "mockResolvedValue",
+          "mockRejectedValue",
+          "500",
+          "error handler",
+          "toHaveBeenCalledWith",
+          "POST",
+          "201"
+        ],
+        "falseClaims": [
+          "достаточно вызвать handler с mock req.user",
+          "auth middleware можно пропустить в integration test",
+          "JWT в тесте не нужен — middleware замокан"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "external_tools_selection",
+      "title": "Выбирает инструменты: nock, Cypress, middleware isolation",
+      "expected": "Кандидат: nock для внешних HTTP; Cypress/Playwright для E2E с браузером, не Supertest; минимальный app + один middleware для изоляции; layered test pyramid для microservices.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Follow-up questions и real-world — бонус senior",
+        "mustConcepts": [
+          "nock",
+          "Cypress",
+          "Playwright",
+          "E2E",
+          "браузер",
+          "middleware isolation",
+          "минимальный app",
+          "Pact",
+          "contract test",
+          "ioredis-mock",
+          "maxWorkers",
+          "pyramid"
+        ],
+        "falseClaims": [
+          "Supertest заменяет Cypress для user flows",
+          "nock не перехватывает исходящие HTTP",
+          "middleware нельзя тестировать отдельно от app"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "app.js экспортирует express app без listen. Supertest: await request(app).get('/users') — status 200, body.users. Unit — mock req/res на handler; integration — полный middleware chain. БД мокаю через jest.mock на service layer.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Health check — первый тест: confirm Supertest wired. Protected POST: jwt.sign + Authorization Bearer + mock usersService.create. Async error: global app.use((err,req,res,next)=>res.status(500)) — иначе timeout. Внешние API — nock, user flows — Cypress.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну supertest кидает запрос в app in-memory, без порта 3000. await обязателен иначе jest зелёный до ответа. listen только в server.js",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В app.js делаю listen(3000) и тестирую через curl на localhost — Supertest не нужен. Handler тестирую напрямую — auth middleware покрыт.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "request(app).get('/users').expect(200) без await — тест проходит, значит route ок. Async route throw — Express сам вернёт 500 без error middleware.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Integration тесты пишу против production MySQL — так реалистичнее. E2E user login делаю через Supertest, Cypress для unit routes.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "supertest_basics",
+      "exampleType": "good",
+      "exampleText": "const res = await request(app).get('/users'); expect(res.status).toBe(200); expect(res.body).toEqual({ users: [] });",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "supertest_basics",
+      "exampleType": "good",
+      "exampleText": "supertest — fake http client, assert status headers body, json парсится сам",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "supertest_basics",
+      "exampleType": "bad",
+      "exampleText": "Supertest требует npm start на порту 3000 перед каждым тестом.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "app_server_split",
+      "exampleType": "good",
+      "exampleText": "app.js — routes + middleware + module.exports = app. server.js — require app + listen(3000). Тесты импортируют только app.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "app_server_split",
+      "exampleType": "good",
+      "exampleText": "listen в app.js — EADDRINUSE или supertest биндит другой instance, запросы мимо",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "app_server_split",
+      "exampleType": "bad",
+      "exampleText": "Supertest нормально работает когда app.js уже слушает порт 3000.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "unit_vs_integration",
+      "exampleType": "good",
+      "exampleText": "Unit: handler(mockReq, mockRes) — быстро, без auth middleware. Integration: request(app) через app.use(auth) — ловит сломанный next() в middleware.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "unit_vs_integration",
+      "exampleType": "good",
+      "exampleText": "timestamp middleware + GET /users — integration видит requestedAt, unit на handler alone — нет",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "unit_vs_integration",
+      "exampleType": "bad",
+      "exampleText": "Unit test handler с mockUser полностью заменяет integration test protected route.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "supertest_internals",
+      "exampleType": "good",
+      "exampleText": "request(app) → http.createServer → random port 52341 → real middleware → server.close(). request(server) — к уже running server, редко.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "supertest_internals",
+      "exampleType": "good",
+      "exampleText": "in-memory server per test, no network I/O, no leftover process",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "supertest_internals",
+      "exampleType": "bad",
+      "exampleText": "Supertest не выполняет реальные Express callbacks — только mock.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "test_db_strategy",
+      "exampleType": "good",
+      "exampleText": "jest.mock('../services/users.service') + mockResolvedValue — тест <10ms, БД не трогаем. Критичные paths — in-memory SQLite позже.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "test_db_strategy",
+      "exampleType": "good",
+      "exampleText": "shared test DB делает suite order-dependent — один dirty record ломает соседний тест",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "test_db_strategy",
+      "exampleType": "bad",
+      "exampleText": "Для реализма все integration тесты пишу в production PostgreSQL.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "await request(app).get('/users').expect(200) — без await Jest завершит тест до Promise.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "async route throw без app.use((err,req,res,next)=>...) — socket висит, test timeout",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "handler({user:mockUser}) — auth middleware never ran, ложная уверенность",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "await не нужен — supertest синхронный. Error middleware опционален для async routes.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "protected_routes_testing",
+      "exampleType": "good",
+      "exampleText": "const token = jwt.sign({id:1}, secret); await request(app).get('/profile').set('Authorization', `Bearer ${token}`).expect(200);",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "protected_routes_testing",
+      "exampleType": "good",
+      "exampleText": "mockRejectedValue + error middleware → expect 500 и body.error, не hanging test",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "protected_routes_testing",
+      "exampleType": "bad",
+      "exampleText": "Profile handler тестирую require('./handlers/profile') напрямую — auth покрыт.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "external_tools_selection",
+      "exampleType": "good",
+      "exampleText": "nock('https://api.stripe.com').post('/charges').reply(200) — исходящий HTTP без сети. Cypress — E2E login flow, не Supertest.",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "external_tools_selection",
+      "exampleType": "good",
+      "exampleText": "middleware isolation: mini express app + только authMiddleware + supertest",
+      "sortOrder": 26
+    },
+    {
+      "checkpointKey": "external_tools_selection",
+      "exampleType": "bad",
+      "exampleText": "Supertest эмулирует браузер — заменяет Playwright для click flows.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "expressjs-testing",
+    "apiUrl": "https://api.itlead.org/api/questions/expressjs-testing",
+    "pageUrl": "https://itlead.org/interview-questions/expressjs/expressjs-testing",
+    "difficulty": "SENIOR",
+    "titleEn": "How to test an Express.js application?",
+    "categorySlug": "expressjs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

@@ -1,0 +1,491 @@
+{
+  "topic": {
+    "code": "docker_exec_vs_attach",
+    "name": "docker exec vs docker attach",
+    "skillCode": "docker",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "В чём разница между docker exec и docker attach?",
+    "shortAnswer": "docker exec запускает новый процесс внутри уже работающего контейнера — при выходе из shell контейнер продолжает работать. docker attach подключается к stdin/stdout/stderr процесса PID 1; Ctrl+C отправляет SIGINT главному процессу и обычно останавливает контейнер. Для отладки почти всегда нужен exec; detach от attach — Ctrl+P, затем Ctrl+Q.",
+    "idealAnswer": "docker exec и docker attach — оба способы взаимодействия с running-контейнером, но подключаются к разным вещам. exec создаёт новый процесс внутри контейнера (например sh или bash) — он работает параллельно с PID 1; exit или Ctrl+C завершает только этот процесс, nginx или другое приложение на PID 1 не затрагивается, контейнер остаётся Up. attach подключает ваш терминал к stdio процесса PID 1: вы видите его stdout/stderr, ввод попадает в его stdin; Ctrl+C шлёт SIGINT на PID 1 — nginx получает SIGINT, выходит, контейнер останавливается. Это главный production-риск: attach к web-серверу и случайный Ctrl+C = outage. Безопасный detach от attach: Ctrl+P, затем Ctrl+Q (нужен интерактивный TTY, флаг -it); без escape sequence остаётся только Ctrl+C, который убивает контейнер. В 99% случаев для debug и inspect нужен docker exec -it container sh — cat конфигов, ps aux, netstat, exit без риска. attach нужен редко: REPL как PID 1 (node/python без -i в CMD), console-приложения со stdio как API, иногда live output PID 1 — но docker logs -f безопаснее для логов. Типичные ошибки: attach вместо exec на prod; attach без -it (нет TTY → нельзя Ctrl+P Ctrl+Q); attach к stopped container (нужен docker start -ai); --sig-proxy=false — workaround, но если нужен — вероятно хотели exec. Несколько пользователей могут attach к одному контейнеру — shared stdin/out как screen, риск случайного Ctrl+C. docker run -d + attach позже эквивалентно docker run без -d по stdio PID 1.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "exec_vs_attach_core",
+      "title": "Понимает ключевое различие exec и attach",
+      "expected": "Кандидат формулирует: exec — новый процесс в контейнере, PID 1 независим; attach — подключение к stdio PID 1; последствия для жизни контейнера при выходе/Ctrl+C разные.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR темы — без этого остальное бессмысленно",
+        "confusionPairs": [
+          {
+            "checkpointKey": "exec_vs_attach_core",
+            "oftenConfusedWith": [
+              "exec_new_process",
+              "attach_pid1_stdio"
+            ],
+            "anchorTermsExpected": [
+              "exec",
+              "attach",
+              "новый процесс",
+              "PID 1",
+              "stdio",
+              "независим",
+              "подключ"
+            ],
+            "anchorTermsWrongTopic": [
+              "exec и attach одно и то же",
+              "attach создаёт shell",
+              "exec подключается к nginx"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "exec",
+              "attach",
+              "разниц"
+            ],
+            "ask": "чем exec отличается от attach на уровне процессов и PID 1"
+          }
+        ],
+        "mustConcepts": [
+          "exec",
+          "attach",
+          "новый процесс",
+          "отдельн",
+          "PID 1",
+          "stdio",
+          "stdin",
+          "stdout",
+          "stderr",
+          "независим",
+          "подключ",
+          "running",
+          "контейнер",
+          "различ",
+          "разниц"
+        ],
+        "falseClaims": [
+          "exec и attach делают одно и то же",
+          "attach создаёт новый процесс в контейнере",
+          "exec подключается к stdio PID 1",
+          "оба команды одинаково влияют на жизнь контейнера при Ctrl+C"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "exec_new_process",
+      "title": "Знает как работает docker exec",
+      "expected": "Кандидат объясняет: exec запускает новый процесс (sh/bash/команда) рядом с PID 1; exit или Ctrl+C завершает только exec-процесс; контейнер продолжает работать.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый механизм exec из примера nginx + sh",
+        "mustConcepts": [
+          "exec",
+          "новый процесс",
+          "sh",
+          "bash",
+          "отдельн",
+          "PID",
+          "exit",
+          "Ctrl+D",
+          "контейнер running",
+          "не останавлива",
+          "nginx",
+          "ps aux",
+          "параллельн",
+          "-it"
+        ],
+        "falseClaims": [
+          "exit из exec shell останавливает контейнер",
+          "exec заменяет PID 1",
+          "exec подключается к stdout nginx напрямую как attach",
+          "без -it exec невозможен"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "attach_pid1_stdio",
+      "title": "Знает как работает docker attach",
+      "expected": "Кандидат объясняет: attach подключает терминал к stdin/stdout/stderr PID 1; видите вывод главного процесса, ввод идёт ему; новый процесс не создаётся.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "attach = stdio PID 1, не новый shell",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "exec_vs_attach_core",
+            "floorFraction": 0.4
+          }
+        ],
+        "mustConcepts": [
+          "attach",
+          "PID 1",
+          "stdio",
+          "stdin",
+          "stdout",
+          "stderr",
+          "главн",
+          "процесс",
+          "не созда",
+          "подключ",
+          "терминал",
+          "вывод",
+          "ввод",
+          "nginx",
+          "REPL"
+        ],
+        "falseClaims": [
+          "attach создаёт новый bash внутри контейнера",
+          "attach не связан с PID 1",
+          "attach всегда безопасен для production",
+          "attach и exec -it bash подключаются к одному и тому же"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "ctrl_c_sigint_risk",
+      "title": "Понимает риск Ctrl+C при attach",
+      "expected": "Кандидат объясняет: при attach Ctrl+C → SIGINT на PID 1 → главный процесс выходит → контейнер останавливается; при exec Ctrl+C убивает только shell exec.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "главный production-риск из ITLead Common mistakes",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Ctrl+C",
+              "SIGINT",
+              "attach"
+            ],
+            "ask": "почему Ctrl+C при attach останавливает контейнер, а при exec — нет"
+          }
+        ],
+        "mustConcepts": [
+          "Ctrl+C",
+          "SIGINT",
+          "attach",
+          "exec",
+          "PID 1",
+          "останавлива",
+          "контейнер",
+          "outage",
+          "production",
+          "nginx",
+          "502",
+          "убива",
+          "shell",
+          "главн процесс",
+          "выход"
+        ],
+        "falseClaims": [
+          "Ctrl+C при attach безопасен для web-сервера",
+          "Ctrl+C при exec убивает PID 1",
+          "SIGINT при attach не доходит до главного процесса",
+          "attach на prod-web безопасен если не нажимать exit"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "detach_ctrl_p_q",
+      "title": "Знает безопасный detach от attach",
+      "expected": "Кандидат называет последовательность Ctrl+P, Ctrl+Q; понимает что нужен -it (TTY); без escape остаётся только Ctrl+C, который убивает контейнер.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "escape sequence из ITLead Detaching from attach",
+        "mustConcepts": [
+          "Ctrl+P",
+          "Ctrl+Q",
+          "detach",
+          "отсоедин",
+          "escape",
+          "-it",
+          "TTY",
+          "interactive",
+          "не убива",
+          "контейнер running",
+          "re-attach",
+          "без TTY"
+        ],
+        "falseClaims": [
+          "Ctrl+P Ctrl+Q останавливает контейнер",
+          "detach работает без -t",
+          "Ctrl+D безопасно detach-ит attach-сессию",
+          "escape sequence нужен для exec, не для attach"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "practical_usage",
+      "title": "Понимает когда exec, когда attach",
+      "expected": "Кандидат: exec для debug/inspect в 99% случаев; attach для REPL/console как PID 1; для логов — docker logs -f вместо attach на prod.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Real-world usage и When attach is useful из ITLead",
+        "mustConcepts": [
+          "debug",
+          "inspect",
+          "99%",
+          "exec",
+          "attach",
+          "REPL",
+          "console",
+          "PID 1",
+          "docker logs",
+          "logs -f",
+          "production",
+          "безопасн",
+          "live tail",
+          "admin",
+          "node",
+          "python"
+        ],
+        "falseClaims": [
+          "attach — стандартный способ debug production",
+          "docker logs -f опаснее attach",
+          "exec нельзя использовать для inspect конфигов",
+          "attach нужен для любого просмотра логов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: attach вместо exec на prod; attach без -it; attach к stopped container; --sig-proxy=false как костыль; несколько attach = shared stdin.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes блок ITLead",
+        "mustConcepts": [
+          "attach вместо exec",
+          "prod",
+          "production",
+          "без -it",
+          "no-stdin",
+          "stopped",
+          "not running",
+          "start -ai",
+          "sig-proxy",
+          "несколько",
+          "shared stdin",
+          "screen",
+          "ошибк",
+          "outage"
+        ],
+        "falseClaims": [
+          "attach к stopped container работает как exec",
+          "без -it можно безопасно detach Ctrl+P Ctrl+Q",
+          "attach и exec взаимозаменяемы для debug",
+          "--sig-proxy=false делает attach полностью безопасным без ограничений"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "exec запускает новый sh внутри контейнера — exit не трогает nginx на PID 1. attach цепляется к stdio PID 1: Ctrl+C шлёт SIGINT nginx и контейнер падает. Для prod-debug всегда exec -it; логи смотрю через docker logs -f.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну exec — отдельный shell, можно ps и cat конфиг, вышел — контейнер жив. attach — ты сидишь на stdin/out главного процесса, случайный ctrl+c убьёт сервис. от attach отцепиться ctrl+p ctrl+q, нужен -it.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "attach имеет смысл если REPL сам PID 1 — python/node в фоне, тогда attach для ввода. attach к nginx ради логов — плохая идея, logs -f тот же output без риска sigint.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "exec и attach одно и то же — оба просто заходят в контейнер. Ctrl+C всегда безопасен.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "На prod для debug делаю docker attach web — так вижу live nginx. Exit из attach не влияет на контейнер.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "attach создаёт новый bash, exec подключается к PID 1. docker logs опаснее attach.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "exec_vs_attach_core",
+      "exampleType": "good",
+      "exampleText": "exec = новый процесс внутри; attach = stdio существующего PID 1. Разные последствия при выходе.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "exec_vs_attach_core",
+      "exampleType": "good",
+      "exampleText": "exec не трогает главный процесс, attach — это буквально терминал PID 1",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "exec_vs_attach_core",
+      "exampleType": "bad",
+      "exampleText": "Оба команды создают интерактивный shell и одинаково завершают контейнер при Ctrl+C.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "exec_new_process",
+      "exampleType": "good",
+      "exampleText": "docker exec -it web sh — процесс 45 рядом с nginx PID 1; exit убивает только sh.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "exec_new_process",
+      "exampleType": "good",
+      "exampleText": "exec -it для one-off: cat nginx.conf, netstat, ps — контейнер Up после exit",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "exec_new_process",
+      "exampleType": "bad",
+      "exampleText": "exit из docker exec -it sh останавливает весь контейнер как docker stop.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "attach_pid1_stdio",
+      "exampleType": "good",
+      "exampleText": "attach web — вижу stdout nginx, ввод попадает в nginx stdin; новый shell не создаётся.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "attach_pid1_stdio",
+      "exampleType": "good",
+      "exampleText": "attach цепляет терминал к PID 1, не spawn-ит bash",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "attach_pid1_stdio",
+      "exampleType": "bad",
+      "exampleText": "docker attach запускает отдельный sh процесс, как exec.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "ctrl_c_sigint_risk",
+      "exampleType": "good",
+      "exampleText": "attach + Ctrl+C → SIGINT на nginx PID 1 → контейнер stopped → 502. exec + Ctrl+C — только shell.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "ctrl_c_sigint_risk",
+      "exampleType": "good",
+      "exampleText": "на attach ctrl+c бьёт в главный процесс, на exec — в мой sh",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "ctrl_c_sigint_risk",
+      "exampleType": "bad",
+      "exampleText": "Ctrl+C при attach безопасен — nginx игнорирует SIGINT и контейнер жив.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "detach_ctrl_p_q",
+      "exampleType": "good",
+      "exampleText": "От attach без kill: Ctrl+P, Ctrl+Q при -it; контейнер с REPL остаётся Up, можно attach снова.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "detach_ctrl_p_q",
+      "exampleType": "good",
+      "exampleText": "без tty escape не работает — только ctrl+c который убивает pid1",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "detach_ctrl_p_q",
+      "exampleType": "bad",
+      "exampleText": "Ctrl+D detach-ит attach без остановки контейнера, как в обычном shell.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "practical_usage",
+      "exampleType": "good",
+      "exampleText": "99% debug — exec -it sh. attach — REPL как PID 1 или console admin tool. Prod logs — docker logs -f, не attach.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "practical_usage",
+      "exampleType": "good",
+      "exampleText": "python repl pid 1 — attach; nginx prod — exec или logs -f",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "practical_usage",
+      "exampleType": "bad",
+      "exampleText": "Для inspect prod web всегда attach — exec не показывает конфиг nginx.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Главная ошибка — attach prod-web вместо exec; без -it нельзя Ctrl+P Ctrl+Q; stopped container — docker start -ai.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "attach --no-stdin — только ctrl+c выход, sig-proxy=false костыль если всё же attach",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "docker attach к exited контейнеру работает; несколько attach изолированы и не делят stdin.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-exec-vs-attach",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-exec-vs-attach",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-exec-vs-attach",
+    "difficulty": "JUNIOR",
+    "titleEn": "docker exec vs docker attach: what is the difference?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

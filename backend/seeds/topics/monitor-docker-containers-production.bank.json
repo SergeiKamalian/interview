@@ -1,0 +1,429 @@
+{
+  "topic": {
+    "code": "monitor_docker_containers_production",
+    "name": "Мониторинг Docker в production",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как мониторить Docker контейнеры в production?",
+    "shortAnswer": "Стек: cAdvisor скрейпит container metrics → Prometheus хранит → Grafana визуализирует → Alertmanager пейджит. Плюс Loki/ELK для логов. Алертить на CPU, memory, restart count, healthcheck failures.",
+    "idealAnswer": "Три слоя: host, daemon, containers. Стандарт: cAdvisor (container_cpu_usage_seconds_total, container_memory_working_set_bytes) → Prometheus (scrape 15s, retention 30d) → Grafana (dashboard ID 893) → Alertmanager. Алерты: ContainerDown, HighMemory >90%, OOM, Restarting >2/15m, Unhealthy. Логи отдельно: Loki+Promtail или ELK; json-file max-size 10m max-file 3. Healthcheck → container_health_status. Daemon: metrics-addr :9323. docker stats — live snapshot, не TSDB, не для prod alerts. Ошибки: dashboard без paging; логи без rotation заполняют disk; только host metrics пропускают noisy neighbor; flapping container выглядит up.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "monitoring_layers",
+      "title": "Понимает три слоя мониторинга",
+      "expected": "Кандидат: host (Linux metrics), Docker daemon, containers; плюс app-level /metrics.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR три шара",
+        "mustConcepts": [
+          "host",
+          "daemon",
+          "container",
+          "CPU",
+          "memory",
+          "restart",
+          "healthcheck",
+          "uptime",
+          "три слоя",
+          "Linux",
+          "cgroup",
+          "app-level",
+          "/metrics",
+          "network I/O",
+          "block I/O",
+          "OOM"
+        ],
+        "falseClaims": [
+          "достаточно docker stats",
+          "мониторинг только host без container",
+          "логи заменяют метрики",
+          "app metrics не нужны"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "standard_stack",
+      "title": "Знает стандартный стек cAdvisor+Prometheus+Grafana",
+      "expected": "Кандидат описывает: cAdvisor → Prometheus (TSDB) → Grafana (dashboards) → Alertmanager (paging).",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Standard stack ITLead",
+        "mustConcepts": [
+          "cAdvisor",
+          "Prometheus",
+          "Grafana",
+          "Alertmanager",
+          "TSDB",
+          "scrape",
+          "dashboard",
+          "metrics",
+          "8080",
+          "9090",
+          "paging",
+          "Slack",
+          "PagerDuty",
+          "Compose",
+          "stack"
+        ],
+        "falseClaims": [
+          "Grafana хранит метрики",
+          "Prometheus только визуализирует",
+          "cAdvisor заменяет Prometheus",
+          "Alertmanager не нужен если есть dashboard"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "essential_alerts",
+      "title": "Знает ключевые алерты",
+      "expected": "Кандидат называет: unexpected restarts, healthcheck failures, OOM kills, CPU/memory saturation, container down.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Essential alerts",
+        "mustConcepts": [
+          "restart",
+          "OOM",
+          "healthcheck",
+          "unhealthy",
+          "memory",
+          "90%",
+          "container_last_seen",
+          "oom_events",
+          "CPU",
+          "saturation",
+          "alert",
+          "flapping",
+          "ContainerDown",
+          "ContainerRestarting",
+          "5 правил"
+        ],
+        "falseClaims": [
+          "dashboard без алертов достаточен",
+          "restart count не важен",
+          "OOM не нужно алертить",
+          "healthcheck опционален"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "logs_pipeline",
+      "title": "Понимает отдельный pipeline логов",
+      "expected": "Кандидat: Loki+Promtail, ELK, fluentd; json-file max-size/max-file; метрики для алертов, логи для причин.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Logs separate pipeline",
+        "mustConcepts": [
+          "Loki",
+          "Promtail",
+          "ELK",
+          "fluentd",
+          "Vector",
+          "json-file",
+          "max-size",
+          "max-file",
+          "log driver",
+          "retention",
+          "rotation",
+          "disk",
+          "метрики",
+          "логи",
+          "причин",
+          "tag",
+          "labels"
+        ],
+        "falseClaims": [
+          "логи и метрики одно и то же",
+          "json-file не растёт",
+          "max-size не нужен",
+          "логи заменяют алерты"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "healthcheck_monitoring",
+      "title": "Связывает healthcheck с мониторингом",
+      "expected": "Кандидат: container_health_status в Prometheus/cAdvisor; без healthcheck — blind spot; test CMD curl.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Health-driven monitoring",
+        "mustConcepts": [
+          "healthcheck",
+          "container_health_status",
+          "healthy",
+          "unhealthy",
+          "curl",
+          "interval",
+          "retries",
+          "liveness",
+          "blind spot",
+          "Prometheus",
+          "alert"
+        ],
+        "falseClaims": [
+          "healthcheck не экспортируется в метрики",
+          "healthcheck заменяет мониторинг",
+          "docker stats показывает health"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "daemon_metrics",
+      "title": "Знает метрики Docker daemon",
+      "expected": "Кандидат: metrics-addr 0.0.0.0:9323 в daemon.json, experimental; scrape host:9323/metrics.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Daemon metrics endpoint",
+        "mustConcepts": [
+          "metrics-addr",
+          "9323",
+          "daemon.json",
+          "experimental",
+          "engine_daemon",
+          "scrape",
+          "push pull",
+          "uptime",
+          "daemon health"
+        ],
+        "falseClaims": [
+          "daemon не экспортирует метрики",
+          "9323 открыт по умолчанию",
+          "metrics-addr не требует restart"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат: dashboard без алертов; логи без rotation; только host metrics; игнор restart count; docker stats для prod.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes",
+        "mustConcepts": [
+          "dashboard",
+          "alert",
+          "rotation",
+          "max-size",
+          "host only",
+          "noisy neighbor",
+          "restart count",
+          "flapping",
+          "docker stats",
+          "TSDB",
+          "6 месяцев",
+          "GB"
+        ],
+        "falseClaims": [
+          "docker stats достаточен для production",
+          "логи без max-size ok",
+          "host 50% CPU значит всё ok",
+          "restart flapping не виден"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "cAdvisor → Prometheus → Grafana → Alertmanager. Логи отдельно: Loki+Promtail. Алерты на restart, OOM, health, memory.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "docker stats — snapshot, не для prod. cAdvisor даёт /metrics для истории и алертов.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "json-file без max-size заполняет disk. Healthcheck без мониторинга — blind spot.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker stats достаточен для production мониторинга",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Grafana хранит все метрики навсегда",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "логи заменяют алерты на restart",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "cAdvisor scrape → Prometheus TSDB → Grafana",
+      "sortOrder": 10,
+      "checkpointKey": "standard_stack"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Alertmanager для paging",
+      "sortOrder": 11,
+      "checkpointKey": "standard_stack"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Prometheus только UI",
+      "sortOrder": 42,
+      "checkpointKey": "standard_stack"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "OOM, restart >2, unhealthy — алертить",
+      "sortOrder": 14,
+      "checkpointKey": "essential_alerts"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "flapping ловится по start_time",
+      "sortOrder": 15,
+      "checkpointKey": "essential_alerts"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "restart не важен",
+      "sortOrder": 46,
+      "checkpointKey": "essential_alerts"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "max-size 10m max-file 3",
+      "sortOrder": 18,
+      "checkpointKey": "logs_pipeline"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Loki labels match metrics",
+      "sortOrder": 19,
+      "checkpointKey": "logs_pipeline"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "json-file не растёт",
+      "sortOrder": 50,
+      "checkpointKey": "logs_pipeline"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Понимает три слоя мониторинга»: Кандидат: host (Linux metrics), Docker daemon, containers; плюс app-level /metrics.…",
+      "sortOrder": 51,
+      "checkpointKey": "monitoring_layers"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Понимает три слоя мониторинга»: Кандидат: host (Linux metrics), Docker daemon, containers; плюс app-level /metrics.…",
+      "sortOrder": 52,
+      "checkpointKey": "monitoring_layers"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Неверно: достаточно docker stats",
+      "sortOrder": 40,
+      "checkpointKey": "monitoring_layers"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Связывает healthcheck с мониторингом»: Кандидат: container_health_status в Prometheus/cAdvisor; без healthcheck — blind spot; test CMD curl.…",
+      "sortOrder": 53,
+      "checkpointKey": "healthcheck_monitoring"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Связывает healthcheck с мониторингом»: Кандидат: container_health_status в Prometheus/cAdvisor; без healthcheck — blind spot; test CMD curl.…",
+      "sortOrder": 54,
+      "checkpointKey": "healthcheck_monitoring"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Неверно: healthcheck не экспортируется в метрики",
+      "sortOrder": 41,
+      "checkpointKey": "healthcheck_monitoring"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает метрики Docker daemon»: Кандидат: metrics-addr 0.0.0.0:9323 в daemon.json, experimental; scrape host:9323/metrics.…",
+      "sortOrder": 55,
+      "checkpointKey": "daemon_metrics"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает метрики Docker daemon»: Кандидат: metrics-addr 0.0.0.0:9323 в daemon.json, experimental; scrape host:9323/metrics.…",
+      "sortOrder": 56,
+      "checkpointKey": "daemon_metrics"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Неверно: daemon не экспортирует метрики",
+      "sortOrder": 42,
+      "checkpointKey": "daemon_metrics"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает типичные ошибки»: Кандидат: dashboard без алертов; логи без rotation; только host metrics; игнор restart count; docker stats для prod.…",
+      "sortOrder": 57,
+      "checkpointKey": "common_mistakes"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает типичные ошибки»: Кандидат: dashboard без алертов; логи без rotation; только host metrics; игнор restart count; docker stats для prod.…",
+      "sortOrder": 58,
+      "checkpointKey": "common_mistakes"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Неверно: docker stats достаточен для production",
+      "sortOrder": 43,
+      "checkpointKey": "common_mistakes"
+    }
+  ],
+  "itlead": {
+    "slug": "monitor-docker-containers-production",
+    "categorySlug": "docker",
+    "apiUrl": "https://api.itlead.org/api/questions/monitor-docker-containers-production",
+    "pageUrl": "https://itlead.org/interview-questions/docker/monitor-docker-containers-production",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to monitor Docker containers in production?",
+    "syncedAt": "2026-06-18T14:47:42.000Z"
+  }
+}

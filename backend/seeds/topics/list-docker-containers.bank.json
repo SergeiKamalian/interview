@@ -1,0 +1,474 @@
+{
+  "topic": {
+    "code": "list_docker_containers",
+    "name": "Список Docker-контейнеров",
+    "skillCode": "docker",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Как показать список запущенных и всех Docker-контейнеров?",
+    "shortAnswer": "`docker ps` показывает только запущенные контейнеры. `docker ps -a` — все контейнеры, известные daemon (running, paused, exited, dead, created). `docker ps -aq` выводит только ID — удобно для скриптов и пайпов в `docker rm` или `docker logs`. Для фильтрации — `--filter`, для кастомного вывода — `--format`.",
+    "idealAnswer": "Список контейнеров — одна из первых и самых частых команд Docker. `docker ps` по умолчанию показывает только running-контейнеры: CONTAINER ID, IMAGE, COMMAND, STATUS, PORTS, NAMES. `docker ps -a` выводит все состояния, которые знает daemon: running, paused, exited, dead, created — остановленный one-off job будет виден только с `-a`. `docker ps -q` (quiet) печатает только ID, по одному на строку — идеально для пайпов: `docker rm $(docker ps -aq)`, `docker logs $(docker ps -alq)`. Флаги `-l` (latest), `-n N` (последние N) сочетаются с `-a` и `-q`. Фильтрация через `--filter`: `status=running|exited|paused`, `name=web` (substring), `ancestor=nginx:1.27-alpine`, `label=env=prod`; несколько фильтров объединяются через AND. `--format` задаёт шаблон Go-template: `table {{.Names}}\\t{{.Status}}`, `{{.Names}}` построчно, `--format json` — JSON на контейнер для `jq`. `--no-trunc` показывает полные COMMAND и IMAGE без обрезки. `docker container ls` — длинная форма той же команды, поведение идентично `docker ps`. Типичные ошибки: контейнер «пропал» из `docker ps` — он exited, нужен `-a`; `docker ps | grep myapp` хрупко — лучше `--filter name=myapp`; `docker rm $(docker ps -a)` падает на заголовке CONTAINER ID — нужен `-q`. `docker stats` измеряет CPU/память live, это не listing. Для Compose: `docker compose ps` из директории проекта или `docker ps --filter label=com.docker.compose.project=<name>`. Очистка: `docker container prune --filter 'until=1h'` вместо ручного filter+xargs. В CI после build смотрят `docker ps -a` на exit code в STATUS; в deploy-скриптах проверяют `docker ps --filter name=db --filter status=running -q | grep -q .`.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "ps_running_vs_all",
+      "title": "Отличает docker ps от docker ps -a",
+      "expected": "Кандидат объясняет: docker ps — только running; docker ps -a — все контейнеры daemon (running, paused, exited, dead, created); остановленный контейнер не виден без -a.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — ядро junior-темы",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "docker ps",
+              "-a",
+              "exited",
+              "running"
+            ],
+            "ask": "почему контейнер виден в docker ps -a, но не в docker ps"
+          }
+        ],
+        "mustConcepts": [
+          "docker ps",
+          "docker ps -a",
+          "-a",
+          "running",
+          "exited",
+          "paused",
+          "dead",
+          "created",
+          "остановлен",
+          "запущен",
+          "STATUS",
+          "daemon",
+          "по умолчанию",
+          "только running",
+          "все состоян",
+          "CONTAINER ID",
+          "NAMES"
+        ],
+        "falseClaims": [
+          "docker ps показывает exited контейнеры по умолчанию",
+          "docker ps -a показывает только running",
+          "остановленный контейнер исчезает из daemon без docker rm",
+          "docker ps и docker ps -a выводят одинаковый список"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "quiet_mode_scripting",
+      "title": "Знает quiet mode и пайпы",
+      "expected": "Кандидат объясняет: -q выводит только ID; -l latest, -n N последние; -alq для docker logs последнего контейнера; пайп в docker rm требует -q.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "TL;DR -q и quick example из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "-q",
+              "quiet",
+              "ID"
+            ],
+            "ask": "зачем docker ps -aq перед docker rm"
+          }
+        ],
+        "mustConcepts": [
+          "-q",
+          "quiet",
+          "только ID",
+          "container ID",
+          "пайп",
+          "pipe",
+          "docker rm",
+          "docker logs",
+          "-l",
+          "latest",
+          "-n",
+          "последн",
+          "-alq",
+          "xargs",
+          "скрипт",
+          "один на строку"
+        ],
+        "falseClaims": [
+          "docker ps без -q безопасно передавать в docker rm",
+          "-q добавляет заголовок CONTAINER ID",
+          "docker ps -l показывает все контейнеры",
+          "quiet mode выводит JSON по умолчанию"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "filter_flags",
+      "title": "Использует --filter",
+      "expected": "Кандидат называет фильтры: status=running|exited|paused, name=, ancestor=, label=; несколько --filter объединяются через AND; предпочитает filter вместо grep.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Useful flag combinations — ключевой практический навык",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "ps_running_vs_all",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "--filter",
+              "status=",
+              "name="
+            ],
+            "ask": "как показать только exited контейнеры с именем test"
+          },
+          {
+            "match": [
+              "label=",
+              "ancestor=",
+              "compose"
+            ],
+            "ask": "как отфильтровать контейнеры Compose-проекта или образа nginx"
+          }
+        ],
+        "mustConcepts": [
+          "--filter",
+          "status=running",
+          "status=exited",
+          "status=paused",
+          "name=",
+          "ancestor=",
+          "label=",
+          "env=prod",
+          "AND",
+          "несколько фильтр",
+          "substring",
+          "grep",
+          "структур",
+          "com.docker.compose.project",
+          "compose ps"
+        ],
+        "falseClaims": [
+          "grep надёжнее --filter name=",
+          "фильтры объединяются через OR по умолчанию",
+          "--filter status=running не работает без -a для exited",
+          "ancestor= фильтрует по имени контейнера а не образа"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "format_output",
+      "title": "Настраивает вывод --format",
+      "expected": "Кандидат объясняет: --format с Go-template (table, {{.Names}}, {{.Status}}); --format json для jq; --no-trunc для полных COMMAND/IMAGE.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "--format заменяет awk/grep pipelines из ITLead",
+        "mustConcepts": [
+          "--format",
+          "table",
+          "Go template",
+          "{{.Names}}",
+          "{{.Status}}",
+          "{{.Ports}}",
+          "{{.ID}}",
+          "json",
+          "jq",
+          "кастомн",
+          "колонк",
+          "--no-trunc",
+          "обрез",
+          "truncat",
+          "COMMAND",
+          "IMAGE",
+          "scriptable",
+          "скриптов"
+        ],
+        "falseClaims": [
+          "--format работает только с table и не поддерживает json",
+          "docker ps всегда показывает полный COMMAND без флагов",
+          "--format json выводит один JSON-массив на все контейнеры",
+          "для кастомных колонок обязательно использовать awk"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки listing",
+      "expected": "Кандидат называет: контейнер «пропал» без -a; grep вместо --filter; docker rm $(docker ps -a) без -q; canonical cleanup docker rm -f $(docker ps -aq).",
+      "score": 2.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "advanced",
+        "weightRationale": "Common mistakes ITLead — критичные junior-ловушки",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "ps_running_vs_all",
+            "floorFraction": 0.4
+          },
+          {
+            "checkpointKey": "quiet_mode_scripting",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "пропал",
+              "missing",
+              "empty",
+              "exited"
+            ],
+            "ask": "контейнер не виден в docker ps — что проверить первым делом"
+          },
+          {
+            "match": [
+              "grep",
+              "rm",
+              "CONTAINER ID"
+            ],
+            "ask": "почему docker rm $(docker ps -a) падает с No such container: CONTAINER"
+          }
+        ],
+        "mustConcepts": [
+          "пропал",
+          "не виден",
+          "docker ps -a",
+          "exited",
+          "grep",
+          "хрупк",
+          "substring overlap",
+          "--filter name=",
+          "docker rm",
+          "без -q",
+          "CONTAINER ID",
+          "заголовок",
+          "header",
+          "docker ps -aq",
+          "nuke",
+          "docker rm -f",
+          "No such container"
+        ],
+        "falseClaims": [
+          "если контейнера нет в docker ps — он удалён из daemon",
+          "grep myapp надёжнее --filter name=myapp",
+          "docker rm $(docker ps -a) корректно удаляет все контейнеры",
+          "заголовок таблицы docker ps — валидный container ID"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "related_commands",
+      "title": "Отличает ps от stats и знает compose/prune",
+      "expected": "Кандидат упоминает: docker container ls = docker ps; docker stats измеряет ресурсы, не listing; docker compose ps или filter по compose label; docker container prune --filter until=.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Follow-up questions и real-world usage из ITLead",
+        "mustConcepts": [
+          "docker container ls",
+          "alias",
+          "legacy",
+          "docker stats",
+          "--no-stream",
+          "CPU",
+          "памят",
+          "memory",
+          "listing",
+          "измер",
+          "docker compose ps",
+          "com.docker.compose.project",
+          "label",
+          "docker container prune",
+          "until=",
+          "cleanup",
+          "CI",
+          "monitoring",
+          "health dashboard"
+        ],
+        "falseClaims": [
+          "docker stats заменяет docker ps для списка контейнеров",
+          "docker container ls и docker ps — разные команды с разным выводом",
+          "docker compose ps работает только внутри контейнера",
+          "docker container prune удаляет running контейнеры"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "docker ps — только running. docker ps -a — все, включая Exited. Для скриптов docker ps -aq — только ID, потом docker rm -f $(docker ps -aq). Фильтр exited: docker ps -a --filter status=exited. Кастомный вывод: docker ps --format 'table {{.Names}}\\t{{.Status}}'.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Контейнер пропал из ps — смотрю ps -a, обычно Exited. Логи последнего: docker logs $(docker ps -alq). В CI после job — ps -a и exit code в STATUS. Compose-проект: docker compose ps или filter по label com.docker.compose.project.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну ps без -a только живые, -a все состояния. -q для пайпа в rm, grep не использую — filter name=web. stats это cpu/ram, не список.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker ps показывает все контейнеры включая stopped. Если контейнера нет в выводе — значит docker его уже удалил.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для удаления всех контейнеров: docker rm $(docker ps -a). Для поиска сервиса: docker ps | grep web — это надёжнее filter.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker stats — это команда для listing контейнеров. docker container ls — другая команда, флаги не те же что у ps.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "ps_running_vs_all",
+      "exampleType": "good",
+      "exampleText": "docker ps — running only; docker ps -a добавляет exited, paused, dead, created.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "ps_running_vs_all",
+      "exampleType": "good",
+      "exampleText": "one-off alpine в Exited виден только с -a, в обычном ps его нет",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "ps_running_vs_all",
+      "exampleType": "bad",
+      "exampleText": "docker ps и docker ps -a всегда одинаковые — разница только в сортировке.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "quiet_mode_scripting",
+      "exampleType": "good",
+      "exampleText": "docker ps -aq — только ID, без заголовка; безопасно для docker rm $(docker ps -aq).",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "quiet_mode_scripting",
+      "exampleType": "good",
+      "exampleText": "docker logs $(docker ps -alq) — последний контейнер любого статуса",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "quiet_mode_scripting",
+      "exampleType": "bad",
+      "exampleText": "docker ps -q выводит таблицу с CONTAINER ID в первой строке — её можно передать в rm.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "filter_flags",
+      "exampleType": "good",
+      "exampleText": "docker ps -a --filter status=exited --filter name=test — AND, только stopped test-контейнеры.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "filter_flags",
+      "exampleType": "good",
+      "exampleText": "вместо grep myapp — docker ps --filter name=myapp, точнее и без ложных substring",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "filter_flags",
+      "exampleType": "bad",
+      "exampleText": "несколько --filter работают как OR — достаточно одного status=exited или name=web.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "format_output",
+      "exampleType": "good",
+      "exampleText": "docker ps --format json | jq '.Names' — structured output для мониторинга.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "format_output",
+      "exampleType": "good",
+      "exampleText": "длинный COMMAND обрезан — --no-trunc или --format '{{.Command}}'",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "format_output",
+      "exampleType": "bad",
+      "exampleText": "кастомные колонки в docker ps возможны только через awk после grep.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "контейнер missing в ps — первым делом ps -a, скорее Exited после CI job.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "rm $(docker ps -a) ломается на header — canonical: docker rm -f $(docker ps -aq)",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "если ps пустой — контейнер точно удалён, -a не поможет найти exited.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "related_commands",
+      "exampleType": "good",
+      "exampleText": "docker container ls = docker ps; stats — live CPU/RAM, ps — список и STATUS.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "related_commands",
+      "exampleType": "good",
+      "exampleText": "cleanup stopped: docker container prune --filter 'until=1h' вместо ручного awk по CreatedAt",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "related_commands",
+      "exampleType": "bad",
+      "exampleText": "docker stats --no-stream заменяет docker ps -a для просмотра exited контейнеров.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "list-docker-containers",
+    "apiUrl": "https://api.itlead.org/api/questions/list-docker-containers",
+    "pageUrl": "https://itlead.org/interview-questions/docker/list-docker-containers",
+    "difficulty": "JUNIOR",
+    "titleEn": "How to list running and all Docker containers?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

@@ -1,0 +1,374 @@
+{
+  "topic": {
+    "code": "what_is_docker_buildkit",
+    "name": "Docker BuildKit",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое BuildKit и какие преимущества он даёт?",
+    "shortAnswer": "BuildKit — современный движок сборки Docker (default с Docker 23): параллельные multi-stage stages, cache mounts, secret mounts без утечки в history, умнее invalidation COPY по content hash, директива # syntax= для новых инструкций. CLI: docker buildx.",
+    "idealAnswer": "BuildKit vs legacy: граф параллельных операций вместо линейной сборки; cache mounts (--mount=type=cache) держат кэш pip/npm/apt вне слоёв образа; secret mounts (--mount=type=secret) — токены не попадают в docker history, в отличие от ARG NPM_TOKEN; ключ кэша COPY по content hash, не mtime; директива # syntax=docker/dockerfile:1.7 фиксирует frontend. Параллельные multi-stage: go и rust builders одновременно. Включение: default с Docker 23+ или DOCKER_BUILDKIT=1; сборка через docker buildx build. Remote builders, attestations. В legacy ARG-секреты видны в docker history --no-trunc.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "buildkit_definition",
+      "title": "Определяет BuildKit",
+      "expected": "Кандидат: современный build engine по умолчанию с Docker 23; граф параллельных операций; buildx CLI.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR buildkit",
+        "mustConcepts": [
+          "buildkit",
+          "docker 23",
+          "build engine",
+          "default",
+          "legacy builder",
+          "dag",
+          "graph",
+          "parallel",
+          "buildx",
+          "docker buildx"
+        ],
+        "falseClaims": [
+          "buildkit optional never default",
+          "legacy builder faster 2026",
+          "buildkit only remote builds",
+          "buildx unrelated buildkit",
+          "buildkit replaces containerd"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "parallel_stages",
+      "title": "Параллельные stages",
+      "expected": "Кандидат: независимые multi-stage stages собираются параллельно; wall time = max, не sum.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "killer feature 1",
+        "mustConcepts": [
+          "parallel",
+          "multi-stage",
+          "concurrent",
+          "independent stages",
+          "go-builder",
+          "rust-builder",
+          "wall time",
+          "legacy sequential"
+        ],
+        "falseClaims": [
+          "buildkit always sequential",
+          "multi-stage never parallel",
+          "parallel only single stage",
+          "stages must share cache always serial",
+          "parallel requires swarm"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "cache_mounts",
+      "title": "Cache mounts",
+      "expected": "Кандидат: RUN --mount=type=cache — кэш pip/npm/apt вне слоёв; образ остаётся маленьким, сборка быстрой.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "killer feature 2",
+        "mustConcepts": [
+          "cache mount",
+          "type=cache",
+          "pip cache",
+          "npm cache",
+          "apt cache",
+          "go mod",
+          "cargo registry",
+          "outside image",
+          "small image",
+          "fast rebuild"
+        ],
+        "falseClaims": [
+          "cache mount bakes into image always",
+          "cache mount same as regular layer",
+          "pip cache must COPY into image",
+          "cache mounts legacy builder support",
+          "cache mount shares between unrelated builds never"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "secret_mounts",
+      "title": "Secret mounts",
+      "expected": "Кандидат: --mount=type=secret не попадает в layers; в отличие от ARG с токеном в docker history.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "killer feature 3 security",
+        "mustConcepts": [
+          "secret mount",
+          "type=secret",
+          "npmrc",
+          "buildx build --secret",
+          "not in history",
+          "docker history",
+          "arg leak",
+          "token",
+          "no trace"
+        ],
+        "falseClaims": [
+          "secret mount visible docker history",
+          "ARG safe for npm token",
+          "secret mount same as env build",
+          "buildkit cannot hide secrets",
+          "secrets in layer tarball inspectable always"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "probeConceptGroups": [
+          {
+            "match": [
+              "secret",
+              "ARG"
+            ],
+            "ask": "почему ARG NPM_TOKEN опаснее secret mount"
+          }
+        ],
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "legacy_vs_buildkit",
+      "title": "Legacy vs BuildKit",
+      "expected": "Кандидат: legacy линейный, COPY по mtime; BuildKit — граф, content hash, cache/secret mounts.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "architecture comparison",
+        "mustConcepts": [
+          "legacy",
+          "linear",
+          "mtime",
+          "content hash",
+          "cache key",
+          "touch file",
+          "invalidation",
+          "content-addressed",
+          "sequential"
+        ],
+        "falseClaims": [
+          "legacy uses content hash always",
+          "touch file invalidates buildkit copy",
+          "legacy has cache mounts",
+          "no difference docker 23",
+          "legacy parallel multi-stage default"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "enable_buildx",
+      "title": "Включение и buildx",
+      "expected": "Кандидат: Docker 23+ default; иначе DOCKER_BUILDKIT=1; docker buildx build; директива # syntax=.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "enabling section",
+        "mustConcepts": [
+          "DOCKER_BUILDKIT=1",
+          "docker buildx",
+          "syntax=docker/dockerfile",
+          "frontend",
+          "1.7",
+          "remote builder",
+          "attestation",
+          "buildkit enabled"
+        ],
+        "falseClaims": [
+          "buildkit cannot enable manually",
+          "buildx deprecated",
+          "syntax directive ignored",
+          "docker build never uses buildkit",
+          "BUILDKIT only windows"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "checkpointKey": null,
+      "exampleType": "good",
+      "exampleText": "BuildKit default: parallel go+rust stages; cache mount pip outside layers; secret mount npmrc без history.",
+      "sortOrder": 0
+    },
+    {
+      "checkpointKey": null,
+      "exampleType": "good",
+      "exampleText": "Legacy COPY invalidates on mtime touch; BuildKit content hash. ARG token leaks — secret mount нет.",
+      "sortOrder": 1
+    },
+    {
+      "checkpointKey": null,
+      "exampleType": "good",
+      "exampleText": "docker buildx build --secret id=npmrc. # syntax=docker/dockerfile:1.7 для cache/secret mounts.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": null,
+      "exampleType": "bad",
+      "exampleText": "BuildKit sequential only. ARG secrets never appear history.",
+      "sortOrder": 0
+    },
+    {
+      "checkpointKey": null,
+      "exampleType": "bad",
+      "exampleText": "Cache mount увеличивает final image size всегда.",
+      "sortOrder": 1
+    },
+    {
+      "checkpointKey": null,
+      "exampleType": "bad",
+      "exampleText": "BuildKit не default в Docker 23.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "buildkit_definition",
+      "exampleType": "good",
+      "exampleText": "Modern engine Docker 23+ graph parallel buildx.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "buildkit_definition",
+      "exampleType": "good",
+      "exampleText": "replaced legacy 2014 builder",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "buildkit_definition",
+      "exampleType": "bad",
+      "exampleText": "buildkit is runtime not builder",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "parallel_stages",
+      "exampleType": "good",
+      "exampleText": "Independent stages build same time max duration.",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "parallel_stages",
+      "exampleType": "good",
+      "exampleText": "go rust parallel multi-stage",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "parallel_stages",
+      "exampleType": "bad",
+      "exampleText": "always serial wall time sum",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "cache_mounts",
+      "exampleType": "good",
+      "exampleText": "type=cache pip npm outside image fast rebuild small.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "cache_mounts",
+      "exampleType": "good",
+      "exampleText": "target /root/.cache/pip",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "cache_mounts",
+      "exampleType": "bad",
+      "exampleText": "cache baked into final layer always",
+      "sortOrder": 38
+    },
+    {
+      "checkpointKey": "secret_mounts",
+      "exampleType": "good",
+      "exampleText": "type=secret npmrc never in layers vs ARG history leak.",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "secret_mounts",
+      "exampleType": "good",
+      "exampleText": "buildx --secret id=npmrc",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "secret_mounts",
+      "exampleType": "bad",
+      "exampleText": "ARG safe production pattern",
+      "sortOrder": 41
+    },
+    {
+      "checkpointKey": "legacy_vs_buildkit",
+      "exampleType": "good",
+      "exampleText": "Legacy mtime copy invalidation; buildkit content hash.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "legacy_vs_buildkit",
+      "exampleType": "good",
+      "exampleText": "touch without edit legacy miss",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "legacy_vs_buildkit",
+      "exampleType": "bad",
+      "exampleText": "identical behavior always",
+      "sortOrder": 44
+    },
+    {
+      "checkpointKey": "enable_buildx",
+      "exampleType": "good",
+      "exampleText": "DOCKER_BUILDKIT=1; buildx; syntax 1.7 frontend features.",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "enable_buildx",
+      "exampleType": "good",
+      "exampleText": "docker 23 default off",
+      "sortOrder": 26
+    },
+    {
+      "checkpointKey": "enable_buildx",
+      "exampleType": "bad",
+      "exampleText": "syntax directive useless",
+      "sortOrder": 47
+    }
+  ],
+  "itlead": {
+    "slug": "what-is-docker-buildkit",
+    "apiUrl": "https://api.itlead.org/api/questions/what-is-docker-buildkit",
+    "pageUrl": "https://itlead.org/interview-questions/docker/what-is-docker-buildkit",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is BuildKit and what advantages does it provide?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T14:44:01.314Z"
+  }
+}

@@ -1,0 +1,571 @@
+{
+  "topic": {
+    "code": "docker_container_lifecycle",
+    "name": "Жизненный цикл Docker-контейнера",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое жизненный цикл Docker-контейнера и через какие состояния он проходит?",
+    "shortAnswer": "Жизненный цикл контейнера — набор состояний от создания до удаления: created → running → (paused) → exited → removed, плюс переходные restarting и terminal dead. Каждый переход вызывается конкретной командой; `docker ps -a` показывает текущее состояние. Exited-контейнер ещё существует на диске — его можно `docker start`; только `docker rm` удаляет окончательно.",
+    "idealAnswer": "Жизненный цикл Docker-контейнера описывает, как контейнер движется между состояниями от создания до удаления. Шесть основных состояний daemon: created (конфиг и filesystem готовы, процесс не запущен), running (PID 1 жив, CPU/память/сеть активны), paused (процессы заморожены через freezer cgroup — в памяти, но не планируются), restarting (переходное — сработала restart policy), exited (главный процесс остановился, writable layer на диске сохранён), dead (редкий terminal — daemon не смог привести в чистое состояние). removed — не состояние daemon: после `docker rm` контейнер исчезает из `docker ps -a`. `docker create` → created; `docker start` → running; `docker run` = create + start в одну команду. `docker pause` / `docker unpause` ↔ paused. `docker stop`: t=0 SIGTERM на PID 1, grace period 10 с (настраивается `-t`), затем SIGKILL → exited. `docker kill` — немедленный SIGKILL (или другой сигнал через `--signal`). Exited-контейнер не удалён: `docker start` возвращает в running; writable layer и имя сохраняются до `docker rm` (или `docker rm -f` = stop+remove). Типичная ошибка: думать, что `docker stop` удаляет контейнер — имя остаётся занятым. Exit codes в Status: 0 — чистый выход; 1 — ошибка приложения; 137 = 128+9 SIGKILL (docker kill, OOM, stop после timeout); 143 = SIGTERM; 139 — segfault; 130 — SIGINT. Для 137 проверять `docker inspect --format '{{.State.OOMKilled}}'` — true значит OOM cgroup, не внешний kill. Restart policies: `--restart=no` (default), `on-failure` (только exit != 0), `always` (даже после reboot хоста), `unless-stopped` (авторестарт, но ручной stop уважается). Restarting долго — crash loop: `docker logs --tail 50`. Exited накапливаются — `--rm` на run или `docker container prune`. CI: `docker run --rm`; сервисы: `--restart=unless-stopped`. Writable layer переживает exit/restart; in-memory state теряется. `docker inspect --format '{{json .State}}'` — timestamps, exit code, OOM, error; `docker events` — live transitions.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "lifecycle_states",
+      "title": "Знает состояния контейнера",
+      "expected": "Кандидат перечисляет created, running, paused, restarting, exited, dead; понимает, что removed — финальное удаление после docker rm; docker ps -a показывает текущий статус.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — шесть состояний + removed",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "lifecycle_states",
+            "oftenConfusedWith": [
+              "exited_vs_removed",
+              "create_run_start"
+            ],
+            "anchorTermsExpected": [
+              "created",
+              "running",
+              "paused",
+              "exited",
+              "restarting",
+              "dead",
+              "removed",
+              "docker ps"
+            ],
+            "anchorTermsWrongTopic": [
+              "image lifecycle",
+              "pod Pending Running",
+              "volume lifecycle"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "created",
+              "running",
+              "exited",
+              "paused"
+            ],
+            "ask": "чем отличаются created, running, paused и exited"
+          },
+          {
+            "match": [
+              "restarting",
+              "dead"
+            ],
+            "ask": "когда контейнер в restarting и что означает dead"
+          }
+        ],
+        "mustConcepts": [
+          "created",
+          "running",
+          "paused",
+          "restarting",
+          "exited",
+          "dead",
+          "removed",
+          "lifecycle",
+          "жизненн",
+          "состоян",
+          "docker ps",
+          "docker ps -a",
+          "STATUS",
+          "daemon",
+          "freezer",
+          "cgroup",
+          "переход",
+          "transient",
+          "terminal"
+        ],
+        "falseClaims": [
+          "removed — это одно из шести состояний daemon",
+          "paused контейнер не занимает память",
+          "dead — обычное состояние после docker stop",
+          "restarting означает успешный long-running сервис",
+          "docker ps без -a показывает exited контейнеры"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "create_run_start",
+      "title": "Понимает create, start и run",
+      "expected": "Кандидат объясняет: docker create готовит контейнер без запуска; docker start переводит created/exited → running; docker run = create + start.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовые команды переходов из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "docker run",
+              "docker create",
+              "docker start"
+            ],
+            "ask": "чем docker run отличается от create + start и когда полезен create отдельно"
+          }
+        ],
+        "mustConcepts": [
+          "docker create",
+          "docker start",
+          "docker run",
+          "create + start",
+          "created",
+          "running",
+          "конфиг",
+          "filesystem",
+          "без запуск",
+          "одной команд",
+          "network connect",
+          "volume",
+          "env",
+          "inspect config"
+        ],
+        "falseClaims": [
+          "docker create сразу запускает процесс",
+          "docker run только создаёт контейнер без старта",
+          "docker start работает только из created, не из exited",
+          "create и run создают разные типы контейнеров"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "docker_stop_mechanism",
+      "title": "Знает механизм docker stop",
+      "expected": "Кандидат описывает: SIGTERM на PID 1 → grace period 10 с (docker stop -t) → SIGKILL → exited; отличает stop (graceful) от kill (немедленный SIGKILL).",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "SIGTERM/grace/SIGKILL — ключ к отладке production",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "exit_codes_debugging",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "SIGTERM",
+              "SIGKILL",
+              "docker stop",
+              "grace"
+            ],
+            "ask": "что происходит при docker stop пошагово и зачем trap SIGTERM в приложении"
+          },
+          {
+            "match": [
+              "docker kill",
+              "stop",
+              "kill"
+            ],
+            "ask": "разница между docker stop и docker kill"
+          }
+        ],
+        "mustConcepts": [
+          "SIGTERM",
+          "SIGKILL",
+          "docker stop",
+          "docker kill",
+          "grace",
+          "grace period",
+          "10",
+          "-t",
+          "PID 1",
+          "exited",
+          "trap",
+          "SIGTERM handler",
+          "чист",
+          "shutdown",
+          "немедлен",
+          "--signal",
+          "137"
+        ],
+        "falseClaims": [
+          "docker stop сразу шлёт SIGKILL без ожидания",
+          "docker stop и docker kill работают одинаково",
+          "grace period нельзя изменить",
+          "SIGTERM всегда завершает процесс мгновенно",
+          "docker kill всегда graceful"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "exited_vs_removed",
+      "title": "Отличает exited от removed",
+      "expected": "Кандидат объясняет: docker stop переводит в exited, но контейнер остаётся (имя, writable layer); docker start оживляет; docker rm удаляет; типичная ошибка — stop ≠ delete.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "stop не удаляет — частая ошибка из ITLead Common mistakes",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "lifecycle_states",
+            "floorFraction": 0.4
+          }
+        ],
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "exited",
+              "docker rm",
+              "docker start",
+              "name already in use"
+            ],
+            "ask": "почему после docker stop нельзя сразу docker run с тем же --name"
+          },
+          {
+            "match": [
+              "--rm",
+              "prune",
+              "writable"
+            ],
+            "ask": "как не копить exited контейнеры и что сохраняется в writable layer"
+          }
+        ],
+        "mustConcepts": [
+          "exited",
+          "removed",
+          "docker rm",
+          "docker rm -f",
+          "docker start",
+          "docker stop",
+          "writable",
+          "layer",
+          "имя",
+          "name already in use",
+          "не удал",
+          "остаётся",
+          "docker ps -a",
+          "--rm",
+          "container prune",
+          "prune",
+          "filesystem",
+          "на диске"
+        ],
+        "falseClaims": [
+          "docker stop удаляет контейнер с диска",
+          "exited контейнер нельзя docker start",
+          "docker rm не нужен после stop — контейнер сам исчезает",
+          "writable layer удаляется при exit",
+          "имя освобождается сразу после docker stop"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "exit_codes_debugging",
+      "title": "Читает exit codes и отлаживает",
+      "expected": "Кандидат знает коды 0, 1, 137, 143, 139, 130; 137 = 128+9 SIGKILL; проверяет OOMKilled через docker inspect; не путает kill с OOM.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "exit code + OOM flag — практическая отладка из ITLead examples",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "docker_stop_mechanism",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "137",
+              "143",
+              "OOMKilled",
+              "exit code"
+            ],
+            "ask": "что означает Exited (137) и как отличить OOM от docker kill"
+          },
+          {
+            "match": [
+              "docker inspect",
+              "State",
+              "Status"
+            ],
+            "ask": "какие поля docker inspect помогают понять причину остановки"
+          }
+        ],
+        "mustConcepts": [
+          "exit code",
+          "код выхода",
+          "0",
+          "1",
+          "137",
+          "143",
+          "139",
+          "130",
+          "128 + 9",
+          "SIGKILL",
+          "SIGTERM",
+          "SIGSEGV",
+          "SIGINT",
+          "OOM",
+          "OOMKilled",
+          "docker inspect",
+          "State",
+          "Status",
+          "Error",
+          "Exited (137)",
+          "Exited (0)",
+          "memory limit",
+          "cgroup"
+        ],
+        "falseClaims": [
+          "137 всегда означает docker kill от пользователя",
+          "exit 0 после docker stop после timeout — норма",
+          "OOMKilled true означает внешний kill, не память",
+          "exit code виден только в docker logs",
+          "143 означает SIGKILL"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "restart_policies",
+      "title": "Знает restart policies",
+      "expected": "Кандидат перечисляет no, on-failure, always, unless-stopped; понимает crash loop в restarting; on-failure:N ограничивает retry.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "автоматизация переходов — production сервисы и CI",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "unless-stopped",
+              "always",
+              "on-failure",
+              "--restart"
+            ],
+            "ask": "когда использовать unless-stopped vs always и что делает on-failure"
+          },
+          {
+            "match": [
+              "Restarting",
+              "crash loop",
+              "docker logs"
+            ],
+            "ask": "контейнер долго в Restarting — что проверять"
+          }
+        ],
+        "mustConcepts": [
+          "restart",
+          "restart policy",
+          "--restart",
+          "no",
+          "on-failure",
+          "always",
+          "unless-stopped",
+          "daemon",
+          "reboot",
+          "ручн",
+          "docker stop",
+          "crash loop",
+          "Restarting",
+          "retry",
+          "on-failure:5",
+          "CI",
+          "--rm",
+          "long-lived"
+        ],
+        "falseClaims": [
+          "unless-stopped рестартует даже после ручного docker stop",
+          "on-failure рестартует при exit 0",
+          "always не рестартует после reboot хоста",
+          "Restarting — нормальное стабильное состояние сервиса",
+          "restart policy удаляет exited контейнеры"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Контейнер проходит created → running → exited → removed. docker run = create + start. docker stop шлёт SIGTERM, ждёт 10 с, потом SIGKILL — статус Exited (137). Контейнер ещё на диске, docker start поднимет снова; docker rm удалит. Exit 137 проверяю OOMKilled в inspect — отличить OOM от kill.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На проде сервисы с --restart=unless-stopped: упал — daemon поднимет, ручной stop — не трогает. CI — docker run --rm, exited сразу чистится. Если Restarting крутится — crash loop, смотрю docker logs --tail 50. Exited копятся — container prune или --rm.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "created — конфиг готов, процесс не бежит. pause замораживает через freezer cgroup. stop graceful, kill — сразу SIGKILL. Writable layer переживает exit до rm. 0 — чистый выход, 143 — SIGTERM, 139 — segfault.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker stop удаляет контейнер. Exited (137) — всегда daemon убил. Restart policy no по умолчанию рестартует всё подряд. paused не использует память.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker run только создаёт, не запускает. После stop имя свободно для нового run. Exit code смотреть только в логах приложения, inspect не нужен.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker kill и docker stop одинаковые — оба ждут 10 секунд SIGTERM. removed — шестое состояние daemon наряду с dead.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "lifecycle_states",
+      "exampleType": "good",
+      "exampleText": "Шесть состояний: created, running, paused, restarting, exited, dead. removed — после docker rm, в ps -a не виден.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "lifecycle_states",
+      "exampleType": "good",
+      "exampleText": "ну created — есть на диске, не running; paused — freezer, процессы в памяти но не крутятся; restarting — policy дёргает рестарт",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "lifecycle_states",
+      "exampleType": "bad",
+      "exampleText": "После docker stop контейнер в состоянии removed. docker ps -a показывает только running.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "create_run_start",
+      "exampleType": "good",
+      "exampleText": "docker create — created без процесса; docker start — в running; docker run = оба шага сразу.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "create_run_start",
+      "exampleType": "good",
+      "exampleText": "create полезен когда сначала network connect или volumes, потом start",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "create_run_start",
+      "exampleType": "bad",
+      "exampleText": "docker start работает только из created, exited контейнер удалён навсегда.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "docker_stop_mechanism",
+      "exampleType": "good",
+      "exampleText": "stop: SIGTERM → 10 с grace (docker stop -t 30) → SIGKILL. kill — SIGKILL сразу, для зависших процессов.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "docker_stop_mechanism",
+      "exampleType": "good",
+      "exampleText": "приложение должно ловить SIGTERM и выходить до timeout, иначе 137 без flush",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "docker_stop_mechanism",
+      "exampleType": "bad",
+      "exampleText": "docker stop мгновенно шлёт SIGKILL, grace period не существует.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "exited_vs_removed",
+      "exampleType": "good",
+      "exampleText": "stop → exited, имя занято: docker run --name web снова — error. Нужен docker rm или rm -f.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "exited_vs_removed",
+      "exampleType": "good",
+      "exampleText": "exited можно docker start — writable layer на месте; rm только docker rm",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "exited_vs_removed",
+      "exampleType": "bad",
+      "exampleText": "docker stop сразу освобождает имя и удаляет writable layer.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "exit_codes_debugging",
+      "exampleType": "good",
+      "exampleText": "Exited (137): inspect OOMKilled — true значит OOM cgroup, false — kill или stop timeout.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "exit_codes_debugging",
+      "exampleType": "good",
+      "exampleText": "0 чистый, 1 app error, 143 SIGTERM, 139 segfault — смотрю Status и json .State",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "exit_codes_debugging",
+      "exampleType": "bad",
+      "exampleText": "137 = 128+15 SIGTERM. OOMKilled не связан с exit code.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "restart_policies",
+      "exampleType": "good",
+      "exampleText": "unless-stopped — автоподъём после краша, ручной stop не перебивается. on-failure:5 — максимум 5 retry.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "restart_policies",
+      "exampleType": "good",
+      "exampleText": "Restarting минутами — crash loop, лезу в logs; CI build — run --rm без restart",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "restart_policies",
+      "exampleType": "bad",
+      "exampleText": "always не рестартует после перезагрузки хоста. unless-stopped рестартует даже после docker stop.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "docker-container-lifecycle",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-container-lifecycle",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-container-lifecycle",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is the Docker container lifecycle?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

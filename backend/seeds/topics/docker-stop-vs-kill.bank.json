@@ -1,0 +1,487 @@
+{
+  "topic": {
+    "code": "docker_stop_vs_kill",
+    "name": "docker stop vs docker kill",
+    "skillCode": "docker",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "В чём разница между docker stop и docker kill?",
+    "shortAnswer": "docker stop — graceful: сначала SIGTERM, ждёт до 10 секунд (настраивается), затем SIGKILL если процесс ещё работает. docker kill — немедленно: по умолчанию SIGKILL, либо любой сигнал через --signal. Для БД и сервисов с состоянием — stop; для зависших процессов и отправки control-сигналов (SIGHUP reload) — kill.",
+    "idealAnswer": "docker stop и docker kill оба останавливают контейнер, но по-разному агрессивно. stop — graceful shutdown: демон шлёт SIGTERM на PID 1 внутри контейнера, ждёт N секунд (по умолчанию 10, флаг -t или docker run --stop-timeout), за это время приложение должно завершить in-flight запросы, flush логов/WAL/кеша, закрыть соединения с БД и выйти с кодом 0; если процесс всё ещё running — демон шлёт SIGKILL. docker kill — немедленная остановка: по умолчанию SIGKILL без grace period; через --signal можно послать любой сигнал (SIGTERM, SIGHUP, SIGUSR1, числовой -s 9). kill гибче для control-сигналов: docker kill --signal=SIGHUP nginx перечитывает конфиг без рестарта. Сравнение: stop — SIGTERM затем SIGKILL, есть grace period, для чистого shutdown; kill — SIGKILL сразу (или кастомный сигнал), без ожидания, для hung-процессов и произвольных сигналов. Для Postgres и stateful-сервисов — только stop: kill mid-write → WAL replay, медленное recovery. Для user-facing API — stop, иначе 502 от оборванных соединений. kill уместен: процесс игнорирует SIGTERM после полного grace period; отправка SIGHUP/USR1; CI cleanup disposable-контейнеров; docker rm -f внутри использует kill. Grace period: docker stop -t 30, docker stop -t 0 (= SIGKILL сразу), docker run --stop-timeout 60, в Compose stop_grace_period: 30s. Типичные ошибки: docker kill postgres-prod; docker kill --signal=SIGTERM без последующего SIGKILL — контейнер может остаться running; PID 1 без trap SIGTERM → полные 10 с и exit 137. Коды: 137 = 128+9 (SIGKILL), 143 = 128+15 (SIGTERM). SIGTERM шлётся один раз за grace period, без retry. Проверка graceful shutdown: docker stop и exit 0 за 1–2 с, не после полного timeout.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "stop_vs_kill_core",
+      "title": "Называет главное отличие stop и kill",
+      "expected": "Кандидат объясняет: stop — graceful (SIGTERM + ожидание + SIGKILL); kill — немедленный SIGKILL по умолчанию или произвольный сигнал через --signal; разница в том, даёт ли приложению время на чистое завершение.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — ядро темы для junior",
+        "mustConcepts": [
+          "docker stop",
+          "docker kill",
+          "graceful",
+          "немедлен",
+          "SIGTERM",
+          "SIGKILL",
+          "grace period",
+          "ожидан",
+          "чист",
+          "shutdown",
+          "разниц",
+          "агрессив",
+          "stop",
+          "kill",
+          "10 секунд",
+          "--signal"
+        ],
+        "falseClaims": [
+          "docker stop и docker kill делают одно и то же",
+          "docker stop сразу шлёт SIGKILL без ожидания",
+          "docker kill всегда только убивает и не может послать другие сигналы",
+          "оба команды не дают приложению времени на cleanup"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "docker_stop_flow",
+      "title": "Описывает механизм docker stop",
+      "expected": "Кандидат описывает flow: SIGTERM на PID 1 → grace period (10 с по умолчанию) → SIGKILL если не завершился; приложение должно обработать SIGTERM и выйти чисто.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "пошаговый flow из ITLead What docker stop does",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "stop_vs_kill_core",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "SIGTERM",
+              "docker stop",
+              "grace"
+            ],
+            "ask": "что происходит при docker stop пошагово от SIGTERM до SIGKILL"
+          }
+        ],
+        "mustConcepts": [
+          "SIGTERM",
+          "SIGKILL",
+          "PID 1",
+          "grace period",
+          "10",
+          "секунд",
+          "демон",
+          "daemon",
+          "in-flight",
+          "flush",
+          "WAL",
+          "закрыт",
+          "соединен",
+          "exit 0",
+          "ожидан",
+          "timeout",
+          "-t"
+        ],
+        "falseClaims": [
+          "docker stop шлёт SIGTERM несколько раз во время grace period",
+          "SIGKILL приходит до SIGTERM при docker stop",
+          "grace period по умолчанию 30 секунд",
+          "docker stop не шлёт SIGKILL если процесс не ответил"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "docker_kill_mechanism",
+      "title": "Знает механизм docker kill",
+      "expected": "Кандидат объясняет: kill по умолчанию SIGKILL; --signal для SIGTERM, SIGHUP, SIGUSR1 или числового сигнала; kill не всегда «убивает» — control-сигналы могут не завершать процесс.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "What docker kill does + --signal flexibility",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "--signal",
+              "SIGHUP",
+              "SIGUSR1"
+            ],
+            "ask": "зачем docker kill --signal=SIGHUP если есть docker stop"
+          }
+        ],
+        "mustConcepts": [
+          "SIGKILL",
+          "SIGTERM",
+          "SIGHUP",
+          "SIGUSR1",
+          "--signal",
+          "-s 9",
+          "числов",
+          "PID 1",
+          "reload",
+          "nginx",
+          "control",
+          "сигнал",
+          "не fatal",
+          "grace period",
+          "нет ожидан"
+        ],
+        "falseClaims": [
+          "docker kill может послать только SIGKILL",
+          "docker kill --signal=SIGHUP всегда останавливает контейнер",
+          "docker kill ждёт grace period как stop",
+          "имя kill означает что процесс всегда завершается"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Выбирает stop или kill по сценарию",
+      "expected": "Кандидат называет: stop — БД, stateful-сервисы, user-facing API, production deploy; kill — hung-процесс после неудачного stop, control-сигналы, CI/disposable, docker rm -f.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Why graceful matters + When kill is right — decision rule",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "stop_vs_kill_core",
+            "floorFraction": 0.4
+          }
+        ],
+        "mustConcepts": [
+          "Postgres",
+          "баз",
+          "database",
+          "stateful",
+          "WAL",
+          "502",
+          "in-flight",
+          "user-facing",
+          "production",
+          "hung",
+          "завис",
+          "SIGTERM игнор",
+          "CI",
+          "disposable",
+          "docker rm -f",
+          "SIGHUP",
+          "reload",
+          "log rotation",
+          "USR1"
+        ],
+        "falseClaims": [
+          "для production Postgres всегда лучше docker kill",
+          "kill безопасен для любого stateful-сервиса",
+          "stop никогда не нужен — kill быстрее",
+          "docker rm -f делает graceful shutdown перед удалением"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "grace_period_config",
+      "title": "Настраивает grace period",
+      "expected": "Кандидат называет: default 10 с; docker stop -t N; docker stop -t 0 = SIGKILL сразу; docker run --stop-timeout; Compose stop_grace_period и stop_signal.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "настройка timeout из ITLead follow-up",
+        "mustConcepts": [
+          "10 секунд",
+          "default",
+          "-t",
+          "docker stop -t",
+          "--stop-timeout",
+          "docker run",
+          "stop_grace_period",
+          "Compose",
+          "stop_signal",
+          "SIGUSR1",
+          "30s",
+          "60",
+          "override",
+          "настрой"
+        ],
+        "falseClaims": [
+          "grace period нельзя изменить",
+          "docker stop -t 0 эквивалентен обычному stop с 10 секундами",
+          "Compose не поддерживает настройку stop timeout",
+          "SIGTERM повторяется каждую секунду grace period"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат опровергает: kill БД mid-write; kill --signal=SIGTERM вместо stop (нет follow-up SIGKILL); PID 1 без trap → полный grace и 137; путать rm -f с graceful stop.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes ITLead — критичные production-ошибки",
+        "falseClaimCapFraction": 0,
+        "probeConceptGroups": [
+          {
+            "match": [
+              "137",
+              "SIGTERM",
+              "trap",
+              "PID 1"
+            ],
+            "ask": "почему docker stop занимает все 10 секунд и контейнер выходит с 137"
+          }
+        ],
+        "mustConcepts": [
+          "docker kill postgres",
+          "mid-write",
+          "corrupt",
+          "WAL replay",
+          "kill --signal=SIGTERM",
+          "stop -t 0",
+          "PID 1",
+          "trap",
+          "handler",
+          "137",
+          "игнорир",
+          "SIGTERM",
+          "process.on",
+          "exec form",
+          "shell form",
+          "137",
+          "dirty shutdown"
+        ],
+        "falseClaims": [
+          "docker kill --signal=SIGTERM эквивалентен docker stop с grace period",
+          "kill postgres-prod безопасен если контейнер «обычно» переживает рестарт",
+          "exit 137 означает успешный graceful shutdown",
+          "PID 1 автоматически обрабатывает SIGTERM без handler в коде"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "exit_codes",
+      "title": "Понимает коды выхода 137 и 143",
+      "expected": "Кандидат объясняет: 137 = 128+9 (SIGKILL), 143 = 128+15 (SIGTERM); при stop и коде 137 приложение не обработало SIGTERM и получило SIGKILL после grace.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "follow-up ITLead — диагностика по exit code",
+        "mustConcepts": [
+          "137",
+          "143",
+          "128",
+          "SIGKILL",
+          "SIGTERM",
+          "exit code",
+          "код выхода",
+          "grace",
+          "диагност"
+        ],
+        "falseClaims": [
+          "137 и 143 означают одно и то же",
+          "143 всегда означает что контейнер убит SIGKILL",
+          "exit code не связан с сигналом завершения"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "docker stop — graceful: SIGTERM на PID 1, ждёт 10 секунд (или -t), потом SIGKILL. docker kill — сразу SIGKILL или любой сигнал через --signal. Для Postgres и API — stop; для зависшего контейнера или SIGHUP reload nginx — kill.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "stop даёт приложению время закрыть соединения и flush WAL. kill обрывает mid-write — для prod БД опасно. В CI docker rm -f норм, там graceful не важен.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну stop = сначала SIGTERM, потом если не вышел — SIGKILL через 10с. kill = сразу убить, либо docker kill --signal=SIGHUP для reload конфига без рестарта",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker stop и docker kill одинаковые — оба сразу SIGKILL. Для Postgres лучше kill, stop слишком медленный.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker kill --signal=SIGTERM то же самое что docker stop с grace period. Exit 137 — нормальный код успешной остановки.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Grace period нельзя настроить, всегда 10 секунд и SIGTERM шлётся каждую секунду пока ждёт.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "stop_vs_kill_core",
+      "exampleType": "good",
+      "exampleText": "stop — graceful shutdown с ожиданием; kill — немедленная остановка SIGKILL или кастомный сигнал без grace window.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "stop_vs_kill_core",
+      "exampleType": "good",
+      "exampleText": "главное: stop даёт шанс прибраться, kill — нет (если не указал другой сигнал)",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "stop_vs_kill_core",
+      "exampleType": "bad",
+      "exampleText": "Разницы нет — обе команды мгновенно убивают контейнер SIGKILL.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "docker_stop_flow",
+      "exampleType": "good",
+      "exampleText": "t=0 SIGTERM на PID 1 → приложение закрывает запросы и БД → если за 10 с не вышло — SIGKILL.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "docker_stop_flow",
+      "exampleType": "good",
+      "exampleText": "docker stop -t 30 даёт 30 секунд на checkpoint Postgres перед SIGKILL",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "docker_stop_flow",
+      "exampleType": "bad",
+      "exampleText": "docker stop шлёт только SIGTERM и никогда не использует SIGKILL.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "docker_kill_mechanism",
+      "exampleType": "good",
+      "exampleText": "docker kill web — SIGKILL сразу. docker kill --signal=SIGHUP nginx-prod — reload конфига, контейнер продолжает работать.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "docker_kill_mechanism",
+      "exampleType": "good",
+      "exampleText": "kill гибче: -s 9 или --signal=SIGUSR1 для ротации логов",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "docker_kill_mechanism",
+      "exampleType": "bad",
+      "exampleText": "docker kill умеет только SIGKILL, другие сигналы послать нельзя.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Postgres и user-facing API — docker stop. Hung container после stop -t 5 — docker kill. CI cleanup — rm -f с kill внутри.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "kill postgres mid-write → WAL replay минутами; stop api → добивает in-flight без 502",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "В production всегда kill — stop только для отладки.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "grace_period_config",
+      "exampleType": "good",
+      "exampleText": "Default 10 с; docker stop -t 60 postgres-prod; docker run --stop-timeout 60; в Compose stop_grace_period: 30s.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "grace_period_config",
+      "exampleType": "good",
+      "exampleText": "docker stop -t 0 = SIGKILL сразу, как kill без --signal",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "grace_period_config",
+      "exampleType": "bad",
+      "exampleText": "Grace period зашит в образ и менять его нельзя ни через stop, ни через run.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Нельзя docker kill postgres-prod — риск corrupt indexes и долгий WAL replay. kill --signal=SIGTERM не даст SIGKILL если app игнорирует — нужен stop.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "PID 1 без trap SIGTERM → stop ждёт все 10с и exit 137. Фикс: process.on('SIGTERM') + server.close + exec form CMD.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "docker kill --signal=SIGTERM лучше stop — grace period не нужен в production.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "exit_codes",
+      "exampleType": "good",
+      "exampleText": "137 = SIGKILL (128+9), 143 = SIGTERM (128+15). stop и 137 — app не обработал SIGTERM.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "exit_codes",
+      "exampleType": "good",
+      "exampleText": "если после stop видишь 137 — проверь handler SIGTERM, не grace period",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "exit_codes",
+      "exampleType": "bad",
+      "exampleText": "137 означает что контейнер корректно завершился по SIGTERM.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-stop-vs-kill",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-stop-vs-kill",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-stop-vs-kill",
+    "difficulty": "JUNIOR",
+    "titleEn": "docker stop vs docker kill: what is the difference?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

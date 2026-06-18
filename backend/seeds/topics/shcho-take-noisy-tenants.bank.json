@@ -1,0 +1,171 @@
+{
+  "topic": {
+    "code": "shcho_take_noisy_tenants",
+    "name": "Noisy tenants",
+    "skillCode": "architecture",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое noisy tenants и как защитить multi-tenant систему от них?",
+    "shortAnswer": "Noisy tenants — клиенты в multi-tenant системе, которые потребляют непропорционально много общих ресурсов (CPU, память, соединения БД), деградируя сервис для остальных. Типовые меры: per-tenant rate limits, квоты ресурсов, reserved concurrency, изоляция тяжёлых клиентов.",
+    "idealAnswer": "Noisy tenant — арендатор SaaS, который забирает >50% shared pool (CPU, Lambda concurrency, DB connections, Redis) и замедляет всех соседей на той же инфраструктуре. В single-tenant spike изолирован; в multi-tenant на AWS/K8s ресурсы общие — один tenant с 80% CPU throttling'ит остальных. Noisy tenant часто не знает о проблеме — его запросы 200, жертвы видят latency/errors и пишут в support. Стратегии: >50 tenants схожий usage — мониторинг Prometheus; variable workloads — per-tenant quotas (API Gateway, express-rate-limit с key x-tenant-id); regulated — namespace isolation; tenant >2x average — dedicated infra или billing. K8s: ResourceQuota/LimitRange, cgroups, OOMKilled pod может вызвать eviction соседей на ноде. Lambda: account limit 1000 concurrency — ReservedConcurrency per tenant. DB: pgBouncer per-tenant pool; без лимита один tenant открывает 900/1000 connections. Redis: prefix tenant:${id}:, SCAN не KEYS. Ошибки: autoscale по global CPU; shared Redis без namespace; нет reserved concurrency; hard vs soft limits — cgroups kill vs throttle. Detection: sum(rate(container_cpu[5m])) by (tenant), p99>500ms. Senior: 10k tenants 99.99% SLO — Envoy sidecar quota filters, Kafka partition by tenant, anomaly detection, pools per pricing tier.",
+    "maxScore": 10,
+    "skills": ["architecture"]
+  },
+  "checkpoints": [
+    {
+      "key": "noisy_tenant_definition",
+      "title": "Понимает определение noisy tenant",
+      "expected": "Кандидат объясняет: клиент multi-tenant системы потребляет непропорционально много shared ресурсов; аналогия с соседом, громко играющим музыку; >50% pool — проблема.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR noisy tenants",
+        "probePolicy": { "requireProbeBeforeFinalPartial": true, "minScoreAfterShallowAccept": 0.55 },
+        "probeConceptGroups": [{ "match": ["noisy tenant", "шумный"], "ask": "почему один tenant может замедлить всех в multi-tenant SaaS" }],
+        "confusionPairs": [{ "checkpointKey": "noisy_tenant_definition", "oftenConfusedWith": ["mitigation_strategies"], "anchorTermsExpected": ["multi-tenant", "shared", "ресурс", "50%"], "anchorTermsWrongTopic": ["noisy tenant — это баг в коде tenant", "single-tenant та же проблема"] }],
+        "mustConcepts": ["noisy tenant", "шумный", "multi-tenant", "багатоаренд", "shared", "общ", "ресурс", "CPU", "память", "соединен", "БД", "disproportionate", "50%", "сосед", "аналогия", "SaaS", "инфраструктур"],
+        "falseClaims": ["noisy tenant всегда знает что перегружает систему", "в single-tenant та же проблема shared pool", "noisy tenant — это только DDoS атака", "проблема только на уровне application code", "noisy tenant влияет только на свой namespace без соседей"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "shared_vs_isolated",
+      "title": "Отличает shared multi-tenant от isolated single-tenant",
+      "expected": "Кандидат сравнивает: single-tenant spike на dedicated hardware; multi-tenant — contention на общем pool; жертвы видят errors, noisy tenant получает 200.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "system design problem из ITLead",
+        "impliesCheckpointFloors": [{ "checkpointKey": "noisy_tenant_definition", "floorFraction": 0.45 }],
+        "mustConcepts": ["single-tenant", "multi-tenant", "dedicated", "выделен", "shared pool", "contention", "конкуренц", "80% CPU", "жертв", "support ticket", "200 OK", "latency", "Kubernetes", "AWS", "debug"],
+        "falseClaims": ["single-tenant и multi-tenant одинаково страдают от noisy neighbor", "noisy tenant всегда получает 429 первым", "shared infrastructure не усиливает impact", "проблема видна только в метриках noisy tenant"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "mitigation_strategies",
+      "title": "Знает стратегии mitigation",
+      "expected": "Кандидat называет: per-tenant rate limits, resource quotas, dedicated infra для heavy tenants; правило 50 tenants / 2x average isolation; API Gateway usage plans.",
+      "score": 2.0,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "When to use each strategy",
+        "probeConceptGroups": [{ "match": ["rate limit", "quota", "квот"], "ask": "когда переводить tenant на dedicated infrastructure" }],
+        "mustConcepts": ["rate limit", "квот", "quota", "per-tenant", "API Gateway", "usage plan", "dedicated", "выделен", "2x average", "50 tenants", "Prometheus", "monitoring", "namespace isolation", "MVP", "Black Friday", "circuit breaker"],
+        "falseClaims": ["достаточно только global rate limit без tenant id", "dedicated infra никогда не нужна", "квоты решают проблему только в application code", "noisy tenant всегда надо блокировать полностью"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "infrastructure_level",
+      "title": "Понимает механизмы на уровне инфраструктуры",
+      "expected": "Кандидат описывает: K8s ResourceQuota/cgroups/OOM cascade; Lambda ReservedConcurrency; pgBouncer per-tenant; Redis prefix + SCAN; Salesforce governor limits.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "How it works at infrastructure level",
+        "mustConcepts": ["Kubernetes", "ResourceQuota", "cgroups", "OOMKilled", "eviction", "Lambda", "ReservedConcurrency", "1000", "pgBouncer", "PostgreSQL", "Redis", "KEYS", "SCAN", "prefix", "Salesforce", "governor limits", "RabbitMQ", "virtual host"],
+        "falseClaims": ["Lambda автоматически делит concurrency между tenants", "Redis KEYS безопасен в production multi-tenant", "pgBouncer не нужен при max_connections=1000", "OOM одного pod никогда не затрагивает других tenants"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "detection_monitoring",
+      "title": "Умеет обнаруживать noisy tenants",
+      "expected": "Кандидат называет Prometheus query by tenant, top 5% usage, p99 latency per tenant; CloudWatch custom metrics CPU.TenantA.",
+      "score": 1.0,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Follow-up detection",
+        "mustConcepts": ["Prometheus", "rate", "container_cpu", "by tenant", "top 5%", "p99", "latency", "500ms", "CloudWatch", "custom metric", "alert", "anomaly", "baseline"],
+        "falseClaims": ["noisy tenant виден только через логи приложения", "global CPU metric достаточен для per-tenant detection", "p99 latency не помогает найти noisy tenant"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "noisy_common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: global DB pool без per-tenant; shared Redis KEYS; autoscale на global CPU; нет Lambda reserved concurrency; hard vs soft limits tradeoff.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes",
+        "mustConcepts": ["global pool", "max_connections", "900", "Redis KEYS", "autoscale", "global CPU", "ReservedConcurrency", "hard limit", "soft limit", "cgroups", "throttle", "SLO", "bursty", "batch job"],
+        "falseClaims": ["global autoscale решает noisy tenant без per-tenant metrics", "hard limits всегда лучше soft limits", "platform-level quotas требуют изменения app code", "Redis без prefix безопасен при малом числе keys"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "senior_quota_architecture",
+      "title": "Проектирует quota system для thousands tenants",
+      "expected": "Кандидат описывает: Envoy sidecar dynamic quota; Kafka partition by tenant; anomaly detection; separate pools per pricing tier; multi-region blast radius containment.",
+      "score": 1.0,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "advanced",
+        "weightRationale": "Senior follow-up 10k tenants 99.99% SLO",
+        "impliesCheckpointFloors": [{ "checkpointKey": "mitigation_strategies", "floorFraction": 0.4 }],
+        "probeConceptGroups": [{ "match": ["10000", "99.99", "Envoy"], "ask": "как спроектировать quota для 10k tenants с 99.99% SLO" }],
+        "mustConcepts": ["Envoy", "sidecar", "quota filter", "Kafka", "partition", "tenant", "anomaly detection", "pricing tier", "concurrency pool", "99.99", "SLO", "multi-region", "DynamoDB", "replication lag", "blast radius", "regional queue"],
+        "falseClaims": ["flat account-wide limit масштабируется на 10k tenants", "multi-region не меняет noisy tenant problem", "Kafka без partition by tenant изолирует events", "Envoy не может enforce per-tenant quota"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    { "exampleType": "good", "exampleText": "Noisy tenant — tenant_A забрал все 1000 Lambda concurrency, tenant_B в очереди 30+ сек. Fix: ReservedConcurrency 100 per function. Express rate-limit по x-tenant-id в Redis — 429 только noisy, остальные 200.", "sortOrder": 0 },
+    { "exampleType": "good", "exampleText": "ну один клиент bulk export ночью открыл 900 PG connections — все получили too many connections. pgBouncer pool per tenant. K8s ResourceQuota на namespace — OOM noisy pod не evict'ит соседей.", "sortOrder": 1 },
+    { "exampleType": "good", "exampleText": "Prometheus sum(rate(container_cpu[5m])) by (tenant) — alert top 5%. Tenant >2x baseline → dedicated ASG временно. Redis: tenant:${id}: prefix, SCAN не KEYS.", "sortOrder": 2 },
+    { "exampleType": "bad", "exampleText": "Noisy tenant — это когда у клиента медленный код. Global rate limit 1000 rps решает проблему. Lambda concurrency делится автоматически fair.", "sortOrder": 0 },
+    { "exampleType": "bad", "exampleText": "Autoscale по cluster CPU — правильный подход. KEYS * в shared Redis безопасен. Platform quotas требуют переписать весь app.", "sortOrder": 1 },
+    { "exampleType": "bad", "exampleText": "Single-tenant и multi-tenant одинаково страдают. Noisy tenant всегда видит 429 первым.", "sortOrder": 2 },
+    { "checkpointKey": "noisy_tenant_definition", "exampleType": "good", "exampleText": "Клиент забирает >50% shared CPU/connections — остальные tenants деградируют.", "sortOrder": 10 },
+    { "checkpointKey": "noisy_tenant_definition", "exampleType": "good", "exampleText": "шумный сосед в multi-tenant — один flood, все ждут", "sortOrder": 11 },
+    { "checkpointKey": "noisy_tenant_definition", "exampleType": "bad", "exampleText": "Noisy tenant — только malicious DDoS.", "sortOrder": 30 },
+    { "checkpointKey": "shared_vs_isolated", "exampleType": "good", "exampleText": "Single-tenant spike на dedicated iron; multi-tenant — contention, жертвы в support.", "sortOrder": 12 },
+    { "checkpointKey": "shared_vs_isolated", "exampleType": "good", "exampleText": "noisy получает 200, соседи видят timeout", "sortOrder": 13 },
+    { "checkpointKey": "shared_vs_isolated", "exampleType": "bad", "exampleText": "Shared infra не усиливает noisy tenant impact.", "sortOrder": 31 },
+    { "checkpointKey": "mitigation_strategies", "exampleType": "good", "exampleText": "Per-tenant rate limit, quotas, >2x average → dedicated или billing.", "sortOrder": 14 },
+    { "checkpointKey": "mitigation_strategies", "exampleType": "good", "exampleText": "API Gateway usage plan на tenant", "sortOrder": 15 },
+    { "checkpointKey": "mitigation_strategies", "exampleType": "bad", "exampleText": "Dedicated infra никогда не нужна — только rate limit.", "sortOrder": 32 },
+    { "checkpointKey": "infrastructure_level", "exampleType": "good", "exampleText": "K8s ResourceQuota, Lambda ReservedConcurrency, pgBouncer per tenant.", "sortOrder": 16 },
+    { "checkpointKey": "infrastructure_level", "exampleType": "good", "exampleText": "Redis prefix + SCAN, не KEYS *", "sortOrder": 17 },
+    { "checkpointKey": "infrastructure_level", "exampleType": "bad", "exampleText": "OOM pod никогда не evict'ит чужие namespaces.", "sortOrder": 33 },
+    { "checkpointKey": "detection_monitoring", "exampleType": "good", "exampleText": "Prometheus by (tenant), p99>500ms, CloudWatch CPU.TenantA.", "sortOrder": 18 },
+    { "checkpointKey": "detection_monitoring", "exampleType": "good", "exampleText": "топ 5% по CPU — alert", "sortOrder": 19 },
+    { "checkpointKey": "detection_monitoring", "exampleType": "bad", "exampleText": "Global CPU достаточен для per-tenant detection.", "sortOrder": 34 },
+    { "checkpointKey": "noisy_common_mistakes", "exampleType": "good", "exampleText": "Global DB pool без tenant cap; autoscale на cluster CPU удваивает cost для всех.", "sortOrder": 20 },
+    { "checkpointKey": "noisy_common_mistakes", "exampleType": "good", "exampleText": "hard cgroups kill vs soft throttle — tradeoff по SLO", "sortOrder": 21 },
+    { "checkpointKey": "noisy_common_mistakes", "exampleType": "bad", "exampleText": "Platform ResourceQuota требует изменения business logic.", "sortOrder": 35 },
+    { "checkpointKey": "senior_quota_architecture", "exampleType": "good", "exampleText": "10k tenants: Envoy quota sidecar, Kafka by tenant, pools per tier, regional queues.", "sortOrder": 22 },
+    { "checkpointKey": "senior_quota_architecture", "exampleType": "good", "exampleText": "anomaly detection до cascade, не flat 1000 limit", "sortOrder": 23 },
+    { "checkpointKey": "senior_quota_architecture", "exampleType": "bad", "exampleText": "Multi-region DynamoDB не propagates noisy tenant issues.", "sortOrder": 36 }
+  ],
+  "itlead": {
+    "slug": "shcho-take-noisy-tenants",
+    "apiUrl": "https://api.itlead.org/api/questions/shcho-take-noisy-tenants",
+    "pageUrl": "https://itlead.org/interview-questions/general/shcho-take-noisy-tenants",
+    "difficulty": "SENIOR",
+    "titleEn": "What are noisy tenants?",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

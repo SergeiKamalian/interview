@@ -1,0 +1,468 @@
+{
+  "topic": {
+    "code": "docker_cp_files",
+    "name": "Копирование файлов между контейнером и хостом",
+    "skillCode": "docker",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Как копировать файлы между Docker-контейнером и хостом?",
+    "shortAnswer": "`docker cp` копирует файлы в обе стороны между контейнером и хостом. Контейнер может быть запущен или остановлен. Одна сторона всегда в формате `CONTAINER:PATH`, вторая — путь на хосте. Для разовых копий — `docker cp`; для постоянной синхронизации при разработке — bind mount; для долгоживущих данных — named volume.",
+    "idealAnswer": "`docker cp` — простейший способ переместить файлы между контейнером и хостом в обе стороны. Синтаксис: `docker cp SRC DST`, где одна сторона имеет формат `CONTAINER:PATH` (имя или ID контейнера и путь внутри), другая — обычный путь на хосте. Работает на running и stopped контейнерах: filesystem (image + writable layer) существует, пока есть запись контейнера. Копирует каталоги рекурсивно, сохраняет owner/permissions внутри контейнера; флаг `-a`/`--archive` сохраняет владельца и режим (поведение по умолчанию в новых версиях), `-L`/`--follow-link` следует симлинкам в источнике. Поведение путей как у `cp -r`: оба каталога существуют → содержимое SRC в DEST (`dir/.` важен); SRC — каталог, DEST нет → SRC становится DEST; SRC — файл, DEST — каталог → файл внутрь DEST; SRC — файл, DEST — новый путь → переименование. Направление: `docker cp container:/path/file ./file` — из контейнера на хост; `docker cp ./file container:/path/file` — с хоста в контейнер. Двоеточие всегда на стороне контейнера. Потоковая форма: `docker cp container:/etc -` выводит tar в stdout; `tar cf - dir | docker cp - container:/dest` — загрузка tar в контейнер. Типичные ошибки: `docker cp` пишет в writable layer — переживает stop/start, но теряется при `docker rm`; для постоянных изменений — Dockerfile или volume/bind mount. Нельзя копировать напрямую между двумя контейнерами (`docker cp source:/f target:/f` — ошибка); обход — pipe через хост: `docker cp source:/file - | docker cp - target:/file` или общий volume. Файлы, извлечённые на хост, сохраняют UID/GID из контейнера (часто 1000 или root) — при необходимости `chown` после копирования. Когда не использовать `docker cp`: постоянные данные (БД, uploads) — named volume; live dev sync — bind mount; большие повторяющиеся копии — rsync через exec или mount; между хостами — tar/ssh или registry. Реальные кейсы: вытащить логи перед `docker rm`, инжект hotfix SQL/config в running контейнер, backup через helper container с volume (`docker run --rm -v vol:/data alpine tar czf ...`). Отличие от `docker exec ... cat > file`: `docker cp` понимает рекурсию, сохраняет метаданные и работает на stopped контейнерах.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "cp_basic_syntax",
+      "title": "Знает базовый синтаксис docker cp",
+      "expected": "Кандидат объясняет: `docker cp SRC DST`; одна сторона `CONTAINER:PATH`; копирование container→host и host→container; работает на running и stopped контейнерах; рекурсивно для каталогов.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ядро темы — синтаксис и оба направления из ITLead TL;DR",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "docker cp",
+              "CONTAINER:PATH",
+              "container:"
+            ],
+            "ask": "примеры копирования файла из контейнера на хост и обратно"
+          }
+        ],
+        "mustConcepts": [
+          "docker cp",
+          "SRC",
+          "DST",
+          "CONTAINER:PATH",
+          "container:",
+          "хост",
+          "host",
+          "container → host",
+          "host → container",
+          "из контейнера",
+          "в контейнер",
+          "running",
+          "stopped",
+          "запущен",
+          "остановлен",
+          "рекурсив",
+          "каталог",
+          "директор",
+          "имя контейнера",
+          "ID контейнера"
+        ],
+        "falseClaims": [
+          "docker cp работает только на running контейнерах",
+          "docker cp копирует только с хоста в контейнер",
+          "обе стороны должны быть в формате container:path",
+          "docker cp не копирует каталоги рекурсивно",
+          "для docker cp контейнер обязан быть запущен"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "direction_and_paths",
+      "title": "Понимает направление и поведение путей",
+      "expected": "Кандидат различает container→host и host→container; двоеточие на стороне контейнера; знает поведение при существующих/несуществующих каталогах и trailing `/.`.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "частая путаница направления и trailing slash из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "двоеточ",
+              "container:",
+              "направлен"
+            ],
+            "ask": "как отличить копирование из контейнера на хост от копирования с хоста в контейнер"
+          }
+        ],
+        "mustConcepts": [
+          "двоеточ",
+          "container:",
+          "сторона контейнера",
+          "сторона хоста",
+          "container → host",
+          "host → container",
+          "trailing",
+          "/.",
+          "dir/.",
+          "существующ каталог",
+          "DEST не существует",
+          "файл внутрь каталога",
+          "переименован",
+          "cp -r",
+          "содержимое",
+          "путь"
+        ],
+        "falseClaims": [
+          "двоеточие может быть на любой стороне — главное указать контейнер",
+          "docker cp container:./file ./file — правильный синтаксис для вытаскивания файла",
+          "trailing slash не влияет на поведение docker cp",
+          "при копировании в несуществующий каталог всегда создаётся вложенная папка с именем SRC"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "recursive_and_metadata",
+      "title": "Знает рекурсию и сохранение метаданных",
+      "expected": "Кандидат упоминает рекурсивное копирование каталогов; флаги `-a`/`--archive`, `-L`/`--follow-link`; сохранение owner/permissions внутри контейнера.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "флаги и metadata из Syntax in detail ITLead",
+        "mustConcepts": [
+          "рекурсив",
+          "каталог",
+          "директор",
+          "-a",
+          "--archive",
+          "-L",
+          "--follow-link",
+          "owner",
+          "владелец",
+          "permissions",
+          "права",
+          "mode",
+          "метадан",
+          "симлинк",
+          "symlink",
+          "сохран"
+        ],
+        "falseClaims": [
+          "docker cp всегда сбрасывает права файлов внутри контейнера",
+          "docker cp не поддерживает копирование целых каталогов",
+          "флаг -a отключает сохранение владельца",
+          "docker cp не следует символическим ссылкам никогда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки docker cp",
+      "expected": "Кандидат называет: writable layer эфемерен (теряется при docker rm); нельзя cp между двумя контейнерами напрямую; путаница направления; неожиданные UID на хосте после извлечения.",
+      "score": 2.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — главный pitfalls-блок ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "writable",
+              "docker rm",
+              "эфемер"
+            ],
+            "ask": "что происходит с файлом, скопированным в контейнер, после docker rm"
+          },
+          {
+            "match": [
+              "два контейнера",
+              "между контейнерами",
+              "pipe"
+            ],
+            "ask": "как скопировать файл из одного контейнера в другой"
+          }
+        ],
+        "mustConcepts": [
+          "writable layer",
+          "записываемый слой",
+          "docker rm",
+          "docker stop",
+          "эфемер",
+          "потер",
+          "persist",
+          "между контейнерами",
+          "два контейнера",
+          "invalid arguments",
+          "pipe",
+          "через хост",
+          "UID",
+          "GID",
+          "chown",
+          "1000",
+          "root",
+          "направлен",
+          "двоеточ",
+          "общий volume"
+        ],
+        "falseClaims": [
+          "файлы docker cp в контейнере сохраняются навсегда даже после docker rm",
+          "можно docker cp source:/file target:/file напрямую между контейнерами",
+          "файлы на хосте всегда получают владельца текущего пользователя",
+          "docker cp в writable layer — правильное место для данных БД",
+          "docker cp container:./file ./file — корректная команда вытаскивания"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_not_to_use",
+      "title": "Понимает когда не использовать docker cp",
+      "expected": "Кандидат называет: bind mount для live dev sync; named volume для постоянных данных; Dockerfile для версионируемых конфигов; tar/helper container для backup volume; docker cp — ad-hoc one-shot.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "When to NOT use — выбор правильного примитива",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "bind mount",
+              "volume",
+              "постоянн"
+            ],
+            "ask": "чем bind mount лучше docker cp при разработке"
+          }
+        ],
+        "mustConcepts": [
+          "bind mount",
+          "named volume",
+          "volume",
+          "постоянн",
+          "данные",
+          "БД",
+          "uploads",
+          "dev sync",
+          "разработк",
+          "Dockerfile",
+          "образ",
+          "image",
+          "backup",
+          "helper container",
+          "alpine",
+          "tar",
+          "ad-hoc",
+          "one-shot",
+          "rsync",
+          "object storage"
+        ],
+        "falseClaims": [
+          "docker cp — лучший способ синхронизировать код при live-разработке",
+          "данные PostgreSQL надёжно хранить через docker cp в writable layer",
+          "для backup volume достаточно docker cp из running контейнера без helper",
+          "повторяющиеся копии конфигов — нормальный кейс для docker cp",
+          "bind mount и docker cp решают одну задачу одинаково хорошо"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "stream_tar_form",
+      "title": "Знает потоковую форму (tar)",
+      "expected": "Кандидат описывает: `docker cp container:/path -` → tar в stdout; `docker cp - container:/path` ← tar из stdin; pipe для копирования между контейнерами или backup-пайплайнов.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Stream form и pipe между контейнерами из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "tar",
+              "stdin",
+              "stdout",
+              "-"
+            ],
+            "ask": "как вытащить каталог из контейнера как tar-поток и загрузить tar в другой контейнер"
+          }
+        ],
+        "mustConcepts": [
+          "tar",
+          "stdin",
+          "stdout",
+          "поток",
+          "stream",
+          "docker cp -",
+          "container:/path -",
+          "- container:",
+          "pipe",
+          "через хост",
+          "между контейнерами",
+          "backup",
+          "tar cf",
+          "tar xf",
+          "ssh",
+          "remote"
+        ],
+        "falseClaims": [
+          "docker cp не поддерживает потоковую форму через stdin/stdout",
+          "для копирования между контейнерами обязательно нужен общий bind mount на хосте",
+          "потоковая форма работает только для одиночных файлов, не каталогов",
+          "tar pipe нельзя использовать с docker cp"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "`docker cp` копирует в обе стороны: `docker cp web:/etc/nginx/nginx.conf ./nginx.conf` — из контейнера; `docker cp ./fix.sql db:/tmp/fix.sql` — в контейнер. Работает на stopped контейнерах. Для разовых hotfix — ок; для постоянных данных — volume, для dev — bind mount.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Вытащил логи: `docker cp web:/var/log/nginx ./nginx-logs`. Hotfix SQL: `docker cp ./hotfix.sql db:/tmp/` и `docker exec db psql -f /tmp/hotfix.sql`. Между контейнерами напрямую нельзя — pipe: `docker cp src:/f - | docker cp - dst:/f`.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну docker cp — как scp для контейнера. container:path — оттуда, обычный путь — на хост. stop/start переживает, rm — нет. для девелопмента mount лучше чем каждый раз cp",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker cp работает только когда контейнер запущен и только с хоста в контейнер. Можно копировать между двумя контейнерами: `docker cp a:/file b:/file`.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для PostgreSQL данных пишу через docker cp в writable layer — это надёжное постоянное хранилище. При live-разработке каждый раз делаю docker cp вместо bind mount.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker cp container:./file ./file — правильная команда вытащить файл. Файлы на хосте всегда становятся владельцем моего пользователя автоматически.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "cp_basic_syntax",
+      "exampleType": "good",
+      "exampleText": "`docker cp web:/etc/nginx/nginx.conf ./nginx.conf` — container→host; `docker cp ./fix.sql db:/tmp/fix.sql` — host→container. Оба на running и stopped.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "cp_basic_syntax",
+      "exampleType": "good",
+      "exampleText": "синтаксис docker cp SRC DST, одна сторона container:путь. целую папку логов: docker cp web:/var/log/nginx ./logs",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "cp_basic_syntax",
+      "exampleType": "bad",
+      "exampleText": "docker cp только на running контейнер и только в одну сторону — с хоста внутрь.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "direction_and_paths",
+      "exampleType": "good",
+      "exampleText": "Двоеточие всегда на стороне контейнера: `container:/path` — контейнерная сторона, второй аргумент — хост. `dir/.` копирует содержимое, не сам каталог-обёртку.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "direction_and_paths",
+      "exampleType": "good",
+      "exampleText": "из контейнера — container:/etc/file ./file. в контейнер — ./file container:/tmp/file. перепутал двоеточие — получишь ошибку или сюрприз",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "direction_and_paths",
+      "exampleType": "bad",
+      "exampleText": "Направление не важно — главное указать container где-нибудь в пути. `docker cp container:./file ./file` — стандарт для вытаскивания.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "recursive_and_metadata",
+      "exampleType": "good",
+      "exampleText": "Каталоги копируются рекурсивно. `-a` сохраняет owner/mode; `-L` следует симлинкам в источнике.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "recursive_and_metadata",
+      "exampleType": "good",
+      "exampleText": "docker cp web:/var/log/nginx ./nginx-logs — вся папка с подпапками. права внутри контейнера сохраняются",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "recursive_and_metadata",
+      "exampleType": "bad",
+      "exampleText": "docker cp копирует только один файл за раз, каталоги нужно архивировать вручную перед cp.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "docker cp в writable layer: stop/start ок, docker rm — файл пропадёт. Между контейнерами: `docker cp src:/f - | docker cp - dst:/f`. На хосте UID 1000 — chown при необходимости.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "скопировал конфиг в контейнер — перезапуск переживёт, но rm контейнера убьёт. для прод данных — volume, не cp в layer",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "docker cp source:/file target:/file — штатный способ копирования между контейнерами. Данные в writable layer переживают docker rm.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_not_to_use",
+      "exampleType": "good",
+      "exampleText": "Live dev — bind mount, не cp на каждое сохранение. БД и uploads — named volume. Версионируемый конфиг — Dockerfile COPY. docker cp — emergency hotfix и вытащить логи.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_not_to_use",
+      "exampleType": "good",
+      "exampleText": "backup pg volume: helper alpine + tar, не docker cp из writable layer. повторяющиеся копии — volume или mount",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_not_to_use",
+      "exampleType": "bad",
+      "exampleText": "Для синхронизации кода при разработке docker cp лучше bind mount — быстрее и проще. Данные БД надёжно хранить через docker cp.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "stream_tar_form",
+      "exampleType": "good",
+      "exampleText": "`docker cp web:/var/log/nginx - > logs.tar` — tar в stdout. `tar cf - dir | docker cp - container:/dest` — загрузка. Между хостами: pipe через ssh.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "stream_tar_form",
+      "exampleType": "good",
+      "exampleText": "между контейнерами через tar pipe на хосте: docker cp a:/f - | docker cp - b:/f. удобно для backup пайплайнов",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "stream_tar_form",
+      "exampleType": "bad",
+      "exampleText": "docker cp не умеет stdin/stdout — только файлы на диске хоста. Для каталогов обязательно сначала zip на хосте.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "docker-cp-files",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-cp-files",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-cp-files",
+    "difficulty": "JUNIOR",
+    "titleEn": "How to copy files between a Docker container and the host?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T15:00:00.000Z"
+  }
+}

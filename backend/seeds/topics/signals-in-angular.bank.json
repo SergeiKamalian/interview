@@ -1,0 +1,596 @@
+{
+  "topic": {
+    "code": "signals_angular",
+    "name": "Signals в Angular",
+    "skillCode": "angular",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое Signals в Angular и как они работают?",
+    "shortAnswer": "Signals (Angular 16+) — реактивные контейнеры состояния с fine-grained обновлениями: Angular знает, кто прочитал signal, и перерисовывает только зависимые bindings. Три примитива: `signal()` для записи, `computed()` для производных значений, `effect()` для побочных эффектов. Zone.js не обязателен — обновления идут по графу зависимостей, а не через полный обход дерева компонентов.",
+    "idealAnswer": "Angular Signals (с Angular 16) — новый реактивный примитив для синхронного состояния. Аналогия с Excel: изменил A1 — пересчитываются только ячейки, которые ссылаются на A1, а не весь лист. Три примитива: `signal(0)` — writable, методы `set()` и `update()`; `computed(() => this.count() * 2)` — read-only производное значение с кешем; `effect()` — side effects при изменении прочитанных signals, между запусками вызывается `onCleanup()` для отмены таймеров/запросов. В шаблоне читают через `{{ count() }}` — скобки обязательны для регистрации зависимости. Zone.js патчит async API и после каждого события запускает полный scan дерева компонентов; Signals строят граф зависимостей при чтении: template или computed вызывает `count()` — Angular фиксирует ребро reader→signal. На `set()`/`update()` scheduler помечает dirty узлы и ставит microtask через `queueMicrotask`; при flush пересчитываются только dirty nodes. `computed()` кеширует результат — если upstream не менялся, функция не перезапускается. Benchmarks Angular: 2–10x ускорение на больших деревьях в Zone-less режиме. Signals vs Observables: signal всегда имеет текущее значение, синхронное чтение, auto-cleanup; Observable — async потоки, operators, ручной unsubscribe, в шаблоне `| async`. Мост: `toSignal(obs$)` для шаблона, `toObservable(signal)` обратно. Когда Signals: локальный state (toggle, counter), shared state в `@Injectable` service, derived через `computed()`. Когда RxJS: HTTP, WebSocket, timers — потом `toSignal()`. Существующий Zone.js код — Signals работают рядом, миграция постепенная. Типичные ошибки: `{{ count }}` без `()` — объект Signal без реактивности; чтение в constructor — один раз; `count.set(count() + 1)` вместо `update(c => c+1)`; `items().push()` без новой ссылки; stale closure в effect — читать `this.externalValue`, не захваченную переменную. Angular 17+: `input.required<string>()` — Signal-based @Input, computed отслеживает без ngOnChanges. NgRx 17+, Material tables, PrimeNG toSignal — реальное применение. Zone-less Angular 18+: scheduler батчит несколько `set()` в один flush — consistent snapshot, без UI tearing.",
+    "maxScore": 10,
+    "skills": [
+      "angular",
+      "typescript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "signal_primitives",
+      "title": "Знает три примитива Signals",
+      "expected": "Кандидат называет signal() для writable state (set/update), computed() для read-only производных значений, effect() для side effects; в шаблоне {{ count() }} с вызовом.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — три примитива из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "signal",
+              "computed",
+              "effect"
+            ],
+            "ask": "чем отличаются signal(), computed() и effect() — кто writable, кто read-only"
+          }
+        ],
+        "mustConcepts": [
+          "signal",
+          "computed",
+          "effect",
+          "set",
+          "update",
+          "writable",
+          "read-only",
+          "производн",
+          "побочн",
+          "side effect",
+          "count()",
+          "шаблон",
+          "binding",
+          "примитив",
+          "Angular 16",
+          "реактивн",
+          "состоян"
+        ],
+        "falseClaims": [
+          "computed() можно изменить через set()",
+          "effect() хранит основное состояние приложения",
+          "signal() read-only как computed",
+          "в шаблоне достаточно {{ count }} без скобок для реактивности",
+          "Signals заменяют все RxJS операторы один в один"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "signals_vs_zone",
+      "title": "Сравнивает Signals и Zone.js",
+      "expected": "Кандидат объясняет: Zone.js — полный обход дерева после async-событий; Signals — граф зависимостей, обновляются только прочитавшие bindings; Zone.js не обязателен; 2–10x на больших apps.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевое отличие fine-grained vs full tree scan",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "signal_primitives",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "signals_vs_zone",
+            "oftenConfusedWith": [
+              "reactive_graph"
+            ],
+            "anchorTermsExpected": [
+              "Zone.js",
+              "дерев",
+              "граф",
+              "зависимост",
+              "fine-grained",
+              "scan",
+              "bindings"
+            ],
+            "anchorTermsWrongTopic": [
+              "OnPush skip subtree",
+              "change detection tick",
+              "Signals это Zone.js patch"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Zone.js",
+              "Zone",
+              "дерев"
+            ],
+            "ask": "почему Zone.js медленнее на большом дереве компонентов чем Signals"
+          },
+          {
+            "match": [
+              "2-10",
+              "benchmark",
+              "zone-less"
+            ],
+            "ask": "что даёт Zone-less режим с Signals по производительности"
+          }
+        ],
+        "mustConcepts": [
+          "Zone.js",
+          "Zone",
+          "дерев",
+          "компонент",
+          "обход",
+          "scan",
+          "граф",
+          "зависимост",
+          "fine-grained",
+          "binding",
+          "привяз",
+          "async",
+          "событ",
+          "queueMicrotask",
+          "microtask",
+          "zone-less",
+          "без Zone",
+          "2-10",
+          "производитель"
+        ],
+        "falseClaims": [
+          "Signals требуют Zone.js для обновления UI",
+          "Zone.js обновляет только изменённые bindings как Signals",
+          "Signals и Zone.js делают одно и то же — полный tree walk",
+          "после signal.set() Angular всегда проверяет все 200 компонентов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "signals_vs_observables",
+      "title": "Отличает Signals от Observables",
+      "expected": "Кандидат сравнивает: signal всегда имеет значение, sync read, auto-cleanup; Observable — async потоки, operators, unsubscribe; шаблон count() vs async pipe; мост toSignal/toObservable.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "таблица Signals vs RxJS из ITLead",
+        "confusionPairs": [
+          {
+            "checkpointKey": "signals_vs_observables",
+            "oftenConfusedWith": [
+              "when_to_use"
+            ],
+            "anchorTermsExpected": [
+              "Observable",
+              "RxJS",
+              "toSignal",
+              "async pipe",
+              "unsubscribe",
+              "BehaviorSubject"
+            ],
+            "anchorTermsWrongTopic": [
+              "HTTP без RxJS",
+              "Signals имеют map/filter как RxJS"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "toSignal",
+              "toObservable"
+            ],
+            "ask": "когда оборачиваешь HttpClient Observable в toSignal для шаблона"
+          }
+        ],
+        "mustConcepts": [
+          "Observable",
+          "RxJS",
+          "BehaviorSubject",
+          "async pipe",
+          "unsubscribe",
+          "отписк",
+          "синхрон",
+          "асинхрон",
+          "оператор",
+          "toSignal",
+          "toObservable",
+          "HTTP",
+          "WebSocket",
+          "timer",
+          "текущее значение",
+          "count()",
+          "поток"
+        ],
+        "falseClaims": [
+          "Signals полностью заменяют RxJS для HTTP",
+          "Observable всегда имеет синхронное текущее значение без BehaviorSubject",
+          "toSignal не нужен — можно подписаться в constructor",
+          "Signals поддерживают switchMap и debounceTime нативно"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "reactive_graph",
+      "title": "Понимает граф зависимостей и scheduler",
+      "expected": "Кандидат описывает: чтение count() записывает ребро; set/update помечает dependents dirty; microtask flush; computed кеширует если upstream не менялся.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "внутренний механизм из ITLead How it works",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "set",
+              "update",
+              "dirty"
+            ],
+            "ask": "чем update(c => c+1) лучше set(count()+1) с точки зрения atomic transform"
+          },
+          {
+            "match": [
+              "кеш",
+              "cache",
+              "computed"
+            ],
+            "ask": "когда computed() реально пересчитывается — всегда или только при read upstream change"
+          }
+        ],
+        "mustConcepts": [
+          "граф",
+          "зависимост",
+          "ребр",
+          "узел",
+          "node",
+          "reader",
+          "читател",
+          "set",
+          "update",
+          "dirty",
+          "scheduler",
+          "flush",
+          "microtask",
+          "queueMicrotask",
+          "кеш",
+          "cache",
+          "upstream",
+          "пересч",
+          "atomic",
+          "атомар"
+        ],
+        "falseClaims": [
+          "computed() пересчитывается на каждый tick приложения",
+          "set() и update() не уведомляют dependents",
+          "граф зависимостей строится один раз при bootstrap и не меняется",
+          "чтение signal в constructor попадает в граф реактивности шаблона"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки Signals",
+      "expected": "Кандидат называет: забытые () в template; чтение в constructor; set вместо update; мутация массива signal; stale closure в effect — читать this.prop внутри effect.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "5 паттернов Common mistakes из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "signal_primitives",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "count()",
+              "скобк",
+              "()"
+            ],
+            "ask": "почему {{ count }} показывает [object Object] и не обновляется"
+          },
+          {
+            "match": [
+              "constructor",
+              "effect"
+            ],
+            "ask": "почему console.log в constructor с count() не реагирует на изменения"
+          },
+          {
+            "match": [
+              "push",
+              "мутац",
+              "spread"
+            ],
+            "ask": "почему items().push('x') не обновляет UI и как правильно"
+          }
+        ],
+        "mustConcepts": [
+          "скобк",
+          "count()",
+          "constructor",
+          "effect",
+          "lifecycle",
+          "set",
+          "update",
+          "stale",
+          "замыкание",
+          "closure",
+          "мутац",
+          "push",
+          "spread",
+          "новая ссылка",
+          "immutable",
+          "this.",
+          "externalValue",
+          "уведомлен"
+        ],
+        "falseClaims": [
+          "{{ count }} в шаблоне регистрирует зависимость так же как count()",
+          "можно мутировать массив внутри signal без update",
+          "effect отслеживает переменные вне тела если они захвачены в closure",
+          "count.set(count()+1) всегда безопаснее update при конкурентных обновлениях"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда использовать Signals",
+      "expected": "Кандидат называет: signal для local/shared state в service; computed для derived; RxJS для HTTP/WebSocket/timers + toSignal; incremental migration из Zone.js codebase.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use таблица ITLead",
+        "mustConcepts": [
+          "локальн",
+          "компонент",
+          "сервис",
+          "Injectable",
+          "shared",
+          "computed",
+          "HTTP",
+          "WebSocket",
+          "timer",
+          "RxJS",
+          "toSignal",
+          "миграц",
+          "incremental",
+          "toggle",
+          "counter",
+          "форма",
+          "NgRx",
+          "Material"
+        ],
+        "falseClaims": [
+          "Signals нужно использовать для всех HTTP запросов вместо HttpClient",
+          "новый Angular 16+ проект должен полностью отказаться от RxJS",
+          "shared state только через NgRx, Signals не подходят",
+          "Signals не работают в существующем Zone.js приложении"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "computed_effect_input",
+      "title": "Знает computed, effect и input signals",
+      "expected": "Кандидат упоминает: computed lazy recalc при read; effect onCleanup между runs; input.required() как Signal @Input без ngOnChanges; batch flush в Zone-less без tearing.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "follow-up вопросы ITLead — бонус middle+",
+        "mustConcepts": [
+          "onCleanup",
+          "effect",
+          "lazy",
+          "input.required",
+          "input",
+          "ngOnChanges",
+          "batch",
+          "tearing",
+          "snapshot",
+          "Angular 17",
+          "Angular 18"
+        ],
+        "falseClaims": [
+          "computed() пересчитывается даже если его никто не читает в template",
+          "effect() не имеет cleanup между запусками",
+          "input signals требуют ngOnChanges для computed от inputs"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Signals — fine-grained реактивность: count = signal(0), double = computed(() => count()*2), в шаблоне {{ count() }}. Zone.js после клика сканирует всё дерево; signal.set обновляет только bindings, которые читали count. HTTP — RxJS + toSignal для template. Ошибка — {{ count }} без скобок и items().push без update.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "TodoService: private todos = signal([]), count = computed length, addTodo через update с spread. Компоненты читают service.count() — автообновление без Subject/async pipe. WebSocket prices — Observable + toSignal. Counter: increment через count.update(c=>c+1), не set(count()+1).",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну signals как excel — поменял ячейку, пересчитались только зависимые. zone-less на большом app быстрее в разы. effect с onCleanup отменяет timer между runs",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Signals — это RxJS BehaviorSubject с другим именем. Zone.js обязателен. В шаблоне {{ count }} работает как reactive binding.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "computed.set(5) меняет производное значение. HTTP делаю через signal() напрямую без Observable. items().push('x') сразу обновляет всех dependents.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Signals заменяют change detection полностью — OnPush не нужен. toSignal не существует, подписываюсь в constructor и всё ок с Zone.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "signal_primitives",
+      "exampleType": "good",
+      "exampleText": "signal(0) writable с set/update; computed read-only от count(); effect для side effects при изменении signals.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "signal_primitives",
+      "exampleType": "good",
+      "exampleText": "count = signal(0), double = computed(() => count()*2), increment: count.update(v=>v+1)",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "signal_primitives",
+      "exampleType": "bad",
+      "exampleText": "effect() хранит counter, computed() имеет set() для записи состояния.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "signals_vs_zone",
+      "exampleType": "good",
+      "exampleText": "Zone.js патчит fetch/click → full tree CD scan. Signals: count() в template записал dependency → set(1) обновляет только эти bindings через microtask.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "signals_vs_zone",
+      "exampleType": "good",
+      "exampleText": "на 500 компонентах zone-less signals — 2-10x быстрее чем каждый click триггерит tick по всему дереву",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "signals_vs_zone",
+      "exampleType": "bad",
+      "exampleText": "Signals работают только внутри Zone.js, без patch async API UI не обновится никогда.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "signals_vs_observables",
+      "exampleType": "good",
+      "exampleText": "Signal — sync count(), always has value, auto cleanup. HTTP stream — Observable, toSignal(http.get()) в template вместо async pipe если нужен signal API.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "signals_vs_observables",
+      "exampleType": "good",
+      "exampleText": "websocket — rxjs operators debounce; ui — toSignal. обратно toObservable(signal) если сервис ждёт Observable",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "signals_vs_observables",
+      "exampleType": "bad",
+      "exampleText": "Signals имеют switchMap и debounceTime встроенно, RxJS больше не нужен для HTTP.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "reactive_graph",
+      "exampleType": "good",
+      "exampleText": "count() в computed записывает edge; count.set(1) marks double dirty; flush в microtask; computed cache если upstream unchanged.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "reactive_graph",
+      "exampleType": "good",
+      "exampleText": "update(c=>c+1) atomic — один read+write; set(count()+1) два read, риск stale при batch",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "reactive_graph",
+      "exampleType": "bad",
+      "exampleText": "computed пересчитывается каждый ApplicationRef.tick() независимо от reads.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "{{ count() }} not {{ count }}. constructor log once — move to effect(). items.update(arr=>[...arr,'new']) not push.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "stale closure: effect(() => count()*this.externalValue) not captured externalValue outside",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "можно items().push в signal array — Angular diff сам увидит. constructor ideal place для reactive reads.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "toggle/counter — signal local. TodoService shared. HTTP GET — HttpClient Observable + toSignal. legacy zone app — migrate piece by piece.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "форма toggle — signal; ngrx 17 selectors signals; primeNG table toSignal от http",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "все state только signals, HttpClient deprecated, rxjs удалён из angular 17.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "computed_effect_input",
+      "exampleType": "good",
+      "exampleText": "effect onCleanup clears interval. input.required<string>() — signals under hood, isAdult = computed(() => age()>=18). Zone-less batch set — consistent snapshot.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "computed_effect_input",
+      "exampleType": "good",
+      "exampleText": "computed lazy — пересчёт только когда читают после upstream change. onCleanup перед rerun effect",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "computed_effect_input",
+      "exampleType": "bad",
+      "exampleText": "input signals need ngOnChanges. effect never calls cleanup. computed runs every change detection cycle.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "signals-in-angular",
+    "apiUrl": "https://api.itlead.org/api/questions/signals-in-angular",
+    "pageUrl": "https://itlead.org/interview-questions/angular/signals-in-angular",
+    "difficulty": "MIDDLE",
+    "titleEn": "Signals in Angular",
+    "categorySlug": "angular",
+    "syncedAt": "2026-06-18T22:00:00.000Z"
+  }
+}

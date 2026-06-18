@@ -1,0 +1,401 @@
+{
+  "topic": {
+    "code": "what_is_dockerignore",
+    "name": ".dockerignore и build context",
+    "skillCode": "docker",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Что такое .dockerignore и зачем он нужен?",
+    "shortAnswer": ".dockerignore — файл в стиле .gitignore, который исключает файлы из build context при `docker build`. Без него на daemon уходит вся директория — node_modules, .git, секреты — что замедляет сборку, раздувает образ и может привести к утечке .env в image.",
+    "idealAnswer": ".dockerignore — самый простой и один из самых важных Docker-файлов: он управляет тем, что попадает в build context при `docker build`. Build context — директория, которую вы передаёте в `docker build` (обычно `.`); всё её содержимое загружается на daemon до начала сборки. Без .dockerignore отправляется ВСЯ директория: node_modules (сотни MB), .git (история 50–500 MB), dist/build, IDE-конфиг, .env и прочее. Синтаксис как у .gitignore: паттерны, комментарии `#`, negation через `!`, порядок правил важен — поздние перекрывают ранние. Файл должен лежать в корне build context (рядом с Dockerfile), не в поддиректории — Docker читает только `.dockerignore` из корня контекста. Три причины использовать: (1) скорость сборки — меньший context = быстрее transferring context и CI; (2) размер image — COPY . . не тащит лишнее; (3) безопасность — .env, *.pem, secrets.yaml не попадут в образ. Типичные исключения: node_modules/vendor/.venv (переустанавливаются в Dockerfile), .git, dist/build/out/target, *.log, .env*, IDE (.vscode, .idea), coverage, иногда tests. Ошибки: нет .dockerignore вообще (248 MB context вместо 4 MB); COPY . . копирует всё включая .env; .dockerignore в подпапке игнорируется; allow-list через `*` + `!src/**` хрупок; забывают что context один для всех stage multi-stage build. COPY файла из .dockerignore → ошибка «file not found» — для Docker его нет в context. .dockerignore ≠ .gitignore: независимые файлы, разное назначение; .git не в .gitignore, но должен быть в .dockerignore. Build-time only: на `docker run -v` bind mount не влияет. BuildKit: с `# syntax=docker/dockerfile:1.7` можно `<Dockerfile>.dockerignore` для нескольких Dockerfile в одном репо. Проверка: `docker build --progress=plain` смотреть transferring context; `tar --exclude-from=.dockerignore -cf - . | wc -c`. Real-world: обязателен в prod; критичен в monorepo и CI/cloud builds.",
+    "maxScore": 10,
+    "skills": ["docker"]
+  },
+  "checkpoints": [
+    {
+      "key": "dockerignore_definition",
+      "title": "Понимает .dockerignore и build context",
+      "expected": "Кандидат объясняет: .dockerignore исключает файлы из build context; build context — директория для docker build, всё содержимое загружается на daemon; файл в корне context рядом с Dockerfile.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — ядро темы для junior",
+        "mustConcepts": [
+          ".dockerignore",
+          "dockerignore",
+          "build context",
+          "контекст сборки",
+          "docker build",
+          "исключ",
+          "exclude",
+          "daemon",
+          "загруж",
+          "upload",
+          "transferring context",
+          "корень",
+          "Dockerfile",
+          "gitignore",
+          "директор"
+        ],
+        "falseClaims": [
+          ".dockerignore фильтрует файлы уже внутри образа после COPY",
+          "build context это только Dockerfile",
+          ".dockerignore работает при docker run",
+          "Docker читает .dockerignore из любой поддиректории репозитория"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "three_reasons",
+      "title": "Называет три причины использовать .dockerignore",
+      "expected": "Кандидат перечисляет: скорость сборки (меньший context), размер image, безопасность (секреты не попадают в образ); может привести пример 200+ MB → несколько MB.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "build speed / image size / security — три класса багов ITLead",
+        "impliesCheckpointFloors": [
+          { "checkpointKey": "dockerignore_definition", "floorFraction": 0.45 }
+        ],
+        "mustConcepts": [
+          "скорость",
+          "быстр",
+          "build speed",
+          "размер",
+          "image size",
+          "безопас",
+          "security",
+          "секрет",
+          ".env",
+          "утеч",
+          "leak",
+          "меньш",
+          "context",
+          "MB",
+          "CI"
+        ],
+        "falseClaims": [
+          ".dockerignore нужен только для уменьшения image, не для скорости",
+          "секреты в .env безопасны если COPY . .",
+          ".dockerignore не влияет на transferring context"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "pattern_syntax",
+      "title": "Знает синтаксис паттернов .dockerignore",
+      "expected": "Кандидат описывает: gitignore-подобный синтаксис; `*.log`, `logs/`, `**/temp`; negation `!`; порядок правил важен — поздние перекрывают ранние.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "pattern syntax из ITLead quick example",
+        "probeConceptGroups": [
+          {
+            "match": ["!", "negation", "исключени"],
+            "ask": "как через ! включить файл, который уже исключён паттерном выше"
+          }
+        ],
+        "mustConcepts": [
+          "gitignore",
+          "паттерн",
+          "glob",
+          "*.log",
+          "logs/",
+          "**",
+          "negation",
+          "!",
+          "порядок",
+          "перекры",
+          "комментар",
+          "исключени",
+          "include"
+        ],
+        "falseClaims": [
+          "порядок правил в .dockerignore не важен",
+          "negation ! работает идентично во всех версиях Docker без ограничений",
+          ".dockerignore использует regex вместо glob"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_exclusions",
+      "title": "Знает что обычно исключать",
+      "expected": "Кандидат называет: node_modules/vendor/.venv (переустанавливаются в Dockerfile), .git, dist/build/out, .env*/секреты, IDE/OS-мусор, coverage; понимает зачем каждая группа.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "why each entry matters — node_modules, .git, secrets",
+        "mustConcepts": [
+          "node_modules",
+          "vendor",
+          ".venv",
+          "__pycache__",
+          ".git",
+          "dist",
+          "build",
+          "out",
+          "target",
+          ".env",
+          "*.pem",
+          "secrets",
+          ".vscode",
+          ".idea",
+          ".DS_Store",
+          "coverage",
+          "npm ci",
+          "переустан"
+        ],
+        "falseClaims": [
+          "node_modules нужно копировать в образ через COPY . .",
+          ".git полезен в production image для git log",
+          ".env безопасно копировать если не в .gitignore"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с .dockerignore",
+      "expected": "Кандидат называет: нет файла вообще; COPY . . тащит .env; .dockerignore в поддиректории; хрупкий allow-list `*` + `!src/**`; один context для всех stage multi-stage; COPY исключённого файла → file not found.",
+      "score": 2.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes ITLead — security и build failures",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": ["COPY", ".env", "COPY . ."],
+            "ask": "что случится если .env есть в директории но не в .dockerignore и Dockerfile делает COPY . ."
+          },
+          {
+            "match": ["поддиректор", "api/.dockerignore", "корень"],
+            "ask": "где Docker ищет .dockerignore при docker build . из корня репо"
+          }
+        ],
+        "mustConcepts": [
+          "COPY . .",
+          ".env",
+          "file not found",
+          "поддиректор",
+          "корень context",
+          "allow-list",
+          "multi-stage",
+          "transferring context",
+          "248",
+          "312",
+          "аудит",
+          "утеч",
+          "нет .dockerignore"
+        ],
+        "falseClaims": [
+          "COPY . . автоматически игнорирует .env",
+          ".dockerignore в ./api/ работает при docker build . из корня",
+          "multi-stage build использует разный context для каждого stage",
+          "исключённый .dockerignore файл всё равно доступен для COPY"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "scope_and_gitignore",
+      "title": "Отличает .dockerignore от .gitignore и знает scope",
+      "expected": "Кандидат объясняет: .gitignore — для git, .dockerignore — для docker build; независимые файлы; build-time only, не влияет на docker run -v; BuildKit `<Dockerfile>.dockerignore` для нескольких Dockerfile.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up questions ITLead — vs gitignore, run -v, BuildKit",
+        "mustConcepts": [
+          ".gitignore",
+          "независим",
+          "build-time",
+          "docker run",
+          "-v",
+          "bind mount",
+          "BuildKit",
+          "Dockerfile.dockerignore",
+          "syntax=docker/dockerfile",
+          "git rev-parse",
+          "VERSION",
+          "build-arg"
+        ],
+        "falseClaims": [
+          ".dockerignore и .gitignore всегда идентичны",
+          ".dockerignore блокирует bind mount при docker run -v",
+          ".git автоматически исключается из build context без .dockerignore"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": ".dockerignore исключает файлы из build context при docker build. Без него на daemon уходит node_modules и .git — сотни MB. Три причины: быстрее сборка, меньше image, .env не попадёт в образ через COPY . .",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В Node-проекте: node_modules, .git, dist, .env*, coverage в .dockerignore. npm ci в Dockerfile ставит deps заново. transferring context падает с 300 MB до 4 MB — CI быстрее и дешевле.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Файл в корне build context рядом с Dockerfile. Синтаксис как gitignore: *.log, !.env.example. COPY исключённого файла — file not found. На docker run -v не влияет.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": ".dockerignore — то же что .gitignore, Docker сам читает .gitignore при build. Файл можно положить куда угодно в репо.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "COPY . . безопасен — Docker не копирует .env если он в .gitignore. Multi-stage каждый stage получает свой отдельный context.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": ".dockerignore замедляет build потому что Docker дважды сканирует файлы. node_modules обязательно включать в context для npm ci.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "dockerignore_definition",
+      "exampleType": "good",
+      "exampleText": "Build context — директория для docker build; .dockerignore фильтрует что upload на daemon до старта сборки.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "dockerignore_definition",
+      "exampleType": "good",
+      "exampleText": "ну dockerignore как gitignore для build — без него весь каталог летит на daemon",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "dockerignore_definition",
+      "exampleType": "bad",
+      "exampleText": ".dockerignore удаляет файлы из образа после COPY, как .dockerignore на runtime.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "three_reasons",
+      "exampleType": "good",
+      "exampleText": "Три причины: скорость (меньше transferring context), размер image, безопасность (.env не в образе).",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "three_reasons",
+      "exampleType": "good",
+      "exampleText": "312 MB context → 4 MB после node_modules и .git — build в 5 раз быстрее на CI",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "three_reasons",
+      "exampleType": "bad",
+      "exampleText": ".dockerignore нужен только чтобы README не попал в image, на скорость не влияет.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "pattern_syntax",
+      "exampleType": "good",
+      "exampleText": "*.log на любой глубине; logs/ — вся папка; !important.log — исключение из правила выше; порядок важен.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "pattern_syntax",
+      "exampleType": "good",
+      "exampleText": "src/**/*.test.js — тесты под src; **/temp — temp на любой глубине",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "pattern_syntax",
+      "exampleType": "bad",
+      "exampleText": "В .dockerignore только exact match имён файлов, glob не работает.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "common_exclusions",
+      "exampleType": "good",
+      "exampleText": "node_modules — сотни MB, npm ci в Dockerfile; .git — история не нужна; .env* — секреты; dist — пересобирается внутри image.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "common_exclusions",
+      "exampleType": "good",
+      "exampleText": "vendor, .venv, __pycache__ — аналог node_modules; .vscode, .DS_Store — мусор IDE/OS",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "common_exclusions",
+      "exampleType": "bad",
+      "exampleText": ".git нужен в image для git rev-parse внутри контейнера — всегда COPY .git.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "COPY . . без .dockerignore — .env в образе. Файл только в корне context: api/.dockerignore игнорируется при docker build .",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Allow-list `*` + `!src/**` хрупкий; лучше deny-list. Multi-stage — один filtered context на все stage.",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Если файл в .dockerignore, COPY всё равно его найдёт через force flag.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "scope_and_gitignore",
+      "exampleType": "good",
+      "exampleText": ".gitignore для git, .dockerignore для build — разные файлы. .git в gitignore нет, в dockerignore должен быть. Build-time only, -v mount не фильтруется.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "scope_and_gitignore",
+      "exampleType": "good",
+      "exampleText": "BuildKit: Dockerfile.dockerignore рядом с api/Dockerfile для разных exclude per service",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "scope_and_gitignore",
+      "exampleType": "bad",
+      "exampleText": ".dockerignore блокирует docker run -v ./data:/app/data — mount не сработает.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "what-is-dockerignore",
+    "apiUrl": "https://api.itlead.org/api/questions/what-is-dockerignore",
+    "pageUrl": "https://itlead.org/interview-questions/docker/what-is-dockerignore",
+    "difficulty": "JUNIOR",
+    "titleEn": "What is .dockerignore and why do you need it?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T22:00:00.000Z"
+  }
+}

@@ -1,0 +1,602 @@
+{
+  "topic": {
+    "code": "docker_bridge_networking",
+    "name": "Docker Bridge Networking",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работает bridge networking в Docker?",
+    "shortAnswer": "Docker bridge networking — режим по умолчанию для связи контейнеров на одном хосте: Linux software bridge (docker0 или br-<id>) соединяет контейнеры через veth-пары; iptables MASQUERADE NAT'ит исходящий трафик, DNAT реализует -p. Контейнеры на одном bridge общаются напрямую; user-defined bridge добавляет DNS по имени, default docker0 — нет.",
+    "idealAnswer": "Bridge networking — дефолтный драйвер Docker для single-host коммуникации. Под капотом: Linux software bridge на хосте (default `docker0`, user-defined — `br-<random-id>`) и veth-пара на каждый контейнер: один конец в network namespace контейнера как `eth0`, второй присоединён к bridge. Все контейнеры на одном bridge получают IP из приватной подсети (например 172.17.0.0/16 или 172.18.0.0/24) и достигают друг друга напрямую на любом порту — bridge форвардит пакеты между veth без NAT. Хост может достучаться до контейнера по bridge IP, но не по имени контейнера — embedded DNS работает только внутри контейнеров на том же bridge. Исходящий трафик: пакет выходит eth0 → bridge → outbound interface хоста → iptables MASQUERADE переписывает source IP на IP хоста → интернет; обратный путь через conntrack. Публикация портов `-p 8080:80`: iptables DNAT `host:8080 → container_ip:80`; docker-proxy как fallback для IPv6/loopback. Default bridge (`docker0`, сеть `bridge`) vs user-defined (`docker network create`): у default нет DNS по имени (только legacy --link), нет изоляции проектов, subnet 172.17.0.0/16; user-defined даёт embedded DNS 127.0.0.11, изоляцию сетей, кастомный subnet. Без `--network` контейнер попадает на default bridge — для нетривиальных задач всегда создавай user-defined сеть. Типичные ошибки: curl http://web с хоста (DNS не резолвит); api на net-a и db на net-b не пингуются (bridges изолированы — connect или одна сеть); контейнеры на docker0 без DNS; `iptables -F` ломает DOCKER chain и port publishing — restart docker. Отладка: `docker network inspect`, `docker inspect --format IPAddress`, `tcpdump -i br-*`, `iptables -t nat -L DOCKER`. Compose автосоздаёт user-defined bridge с DNS по service name. Кастом subnet: `docker network create --subnet 10.0.0.0/24`.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "bridge_basics",
+      "title": "Понимает bridge networking",
+      "expected": "Кандидат объясняет: Linux software bridge на хосте (docker0 / br-<id>), приватная подсеть, default режим single-host связи контейнеров.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — что такое bridge и зачем Docker его создаёт",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "docker0",
+              "bridge",
+              "br-"
+            ],
+            "ask": "чем отличается default docker0 от user-defined bridge br-<id>"
+          }
+        ],
+        "mustConcepts": [
+          "bridge",
+          "bridge networking",
+          "docker0",
+          "br-",
+          "Linux software bridge",
+          "software bridge",
+          "single-host",
+          "один хост",
+          "приватн",
+          "подсеть",
+          "172.17",
+          "172.18",
+          "default",
+          "дефолт",
+          "network namespace",
+          "драйвер bridge"
+        ],
+        "falseClaims": [
+          "bridge networking работает между разными хостами без overlay",
+          "docker0 это контейнерный интерфейс внутри контейнера",
+          "все контейнеры Docker автоматически в одной глобальной сети интернета",
+          "bridge заменяет iptables для публикации портов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "veth_architecture",
+      "title": "Знает архитектуру veth-пары",
+      "expected": "Кандидат описывает veth как виртуальный кабель: eth0 в namespace контейнера ↔ veth на хосте ↔ bridge; пакет на одном конце выходит на другом.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "veth — фундаментальный механизм из ITLead диаграммы",
+        "confusionPairs": [
+          {
+            "checkpointKey": "veth_architecture",
+            "oftenConfusedWith": [
+              "bridge_basics"
+            ],
+            "anchorTermsExpected": [
+              "veth",
+              "eth0",
+              "namespace",
+              "виртуальн кабель",
+              "пара"
+            ],
+            "anchorTermsWrongTopic": [
+              "veth это физический NIC",
+              "eth0 на хосте"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "veth",
+              "eth0"
+            ],
+            "ask": "куда подключается каждый конец veth-пары — хост и контейнер"
+          }
+        ],
+        "mustConcepts": [
+          "veth",
+          "veth pair",
+          "veth-пар",
+          "eth0",
+          "network namespace",
+          "namespace контейнер",
+          "виртуальн",
+          "кабель",
+          "один конец",
+          "другой конец",
+          "brctl",
+          "bridge link",
+          "eth0@if",
+          "присоедин",
+          "attach"
+        ],
+        "falseClaims": [
+          "veth — это физический сетевой адаптер хоста",
+          "eth0 контейнера напрямую подключён к eth0 хоста без bridge",
+          "Docker не использует veth для bridge networking",
+          "veth-пара существует только внутри контейнера"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "container_to_container",
+      "title": "Понимает трафик между контейнерами",
+      "expected": "Кандидат объясняет: на одном bridge контейнеры общаются по IP напрямую, bridge форвардит veth→veth без NAT; на user-defined bridge — ещё и по имени через DNS 127.0.0.11.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "container-to-container flow — ключевой сценарий Compose",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "veth_architecture",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "контейнер",
+              "container",
+              "напрямую",
+              "без NAT"
+            ],
+            "ask": "нужен ли NAT когда api стучится в db на том же bridge"
+          },
+          {
+            "match": [
+              "127.0.0.11",
+              "DNS",
+              "по имени"
+            ],
+            "ask": "как api резолвит hostname db на user-defined bridge"
+          }
+        ],
+        "mustConcepts": [
+          "контейнер",
+          "напрямую",
+          "без NAT",
+          "форвард",
+          "forward",
+          "bridge logic",
+          "vethA",
+          "vethB",
+          "один bridge",
+          "та же сеть",
+          "127.0.0.11",
+          "embedded DNS",
+          "resolv.conf",
+          "по имени",
+          "ping db",
+          "nslookup"
+        ],
+        "falseClaims": [
+          "контейнеры на одном bridge всегда общаются через NAT хоста",
+          "для связи двух контейнеров обязательно нужен -p",
+          "DNS по имени работает на default docker0",
+          "контейнеры на разных bridge видят друг друга по умолчанию"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "outbound_masquerade",
+      "title": "Понимает исходящий трафик и MASQUERADE",
+      "expected": "Кандидат описывает путь наружу: eth0 → bridge → outbound NIC → iptables MASQUERADE меняет source IP на IP хоста; обратный трафик через conntrack.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "NAT наружу — отличие от container-to-container",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "MASQUERADE",
+              "исходящ",
+              "outbound"
+            ],
+            "ask": "почему source IP контейнера переписывается при выходе в интернет"
+          }
+        ],
+        "mustConcepts": [
+          "исходящ",
+          "outbound",
+          "MASQUERADE",
+          "NAT",
+          "source IP",
+          "перепис",
+          "outbound interface",
+          "интернет",
+          "conntrack",
+          "обратн",
+          "return traffic",
+          "eth0 хоста",
+          "wlan0"
+        ],
+        "falseClaims": [
+          "исходящий трафик контейнера уходит в интернет с приватным IP 172.x без NAT",
+          "MASQUERADE не нужен для bridge networking",
+          "conntrack не участвует в возврате пакетов контейнеру",
+          "исходящий и container-to-container трафик обрабатываются одинаково через NAT"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "port_publishing_dnat",
+      "title": "Знает публикацию портов `-p` / DNAT",
+      "expected": "Кандидат объясняет: `-p 8080:80` создаёт iptables DNAT host:8080 → container_ip:80; docker-proxy как fallback; с хоста можно и через bridge IP.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый механизм доступа с хоста/снаружи",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "-p",
+              "DNAT",
+              "8080"
+            ],
+            "ask": "что делает iptables DNAT при curl localhost:8080"
+          }
+        ],
+        "mustConcepts": [
+          "-p",
+          "port publishing",
+          "публикац",
+          "DNAT",
+          "iptables",
+          "DOCKER chain",
+          "host:8080",
+          "container_ip",
+          "docker-proxy",
+          "localhost",
+          "bridge IP",
+          "172.17",
+          "mapping"
+        ],
+        "falseClaims": [
+          "-p меняет только firewall контейнера без iptables на хосте",
+          "DNAT переписывает source IP а не destination",
+          "docker-proxy обрабатывает весь трафик вместо iptables",
+          "без -p хост никогда не достучится до контейнера даже по bridge IP"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "default_vs_user_bridge",
+      "title": "Отличает default bridge от user-defined",
+      "expected": "Кандидат сравнивает: docker0/bridge без DNS по имени и без изоляции vs user-defined с DNS 127.0.0.11, br-<id>, изоляцией; рекомендует user-defined для реальных задач.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "главный практический differentiator — DNS и изоляция",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "bridge_basics",
+            "floorFraction": 0.45
+          },
+          {
+            "checkpointKey": "container_to_container",
+            "floorFraction": 0.35
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "default_vs_user_bridge",
+            "oftenConfusedWith": [
+              "container_to_container"
+            ],
+            "anchorTermsExpected": [
+              "docker0",
+              "user-defined",
+              "127.0.0.11",
+              "DNS",
+              "docker network create"
+            ],
+            "anchorTermsWrongTopic": [
+              "default bridge имеет embedded DNS",
+              "docker0 изолирует проекты"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "docker0",
+              "default bridge"
+            ],
+            "ask": "почему ping по имени не работает на default bridge"
+          },
+          {
+            "match": [
+              "docker network create",
+              "user-defined"
+            ],
+            "ask": "зачем создавать appnet перед docker run"
+          }
+        ],
+        "mustConcepts": [
+          "docker0",
+          "default bridge",
+          "дефолтн",
+          "user-defined",
+          "docker network create",
+          "127.0.0.11",
+          "embedded DNS",
+          "DNS по имени",
+          "изоляц",
+          "net-a",
+          "net-b",
+          "docker network connect",
+          "172.17.0.0/16",
+          "--network",
+          "Compose",
+          "service name",
+          "--link",
+          "legacy"
+        ],
+        "falseClaims": [
+          "default bridge docker0 поддерживает DNS по имени контейнера",
+          "user-defined bridge не даёт DNS резолвинг",
+          "все контейнеры без --network изолированы друг от друга",
+          "docker0 и user-defined bridge используют одну подсеть 172.18.0.0/24"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes_debug",
+      "title": "Знает типичные ошибки и отладку",
+      "expected": "Кандидат называет: curl по имени с хоста не работает; разные bridges изолированы; iptables -F ломает DOCKER chain; инструменты: network inspect, tcpdump, iptables -L DOCKER.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes и debugging из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "curl http://web",
+              "с хоста",
+              "имя"
+            ],
+            "ask": "как с хоста достучаться до контейнера web — имя или IP/порт"
+          },
+          {
+            "match": [
+              "iptables -F",
+              "UFW",
+              "firewalld"
+            ],
+            "ask": "почему после flush iptables перестаёт работать -p"
+          }
+        ],
+        "mustConcepts": [
+          "curl",
+          "с хоста",
+          "по имени",
+          "localhost:8080",
+          "bridge IP",
+          "разные bridge",
+          "net-a",
+          "network connect",
+          "iptables -F",
+          "DOCKER chain",
+          "UFW",
+          "firewalld",
+          "restart docker",
+          "docker network inspect",
+          "tcpdump",
+          "iptables -L DOCKER",
+          "FORWARD",
+          "docker inspect",
+          "subnet",
+          "VPN collision"
+        ],
+        "falseClaims": [
+          "с хоста можно curl http://container-name как внутри bridge",
+          "iptables -F не влияет на Docker networking",
+          "контейнеры на net-a и net-b общаются без network connect",
+          "для отладки bridge достаточно только docker ps"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Docker создаёт Linux bridge docker0 или br-<id>. На каждый контейнер — veth: eth0 внутри, второй конец на bridge. Контейнеры на одном bridge пингуют друг друга по IP без NAT. Наружу — MASQUERADE. -p 8080:80 — DNAT на IP контейнера. User-defined bridge даёт DNS 127.0.0.11, default docker0 — нет.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для Compose всегда user-defined сеть: api ходит в postgres://db:5432 потому что embedded DNS резолвит db. С хоста — только localhost:published_port или 172.18.0.2, не curl http://api. Если api на net-a, db на net-b — connect api к net-b или одна сеть. После iptables -F — systemctl restart docker.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "veth — виртуальный кабель между namespace контейнера и bridge хоста. Container A→B на одном bridge: bridge форвардит vethA→vethB. Исходящий в GitHub: MASQUERADE подменяет source на IP хоста, conntrack возвращает ответ. Отладка: tcpdump -i br-*, iptables -t nat -L DOCKER.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Bridge networking — это когда Docker пробрасывает порты через SSH туннель между хостами. Контейнеры общаются по имени с хоста через встроенный DNS docker0.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "На одном bridge контейнеры всегда ходят друг к другу через NAT хоста. -p меняет только EXPOSE в Dockerfile, iptables не участвует.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "api на net-a и db на net-b должны видеть друг друга — bridges не изолированы. После iptables -F Docker сам пересоздаёт правила без рестарта.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "bridge_basics",
+      "exampleType": "good",
+      "exampleText": "Bridge networking — Linux software bridge на хосте, default single-host режим; контейнеры в приватной подсети 172.x.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "bridge_basics",
+      "exampleType": "good",
+      "exampleText": "ну docker поднимает docker0 или br-abc123 — это виртуальный свитч, все контейнеры на нём в одной локалке",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "bridge_basics",
+      "exampleType": "bad",
+      "exampleText": "Bridge networking соединяет контейнеры на разных физических серверах без overlay сети.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "veth_architecture",
+      "exampleType": "good",
+      "exampleText": "veth-пара: eth0 в namespace контейнера, vethXXX на хосте прикреплён к bridge — пакет на одном конце выходит на другом.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "veth_architecture",
+      "exampleType": "good",
+      "exampleText": "brctl show показывает vethabcd123 на br-1234abcd, внутри контейнера eth0@if6 — два конца одного кабеля",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "veth_architecture",
+      "exampleType": "bad",
+      "exampleText": "eth0 контейнера — это физический Wi-Fi адаптер хоста, veth не используется.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "container_to_container",
+      "exampleType": "good",
+      "exampleText": "api и db на appnet: api стучится в db:5432, DNS 127.0.0.11 резолвит в 172.18.0.2, bridge форвардит без NAT.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "container_to_container",
+      "exampleType": "good",
+      "exampleText": "на одном bridge ping по IP работает на любом порту, хост в L3 не участвует кроме routing",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "container_to_container",
+      "exampleType": "bad",
+      "exampleText": "для связи api→db на одном bridge обязательно пробросить -p на postgres порт.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "outbound_masquerade",
+      "exampleType": "good",
+      "exampleText": "Контейнер в GitHub: пакет 172.18.0.2→140.82.x.x, на выходе MASQUERADE подменяет source на IP eth0 хоста, ответ по conntrack обратно в контейнер.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "outbound_masquerade",
+      "exampleType": "good",
+      "exampleText": "исходящий трафик натится, внутренний container-to-container — нет, это разные пути",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "outbound_masquerade",
+      "exampleType": "bad",
+      "exampleText": "Контейнер выходит в интернет с приватным 172.18.0.2 без переписывания source — сайты видят IP контейнера.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "port_publishing_dnat",
+      "exampleType": "good",
+      "exampleText": "-p 8080:80: iptables DNAT to:172.17.0.2:80, curl localhost:8080 попадает в nginx; альтернатива — curl 172.17.0.2 напрямую с хоста.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "port_publishing_dnat",
+      "exampleType": "good",
+      "exampleText": "iptables -t nat -L DOCKER покажет DNAT на 8080, docker-proxy — запасной путь для ipv6/loopback",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "port_publishing_dnat",
+      "exampleType": "bad",
+      "exampleText": "-p только открывает порт внутри контейнера, на хосте DNAT не создаётся.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "default_vs_user_bridge",
+      "exampleType": "good",
+      "exampleText": "docker network create appnet → br-<id>, DNS по service name; docker run без --network попадает на docker0 без DNS — ping db не сработает.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "default_vs_user_bridge",
+      "exampleType": "good",
+      "exampleText": "default bridge — все проекты в одной куче, user-defined изолирует стеки; для prod всегда явная сеть",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "default_vs_user_bridge",
+      "exampleType": "bad",
+      "exampleText": "docker0 резолвит имена контейнеров через 127.0.0.11 так же как user-defined bridge.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes_debug",
+      "exampleType": "good",
+      "exampleText": "curl http://web с хоста падает — DNS только внутри bridge; используй localhost:8080 или docker inspect IP. api на net-a, db на net-b — docker network connect.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes_debug",
+      "exampleType": "good",
+      "exampleText": "порт опубликован но не работает — проверь iptables DOCKER, FORWARD, UFW поверх Docker; tcpdump -i any port 80 где пакет теряется",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes_debug",
+      "exampleType": "bad",
+      "exampleText": "для отладки bridge достаточно docker ps — iptables и tcpdump не нужны.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-bridge-networking",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-bridge-networking",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-bridge-networking",
+    "difficulty": "MIDDLE",
+    "titleEn": "How does Docker bridge networking work?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

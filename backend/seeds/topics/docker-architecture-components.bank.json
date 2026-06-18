@@ -1,0 +1,639 @@
+{
+  "topic": {
+    "code": "docker_architecture_components",
+    "name": "Компоненты архитектуры Docker",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Какие основные компоненты входят в архитектуру Docker и как они взаимодействуют?",
+    "shortAnswer": "Архитектура Docker — client-server стек: CLI `docker` общается с daemon `dockerd` по REST API. Daemon делегирует жизненный цикл контейнеров `containerd`, который через `runc` реально запускает процесс с namespaces и cgroups. Образы приходят из registry (Docker Hub или другого).",
+    "idealAnswer": "Docker — не один бинарник, а многослойный стек с чёткими контрактами (REST, OCI). Пять основных компонентов: client (`docker` CLI) → daemon (`dockerd`) → `containerd` → `runc` → процесс контейнера; плюс registry для хранения и дистрибуции образов. `docker` CLI — тонкий REST-клиент без собственного состояния: парсит команды, шлёт запросы на Engine API через Unix-socket `/var/run/docker.sock` или TCP (`DOCKER_HOST`). Вся логика — в daemon. `dockerd` — долгоживущий процесс (systemd): REST API, управление образами (pull/build/tag, `/var/lib/docker/`), сетями (bridge/overlay/host, iptables), volumes, BuildKit для `docker build`, плагины. Сам контейнеры не запускает — делегирует lifecycle в `containerd` по gRPC. `containerd` — production-grade runtime (CNCF): pull/unpack образов, создание container objects (rootfs + config), start/stop через нижние runtime, трекинг состояния. Kubernetes использует containerd напрямую через CRI, без dockerd. `runc` — reference-реализация OCI Runtime Spec: по JSON-config и rootfs настраивает namespaces, cgroups, mounts и exec() entry-процесс, затем выходит. Долгоживущий процесс контейнера — это CMD, родитель — `containerd-shim` (один на контейнер): держит stdio, переживает рестарт containerd/dockerd. Registry реализует OCI Distribution Spec: daemon тянет/пушит образы по HTTPS (Docker Hub = docker.io/library/..., ECR, GHCR, Harbor). Flow `docker run hello-world`: CLI → POST create/start на dockerd → pull из registry если нет кэша → dockerd → containerd (create) → shim → runc (setup + exec) → runc exit, процесс жив. Остановка dockerd не убивает контейнеры (shim); остановка containerd — убивает. Типичные ошибки: путать dockerd и containerd; думать что CLI что-то делает сам; забыть что на Mac/Windows весь стек в Linux VM (Docker Desktop). Слойность появилась после OCI (2015+): стандартизация runtime и переиспользование containerd в K8s. Альтернативы: Podman (daemonless, без dockerd), nerdctl (напрямую к containerd). BuildKit — subprocess daemon для сборки. Приложение внутри контейнера видит только kernel/namespaces/cgroups, не знает про Docker stack.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "architecture_stack",
+      "title": "Понимает стек Docker",
+      "expected": "Кандидат называет цепочку: client → dockerd → containerd → runc → процесс контейнера; отдельно registry для образов; понимает client-server и стандартные контракты (REST, OCI).",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — пять слоёв и registry",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "architecture_stack",
+            "oftenConfusedWith": [
+              "docker_run_flow",
+              "dockerd_daemon"
+            ],
+            "anchorTermsExpected": [
+              "client",
+              "dockerd",
+              "containerd",
+              "runc",
+              "registry",
+              "REST",
+              "OCI",
+              "client-server"
+            ],
+            "anchorTermsWrongTopic": [
+              "Kubernetes pod",
+              "virtual machine hypervisor",
+              "Dockerfile инструкции"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "dockerd",
+              "containerd",
+              "runc"
+            ],
+            "ask": "перечисли компоненты по порядку от команды docker run до работающего процесса"
+          }
+        ],
+        "mustConcepts": [
+          "client",
+          "CLI",
+          "dockerd",
+          "daemon",
+          "containerd",
+          "runc",
+          "registry",
+          "образ",
+          "контейнер",
+          "процесс",
+          "client-server",
+          "REST",
+          "OCI",
+          "стек",
+          "слой",
+          "компонент",
+          "цепочк"
+        ],
+        "falseClaims": [
+          "Docker — один монолитный бинарник без слоёв",
+          "registry запускает контейнеры",
+          "runc — долгоживущий daemon как dockerd",
+          "CLI и daemon — одно и то же",
+          "containerd заменяет registry для хранения образов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "docker_client",
+      "title": "Знает роль Docker CLI",
+      "expected": "Кандидат объясняет: `docker` CLI — тонкий REST-клиент без state; подключается через docker.sock или DOCKER_HOST; intelligence в daemon; без dockerd команды не работают.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовая роль CLI из ITLead component #1",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "CLI",
+              "docker.sock",
+              "REST"
+            ],
+            "ask": "куда CLI отправляет запросы и что будет если dockerd остановлен"
+          }
+        ],
+        "mustConcepts": [
+          "CLI",
+          "клиент",
+          "REST",
+          "docker.sock",
+          "DOCKER_HOST",
+          "Unix socket",
+          "TCP",
+          "без состоян",
+          "тонк",
+          "обёртк",
+          "Engine API",
+          "не работает без daemon",
+          "Cannot connect"
+        ],
+        "falseClaims": [
+          "docker CLI сам запускает контейнеры локально",
+          "CLI хранит состояние контейнеров",
+          "docker ps работает без запущенного dockerd",
+          "CLI напрямую вызывает runc минуя daemon"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "dockerd_daemon",
+      "title": "Знает роль dockerd",
+      "expected": "Кандидат перечисляет зоны ответственности dockerd: Engine API, images, networks, volumes, BuildKit; сам контейнеры не запускает — делегирует containerd.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "мозг системы — images/networks/build и делегирование",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "architecture_stack",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "dockerd_daemon",
+            "oftenConfusedWith": [
+              "containerd_runc_shim",
+              "architecture_stack"
+            ],
+            "anchorTermsExpected": [
+              "dockerd",
+              "Engine API",
+              "образ",
+              "сеть",
+              "volume",
+              "BuildKit",
+              "делегир",
+              "containerd"
+            ],
+            "anchorTermsWrongTopic": [
+              "dockerd вызывает runc напрямую всегда",
+              "dockerd = containerd"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "dockerd",
+              "BuildKit",
+              "volume"
+            ],
+            "ask": "чем занимается dockerd и что он делегирует containerd"
+          }
+        ],
+        "mustConcepts": [
+          "dockerd",
+          "daemon",
+          "Engine API",
+          "REST API",
+          "образ",
+          "image",
+          "pull",
+          "build",
+          "tag",
+          "сеть",
+          "network",
+          "volume",
+          "BuildKit",
+          "iptables",
+          "var/lib/docker",
+          "делегир",
+          "containerd",
+          "gRPC",
+          "не запускает сам"
+        ],
+        "falseClaims": [
+          "dockerd напрямую exec() процесс контейнера без containerd",
+          "dockerd не управляет сетями и volumes",
+          "BuildKit — часть runc",
+          "dockerd и containerd выполняют одну и ту же роль"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "containerd_runc_shim",
+      "title": "Различает containerd, runc и shim",
+      "expected": "Кандидат различает: containerd — долгоживущий daemon lifecycle (pull, state, many containers); runc — one-shot OCI binary (namespaces, cgroups, exec, exit); shim — процесс на контейнер, держит stdio и переживает рестарт containerd.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевое различие runtime-слоёв и shim — частая ошибка на интервью",
+        "falseClaimCapFraction": 0,
+        "confusionPairs": [
+          {
+            "checkpointKey": "containerd_runc_shim",
+            "oftenConfusedWith": [
+              "dockerd_daemon",
+              "architecture_stack"
+            ],
+            "anchorTermsExpected": [
+              "containerd",
+              "runc",
+              "shim",
+              "OCI",
+              "namespaces",
+              "cgroups",
+              "one-shot",
+              "lifecycle"
+            ],
+            "anchorTermsWrongTopic": [
+              "runc работает постоянно",
+              "containerd = docker CLI",
+              "shim это registry"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "containerd",
+              "runc"
+            ],
+            "ask": "чем containerd отличается от runc и зачем нужен containerd-shim"
+          },
+          {
+            "match": [
+              "shim",
+              "containerd-shim"
+            ],
+            "ask": "почему runc не остаётся родителем процесса контейнера"
+          }
+        ],
+        "mustConcepts": [
+          "containerd",
+          "runc",
+          "shim",
+          "containerd-shim",
+          "OCI",
+          "Runtime Spec",
+          "namespaces",
+          "cgroups",
+          "rootfs",
+          "lifecycle",
+          "one-shot",
+          "выходит",
+          "долгоживущ",
+          "state",
+          "stdio",
+          "рестарт",
+          "CRI",
+          "Kubernetes",
+          "exec"
+        ],
+        "falseClaims": [
+          "runc — долгоживущий daemon как containerd",
+          "containerd и runc — одно и то же",
+          "процесс контейнера parented runc после старта",
+          "shim не нужен, containerd сам держит контейнер",
+          "остановка dockerd всегда убивает все контейнеры через runc"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "registry_role",
+      "title": "Понимает registry",
+      "expected": "Кандидат объясняет: registry хранит и отдаёт образы по OCI Distribution Spec; dockerd pull/push по HTTPS; Docker Hub по умолчанию; ECR/GHCR/Harbor в проде.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "пятый компонент TL;DR — side storage для images",
+        "mustConcepts": [
+          "registry",
+          "Docker Hub",
+          "docker.io",
+          "ECR",
+          "GHCR",
+          "Harbor",
+          "Distribution Spec",
+          "OCI",
+          "pull",
+          "push",
+          "HTTPS",
+          "слои",
+          "layers",
+          "хранен",
+          "дистрибуц"
+        ],
+        "falseClaims": [
+          "registry запускает контейнеры на сервере",
+          "docker pull не обращается к registry если образ локальный всегда",
+          "Docker Hub — единственный возможный registry",
+          "registry заменяет dockerd при docker run"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "docker_run_flow",
+      "title": "Описывает flow docker run",
+      "expected": "Кандидат проходит цепочку hello-world/nginx: CLI REST → dockerd pull/create → gRPC containerd → shim → runc setup+exec → runc exit, процесс жив; может упомянуть 4+ процесса.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "quick example ITLead — интеграционный flow через все слои",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "architecture_stack",
+            "floorFraction": 0.5
+          },
+          {
+            "checkpointKey": "containerd_runc_shim",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "docker run",
+              "hello-world"
+            ],
+            "ask": "пошагово что происходит при docker run hello-world"
+          }
+        ],
+        "mustConcepts": [
+          "docker run",
+          "POST",
+          "containers/create",
+          "containers/start",
+          "pull",
+          "gRPC",
+          "create",
+          "start",
+          "shim",
+          "runc",
+          "namespaces",
+          "cgroups",
+          "exec",
+          "CMD",
+          "процесс жив",
+          "runc выходит",
+          "кэш образ"
+        ],
+        "falseClaims": [
+          "docker run идёт напрямую CLI → runc без dockerd",
+          "runc остаётся работать пока контейнер жив",
+          "pull образа делает containerd CLI команда docker без daemon",
+          "docker run создаёт только один процесс на всём стеке"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные заблуждения",
+      "expected": "Кандидат различает dockerd vs containerd (остановка dockerd ≠ kill containers; containerd stop — kill); CLI — frontend; приложение в контейнере не знает Docker; Mac/Windows — Linux VM под капотом.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes ITLead — отличает оператора от разработчика приложения",
+        "falseClaimCapFraction": 0,
+        "confusionPairs": [
+          {
+            "checkpointKey": "common_mistakes",
+            "oftenConfusedWith": [
+              "dockerd_daemon",
+              "containerd_runc_shim"
+            ],
+            "anchorTermsExpected": [
+              "dockerd",
+              "containerd",
+              "останов",
+              "CLI",
+              "VM",
+              "Mac",
+              "оператор"
+            ],
+            "anchorTermsWrongTopic": [
+              "приложению нужен dockerd внутри контейнера",
+              "docker stop dockerd безопасен для работы CLI"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "dockerd",
+              "containerd",
+              "останов"
+            ],
+            "ask": "что произойдёт с контейнерами если остановить dockerd vs containerd"
+          }
+        ],
+        "mustConcepts": [
+          "dockerd",
+          "containerd",
+          "пута",
+          "CLI",
+          "frontend",
+          "Cannot connect",
+          "останов dockerd",
+          "контейнер жив",
+          "останов containerd",
+          "приложен",
+          "kernel",
+          "namespaces",
+          "оператор",
+          "Mac",
+          "Windows",
+          "Linux VM",
+          "Docker Desktop",
+          "Podman",
+          "nerdctl",
+          "OCI образ"
+        ],
+        "falseClaims": [
+          "остановка dockerd всегда убивает все контейнеры",
+          "docker CLI продолжит работать после stop dockerd",
+          "код внутри контейнера должен знать про containerd",
+          "на Mac dockerd работает нативно без VM",
+          "dockerd и containerd можно считать одним daemon"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Docker — client-server: `docker` CLI шлёт REST на dockerd, dockerd тянет образ из registry и через containerd + runc запускает процесс. runc настраивает namespaces/cgroups и выходит; контейнер держит shim. На K8s kubelet ходит в containerd по CRI, dockerd не нужен.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "docker run nginx: cli → dockerd (pull если надо) → containerd create → shim → runc exec nginx → runc exit. dockerd ещё сети и volumes крутит, но lifecycle контейнера — зона containerd. На Mac весь стек в Linux VM, CLI только в macOS.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Пять частей: клиент, daemon, containerd, runc, registry. OCI стандартизировал image/runtime/distribution — образ из Docker пойдёт в Podman. Podman без dockerd, nerdctl напрямую к containerd.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Docker — один бинарник docker, он и клиент и daemon и runtime. Registry запускает контейнеры когда делаешь docker run.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "runc — главный daemon Docker, containerd это просто alias dockerd. docker ps работает даже если dockerd остановлен.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Приложение в контейнере должно подключаться к docker.sock чтобы работать. На Windows dockerd нативный, VM не нужна.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "architecture_stack",
+      "exampleType": "good",
+      "exampleText": "Цепочка: docker CLI → REST → dockerd → gRPC containerd → runc → процесс; образы из registry сбоку.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "architecture_stack",
+      "exampleType": "good",
+      "exampleText": "ну пять слоёв плюс registry, client-server, контракты OCI и REST",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "architecture_stack",
+      "exampleType": "bad",
+      "exampleText": "Архитектура Docker — Dockerfile, docker-compose и Kubernetes pod, больше ничего.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "docker_client",
+      "exampleType": "good",
+      "exampleText": "CLI — тонкий REST-клиент на /var/run/docker.sock, stateless; вся логика в dockerd.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "docker_client",
+      "exampleType": "good",
+      "exampleText": "остановил dockerd — docker ps пишет Cannot connect, cli сам ничего не запускает",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "docker_client",
+      "exampleType": "bad",
+      "exampleText": "docker CLI хранит список контейнеров локально и синхронизирует с daemon когда удобно.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "dockerd_daemon",
+      "exampleType": "good",
+      "exampleText": "dockerd: Engine API, images в /var/lib/docker, bridge-сети, volumes, BuildKit для build; контейнеры делегирует containerd по gRPC.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "dockerd_daemon",
+      "exampleType": "good",
+      "exampleText": "daemon мозг — pull/tag/network, но runc не дергает сам, только через containerd",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "dockerd_daemon",
+      "exampleType": "bad",
+      "exampleText": "dockerd сам exec() nginx и держит процесс, containerd только для Kubernetes.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "containerd_runc_shim",
+      "exampleType": "good",
+      "exampleText": "containerd — долгоживущий lifecycle daemon; runc — one-shot OCI: namespaces, cgroups, exec, exit. Shim parent процесса и переживает рестарт containerd.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "containerd_runc_shim",
+      "exampleType": "good",
+      "exampleText": "runc не висит в ps — пробежал и вышел; в ps виден containerd-shim на каждый контейнер",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "containerd_runc_shim",
+      "exampleType": "bad",
+      "exampleText": "runc и containerd — одно и то же, оба постоянно работают как dockerd.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "registry_role",
+      "exampleType": "good",
+      "exampleText": "Registry по OCI Distribution: docker pull nginx → docker.io/library/nginx, слои по HTTPS; в проде ECR или GHCR.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "registry_role",
+      "exampleType": "good",
+      "exampleText": "registry только хранит образы, не runtime — pull делает dockerd",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "registry_role",
+      "exampleType": "bad",
+      "exampleText": "Docker Hub запускает контейнеры на своих серверах когда ты делаешь docker run.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "docker_run_flow",
+      "exampleType": "good",
+      "exampleText": "hello-world: CLI POST create/start → dockerd pull → containerd create → shim → runc setup → exec → runc exit, shim держит процесс.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "docker_run_flow",
+      "exampleType": "good",
+      "exampleText": "четыре процесса в стеке плюс контейнер: cli, dockerd, containerd, shim — runc уже вышел",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "docker_run_flow",
+      "exampleType": "bad",
+      "exampleText": "docker run идёт CLI → runc напрямую, dockerd только для docker build.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "dockerd stop — CLI мёртв, контейнеры могут жить на shim; containerd stop — контейнеры падают. App inside видит только kernel.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "на mac docker desktop — linux vm под капотом, docker.sock в vm; podman без root daemon",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Остановил dockerd — все контейнеры сразу умерли, потому что runc тоже остановился.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-architecture-components",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-architecture-components",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-architecture-components",
+    "difficulty": "MIDDLE",
+    "titleEn": "What are the main components of Docker architecture?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T20:00:00.000Z"
+  }
+}

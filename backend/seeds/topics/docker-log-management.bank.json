@@ -1,0 +1,629 @@
+{
+  "topic": {
+    "code": "docker_log_management",
+    "name": "Управление логами в Docker",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как организовать управление логами в Docker?",
+    "shortAnswer": "Три принципа: приложение пишет только в stdout/stderr (без log-файлов внутри контейнера); настраивается log driver с ротацией (max-size, max-file, compress), чтобы хост не заполнялся; логи отправляются с хоста в централизованный стек (Loki, ELK, CloudWatch). Для production — структурированные JSON-логи: парсятся, фильтруются по полям.",
+    "idealAnswer": "Log management в Docker — дисциплина захвата, ротации и централизации того, что контейнеры пишут. Дефолтный json-file подходит для dev, но в production скрывает сюрпризы: болтливый контейнер может заполнить диск за часы, поиск по множеству контейнеров неудобен, логи одной ноды пропадают при её падении. Production-стек: приложения только stdout/stderr + log driver с ротацией + shipper, который выносит логи с хоста. Twelve-Factor: приложение пишет в stdout/stderr, платформа (Docker, Compose, Swarm, K8s) маршрутизирует потоки. Запись в файл внутри контейнера ломает docker logs (Docker видит только stdout/stderr), логи исчезают с контейнером без volume, обходит log drivers, ломает семантику оркестрации. Log drivers определяют судьбу потоков: json-file (дефолт, JSON на диске хоста в /var/lib/docker/containers/<id>/<id>-json.log), local (бинарный формат, быстрее, встроенная ротация), journald, syslog, fluentd, loki, awslogs, gcplogs, splunk, none. Без ротации json-file по умолчанию — chatty app заполнит диск. Ротация: daemon.json с log-driver и log-opts max-size, max-file, compress; или per-container --log-opt; существующие контейнеры сохраняют старый config до recreate. Для multi-host — ship off-node: Loki + Grafana, Fluent Bit → Elasticsearch, awslogs/gcplogs в облаке, per-host shipper (Promtail, Vector) читает /var/lib/docker/containers/*/*-json.log. Структурированные JSON-логи: app emit JSON в stdout, Docker оборачивает в {\"log\": \"...\", \"stream\", \"time\"}, Loki/ELK парсят inner JSON — query по level, request_id, user_id. docker logs работает только с json-file, local, journald; при fluentd/loki/awslogs логи не на диске — docker logs пустой, смотреть в centralized backend. Типичные ошибки: log4j в /var/log/app.log вместо console; нет rotation; пароли/JWT/PII в логах; docker logs как единственный prod-инструмент; compress: false — rotated файлы занимают полный размер. Senior follow-ups: fluentd-async true — Docker не блокируется при недоступном агрегаторе, но возможна потеря при overflow; multiline stack trace — каждая строка отдельное событие, фикс на стороне app (один JSON с trace) или multiline rules в shipper.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "stdout_twelve_factor",
+      "title": "Понимает stdout/stderr и Twelve-Factor",
+      "expected": "Кандидат объясняет: приложение пишет только в stdout/stderr; платформа маршрутизирует потоки; файлы внутри контейнера недоступны docker logs, исчезают с контейнером, обходят log drivers.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — Twelve-Factor stdout-only",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "stdout_twelve_factor",
+            "oftenConfusedWith": [
+              "log_drivers",
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "stdout",
+              "stderr",
+              "Twelve-Factor",
+              "docker logs",
+              "платформ",
+              "не файл"
+            ],
+            "anchorTermsWrongTopic": [
+              "volume для логов как основной паттерн",
+              "log driver заменяет stdout"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "stdout",
+              "stderr",
+              "Twelve-Factor",
+              "файл"
+            ],
+            "ask": "почему приложение не должно писать логи в файл внутри контейнера"
+          }
+        ],
+        "mustConcepts": [
+          "stdout",
+          "stderr",
+          "Twelve-Factor",
+          "twelve factor",
+          "платформ",
+          "docker logs",
+          "не файл",
+          "внутри контейнера",
+          "log driver",
+          "исчеза",
+          "volume",
+          "оркестрац",
+          "Swarm",
+          "Kubernetes",
+          "K8s",
+          "маршрутиз",
+          "поток"
+        ],
+        "falseClaims": [
+          "можно писать логи в /var/log внутри контейнера и docker logs их покажет",
+          "log files в контейнере — рекомендуемый production-паттерн",
+          "stdout и log driver не связаны",
+          "volume на каждый контейнер для логов — норма вместо stdout",
+          "Twelve-Factor разрешает только файловые логи в контейнере"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "log_drivers",
+      "title": "Знает встроенные log drivers",
+      "expected": "Кандидат перечисляет основные drivers: json-file (дефолт, на диск хоста), local (бинарный, ротация), fluentd/loki для централизации, awslogs/gcplogs для облака; понимает что driver определяет судьбу stdout/stderr.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "таблица drivers из ITLead — ядро middle",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "stdout_twelve_factor",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "log_drivers",
+            "oftenConfusedWith": [
+              "log_rotation",
+              "docker_logs_limits"
+            ],
+            "anchorTermsExpected": [
+              "json-file",
+              "local",
+              "fluentd",
+              "loki",
+              "awslogs",
+              "log driver"
+            ],
+            "anchorTermsWrongTopic": [
+              "log driver это формат приложения",
+              "json-file отправляет в CloudWatch"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "json-file",
+              "local",
+              "loki",
+              "fluentd"
+            ],
+            "ask": "чем json-file отличается от local и когда выбрать loki или fluentd"
+          }
+        ],
+        "mustConcepts": [
+          "log driver",
+          "json-file",
+          "local",
+          "journald",
+          "syslog",
+          "fluentd",
+          "Fluent Bit",
+          "loki",
+          "awslogs",
+          "gcplogs",
+          "splunk",
+          "none",
+          "дефолт",
+          "на диск",
+          "хост",
+          "/var/lib/docker/containers",
+          "централиз",
+          "облак"
+        ],
+        "falseClaims": [
+          "json-file и local отправляют логи напрямую в Loki без shipper",
+          "log driver настраивается внутри приложения, не Docker daemon",
+          "none driver ротирует логи на диск",
+          "awslogs хранит логи только на диске хоста",
+          "все drivers поддерживают docker logs одинаково"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "log_rotation",
+      "title": "Настраивает ротацию логов",
+      "expected": "Кандидат описывает max-size, max-file, compress в daemon.json или --log-opt; понимает что без ротации json-file заполнит диск; существующие контейнеры нужно recreate.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "production must-have — самая частая infra-ошибка",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "max-size",
+              "max-file",
+              "rotation",
+              "ротац"
+            ],
+            "ask": "как настроить host-wide rotation и что будет с уже запущенными контейнерами"
+          },
+          {
+            "match": [
+              "compress",
+              "daemon.json"
+            ],
+            "ask": "зачем compress: true и где задаётся per-container override"
+          }
+        ],
+        "mustConcepts": [
+          "ротац",
+          "rotation",
+          "max-size",
+          "max-file",
+          "compress",
+          "daemon.json",
+          "log-opts",
+          "log-opt",
+          "100m",
+          "500 MB",
+          "заполн",
+          "диск",
+          "recreate",
+          "пересозда",
+          "host-wide",
+          "per-container",
+          "json.log.1",
+          "gzip"
+        ],
+        "falseClaims": [
+          "Docker по умолчанию ротирует json-file логи",
+          "изменение daemon.json сразу применяется к running контейнерам",
+          "max-file без max-size достаточно для защиты диска",
+          "compress увеличивает размер rotated файлов",
+          "ротация нужна только для local driver, не для json-file"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "centralized_shipping",
+      "title": "Понимает централизованную доставку логов",
+      "expected": "Кандидат описывает ship off-host: Loki+Grafana, Fluent Bit→ELK, awslogs/CloudWatch; per-host shipper читает container logs; сценарии hobby vs multi-host vs cloud.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "multi-host и prod observability из Real-world usage",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "docker_logs_limits",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Loki",
+              "ELK",
+              "CloudWatch",
+              "Fluent"
+            ],
+            "ask": "какой стек для single-host vs multi-host vs AWS"
+          },
+          {
+            "match": [
+              "Promtail",
+              "shipper",
+              "Fluent Bit"
+            ],
+            "ask": "как работает driver-less вариант с json-file на диске и per-host shipper"
+          }
+        ],
+        "mustConcepts": [
+          "централиз",
+          "ship",
+          "off-host",
+          "off-node",
+          "Loki",
+          "Grafana",
+          "ELK",
+          "Elasticsearch",
+          "Kibana",
+          "CloudWatch",
+          "awslogs",
+          "Fluent Bit",
+          "Promtail",
+          "Vector",
+          "Datadog",
+          "multi-host",
+          "single-host",
+          "compliance",
+          "S3",
+          "cold storage",
+          "loki-url",
+          "logging driver"
+        ],
+        "falseClaims": [
+          "docker logs масштабируется на десятки хостов в production",
+          "centralized logging не нужен если есть json-file с rotation",
+          "Loki driver не требует plugin install",
+          "shipper и log driver — взаимоисключающие подходы без комбинации",
+          "логи на упавшей ноде сохраняются если не было central shipping"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "structured_json_logging",
+      "title": "Понимает структурированные JSON-логи",
+      "expected": "Кандидат объясняет: app emit JSON в stdout; Docker оборачивает в outer wrapper; backends парсят inner JSON; фильтрация по level, request_id, user_id; plaintext не масштабируется.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Structured logging — базовый prod-паттерн из ITLead",
+        "mustConcepts": [
+          "JSON",
+          "structured",
+          "структурир",
+          "console.log",
+          "JSON.stringify",
+          "wrapper",
+          "обёрт",
+          "inner JSON",
+          "level",
+          "request_id",
+          "user_id",
+          "parse",
+          "фильтр",
+          "query",
+          "plaintext",
+          "machine-parseable",
+          "searchable"
+        ],
+        "falseClaims": [
+          "Docker автоматически структурирует plaintext в JSON поля",
+          "structured logging требует писать логи в файл, не stdout",
+          "plaintext лучше JSON для production search",
+          "outer wrapper Docker — это и есть business log без парсинга",
+          "JSON логи нельзя фильтровать по полям в Loki/ELK"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "docker_logs_limits",
+      "title": "Знает ограничения docker logs",
+      "expected": "Кандидат объясняет: docker logs работает с json-file, local, journald; при fluentd/loki/awslogs логи shipped, не на диске — docker logs пустой; tail/follow/since/until флаги.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up Q из ITLead — частый вопрос на middle",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "docker logs",
+              "ничего",
+              "пуст"
+            ],
+            "ask": "почему docker logs может вернуть пустоту для контейнера с loki driver"
+          }
+        ],
+        "mustConcepts": [
+          "docker logs",
+          "json-file",
+          "local",
+          "journald",
+          "fluentd",
+          "loki",
+          "awslogs",
+          "не на диск",
+          "shipped",
+          "centralized",
+          "tail",
+          "follow",
+          "since",
+          "until",
+          "remote driver",
+          "query destination"
+        ],
+        "falseClaims": [
+          "docker logs работает с любым log driver одинаково",
+          "fluentd driver сохраняет копию на диск для docker logs",
+          "docker logs -f работает с awslogs driver",
+          "если docker logs пустой — контейнер не пишет логи",
+          "journald driver не поддерживает docker logs"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки log management",
+      "expected": "Кандидат называет: log files в контейнере (log4j → console); нет rotation; sensitive data в логах; docker logs как единственный prod tool; без compress; Java stack trace multiline (бонус).",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — типичные production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "log4j",
+              "файл",
+              "/var/log"
+            ],
+            "ask": "как исправить Java app с log4j в файл вместо stdout"
+          },
+          {
+            "match": [
+              "PII",
+              "JWT",
+              "password",
+              "sanitize"
+            ],
+            "ask": "почему console.log(req.body) опасен при centralized indexing"
+          }
+        ],
+        "mustConcepts": [
+          "log4j",
+          "/var/log",
+          "console",
+          "rotation",
+          "без ротац",
+          "sensitive",
+          "PII",
+          "JWT",
+          "password",
+          "sanitize",
+          "docker logs production",
+          "retroactive",
+          "compress",
+          "chatty",
+          "multiline",
+          "stack trace",
+          "fluentd-async"
+        ],
+        "falseClaims": [
+          "log4j в файл внутри контейнера — норма для Docker",
+          "PII в логах безопаснее после centralization",
+          "rotation не нужна если диск большой",
+          "docker logs на prod достаточен для incident response на fleet",
+          "compress можно не включать — rotated файлы и так маленькие"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Приложение пишет JSON в stdout, Docker json-file с max-size 100m и max-file 5 в daemon.json. На prod Fluent Bit per host шлёт в Loki — docker logs только для dev. log4j переключил на console, не /var/log.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Три принципа: stdout only, log driver с rotation (compress true), ship off-host в CloudWatch через awslogs. Structured JSON — фильтр level=error и request_id в Grafana.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну twelve-factor — всё в stdout, rotation в daemon.json чтоб диск не забить, на нескольких хостах promtail читает json.log и в loki. docker logs не работает если driver loki — смотрим grafana",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Логи пишем в /var/log/app.log внутри контейнера с volume — docker logs покажет всё. Rotation не нужна, Docker сам чистит. json-file и awslogs одинаково работают с docker logs.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "На production достаточно docker logs -f на каждом сервере по SSH. PII в логах ок — centralized search только для devops. local driver не поддерживает rotation.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Plaintext логи лучше JSON. Изменил daemon.json — running контейнеры сразу получили max-file. fluentd-async false безопаснее потому что логи никогда не теряются даже если агрегатор down.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "stdout_twelve_factor",
+      "exampleType": "good",
+      "exampleText": "Twelve-Factor: app → stdout/stderr, Docker log driver подхватывает потоки. Файл в контейнере docker logs не видит и пропадёт при rm.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "stdout_twelve_factor",
+      "exampleType": "good",
+      "exampleText": "log4j на console вместо /var/log — иначе теряем docker logs и log drivers",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "stdout_twelve_factor",
+      "exampleType": "bad",
+      "exampleText": "Mount volume на /var/log и пишем туда — это рекомендуемый Docker-паттерн вместо stdout.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "log_drivers",
+      "exampleType": "good",
+      "exampleText": "json-file — дефолт на диск хоста; local — бинарный с rotation; prod multi-host — loki или fluentd driver, AWS — awslogs.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "log_drivers",
+      "exampleType": "good",
+      "exampleText": "compose logging driver loki с loki-url и external-labels job=api — плагин grafana/loki-docker-driver один раз",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "log_drivers",
+      "exampleType": "bad",
+      "exampleText": "Log driver выбирается в package.json приложения, Docker daemon не участвует.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "log_rotation",
+      "exampleType": "good",
+      "exampleText": "daemon.json: max-size 100m, max-file 5, compress true — worst case ~500MB на контейнер. Старые контейнеры recreate после смены config.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "log_rotation",
+      "exampleType": "good",
+      "exampleText": "chatty сервис — per-container --log-opt max-size=50m max-file=3, остальные на host default",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "log_rotation",
+      "exampleType": "bad",
+      "exampleText": "Docker json-file по умолчанию ротирует и сжимает — max-size не обязателен в production.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "centralized_shipping",
+      "exampleType": "good",
+      "exampleText": "Single host: json-file + Promtail → Loki + Grafana. Fleet: Fluent Bit per node → OpenSearch. AWS: awslogs с IAM на daemon.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "centralized_shipping",
+      "exampleType": "good",
+      "exampleText": "driver-less: json-file на диск, vector читает /var/lib/docker/containers — decouple deploy от destination",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "centralized_shipping",
+      "exampleType": "bad",
+      "exampleText": "Centralized logging не нужен если на каждом сервере достаточно tail json.log по cron.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "structured_json_logging",
+      "exampleType": "good",
+      "exampleText": "console.log(JSON.stringify({level, msg, request_id})) — Loki парсит inner JSON, query |= \"abc-123\".",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "structured_json_logging",
+      "exampleType": "good",
+      "exampleText": "outer wrapper docker {\"log\",\"stream\",\"time\"} — inner json наш, фильтр user_id=42",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "structured_json_logging",
+      "exampleType": "bad",
+      "exampleText": "Plaintext лучше для Docker — JSON только для ELK, Loki plaintext не ест.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "docker_logs_limits",
+      "exampleType": "good",
+      "exampleText": "docker logs только json-file/local/journald. loki driver — логи в Grafana, docker logs пустой.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "docker_logs_limits",
+      "exampleType": "good",
+      "exampleText": "docker logs -f --since=10m api — ok на dev с json-file; prod с awslogs — CloudWatch Insights",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "docker_logs_limits",
+      "exampleType": "bad",
+      "exampleText": "fluentd driver сохраняет локальную копию специально для docker logs -f.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Не console.log(req.body) — JWT в centralized index. Java stack trace — один JSON event или multiline parser в Fluent Bit.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "retroactive log shipping mid-incident больно — centralize с первого prod deploy",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Rotation опционален на SSD 2TB. Sensitive data в логах ок если access только у admin.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-log-management",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-log-management",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-log-management",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to organize log management in Docker?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T20:00:00.000Z"
+  }
+}

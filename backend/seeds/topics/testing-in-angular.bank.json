@@ -1,0 +1,677 @@
+{
+  "topic": {
+    "code": "testing_angular",
+    "name": "Тестирование в Angular",
+    "skillCode": "angular",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как организовано тестирование в Angular: unit- и integration-тесты, TestBed и работа с HTTP?",
+    "shortAnswer": "Angular использует Jasmine-спеки и TestBed для настройки тестового инжектора. Unit-тесты изолируют один класс с замоканными зависимостями; integration-тесты прогоняют реальные сервисы вместе с компонентами, а HTTP перехватывают через HttpClientTestingModule. После изменения состояния нужен fixture.detectChanges(); для таймеров — fakeAsync + tick.",
+    "idealAnswer": "Тестирование в Angular проверяет компоненты, сервисы и их взаимодействие: в изоляции (unit) и вместе (integration). Стек по умолчанию — Jasmine (спеки) + Karma (браузерный runner); в современных проектах часто Jest. TestBed.configureTestingModule() создаёт тестовый инжектор, зеркалирующий DI Angular: providers, imports, declarations/standalone-компоненты. TestBed.createComponent() возвращает ComponentFixture — обёртку с componentInstance, nativeElement и ручным change detection. Fixture не обновляет DOM автоматически: после изменения состояния вызывают fixture.detectChanges(). Unit-тест изолирует один класс, все зависимости мокают (jasmine.createSpyObj, useValue); быстрые, указывают на точную строку сбоя. Integration-тест пускает реальные сервисы вместе с компонентом, ловит баги на границах контрактов (формат ответа сервиса vs шаблон). Нужны оба слоя; E2E (Cypress, Playwright) — отдельный уровень с реальным backend. Unit: логика сервиса, pipe, guard, input/output компонента без внешних зависимостей. Integration: submit формы через сервис к API, загрузка и отображение данных, routing с guards, HTTP interceptors. HttpClientTestingModule подменяет HttpClient; HttpTestingController.expectOne() перехватывает запрос, flush() отдаёт ответ без сети; afterEach → httpMock.verify() ловит необработанные запросы. Типичные ошибки: забытый detectChanges после смены state; тест implementation details (spyOn private method) вместо поведения в DOM; async() с реальными setTimeout вместо fakeAsync + tick (флаки в CI); перемок всего в integration-тесте (теряется смысл); отсутствие httpMock.verify(). fakeAsync + tick — контроль debounce/throttle/setTimeout; async() — когда просто ждёшь Promise без контроля времени. OnPush: detectChanges после каждого изменения — прямые мутации свойств не триггерят CD. TestBed.inject() vs constructor — один singleton из тестового инжектора; inject удобен для spies в тесте. createComponent vs new ComponentClass — только createComponent даёт DI и lifecycle. Senior-debug: тест ngOnInit проходит, но DOM пуст — проверить detectChanges после async, fakeAsync+tick для delayed Observable, OnPush без CD, spy на сервис (вызов есть, DOM пуст → CD; вызова нет → ngOnInit). NestJS TestingModule — тот же паттерн; React Testing Library render+screen ≈ fixture.nativeElement.",
+    "maxScore": 10,
+    "skills": [
+      "angular",
+      "typescript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "unit_vs_integration",
+      "title": "Отличает unit- и integration-тесты",
+      "expected": "Кандидат объясняет: unit изолирует один класс с моками, быстрый и точный; integration пускает реальные сервисы вместе, ловит баги на границах; нужны оба; E2E — отдельный слой.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — TL;DR и comparison table из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "unit_vs_integration",
+            "oftenConfusedWith": [
+              "when_to_use_each",
+              "http_testing"
+            ],
+            "anchorTermsExpected": [
+              "unit",
+              "integration",
+              "мок",
+              "mock",
+              "изоляц",
+              "реальн",
+              "границ",
+              "контракт",
+              "E2E"
+            ],
+            "anchorTermsWrongTopic": [
+              "integration всегда с реальной сетью",
+              "unit тестирует несколько компонентов вместе",
+              "E2E заменяет integration"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "unit",
+              "integration",
+              "мок"
+            ],
+            "ask": "чем unit отличается от integration и какой баг поймает только integration"
+          }
+        ],
+        "mustConcepts": [
+          "unit",
+          "integration",
+          "модульн",
+          "интеграц",
+          "изоляц",
+          "mock",
+          "мок",
+          "spy",
+          "зависимост",
+          "границ",
+          "контракт",
+          "миллисекунд",
+          "быстр",
+          "E2E",
+          "Cypress",
+          "Playwright",
+          "оба",
+          "логик",
+          "взаимодейств"
+        ],
+        "falseClaims": [
+          "unit и integration проверяют одно и то же",
+          "integration-тесты всегда ходят в реальную сеть",
+          "достаточно только unit-тестов для форм с HTTP",
+          "E2E полностью заменяет integration-тесты"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "testbed_fixture",
+      "title": "Знает TestBed и ComponentFixture",
+      "expected": "Кандидат описывает: configureTestingModule настраивает тестовый инжектор; createComponent → ComponentFixture; detectChanges вручную после изменения state; TestBed.inject для доступа к сервисам в тесте.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TestBed как test harness — ядро Angular testing",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "unit_vs_integration",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "testbed_fixture",
+            "oftenConfusedWith": [
+              "senior_debug_dom"
+            ],
+            "anchorTermsExpected": [
+              "TestBed",
+              "ComponentFixture",
+              "detectChanges",
+              "configureTestingModule",
+              "createComponent",
+              "inject"
+            ],
+            "anchorTermsWrongTopic": [
+              "fixture автоматически обновляет DOM",
+              "new ComponentClass эквивалентен createComponent"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "TestBed",
+              "fixture",
+              "detectChanges"
+            ],
+            "ask": "зачем вызывать fixture.detectChanges() вручную и чем createComponent отличается от new"
+          }
+        ],
+        "mustConcepts": [
+          "TestBed",
+          "configureTestingModule",
+          "createComponent",
+          "ComponentFixture",
+          "fixture",
+          "detectChanges",
+          "nativeElement",
+          "componentInstance",
+          "inject",
+          "TestBed.inject",
+          "compileComponents",
+          "providers",
+          "imports",
+          "тестовый инжектор",
+          "DI",
+          "change detection",
+          "вручную",
+          "не автоматическ"
+        ],
+        "falseClaims": [
+          "fixture автоматически вызывает detectChanges при каждом изменении свойства",
+          "new ComponentClass() даёт тот же результат что TestBed.createComponent()",
+          "TestBed.inject возвращает другой экземпляр чем constructor injection",
+          "compileComponents не нужен в async beforeEach"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "http_testing",
+      "title": "Тестирует HTTP через HttpTestingController",
+      "expected": "Кандидат объясняет: HttpClientTestingModule подменяет HttpClient; expectOne перехватывает запрос; flush отдаёт mock-ответ; httpMock.verify в afterEach; реальный UserService + перехваченный HTTP в integration.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "HttpTestingController — ключ integration-паттерн из ITLead examples",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "HttpTestingController",
+              "expectOne",
+              "flush"
+            ],
+            "ask": "как протестировать ngOnInit который вызывает сервис с HTTP без реальной сети"
+          },
+          {
+            "match": [
+              "verify",
+              "afterEach",
+              "httpMock"
+            ],
+            "ask": "зачем httpMock.verify() в afterEach"
+          }
+        ],
+        "mustConcepts": [
+          "HttpClientTestingModule",
+          "HttpTestingController",
+          "HttpClient",
+          "expectOne",
+          "flush",
+          "verify",
+          "afterEach",
+          "перехват",
+          "mock",
+          "без сети",
+          "реальный сервис",
+          "UserService",
+          "req.error",
+          "ErrorEvent",
+          "GET",
+          "method",
+          "integration"
+        ],
+        "falseClaims": [
+          "HttpClientTestingModule делает реальные HTTP-запросы",
+          "expectOne можно не вызывать если сервис замокан",
+          "verify не нужен если все тесты проходят",
+          "flush и error взаимозаменяемы без разницы для шаблона"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки Angular-тестов",
+      "expected": "Кандидат называет: забытый detectChanges; тест implementation details вместо поведения; fakeAsync вместо async с реальными таймерами; over-mocking в integration; отсутствие httpMock.verify.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "async_timing",
+            "floorFraction": 0.4
+          },
+          {
+            "checkpointKey": "http_testing",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "detectChanges",
+              "DOM",
+              "не обнов"
+            ],
+            "ask": "почему тест падает после component.isLoading = false без detectChanges"
+          },
+          {
+            "match": [
+              "implementation",
+              "getUserData",
+              "spyOn",
+              "поведен"
+            ],
+            "ask": "чем плох spyOn(component, 'getUserData') vs проверка текста в DOM"
+          },
+          {
+            "match": [
+              "over-mock",
+              "мок вс",
+              "integration"
+            ],
+            "ask": "почему мокать UserService и HttpClient в integration-тесте бессмысленно"
+          }
+        ],
+        "mustConcepts": [
+          "detectChanges",
+          "забыл",
+          "DOM не обнов",
+          "implementation details",
+          "поведен",
+          "результат",
+          "spyOn",
+          "getUserData",
+          "refactor",
+          "fakeAsync",
+          "async",
+          "реальн таймер",
+          "CI",
+          "флак",
+          "over-mock",
+          "перемок",
+          "verify",
+          "httpMock",
+          "шаблон",
+          "nativeElement"
+        ],
+        "falseClaims": [
+          "можно тестировать private методы — это лучшая практика",
+          "async с setTimeout стабильнее fakeAsync в CI",
+          "в integration-тесте нужно мокать все сервисы",
+          "detectChanges нужен только один раз в начале теста"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use_each",
+      "title": "Понимает когда unit, integration или E2E",
+      "expected": "Кандидат называет: unit для логики сервиса, pipe, guard, чистого I/O; integration для form→service→HTTP, загрузки данных, routing; E2E для полных browser workflow.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use each из ITLead Theory",
+        "mustConcepts": [
+          "логик",
+          "расчёт",
+          "pipe",
+          "guard",
+          "input",
+          "output",
+          "form submit",
+          "routing",
+          "interceptor",
+          "E2E",
+          "workflow",
+          "staging",
+          "контракт",
+          "шаблон",
+          "отображ",
+          "unit по умолчанию",
+          "integration",
+          "границ"
+        ],
+        "falseClaims": [
+          "integration нужен для каждого метода сервиса",
+          "pipe всегда тестируют через TestBed integration",
+          "E2E покрывает все сценарии без unit",
+          "guard нельзя unit-тестировать изолированно"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "async_timing",
+      "title": "Использует fakeAsync и tick для таймеров",
+      "expected": "Кандидат объясняет: fakeAsync + tick контролирует debounce/setTimeout; async() для Promise без контроля времени; реальные таймеры флакают CI; OnPush требует detectChanges после state.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "fakeAsync vs async и OnPush из ITLead follow-up",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "fakeAsync",
+              "tick",
+              "debounce"
+            ],
+            "ask": "как протестировать debounce search без реального setTimeout"
+          },
+          {
+            "match": [
+              "OnPush",
+              "ChangeDetectionStrategy"
+            ],
+            "ask": "как тестировать OnPush компонент после прямой мутации свойства"
+          }
+        ],
+        "mustConcepts": [
+          "fakeAsync",
+          "tick",
+          "async",
+          "Promise",
+          "setTimeout",
+          "debounce",
+          "throttle",
+          "таймер",
+          "CI",
+          "нестабил",
+          "флак",
+          "OnPush",
+          "ChangeDetectionStrategy",
+          "detectChanges",
+          "мутац",
+          "Input",
+          "Observable",
+          "delay"
+        ],
+        "falseClaims": [
+          "async() даёт контроль времени как fakeAsync",
+          "tick работает только с Promise без Zone.js",
+          "OnPush компоненты автоматически обновляют DOM при мутации свойства в тесте",
+          "реальные setTimeout в тестах стабильны в CI"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "senior_debug_dom",
+      "title": "Диагностирует «тест проходит, DOM пуст»",
+      "expected": "Кандидат описывает senior-debug: detectChanges после async; fakeAsync+tick для delayed Observable; OnPush без CD; spy на сервис — вызов есть но DOM пуст → CD; вызова нет → ngOnInit.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "senior follow-up Q из ITLead — типичный production-debug",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "testbed_fixture",
+            "floorFraction": 0.45
+          },
+          {
+            "checkpointKey": "async_timing",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "senior_debug_dom",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "detectChanges",
+              "fakeAsync",
+              "tick",
+              "OnPush",
+              "spy",
+              "ngOnInit",
+              "DOM пуст"
+            ],
+            "anchorTermsWrongTopic": [
+              "достаточно одного detectChanges в начале",
+              "проблема всегда в моке HTTP"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ngOnInit",
+              "DOM",
+              "пуст",
+              "проходит"
+            ],
+            "ask": "тест ngOnInit зелёный, но Alice не в DOM — с чего начнёшь отладку"
+          }
+        ],
+        "mustConcepts": [
+          "ngOnInit",
+          "detectChanges",
+          "после async",
+          "fakeAsync",
+          "tick",
+          "Observable",
+          "delay",
+          "OnPush",
+          "change detection",
+          "spy",
+          "getData",
+          "of",
+          "mockData",
+          "DOM пуст",
+          "вызов есть",
+          "вызова нет",
+          "сервис",
+          "шаблон",
+          "отладк",
+          "диагност"
+        ],
+        "falseClaims": [
+          "если expect на сервис прошёл — DOM обязан обновиться без detectChanges",
+          "OnPush не влияет на unit-тесты",
+          "spy на сервис не помогает локализовать проблему CD vs ngOnInit",
+          "достаточно увеличить timeout в async() вместо fakeAsync"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Unit-тест LoginComponent: AuthService через jasmine.createSpyObj, проверяю что login вызван с credentials из формы. Integration UserList: реальный UserService, HttpClientTestingModule, expectOne('/api/users'), flush, tick, detectChanges — проверяю .user-item в DOM. После любой смены state — detectChanges.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для debounce search — fakeAsync + tick(300), не реальный setTimeout. Pipe и guard — чистый unit без TestBed. Form submit через сервис к API — integration с httpMock.verify в afterEach. E2E Cypress — только критичные checkout-flow.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "TestBed.configureTestingModule с imports standalone-компонента, createComponent, inject HttpTestingController. ngOnInit грузит users — detectChanges, flush mock, tick, снова detectChanges — Alice в nativeElement.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Unit и integration — одно и то же, мокаю всё включая HttpClient в integration и проверяю spyOn private getUserData. detectChanges один раз в beforeEach хватает.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "HttpClientTestingModule делает реальные запросы на staging. async() с await setTimeout(300) — стабильнее fakeAsync. verify не нужен если тест зелёный.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "new LoginComponent() в тесте — быстрее чем TestBed. OnPush сам обновит DOM при component.items = data. E2E заменяет все integration-тесты.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "unit_vs_integration",
+      "exampleType": "good",
+      "exampleText": "Unit — AuthService spy, проверяю вызов login. Integration — реальный UserService + HttpTestingController, ловлю баг когда сервис возвращает поле name, а шаблон ждёт fullName.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "unit_vs_integration",
+      "exampleType": "good",
+      "exampleText": "ну unit быстрый с моками, integration — когда сервис и компонент вместе, иначе на стейджинге шаблон пустой при валидном JSON",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "unit_vs_integration",
+      "exampleType": "bad",
+      "exampleText": "Integration-тест всегда бьёт в production API, unit не нужен если есть Cypress.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "testbed_fixture",
+      "exampleType": "good",
+      "exampleText": "TestBed.configureTestingModule → createComponent → fixture.detectChanges() вручную после patchValue. TestBed.inject(AuthService) для spy без доступа через component.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "testbed_fixture",
+      "exampleType": "good",
+      "exampleText": "createComponent даёт DI и ngOnInit, new Component() — нет инжекции и lifecycle",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "testbed_fixture",
+      "exampleType": "bad",
+      "exampleText": "ComponentFixture сам вызывает change detection при каждом изменении свойства компонента.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "http_testing",
+      "exampleType": "good",
+      "exampleText": "fixture.detectChanges() → req = httpMock.expectOne('/api/users') → req.flush([{name:'Alice'}]) → tick() → detectChanges() → querySelectorAll('.user-item').",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "http_testing",
+      "exampleType": "good",
+      "exampleText": "afterEach httpMock.verify — ловит лишний GET который тест не обработал",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "http_testing",
+      "exampleType": "bad",
+      "exampleText": "В integration мокаю HttpClient useValue — expectOne не нужен, verify лишний.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "isLoading=false без detectChanges — DOM старый; правильно: detectChanges после state. Тестирую textContent с Alice, не spyOn getUserData.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "debounce — fakeAsync tick(300), не await setTimeout. integration — только HttpClient мок через модуль, UserService реальный",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "spyOn(component, 'loadUsers') — лучший тест загрузки списка, DOM не важен.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use_each",
+      "exampleType": "good",
+      "exampleText": "AuthService.calculateDiscount — unit. UserList ngOnInit→HTTP→template — integration. Checkout happy path — E2E Playwright.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_use_each",
+      "exampleType": "good",
+      "exampleText": "pipe pure transform — unit функция, routing guard canActivate — unit с mock Router, interceptor — integration",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use_each",
+      "exampleType": "bad",
+      "exampleText": "Каждый метод сервиса только через TestBed integration с полным AppModule.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "async_timing",
+      "exampleType": "good",
+      "exampleText": "fakeAsync(() => { search('x'); tick(300); expect(results).toBeDefined(); }) — без реальных таймеров.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "async_timing",
+      "exampleType": "good",
+      "exampleText": "OnPush: component.flag=true; fixture.detectChanges(); — иначе шаблон не увидит мутацию",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "async_timing",
+      "exampleType": "bad",
+      "exampleText": "async() и fakeAsync одинаково контролируют Zone timers; OnPush не требует detectChanges в тестах.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "senior_debug_dom",
+      "exampleType": "good",
+      "exampleText": "Тест зелёный, DOM пуст: flush+c tick+detectChanges; OnPush — CD после data; spy getData — вызов есть, DOM пуст → CD; нет вызова → ngOnInit не триггерит load.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "senior_debug_dom",
+      "exampleType": "good",
+      "exampleText": "сначала detectChanges после async, потом fakeAsync если delay в pipe, потом spy сервиса — локализую CD vs init",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "senior_debug_dom",
+      "exampleType": "bad",
+      "exampleText": "Если toHaveBeenCalled прошёл — проблема только в HTTP mock, detectChanges не при чём.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "testing-in-angular",
+    "apiUrl": "https://api.itlead.org/api/questions/testing-in-angular",
+    "pageUrl": "https://itlead.org/interview-questions/angular/testing-in-angular",
+    "difficulty": "SENIOR",
+    "titleEn": "Testing in Angular (unit and integration tests)",
+    "categorySlug": "angular",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

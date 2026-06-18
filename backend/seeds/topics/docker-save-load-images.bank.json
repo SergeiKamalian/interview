@@ -1,0 +1,587 @@
+{
+  "topic": {
+    "code": "docker_save_load_images",
+    "name": "Передача Docker-образов без registry",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как передать Docker-образ между хостами без registry?",
+    "shortAnswer": "Используйте пару `docker save` + `docker load`: на исходном хосте экспортируете образ в tar-файл, переносите его любым способом (scp, USB, rsync), на целевом хосте загружаете через `docker load`. Registry не нужен. Важно: `save` работает с образами, `export` — с контейнерами; для pipeline лучше registry, save/load — для ad-hoc, air-gapped и offline.",
+    "idealAnswer": "Когда образ есть на host A и нужен на host B без push в registry, каноническое решение — `docker save` / `docker load`. `docker save` экспортирует IMAGE со всеми слоями и metadata (CMD, ENV, history) в tar-файл или stdout. `docker load` импортирует этот tar в daemon на другом хосте — образ появляется с тем же именем, тегом и слоями, как после pull. Базовый flow: `docker save myapp:1.0 -o myapp.tar` → scp/USB → `docker load -i myapp.tar` → `docker run myapp:1.0`. Для экономии места и времени: `docker save myapp:1.0 | gzip > myapp.tar.gz` или zstd/xz; one-liner через SSH без temp-файла: `docker save myapp:1.0 | gzip | ssh user@dest 'gunzip | docker load'`. Несколько образов в одном tar: `docker save img1 img2 img3 -o stack.tar`. Критическое отличие от `docker export`/`import`: save/load работает с образами и сохраняет все слои и metadata; export/import работает с контейнерами, flattening в один слой без CMD/ENV — после import часто «no command specified». `docker load` сохраняет имена; `docker import` создаёт untagged образ. Типичные ошибки: путать save с export; запускать `docker save` без `-o` или `>` — бинарный tar ломает терминал; забывать что tar ≈ размер образа (1 GB image → 1 GB tar) — сжимать для transfer; использовать import и не тегировать. Когда save/load: air-gapped среды, one-off между двумя машинами, backup версий, bootstrap registry, on-premise у заказчика, edge/USB preload. Когда registry: CI/CD, много потребителей, dedup слоёв, pull-by-digest, signing, scanning, RBAC. `pull` тянет из registry по HTTP; `save` экспортирует локальный образ в tar — противоположные направления и носители. История образа при save/load сохраняется полностью; tar содержит директории слоёв, manifest.json, config blob, tags — OCI-совместимый bundle. Современные Docker-версии interoperable; для air-gapped stack: pull всех image из compose, `docker save` в один tar, zstd, transfer, load, digest verification на приёмной стороне.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "save_load_definition",
+      "title": "Понимает docker save и docker load",
+      "expected": "Кандидат объясняет: `docker save` экспортирует образ (IMAGE) со всеми слоями и metadata в tar; `docker load` импортирует tar в другой daemon; образ появляется как после pull — с именем, тегом и слоями.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — save/load как каноническое решение без registry",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "save_load_definition",
+            "oftenConfusedWith": [
+              "save_vs_export",
+              "save_vs_pull"
+            ],
+            "anchorTermsExpected": [
+              "docker save",
+              "docker load",
+              "IMAGE",
+              "образ",
+              "tar",
+              "слои",
+              "metadata"
+            ],
+            "anchorTermsWrongTopic": [
+              "docker export",
+              "docker pull",
+              "контейнер export"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "docker save",
+              "docker load"
+            ],
+            "ask": "что именно save экспортирует и что получается после load на другом хосте"
+          }
+        ],
+        "mustConcepts": [
+          "docker save",
+          "docker load",
+          "IMAGE",
+          "образ",
+          "tar",
+          "слои",
+          "layer",
+          "metadata",
+          "метадан",
+          "CMD",
+          "ENV",
+          "history",
+          "импорт",
+          "daemon",
+          "без registry",
+          "экспорт"
+        ],
+        "falseClaims": [
+          "docker save экспортирует контейнер, а не образ",
+          "docker load создаёт контейнер, а не образ",
+          "save/load теряет теги и имена образа",
+          "save/load работает только через registry",
+          "load требует предварительного pull"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "save_vs_export",
+      "title": "Отличает save/load от export/import",
+      "expected": "Кандидат сравнивает: save/load — образ, все слои и metadata сохранены; export/import — контейнер, flattened в один слой, CMD/ENV теряются; load сохраняет имена, import — untagged.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "главная ловушка middle — export вместо save",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "save_load_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "save_vs_export",
+            "oftenConfusedWith": [
+              "save_load_definition",
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "save",
+              "export",
+              "image",
+              "container",
+              "flattened",
+              "metadata",
+              "CMD",
+              "import"
+            ],
+            "anchorTermsWrongTopic": [
+              "docker push",
+              "docker commit",
+              "volume backup"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "export",
+              "import",
+              "save",
+              "load"
+            ],
+            "ask": "чем save/load отличается от export/import — что сохраняется и что теряется"
+          },
+          {
+            "match": [
+              "no command",
+              "CMD",
+              "metadata"
+            ],
+            "ask": "почему после docker import часто ошибка no command specified"
+          }
+        ],
+        "mustConcepts": [
+          "save",
+          "load",
+          "export",
+          "import",
+          "image",
+          "container",
+          "образ",
+          "контейнер",
+          "слои",
+          "flattened",
+          "один слой",
+          "metadata",
+          "CMD",
+          "ENV",
+          "history",
+          "no command",
+          "untagged",
+          "имя не сохран"
+        ],
+        "falseClaims": [
+          "export и save делают одно и то же",
+          "export сохраняет CMD и ENV образа",
+          "import сохраняет имя и тег как load",
+          "save flattening образ в один слой",
+          "export/import — рекомендуемый способ передачи образов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "save_load_workflow",
+      "title": "Знает базовый workflow save → transfer → load",
+      "expected": "Кандидат описывает: `docker save myapp:1.0 -o myapp.tar` на source → scp/USB/rsync → `docker load -i myapp.tar` на dest → `docker run myapp:1.0`; имя и тег сохраняются.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "базовый quick example из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "docker save",
+              "-o",
+              "docker load",
+              "-i"
+            ],
+            "ask": "опиши пошагово передачу образа с host A на host B через tar"
+          }
+        ],
+        "mustConcepts": [
+          "docker save",
+          "docker load",
+          "-o",
+          "-i",
+          "tar",
+          "scp",
+          "rsync",
+          "USB",
+          "transfer",
+          "перенос",
+          "source",
+          "destination",
+          "Loaded image",
+          "имя",
+          "тег",
+          "docker run"
+        ],
+        "falseClaims": [
+          "нужен промежуточный registry между save и load",
+          "load меняет имя образа на sha256 без тега",
+          "save создаёт контейнер на диске",
+          "transfer обязательно только через scp"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "compression_streaming",
+      "title": "Сжатие и стриминг без temp-файла",
+      "expected": "Кандидат упоминает gzip/zstd/xz для сжатия tar; pipe через SSH без temp-файла; несколько образов в одном tar (`docker save img1 img2 -o multi.tar`).",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "gzip/SSH pipe и multi-image из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "gzip",
+              "zstd",
+              "ssh",
+              "pipe"
+            ],
+            "ask": "как передать образ через SSH без сохранения tar на диск"
+          }
+        ],
+        "mustConcepts": [
+          "gzip",
+          "gunzip",
+          "zstd",
+          "xz",
+          "сжат",
+          "compress",
+          "pipe",
+          "stdout",
+          "ssh",
+          "stream",
+          "стрим",
+          "без temp",
+          "несколько образ",
+          "multi",
+          "stack.tar"
+        ],
+        "falseClaims": [
+          "docker load не умеет читать из pipe",
+          "save/load нельзя комбинировать с gzip",
+          "в одном tar можно сохранить только один образ",
+          "SSH pipe требует промежуточный файл на обеих сторонах"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки save/load",
+      "expected": "Кандидат называет: export вместо save; `docker save` без `-o`/`>` ломает терминал; tar ≈ размер образа — нужно сжимать; import не сохраняет имя — нужен docker tag.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — export, stdout, huge tar",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "save_vs_export",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "export",
+              "import",
+              "no command"
+            ],
+            "ask": "что пойдёт не так если сделать docker export вместо save"
+          },
+          {
+            "match": [
+              "stdout",
+              "терминал",
+              "-o"
+            ],
+            "ask": "почему нельзя просто запустить docker save без перенаправления"
+          }
+        ],
+        "mustConcepts": [
+          "export вместо save",
+          "stdout",
+          "терминал",
+          "-o",
+          "redirect",
+          "перенаправ",
+          "огромн",
+          "размер tar",
+          "1 GB",
+          "сжат",
+          "import",
+          "untagged",
+          "docker tag",
+          "no command",
+          "CMD потер"
+        ],
+        "falseClaims": [
+          "docker save без -o безопасен для интерактивного терминала",
+          "tar всегда намного меньше образа",
+          "docker import автоматически восстанавливает тег myapp:1.0",
+          "export — правильный способ передать готовый образ с CMD"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда save/load, а когда registry",
+      "expected": "Кандидат называет save/load для: air-gapped, offline, one-off, backup, on-prem; registry для: CI/CD, много потребителей, dedup, digest, signing, scanning.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use / when not из ITLead",
+        "mustConcepts": [
+          "air-gapped",
+          "offline",
+          "изолирован",
+          "one-off",
+          "backup",
+          "on-prem",
+          "USB",
+          "registry",
+          "CI/CD",
+          "dedup",
+          "digest",
+          "pull-by-digest",
+          "signing",
+          "scanning",
+          "RBAC",
+          "повторн transfer"
+        ],
+        "falseClaims": [
+          "save/load всегда лучше registry",
+          "registry не нужен никогда",
+          "save/load подходит для ежедневного CI/CD лучше push/pull",
+          "registry не даёт dedup слоёв"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "save_vs_pull",
+      "title": "Отличает save от pull",
+      "expected": "Кандидат объясняет: pull — HTTP из registry на локальный daemon; save — экспорт уже локального образа в tar; противоположные направления и носители.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up Q из ITLead — save vs pull",
+        "mustConcepts": [
+          "pull",
+          "save",
+          "registry",
+          "HTTP",
+          "tar",
+          "локальн",
+          "экспорт",
+          "противополож",
+          "направлен",
+          "носитель",
+          "storage"
+        ],
+        "falseClaims": [
+          "save и pull — одна операция",
+          "pull экспортирует образ в tar-файл",
+          "save скачивает образ из Docker Hub",
+          "save заменяет docker push"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "На build-машине `docker save myapp:1.0 -o myapp.tar`, scp на prod, `docker load -i myapp.tar` — образ с тем же тегом. Для air-gapped стека сохраняю все image из compose в один tar, сжимаю zstd, на изолированной стороне load и compose up.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "save/load — это про образы в tar, export/import — про контейнеры и теряет CMD. One-liner: `docker save myapp:1.0 | gzip | ssh dest 'gunzip | docker load'`. Для CI лучше registry с dedup; save/load — когда сети между зонами нет.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну save упаковывает image со слоями, load на другом хосте как будто pull был. export flattening — после import no command. tar большой — gzip перед usb",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Делаю docker export контейнера в tar и docker import на prod — образ переносится со всеми ENV и CMD как был.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker save без файла просто покажет содержимое tar в терминале — это нормально. Registry всегда хуже save/load даже для daily CI.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "save и pull одно и то же — оба качают образ с Docker Hub в tar на диск.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "save_load_definition",
+      "exampleType": "good",
+      "exampleText": "docker save экспортирует IMAGE с layers и metadata в tar; docker load импортирует в другой daemon — имя и тег сохраняются.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "save_load_definition",
+      "exampleType": "good",
+      "exampleText": "save — упаковать образ в файл, load — распаковать на другой машине без registry",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "save_load_definition",
+      "exampleType": "bad",
+      "exampleText": "save сохраняет running container в tar, load поднимает контейнер с тем же pid.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "save_vs_export",
+      "exampleType": "good",
+      "exampleText": "save/load — image, все слои + CMD/ENV/history. export/import — container filesystem flattened, metadata теряется, import untagged.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "save_vs_export",
+      "exampleType": "good",
+      "exampleText": "export api контейнера → import → docker run падает no command. save myimg:1.0 → load → run работает",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "save_vs_export",
+      "exampleType": "bad",
+      "exampleText": "export и save взаимозаменяемы для передачи production-образа между хостами.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "save_load_workflow",
+      "exampleType": "good",
+      "exampleText": "save myapp:1.0 -o myapp.tar → scp → load -i myapp.tar → Loaded image: myapp:1.0 → docker run.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "save_load_workflow",
+      "exampleType": "good",
+      "exampleText": "на ноуте save, на флешке tar, на сервере load -i — registry не нужен",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "save_load_workflow",
+      "exampleType": "bad",
+      "exampleText": "После load нужно обязательно docker tag, потому что имя образа всегда теряется.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "compression_streaming",
+      "exampleType": "good",
+      "exampleText": "docker save myapp | gzip > myapp.tar.gz; на dest gunzip -c | docker load. Или save img1 img2 nginx -o stack.tar для всего compose.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "compression_streaming",
+      "exampleType": "good",
+      "exampleText": "save | ssh dest docker load — без temp файла когда диск tight",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "compression_streaming",
+      "exampleType": "bad",
+      "exampleText": "docker load принимает только несжатый tar с флагом -i, pipe и gzip не работают.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "WRONG: docker export > api.tar + import — теряется CMD. RIGHT: docker save + load. Не запускать save без -o — бинарь в терминал.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "1GB image → ~1GB tar, перед scp сжимаю zstd. import даёт sha256 untagged — нужен tag вручную, load — нет",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "tar от save всегда в 10 раз меньше образа, сжатие не нужно.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Air-gapped enterprise — все образы save/load между зонами. Ежедневный deploy — push/pull в Harbor с scanning и dedup.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "one-off между двумя dev машинами — save/load проще. ci pipeline — registry",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "В production всегда save/load вместо registry — быстрее и безопаснее для всех сценариев.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "save_vs_pull",
+      "exampleType": "good",
+      "exampleText": "pull — HTTP из registry в local daemon. save — local image → tar file. Разные направления: pull in, save out.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "save_vs_pull",
+      "exampleType": "good",
+      "exampleText": "pull качает с hub, save выгружает то что уже есть локально в файл для offline transfer",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "save_vs_pull",
+      "exampleType": "bad",
+      "exampleText": "docker save myapp:1.0 скачивает образ с registry если его нет локально.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-save-load-images",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-save-load-images",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-save-load-images",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to transfer Docker images between hosts without a registry?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T16:30:00.000Z"
+  }
+}

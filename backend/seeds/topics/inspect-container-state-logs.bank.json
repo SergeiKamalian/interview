@@ -1,0 +1,518 @@
+{
+  "topic": {
+    "code": "inspect_container_state_logs",
+    "name": "Inspect состояния, логов и метаданных контейнера",
+    "skillCode": "docker",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Как проверить состояние контейнера, его логи и метаданные?",
+    "shortAnswer": "Три команды покрывают почти всё: `docker ps -a` — статус, порты и образ; `docker logs` — stdout/stderr приложения; `docker inspect` — полные метаданные в JSON. Дополнительно: `docker stats --no-stream` для CPU/памяти, `docker top` для процессов, `docker port` для маппинга портов. Для выборки полей из inspect используй `--format`, а не grep по JSON.",
+    "idealAnswer": "Observability одного контейнера в Docker строится вокруг нескольких CLI-команд. docker ps -a даёт однострочную сводку: running/exited, образ, порты, имя — ответы на «жив ли?», «с какого образа?», «какие порты?». docker logs читает stdout и stderr процесса PID 1 внутри контейнера: без флагов — весь накопленный вывод; -f follow как tail -f; --tail N последние строки; --since 10m или timestamp для окна по времени; -t добавляет timestamps. Логи приходят только из stdout/stderr — если приложение пишет в файл внутри контейнера, docker logs их не покажет; Twelve-Factor норма — логировать в stdout. docker inspect — source of truth: полный JSON конфигурации и состояния (State, NetworkSettings, Mounts, HostConfig, env). Без --format вывод ~200 строк; с --format '{{.State.Status}}' или '{{.State.OOMKilled}}' извлекаешь одно поле через Go text/template. Полезные поля: State.Status, ExitCode, OOMKilled, RestartCount, NetworkSettings.IPAddress/Ports, Mounts, HostConfig.Memory/NanoCpus, LogConfig.Type. docker stats показывает live CPU, память, сеть, block I/O; в скриптах нужен --no-stream, иначе команда стримит бесконечно. docker top — дерево процессов внутри (host PIDs); docker port — быстрый список host→container портов. docker compose logs -f --tail 50 — tail нескольких сервисов сразу. Типичные ошибки: cat /var/log внутри контейнера вместо docker logs; docker stats без --no-stream в CI; grep/awk по полному inspect вместо --format; docker logs без --tail/--since на long-running контейнере с гигабайтами логов. Для диагностики падения: docker inspect --format '{{.State.Status}} ({{.State.ExitCode}}) OOM={{.State.OOMKilled}}' на последнем контейнере; exit 137 + OOMKilled=true → memory limit. Логи сохраняются через рестарты до docker rm (json-file driver); при syslog/fluentd/loki docker logs может не работать — смотреть LogConfig.Type.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "observability_overview",
+      "title": "Понимает три команды observability",
+      "expected": "Кандидат называет роли: docker ps — состояние и порты; docker logs — stdout/stderr приложения; docker inspect — полные метаданные; может упомянуть docker stats для ресурсов.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — без карты команд остальное фрагментарно",
+        "confusionPairs": [
+          {
+            "checkpointKey": "observability_overview",
+            "oftenConfusedWith": [
+              "docker_logs",
+              "docker_inspect_format"
+            ],
+            "anchorTermsExpected": [
+              "docker ps",
+              "docker logs",
+              "docker inspect",
+              "статус",
+              "stdout",
+              "метадан",
+              "JSON"
+            ],
+            "anchorTermsWrongTopic": [
+              "inspect показывает логи",
+              "logs это метаданные",
+              "ps показывает CPU"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "docker ps",
+              "docker logs",
+              "docker inspect"
+            ],
+            "ask": "какую задачу решает каждая из трёх команд: ps, logs, inspect"
+          }
+        ],
+        "mustConcepts": [
+          "docker ps",
+          "docker logs",
+          "docker inspect",
+          "статус",
+          "состоян",
+          "stdout",
+          "stderr",
+          "метадан",
+          "JSON",
+          "observability",
+          "порты",
+          "docker stats",
+          "source of truth",
+          "inspect",
+          "логи",
+          "контейнер"
+        ],
+        "falseClaims": [
+          "docker inspect показывает stdout приложения",
+          "docker logs содержит полный JSON конфигурации",
+          "docker ps показывает CPU и память",
+          "одной командой ps можно узнать OOMKilled",
+          "logs и inspect решают одну задачу"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "docker_ps_state",
+      "title": "Знает docker ps для быстрого статуса",
+      "expected": "Кандидат объясняет: docker ps -a показывает running/exited, образ, порты, имя; --filter name/status для выборки; отвечает «жив ли сервис?».",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "первая команда при «сервис up?»",
+        "mustConcepts": [
+          "docker ps",
+          "ps -a",
+          "STATUS",
+          "running",
+          "exited",
+          "PORTS",
+          "IMAGE",
+          "NAMES",
+          "CONTAINER ID",
+          "--filter",
+          "name=",
+          "status=running",
+          "Up",
+          "остановлен",
+          "порты",
+          "образ"
+        ],
+        "falseClaims": [
+          "docker ps без -a не показывает остановленные контейнеры",
+          "docker ps показывает exit code",
+          "docker ps показывает логи приложения",
+          "порты в ps — это только внутренние без host mapping"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "docker_logs",
+      "title": "Знает docker logs и флаги",
+      "expected": "Кандидат объясняет: logs читает stdout/stderr PID 1; -f follow; --tail N; --since; -t timestamps; compose logs для нескольких сервисов; логи только из stdout, не из файлов внутри контейнера.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "флаги и PID 1 — частая junior-ошибка",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "observability_overview",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "docker logs",
+              "-f",
+              "--tail",
+              "--since"
+            ],
+            "ask": "чем docker logs отличается от docker logs -f и зачем --tail/--since"
+          },
+          {
+            "match": [
+              "PID 1",
+              "stdout",
+              "файл",
+              "var/log"
+            ],
+            "ask": "почему docker logs не показывает /var/log/app.log внутри контейнера"
+          }
+        ],
+        "mustConcepts": [
+          "docker logs",
+          "stdout",
+          "stderr",
+          "PID 1",
+          "-f",
+          "follow",
+          "tail -f",
+          "--tail",
+          "--since",
+          "-t",
+          "timestamp",
+          "compose logs",
+          "Twelve-Factor",
+          "не файл",
+          "json-file",
+          "рестарт",
+          "daemon",
+          "захват"
+        ],
+        "falseClaims": [
+          "docker logs читает любые файлы внутри контейнера",
+          "docker logs -f выводит логи один раз и завершается",
+          "логи в файле /var/log видны через docker logs",
+          "docker logs теряет историю после restart контейнера",
+          "PID 1 не важен для docker logs"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "docker_inspect_format",
+      "title": "Знает docker inspect и --format",
+      "expected": "Кандидат объясняет: inspect — полный JSON state/config; --format извлекает поле (State.Status, ExitCode, OOMKilled, IP, Ports, Mounts); inspect = source of truth; container inspect — то же для контейнеров.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "inspect + --format — ключ к метаданным без grep",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "inspect",
+              "--format",
+              "State",
+              "ExitCode"
+            ],
+            "ask": "как узнать exit code и OOMKilled через docker inspect --format"
+          },
+          {
+            "match": [
+              "NetworkSettings",
+              "IPAddress",
+              "Ports",
+              "Mounts"
+            ],
+            "ask": "какие поля inspect нужны для IP, портов и volume mounts"
+          }
+        ],
+        "mustConcepts": [
+          "docker inspect",
+          "inspect",
+          "--format",
+          "JSON",
+          "State.Status",
+          "ExitCode",
+          "OOMKilled",
+          "RestartCount",
+          "NetworkSettings",
+          "IPAddress",
+          "Ports",
+          "Mounts",
+          "HostConfig",
+          "Memory",
+          "NanoCpus",
+          "LogConfig",
+          "text/template",
+          "source of truth",
+          "container inspect",
+          "метадан"
+        ],
+        "falseClaims": [
+          "docker inspect без --format нельзя использовать в скриптах",
+          "docker inspect показывает только running контейнеры",
+          "OOMKilled виден только через docker stats",
+          "container inspect и inspect для контейнера дают разный output",
+          "--format требует jq"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "stats_top_port",
+      "title": "Знает stats, top и port",
+      "expected": "Кандидат называет: docker stats — CPU/память/I/O (--no-stream для snapshot); docker top — процессы внутри; docker port — host→container маппинг портов.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "дополнительные view из ITLead TL;DR",
+        "mustConcepts": [
+          "docker stats",
+          "--no-stream",
+          "CPU",
+          "MEM USAGE",
+          "память",
+          "NET I/O",
+          "BLOCK I/O",
+          "docker top",
+          "процесс",
+          "PID",
+          "host PID",
+          "docker port",
+          "маппинг",
+          "HostPort",
+          "snapshot",
+          "live",
+          "stream"
+        ],
+        "falseClaims": [
+          "docker stats по умолчанию делает один snapshot и выходит",
+          "docker top показывает PID 1 как внутри контейнера без host mapping",
+          "docker port заменяет docker inspect для всех метаданных",
+          "docker stats показывает exit code"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки inspect/logs",
+      "expected": "Кандидат называет: читать file logs через exec вместо stdout; docker stats без --no-stream в скриптах; grep по inspect вместо --format; docker logs без --tail/--since на больших объёмах.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Common mistakes из ITLead — отличает практикующего",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "docker_logs",
+            "floorFraction": 0.35
+          },
+          {
+            "checkpointKey": "docker_inspect_format",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "var/log",
+              "exec cat",
+              "stdout"
+            ],
+            "ask": "почему cat /var/log/myapp.log через exec — неправильный способ смотреть логи"
+          },
+          {
+            "match": [
+              "--no-stream",
+              "скрипт",
+              "CI"
+            ],
+            "ask": "почему docker stats без --no-stream зависает в скрипте"
+          }
+        ],
+        "mustConcepts": [
+          "stdout",
+          "не файл",
+          "var/log",
+          "exec cat",
+          "--no-stream",
+          "скрипт",
+          "CI",
+          "grep",
+          "awk",
+          "--format",
+          "--tail",
+          "--since",
+          "гигабайт",
+          "writable layer",
+          "12-factor",
+          "Twelve-Factor",
+          "docker rm",
+          "потеря логов"
+        ],
+        "falseClaims": [
+          "можно безопасно логировать только в файл внутри контейнера",
+          "docker stats без --no-stream подходит для cron-скриптов",
+          "grep по inspect лучше чем --format",
+          "docker logs без ограничений безопасен на production контейнере месячной давности",
+          "file logs переживают docker rm без volume"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Сначала docker ps -a --filter name=web — жив ли. Логи — docker logs -f --tail 100 web. Метаданные — docker inspect --format '{{.State.Status}}' web. CPU/память — docker stats --no-stream web. inspect — source of truth, logs и stats — специализированные view.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ps смотрю статус и порты, logs — что приложение напечатало в stdout, inspect с --format для exit code и OOM. В compose — docker compose logs -f --tail 50 api db.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Контейнер упал: docker inspect --format '{{.State.Status}} ({{.State.ExitCode}}) OOM={{.State.OOMKilled}}' $(docker ps -alq). Логи перед падением — docker logs --tail 200. Если restart-loop — logs --tail между рестартами или --restart=no для стабильного snapshot.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Логи смотрю через docker exec cat /var/log/nginx.log. Метаданные — docker ps. CPU — docker inspect.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker stats пишу в cron без флагов — один snapshot и выход. inspect всегда парсю grep IPAddress.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker logs web без флагов на годовом контейнере — нормально. inspect и logs показывают одно и то же.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "observability_overview",
+      "exampleType": "good",
+      "exampleText": "ps — состояние и порты, logs — stdout/stderr, inspect — полный JSON метаданных, stats — ресурсы.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "observability_overview",
+      "exampleType": "good",
+      "exampleText": "ну три штуки: ps жив ли, logs что пишет app, inspect всё остальное про контейнер",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "observability_overview",
+      "exampleType": "bad",
+      "exampleText": "docker inspect показывает логи, docker logs — конфигурацию сети.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "docker_ps_state",
+      "exampleType": "good",
+      "exampleText": "docker ps -a --filter name=web — STATUS Up, PORTS 8080->80, IMAGE nginx.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "docker_ps_state",
+      "exampleType": "good",
+      "exampleText": "ps -a с filter status=running -q — пусто значит сервис не running",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "docker_ps_state",
+      "exampleType": "bad",
+      "exampleText": "docker ps показывает exit code и OOMKilled — не нужен inspect.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "docker_logs",
+      "exampleType": "good",
+      "exampleText": "docker logs -f --tail 100 --since 10m web — follow последних строк за 10 минут; daemon захватывает stdout/stderr PID 1.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "docker_logs",
+      "exampleType": "good",
+      "exampleText": "логи только из stdout, app в файл не пишем — twelve-factor. compose logs -f tail сразу по api и db",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "docker_logs",
+      "exampleType": "bad",
+      "exampleText": "docker logs читает /var/log/app.log автоматически, stdout не нужен.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "docker_inspect_format",
+      "exampleType": "good",
+      "exampleText": "docker inspect --format '{{.State.OOMKilled}}' web и --format '{{json .NetworkSettings.Ports}}' без grep по JSON.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "docker_inspect_format",
+      "exampleType": "good",
+      "exampleText": "inspect source of truth: Status, ExitCode 137, OOM, IP на bridge, mounts — всё через --format",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "docker_inspect_format",
+      "exampleType": "bad",
+      "exampleText": "inspect только для running; exited контейнер уже не inspect-ишь.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "stats_top_port",
+      "exampleType": "good",
+      "exampleText": "docker stats --no-stream web — snapshot CPU и памяти; docker port web — 80/tcp -> 0.0.0.0:8080.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "stats_top_port",
+      "exampleType": "good",
+      "exampleText": "top web — nginx master/worker с host PID; stats без no-stream в скрипт не кидаю",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "stats_top_port",
+      "exampleType": "bad",
+      "exampleText": "docker stats по умолчанию один раз выводит и завершается — --no-stream не нужен.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "WRONG: exec cat /var/log/myapp.log. RIGHT: app в stdout + docker logs. В CI stats только с --no-stream.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "не grep inspect — --format; на старом контейнере logs с --tail или --since, иначе гигабайты",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "file logs в контейнере — норм, docker logs всё равно их подхватит. inspect парсю awk — так надёжнее --format.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "inspect-container-state-logs",
+    "apiUrl": "https://api.itlead.org/api/questions/inspect-container-state-logs",
+    "pageUrl": "https://itlead.org/interview-questions/docker/inspect-container-state-logs",
+    "difficulty": "JUNIOR",
+    "titleEn": "How to inspect container state, logs, and metadata?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

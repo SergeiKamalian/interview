@@ -1,0 +1,618 @@
+{
+  "topic": {
+    "code": "monorepo_vs_polyrepo",
+    "name": "Monorepo vs Polyrepo",
+    "skillCode": "architecture",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Monorepo vs polyrepo — плюсы и минусы?",
+    "shortAnswer": "Monorepo хранит все проекты в одном Git-репозитории; polyrepo — у каждого проекта свой репозиторий. Monorepo даёт атомарные коммиты между приложениями и shared-библиотеками без version drift. Polyrepo подходит независимым командам с разными cadence деплоя. Ключевое: общий код тянет к monorepo, автономия команд — к polyrepo.",
+    "idealAnswer": "Monorepo — все проекты в одном Git-репозитории (apps/, libs/, общий nx.json); polyrepo — отдельный репозиторий на каждый проект, shared-код через npm publish и version pinning. Главная разница при изменении shared-библиотеки: в monorepo обновляешь shared-ui и web в одном коммите/PR — Nx строит граф зависимостей из project.json и tsconfig.paths, nx affected:build пересобирает только затронутые проекты, нулевой version mismatch. В polyrepo — publish новой версии в registry, bump pin в каждом consumer, отдельный CI в каждом репо, координация мержей между командами; version drift стандартная проблема. Monorepo выбирают когда: несколько приложений делят UI/утилиты/типы; нужны атомарные изменения по стеку (API contract + frontend одним PR); команда до ~50 человек на единый продукт; design system на 3+ apps. Polyrepo — когда команды полностью независимы, нужен repo-level access control (compliance), сервисы деплоятся на разных cadence без coupling, microservices black box. Сравнение: monorepo — прямые импорты, атомарные коммиты, инкрементальная сборка с кешем (Turborepo 90%+); polyrepo — npm publish, простые per-repo пайплайны, мелкие репо 1–5GB. Access control: monorepo — path-based CODEOWNERS и branch protection (гранулярнее repo-level); polyrepo — permissions на уровне репозитория. Инструменты: Nx, Turborepo, Bazel (Google 86TB, remote cache/RBE); polyrepo — Lerna, git submodules, private npm. Git в monorepo — один git diff на всё; polyrepo — CI независим, breaking change в shared-ui обнаруживается только когда consumer обновит pin. Типичные ошибки monorepo: build:all на каждый push (10 apps = 10 мин CI) вместо nx affected; миф что нет access control; monorepo без remote cache (Nx Cloud, Turborepo Remote Cache). Polyrepo: ручные version bumps без conventional commits; миграция через merge полных git histories (50k коммитов); игнор semver. Real-world: Google/Meta/Microsoft — monorepo + Bazel/Nx; Netflix — 700+ repos + Spinnaker. Polyrepo шеринг без monorepo: private npm registry, publish-update-merge цикл; submodules медленные и хрупкие. Module boundaries в monorepo: Nx enforceModuleBoundaries по tags.",
+    "maxScore": 10,
+    "skills": [
+      "architecture",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "monorepo_polyrepo_definitions",
+      "title": "Понимает определения monorepo и polyrepo",
+      "expected": "Кандидат объясняет: monorepo — все проекты в одном Git-репо; polyrepo — отдельный репо на проект; может описать структуру apps/libs vs my-company-web, my-company-api.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — TL;DR и quick example из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "monorepo_polyrepo_definitions",
+            "oftenConfusedWith": [
+              "shared_lib_coordination",
+              "when_to_choose"
+            ],
+            "anchorTermsExpected": [
+              "monorepo",
+              "polyrepo",
+              "один Git",
+              "отдельн",
+              "репозитор",
+              "apps",
+              "libs"
+            ],
+            "anchorTermsWrongTopic": [
+              "monorepo это microservices",
+              "polyrepo всегда один проект",
+              "monorepo без Git"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "monorepo",
+              "polyrepo",
+              "один Git"
+            ],
+            "ask": "чем monorepo отличается от polyrepo на уровне структуры репозитория"
+          }
+        ],
+        "mustConcepts": [
+          "monorepo",
+          "polyrepo",
+          "один Git",
+          "один репозитор",
+          "отдельн",
+          "свой репо",
+          "проект",
+          "apps",
+          "libs",
+          "workspace",
+          "структур",
+          "my-company",
+          "несколько проект",
+          "единый репо",
+          "разделён"
+        ],
+        "falseClaims": [
+          "monorepo и polyrepo — одно и то же",
+          "monorepo означает один npm-пакет",
+          "polyrepo не может содержать несколько пакетов",
+          "monorepo — это только для frontend"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "shared_lib_coordination",
+      "title": "Понимает координацию shared-библиотек",
+      "expected": "Кандидат сравнивает: monorepo — один коммит/PR, прямые импорты, без publish; polyrepo — npm publish, version pin в каждом consumer, version drift, несколько PR и CI.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "key difference ITLead — atomic vs publish cycle",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "monorepo_polyrepo_definitions",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "shared_lib_coordination",
+            "oftenConfusedWith": [
+              "polyrepo_sharing_alternatives",
+              "build_tools_affected"
+            ],
+            "anchorTermsExpected": [
+              "атомарн",
+              "один коммит",
+              "publish",
+              "version drift",
+              "version pin",
+              "shared-ui",
+              "прямой импорт"
+            ],
+            "anchorTermsWrongTopic": [
+              "polyrepo без publish",
+              "monorepo всегда требует npm publish"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "shared-ui",
+              "shared",
+              "библиотек"
+            ],
+            "ask": "что происходит при изменении shared-ui в monorepo vs polyrepo"
+          },
+          {
+            "match": [
+              "version drift",
+              "version pin",
+              "publish"
+            ],
+            "ask": "откуда берётся version drift в polyrepo"
+          }
+        ],
+        "mustConcepts": [
+          "атомарн",
+          "один коммит",
+          "один PR",
+          "publish",
+          "npm publish",
+          "version pin",
+          "version bump",
+          "version drift",
+          "дрейф",
+          "shared-ui",
+          "shared",
+          "библиотек",
+          "consumer",
+          "потребител",
+          "прямой импорт",
+          "workspace",
+          "координац",
+          "несколько PR",
+          "registry"
+        ],
+        "falseClaims": [
+          "в polyrepo shared-код обновляется автоматически без bump",
+          "monorepo требует publish для каждого изменения libs",
+          "version drift невозможен в polyrepo",
+          "один bugfix в shared-utils в polyrepo — один коммит"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_choose",
+      "title": "Знает когда выбирать monorepo или polyrepo",
+      "expected": "Кандидат называет критерии: monorepo — shared UI/types, atomic stack changes, design system 3+ apps, команда до ~50; polyrepo — независимые сервисы, repo-level access, разные cadence, microservices.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "when to use блок ITLead — практический выбор",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "design system",
+              "shared",
+              "3+"
+            ],
+            "ask": "когда monorepo оправдан для design system"
+          },
+          {
+            "match": [
+              "microservices",
+              "независим",
+              "compliance"
+            ],
+            "ask": "когда polyrepo лучше monorepo"
+          }
+        ],
+        "mustConcepts": [
+          "shared code",
+          "общий код",
+          "design system",
+          "UI компонент",
+          "типы",
+          "атомарн",
+          "API contract",
+          "frontend",
+          "50",
+          "независим",
+          "команда",
+          "автоном",
+          "access control",
+          "compliance",
+          "cadence",
+          "деплой",
+          "microservices",
+          "black box",
+          "5+ пакет",
+          "взаимозавис"
+        ],
+        "falseClaims": [
+          "monorepo всегда лучше polyrepo",
+          "polyrepo не подходит для shared UI",
+          "monorepo только для Google-scale",
+          "polyrepo запрещает общий код"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "build_tools_affected",
+      "title": "Знает инструменты сборки и affected builds",
+      "expected": "Кандидат упоминает Nx/Turborepo/Bazel, граф зависимостей, nx affected:build, инкрементальную сборку и remote cache (Nx Cloud, Turborepo Remote Cache).",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "How Git and build tools — ключ middle+ практики",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "nx affected",
+              "affected",
+              "граф"
+            ],
+            "ask": "как Nx определяет affected projects при push"
+          },
+          {
+            "match": [
+              "remote cache",
+              "Turborepo",
+              "Nx Cloud"
+            ],
+            "ask": "зачем remote cache в monorepo"
+          },
+          {
+            "match": [
+              "Bazel",
+              "Turborepo"
+            ],
+            "ask": "когда Bazel vs Turborepo"
+          }
+        ],
+        "mustConcepts": [
+          "Nx",
+          "Turborepo",
+          "Bazel",
+          "affected",
+          "nx affected",
+          "граф",
+          "dependency graph",
+          "project.json",
+          "tsconfig",
+          "paths",
+          "инкремент",
+          "кеш",
+          "cache",
+          "remote cache",
+          "Nx Cloud",
+          "пересбор",
+          "зависим",
+          "base SHA",
+          "nx graph",
+          "enforceModuleBoundaries"
+        ],
+        "falseClaims": [
+          "monorepo всегда собирает все проекты на каждый push",
+          "polyrepo автоматически знает cross-repo dependencies",
+          "remote cache не нужен в monorepo",
+          "Nx affected пересобирает весь workspace всегда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки monorepo и polyrepo",
+      "expected": "Кандидат называет: full CI без affected; миф об отсутствии access control; polyrepo без auto versioning; merge git histories при миграции; monorepo без remote cache.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — 5 паттернов из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "build_tools_affected",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "build:all",
+              "full CI",
+              "каждый push"
+            ],
+            "ask": "почему build:all на каждый push — ошибка в monorepo"
+          },
+          {
+            "match": [
+              "CODEOWNERS",
+              "access control",
+              "доступ"
+            ],
+            "ask": "как настроить access control в monorepo"
+          },
+          {
+            "match": [
+              "filter-repo",
+              "миграц",
+              "git history"
+            ],
+            "ask": "как правильно мигрировать несколько repos в monorepo"
+          }
+        ],
+        "mustConcepts": [
+          "build:all",
+          "full CI",
+          "affected",
+          "CODEOWNERS",
+          "path-based",
+          "access control",
+          "branch protection",
+          "conventional commits",
+          "npm version",
+          "автоверс",
+          "filter-repo",
+          "миграц",
+          "git history",
+          "remote cache",
+          "замедл",
+          "10 минут",
+          "ручной bump",
+          "breaking"
+        ],
+        "falseClaims": [
+          "в monorepo нельзя ограничить доступ по папкам",
+          "merge всех histories — лучший способ миграции",
+          "polyrepo не нуждается в semver automation",
+          "monorepo без remote cache масштабируется так же быстро как polyrepo"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "comparison_tradeoffs",
+      "title": "Сравнивает trade-offs по аспектам",
+      "expected": "Кандидат сравнивает по таблице: code sharing (direct vs npm), commits (atomic vs separate PRs), build speed (cache vs full rebuild), repo size, CI complexity, tooling.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "comparison table ITLead — базовый обзор",
+        "mustConcepts": [
+          "code sharing",
+          "шеринг",
+          "npm",
+          "атомарн",
+          "коммит",
+          "build speed",
+          "скорость сборки",
+          "кеш",
+          "repo size",
+          "размер",
+          "CI/CD",
+          "оркестрац",
+          "Google",
+          "Netflix",
+          "Meta",
+          "Microsoft",
+          "Lerna",
+          "submodules"
+        ],
+        "falseClaims": [
+          "polyrepo всегда быстрее собирается чем monorepo с cache",
+          "monorepo всегда 100GB+ и неуправляем",
+          "Netflix использует monorepo",
+          "polyrepo даёт атомарные cross-repo коммиты"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "polyrepo_sharing_alternatives",
+      "title": "Знает шеринг кода в polyrepo без monorepo",
+      "expected": "Кандидат упоминает private npm registry, semver publish-update-merge цикл; git submodules как альтернатива с минусами.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "follow-up ITLead — polyrepo sharing без перехода",
+        "mustConcepts": [
+          "npm registry",
+          "private npm",
+          "semver",
+          "publish",
+          "submodules",
+          "git submodules",
+          "версион",
+          "зависимост",
+          "coordination cost"
+        ],
+        "falseClaims": [
+          "в polyrepo нельзя шерить код",
+          "submodules обновляются так же быстро как workspace imports",
+          "npm registry убирает coordination cost"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Monorepo — все apps и libs в одном Git. Меняю shared-ui и web одним PR, Nx affected пересобирает только web. Polyrepo — три репо, publish в npm, bump в каждом consumer, version drift на каждом update.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Design system на 4 приложения — monorepo: workspace:* импорты, без publish. Независимые microservices с compliance isolation — polyrepo с repo-level permissions. Monorepo без nx affected и remote cache на 10 apps — 10 мин CI на typo.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну monorepo это одна кухня — shared-ui правишь и web сразу видит. polyrepo — каждый шеф со своей специей, npm publish и три PR на один fix formatDate",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Monorepo и polyrepo одинаковые, разница только в названии. В polyrepo shared-код обновляется сам когда lib меняется.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Monorepo — все видят весь код, access control невозможен. Всегда monorepo, polyrepo устарел.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "На каждый push в monorepo делаю npm run build:all — так надёжнее. Миграцию в monorepo делаю merge всех git histories из 5 repos.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "monorepo_polyrepo_definitions",
+      "exampleType": "good",
+      "exampleText": "Monorepo — apps/web, apps/api, libs/shared-ui в одном Git. Polyrepo — my-company-web, my-company-api, my-company-ui — три отдельных репо.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "monorepo_polyrepo_definitions",
+      "exampleType": "good",
+      "exampleText": "monorepo один репо на компанию, polyrepo каждый сервис отдельно",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "monorepo_polyrepo_definitions",
+      "exampleType": "bad",
+      "exampleText": "Monorepo — это когда один npm package, polyrepo — когда microservices.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "shared_lib_coordination",
+      "exampleType": "good",
+      "exampleText": "Fix formatDate в monorepo — один commit, web импортирует напрямую. В polyrepo — publish 1.0.1, отдельный PR в web и mobile с bump pin.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "shared_lib_coordination",
+      "exampleType": "good",
+      "exampleText": "polyrepo на shared lib — publish цикл и version drift, monorepo — atomic PR без mismatch версий",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "shared_lib_coordination",
+      "exampleType": "bad",
+      "exampleText": "В polyrepo consumer автоматически получает последнюю версию shared-ui без bump.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "when_to_choose",
+      "exampleType": "good",
+      "exampleText": "3+ apps на общий UI и типы — monorepo. Команды с независимым deploy и без shared code — polyrepo. API contract + frontend одним PR — monorepo.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "when_to_choose",
+      "exampleType": "good",
+      "exampleText": "design system на 5 apps — monorepo; compliance изоляция сервисов — polyrepo",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "when_to_choose",
+      "exampleType": "bad",
+      "exampleText": "Polyrepo всегда для frontend, monorepo только для backend.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "build_tools_affected",
+      "exampleType": "good",
+      "exampleText": "Nx парсит project.json и tsconfig.paths, nx affected:build --base=main пересобирает только web после изменения shared-ui. Remote cache через Nx Cloud — один dev наполняет кеш для CI.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "build_tools_affected",
+      "exampleType": "good",
+      "exampleText": "turborepo видит workspace deps, rebuild только web, api cache hit — минус минута сборки",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "build_tools_affected",
+      "exampleType": "bad",
+      "exampleText": "Monorepo на каждый push собирает все 10 apps — affected не нужен, так надёжнее.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Ошибка — build:all на push; правильно nx affected. CODEOWNERS на /libs/shared-ui/ — @ui-team review. Миграция — filter-repo или clean initial commit, не merge 50k histories.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "polyrepo без conventional commits + npm version в CI — ручные bump ломают downstream. monorepo без remote cache деградирует по скорости",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Monorepo не поддерживает CODEOWNERS — все могут мержить что угодно.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "comparison_tradeoffs",
+      "exampleType": "good",
+      "exampleText": "Monorepo — direct imports, atomic commits, incremental cache; polyrepo — npm publish, простые per-repo CI, мелкие repos. Google/Meta — monorepo; Netflix — 700+ repos.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "comparison_tradeoffs",
+      "exampleType": "good",
+      "exampleText": "monorepo растёт до 100GB+, polyrepo по 1-5GB; CI monorepo сложнее но affected+cache компенсирует",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "comparison_tradeoffs",
+      "exampleType": "bad",
+      "exampleText": "Polyrepo всегда быстрее monorepo потому что repos маленькие — cache не важен.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "polyrepo_sharing_alternatives",
+      "exampleType": "good",
+      "exampleText": "Polyrepo шеринг — private npm registry, semver publish, consumer bump. Submodules возможны но медленные и ломкие.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "polyrepo_sharing_alternatives",
+      "exampleType": "good",
+      "exampleText": "без monorepo — npm publish shared-utils, web/mobile отдельно bump, coordination cost растёт с числом consumers",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "polyrepo_sharing_alternatives",
+      "exampleType": "bad",
+      "exampleText": "В polyrepo общий код только через copy-paste, npm не используют.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "monorepo-vs-polyrepo",
+    "apiUrl": "https://api.itlead.org/api/questions/monorepo-vs-polyrepo",
+    "pageUrl": "https://itlead.org/interview-questions/architecture/monorepo-vs-polyrepo",
+    "difficulty": "MIDDLE",
+    "titleEn": "Monorepo vs Polyrepo - pros and cons?",
+    "categorySlug": "architecture",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

@@ -1,0 +1,606 @@
+{
+  "topic": {
+    "code": "docker_layers_union_filesystem",
+    "name": "Docker layers и Union File System",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Объясните, что такое Docker layers (слои) и Union File System, и как они влияют на размер образа и кэш сборки?",
+    "shortAnswer": "Docker layers — read-only дельты файловой системы: каждая инструкция Dockerfile обычно добавляет один слой; образ — упорядоченный стек слоёв с content-addressed SHA256. Union File System (OverlayFS в современном Docker) объединяет read-only слои и один writable-слой контейнера в единое представление `/`. Слои дедуплицируются и кэшируются при сборке; порядок инструкций в Dockerfile напрямую влияет на cache hit и итоговый размер образа.",
+    "idealAnswer": "Каждая инструкция Dockerfile обычно создаёт один layer — read-only diff файловой системы после выполнения команды. Образ — упорядоченный стек слоёв плюс config; слои неизменяемы и идентифицируются content hash (SHA256 tarball). Слой содержит добавленные/изменённые файлы; для удалений — whiteout-файл `.wh.<name>`, который прячет файл из нижних слоёв в union-view, но не удаляет байты с диска. Union File System (на Linux по умолчанию OverlayFS) монтирует lowerdir (read-only слои образа, снизу вверх), upperdir (writable-слой контейнера), workdir (служебный) и merged (то, что контейнер видит как `/`). Чтение идёт сверху вниз; запись — в upperdir. Изменение файла из lower layer вызывает copy-up: файл копируется в upper, затем меняется там; оригинал в read-only слое не тронут. Изменения в writable layer теряются при удалении контейнера — persistent state в volumes. Copy-up копирует весь файл: правка одного байта в 100 MB файле тянет 100 MB в writable layer — БД внутри контейнера без volume плохая идея. Build cache: ключ = digest предыдущего слоя + текст инструкции + для COPY/ADD digest файлов; для RUN — только строка команды (apt может скачать новое, но cache hit при той же строке). Cache miss на шаге инвалидирует все последующие шаги. Оптимизация: стабильные медленные шаги (deps) вниз, часто меняющийся source сверху — `COPY package*.json` + `npm ci` до `COPY . .`. Размер образа: cleanup в отдельном RUN не помогает — apt cache остаётся в предыдущем слое, следующий RUN лишь добавляет whiteouts. Удаление должно быть в том же RUN, что и создание мусора. Add в layer 4 + delete в layer 5 = образ всё ещё ~200 MB. Multi-stage — канонический способ выкинуть build-tools из финального образа; BuildKit cache mounts держат кэш сборки вне слоёв; registry (ECR/GCR/GHCR) дедуплицирует blobs — два образа с общей Alpine-base скачивают base один раз. `docker history` показывает размер каждого слоя; `docker pull` с Already exists демонстрирует dedup.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "layers_definition",
+      "title": "Понимает Docker layers",
+      "expected": "Кандидат объясняет: layer — read-only diff после инструкции Dockerfile; образ — стек слоёв; immutable, content-addressed SHA256; dedup одинаковых слоёв между образами.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — что такое слой и стек образа",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "layers_definition",
+            "oftenConfusedWith": [
+              "union_filesystem_overlayfs",
+              "copy_on_write"
+            ],
+            "anchorTermsExpected": [
+              "layer",
+              "слой",
+              "read-only",
+              "Dockerfile",
+              "SHA256",
+              "stack",
+              "immutable",
+              "dedup"
+            ],
+            "anchorTermsWrongTopic": [
+              "writable layer контейнера это layer образа",
+              "слой удаляется при rm файла"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "layer",
+              "слой",
+              "Dockerfile"
+            ],
+            "ask": "что создаёт одну инструкция Dockerfile и как слои складываются в образ"
+          }
+        ],
+        "mustConcepts": [
+          "layer",
+          "слой",
+          "read-only",
+          "Dockerfile",
+          "инструкц",
+          "diff",
+          "delta",
+          "образ",
+          "stack",
+          "стек",
+          "SHA256",
+          "content-addressed",
+          "immutable",
+          "неизмен",
+          "dedup",
+          "дедупл",
+          "tarball",
+          "docker history"
+        ],
+        "falseClaims": [
+          "каждый образ — один монолитный tarball без слоёв",
+          "слои образа перезаписываются при docker run",
+          "удаление файла уменьшает размер слоя на диске",
+          "слои идентифицируются только по имени тега образа"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "union_filesystem_overlayfs",
+      "title": "Знает Union FS / OverlayFS",
+      "expected": "Кандидат описывает OverlayFS: lowerdir (RO слои), upperdir (writable), workdir, merged; чтение сверху вниз; запись в upper; современный default на Linux.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Union FS — как контейнер видит единую файловую систему",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "layers_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "union_filesystem_overlayfs",
+            "oftenConfusedWith": [
+              "copy_on_write",
+              "layers_definition"
+            ],
+            "anchorTermsExpected": [
+              "OverlayFS",
+              "Union",
+              "lowerdir",
+              "upperdir",
+              "merged",
+              "writable"
+            ],
+            "anchorTermsWrongTopic": [
+              "union FS это только для build",
+              "все слои writable при run"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "OverlayFS",
+              "lowerdir",
+              "upperdir"
+            ],
+            "ask": "как lowerdir, upperdir и merged связаны в OverlayFS"
+          }
+        ],
+        "mustConcepts": [
+          "Union File System",
+          "Union FS",
+          "OverlayFS",
+          "lowerdir",
+          "upperdir",
+          "workdir",
+          "merged",
+          "read-only",
+          "writable",
+          "стек сло",
+          "mount",
+          "единое представ",
+          "AUFS",
+          "kernel",
+          "Linux",
+          "default"
+        ],
+        "falseClaims": [
+          "Union FS делает все слои образа writable при запуске",
+          "OverlayFS хранит образы в registry",
+          "merged — это отдельная копия всех слоёв на диске",
+          "Union FS используется только при docker build, не при run"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "copy_on_write",
+      "title": "Понимает copy-on-write",
+      "expected": "Кандидат объясняет copy-up при записи в файл из lower layer; изменения в writable layer; данные теряются с контейнером; volumes для persistence; copy-up копирует весь файл.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "CoW — поведение runtime и типичный perf trap",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "copy-up",
+              "copy-on-write",
+              "CoW"
+            ],
+            "ask": "что происходит при echo в файл из read-only слоя образа"
+          },
+          {
+            "match": [
+              "volume",
+              "writable",
+              "удален"
+            ],
+            "ask": "куда писать persistent data и что теряется при docker rm"
+          }
+        ],
+        "mustConcepts": [
+          "copy-on-write",
+          "CoW",
+          "copy-up",
+          "writable layer",
+          "upperdir",
+          "lower layer",
+          "read-only",
+          "volume",
+          "persistent",
+          "теря",
+          "удален",
+          "контейнер",
+          "hostname",
+          "весь файл",
+          "100 MB",
+          "database",
+          "БД"
+        ],
+        "falseClaims": [
+          "запись в файл lower layer меняет read-only слой образа",
+          "изменения контейнера сохраняются в образ автоматически",
+          "copy-up копирует только изменённые байты, не весь файл",
+          "volume и writable layer — одно и то же для perf"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "build_cache_layers",
+      "title": "Знает build cache и порядок Dockerfile",
+      "expected": "Кандидат описывает cache key (prev digest + instruction + file digest для COPY); cache miss инвалидирует все ниже; COPY package*.json + npm ci до COPY source.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "build cache — главный практический выигрыш middle",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "layers_definition",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "cache",
+              "кэш",
+              "npm ci",
+              "package.json"
+            ],
+            "ask": "почему COPY . . перед npm ci ломает кэш и как правильно"
+          },
+          {
+            "match": [
+              "cache miss",
+              "инвалид",
+              "RUN"
+            ],
+            "ask": "что происходит со всеми шагами после первого cache miss"
+          }
+        ],
+        "mustConcepts": [
+          "build cache",
+          "кэш",
+          "cache key",
+          "digest",
+          "предыдущ",
+          "слой",
+          "COPY",
+          "ADD",
+          "RUN",
+          "package.json",
+          "package-lock",
+          "npm ci",
+          "npm install",
+          "cache hit",
+          "cache miss",
+          "инвалид",
+          "порядок",
+          "COPY . .",
+          "стабильн",
+          "deps",
+          "source"
+        ],
+        "falseClaims": [
+          "docker build всегда пересобирает все слои с нуля",
+          "RUN кэшируется по фактическому содержимому apt cache, не по строке",
+          "порядок инструкций в Dockerfile не влияет на скорость сборки",
+          "cache miss на шаге 5 не затрагивает шаги 6+"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "image_size_whiteouts",
+      "title": "Понимает размер образа и whiteouts",
+      "expected": "Кандидат объясняет: whiteout `.wh.` прячет файл в union-view; удаление в другом RUN не уменьшает образ; cleanup в том же RUN; add+delete в разных слоях — байты остаются.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "image size pitfalls — частая ошибка на собесах",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "whiteout",
+              ".wh.",
+              "rm -rf"
+            ],
+            "ask": "почему rm apt cache в отдельном RUN не уменьшает образ"
+          },
+          {
+            "match": [
+              "200 MB",
+              "слой",
+              "удал"
+            ],
+            "ask": "файл добавлен в layer 4 и удалён в layer 5 — какой размер образа"
+          }
+        ],
+        "mustConcepts": [
+          "whiteout",
+          ".wh.",
+          "размер образа",
+          "image size",
+          "слой",
+          "удал",
+          "hide",
+          "прят",
+          "union view",
+          "apt cache",
+          "var/lib/apt",
+          "тот же RUN",
+          "&&",
+          "multi-stage",
+          "байт",
+          "оста",
+          "docker history"
+        ],
+        "falseClaims": [
+          "whiteout физически удаляет файл из предыдущего слоя",
+          "rm в отдельном RUN уменьшает суммарный размер образа",
+          "образ shrink если удалить файл в верхнем слое",
+          "docker history показывает только финальный размер без слоёв"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: add/delete в разных слоях; npm install на каждый commit; copy-up на multi-GB файле; медленный disk для /var/lib/docker; git clone в отдельных RUN.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes блок ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "npm install",
+              "60 секунд",
+              "кажд"
+            ],
+            "ask": "почему rebuild занимает минуту на однострочное изменение кода"
+          }
+        ],
+        "mustConcepts": [
+          "add delete",
+          "разные слои",
+          "npm install",
+          "rebuild",
+          "copy-up",
+          "multi-GB",
+          "volume",
+          "var/lib/docker",
+          "SSD",
+          "git clone",
+          "отдельн RUN",
+          "multi-stage",
+          "BuildKit"
+        ],
+        "falseClaims": [
+          "удаление в верхнем слое обнуляет вес добавленного файла",
+          "npm install перед COPY source — антипаттерн для кэша",
+          "OverlayFS не зависит от скорости диска",
+          "git clone + rm в одном RUN оставляет репо в образе"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "real_world_practices",
+      "title": "Знает multi-stage и BuildKit",
+      "expected": "Кандидат упоминает multi-stage (build stage vs runtime), distroless/scratch, BuildKit cache mounts, registry layer dedup (Already exists при pull).",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "бонус — real-world из ITLead",
+        "mustConcepts": [
+          "multi-stage",
+          "distroless",
+          "scratch",
+          "BuildKit",
+          "cache mount",
+          "--mount=type=cache",
+          "registry",
+          "Already exists",
+          "dedup",
+          "ECR",
+          "GHCR",
+          "COPY --from"
+        ],
+        "falseClaims": [
+          "multi-stage увеличивает финальный образ",
+          "BuildKit cache mount запекает кэш в layer навсегда",
+          "registry хранит каждый образ полностью без dedup слоёв"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Каждая инструкция Dockerfile — read-only слой. OverlayFS склеивает их с writable upperdir контейнера. Запись в /etc/hostname из alpine layer делает copy-up в upper. Build: сначала COPY package.json + npm ci, потом COPY source — deps кэшируются. rm apt cache в отдельном RUN не уменьшает образ — нужен один RUN с &&.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Слои content-addressed, node:22-alpine и python:3.13-alpine делят alpine base — pull показывает Already exists. Multi-stage: build на node:22, финал nginx:alpine только dist. Whiteout .wh. прячет файл, но 200 MB из layer 4 остаётся если удалили в layer 5. БД — volume, не writable layer.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "docker history показывает размер каждого слоя. Cache miss на COPY . . после изменения одной строки — все RUN ниже пересобираются. Правильный порядок: deps вниз, код сверху. BuildKit --mount=type=cache для pip без раздувания слоёв.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Docker layer — это просто папка в контейнере. Union FS делает все слои writable. Удалил файл в RUN rm — образ стал меньше на размер файла.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "COPY . . в начале Dockerfile норм — docker умный и кэширует npm ci даже когда меняется код. Whiteout удаляет байты из предыдущих слоёв.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Persistent data пишу в writable layer — docker commit сохранит всё. OverlayFS не использует copy-on-write, файлы редактируются in-place в read-only слое.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "layers_definition",
+      "exampleType": "good",
+      "exampleText": "Layer — read-only diff после RUN/COPY; образ — стек SHA256-слоёв; одинаковые слои хранятся один раз.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "layers_definition",
+      "exampleType": "good",
+      "exampleText": "ну каждая строка dockerfile — слой, они immutable и складываются стопкой, alpine base шарится между образами",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "layers_definition",
+      "exampleType": "bad",
+      "exampleText": "Слой образа перезаписывается при каждом docker run, поэтому контейнеры из одного образа делят writable diff.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "union_filesystem_overlayfs",
+      "exampleType": "good",
+      "exampleText": "OverlayFS: lowerdir — RO слои образа, upperdir — writable контейнера, merged — единый /. Читаем сверху вниз.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "union_filesystem_overlayfs",
+      "exampleType": "good",
+      "exampleText": "union fs на linux это overlay — несколько lower + один upper rw, контейнер видит одну fs",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "union_filesystem_overlayfs",
+      "exampleType": "bad",
+      "exampleText": "Union FS нужен только при docker build, при run контейнер монтирует один flat tarball.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "copy_on_write",
+      "exampleType": "good",
+      "exampleText": "echo в /etc/hostname из alpine layer → copy-up в upper; другие контейнеры образа видят оригинал. docker rm — upper пропадает, нужен volume.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "copy_on_write",
+      "exampleType": "good",
+      "exampleText": "правка байта в большом файле из lower — копируется весь файл в writable, для postgres только volume",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "copy_on_write",
+      "exampleType": "bad",
+      "exampleText": "Запись в файл образа меняет read-only слой навсегда для всех контейнеров.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "build_cache_layers",
+      "exampleType": "good",
+      "exampleText": "COPY package*.json → npm ci → COPY . . : deps кэш пока lock не менялся; miss на COPY . . не трогает npm ci слой.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "build_cache_layers",
+      "exampleType": "good",
+      "exampleText": "cache key = digest prev layer + текст RUN; apt-get update в RUN кэшируется по строке даже если репо обновилось",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "build_cache_layers",
+      "exampleType": "bad",
+      "exampleText": "Порядок COPY и RUN не важен — docker пересчитывает только изменившиеся файлы внутри RUN автоматически.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "image_size_whiteouts",
+      "exampleType": "good",
+      "exampleText": "apt install в RUN 2, rm lists в RUN 3 — cache всё ещё в слое 2; whiteout в 3 только скрывает. Один RUN с && и rm.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "image_size_whiteouts",
+      "exampleType": "good",
+      "exampleText": "200mb файл в layer 4, delete в layer 5 — образ ~200mb, .wh. не удаляет байты",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "image_size_whiteouts",
+      "exampleType": "bad",
+      "exampleText": "RUN rm -rf /tmp/bigfile после COPY в предыдущем RUN делает финальный образ без bigfile.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Классика: COPY . . до npm ci — 60s rebuild на каждый commit. Фикс: lockfile отдельным слоем.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "docker root на usb — старт контейнера тормозит; /var/lib/docker на ssd",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Добавил 500mb в layer 3, удалил в layer 4 — образ стал на 500mb меньше благодаря whiteout.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "real_world_practices",
+      "exampleType": "good",
+      "exampleText": "Multi-stage: node build → nginx:alpine COPY --from=build /app/dist; build stage 600mb не попадает в финал.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "real_world_practices",
+      "exampleType": "good",
+      "exampleText": "pull python:3.13-alpine после node:22-alpine — alpine layer Already exists, registry dedup blobs",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "real_world_practices",
+      "exampleType": "bad",
+      "exampleText": "BuildKit cache mount навсегда увеличивает image layer на размер pip cache.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-layers-union-filesystem",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-layers-union-filesystem",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-layers-union-filesystem",
+    "difficulty": "MIDDLE",
+    "titleEn": "Docker layers and Union File System explained",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

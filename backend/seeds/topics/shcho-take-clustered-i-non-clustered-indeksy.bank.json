@@ -1,0 +1,170 @@
+{
+  "topic": {
+    "code": "shcho_take_clustered_i_non_clustered_indeksy",
+    "name": "Clustered и non-clustered индексы",
+    "skillCode": "architecture",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое clustered и non-clustered индексы и чем они отличаются?",
+    "shortAnswer": "Clustered index хранит строки таблицы физически отсортированными по ключу в листьях B+ дерева — данные и индекс это одна структура, на таблицу максимум один. Non-clustered index — отдельное B+ дерево с ключом и указателем на строку; при SELECT * добавляет bookmark lookup, если индекс не покрывающий.",
+    "idealAnswer": "Clustered index — B+ дерево, где листовые узлы содержат сами строки данных, отсортированные по ключу. Таблица и индекс — одна физическая структура; на таблице может быть только один clustered (или heap без clustered). SQL Server создаёт clustered автоматически на PRIMARY KEY; InnoDB всегда кластеризует по PK. Non-clustered index — отдельное B+ дерево: в листьях ключ + row locator (clustered key или RID на heap). Range scan по clustered ключу читает последовательные страницы — самый быстрый путь. Запрос по вторичному фильтру идёт: seek по non-clustered → bookmark lookup в clustered за полной строкой. Покрывающий (covering) non-clustered с INCLUDE всех колонок SELECT убирает второй hop. Правило выбора: clustered на основной sort/range колонке (OrderID, event_date); non-clustered на вторичных фильтрах (CustomerID, status). Типичные ошибки: clustered на gender (hotspot page splits); random GUID (NEWID) → фрагментация 80%+ — NEWSEQUENTIALID/ULID; SELECT * через узкий индекс на 10M строк → миллионы bookmark lookup (INCLUDE message); 15+ non-clustered на write-heavy таблице — TPS падает на каждый INSERT. Диагностика: sys.dm_db_index_usage_stats для мёртвых индексов; sys.dm_db_index_physical_stats для REBUILD/REORGANIZE. Senior: fact table 1B строк — columnstore clustered для batch scan + B-tree non-clustered на FK с INCLUDE мер для point lookup.",
+    "maxScore": 10,
+    "skills": ["architecture"]
+  },
+  "checkpoints": [
+    {
+      "key": "clustered_nonclustered_definition",
+      "title": "Понимает определение clustered vs non-clustered",
+      "expected": "Кандидат объясняет: clustered — листья B+ дерева это сами строки, отсортированные физически; non-clustered — отдельное дерево с указателями; аналогия телефонного справочника vs предметного указателя.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — физический порядок vs отдельное дерево",
+        "probePolicy": { "requireProbeBeforeFinalPartial": true, "minScoreAfterShallowAccept": 0.55 },
+        "probeConceptGroups": [{ "match": ["clustered", "кластерный"], "ask": "чем clustered index отличается от non-clustered на уровне хранения строк" }],
+        "confusionPairs": [{ "checkpointKey": "clustered_nonclustered_definition", "oftenConfusedWith": ["one_clustered_limit", "bookmark_lookup"], "anchorTermsExpected": ["clustered", "non-clustered", "лист", "строк", "указател"], "anchorTermsWrongTopic": ["non-clustered хранит данные в листьях", "два clustered на таблице"] }],
+        "mustConcepts": ["clustered", "non-clustered", "кластерный", "некластерный", "B+ дерево", "листов", "строк", "физическ", "сортир", "указател", "row locator", "телефонный справочник", "предметный указатель", "данные", "индекс", "одна структура", "отдельное дерево"],
+        "falseClaims": ["clustered и non-clustered — это одно и то же дерево", "non-clustered хранит полные строки в листьях как clustered", "на таблице может быть несколько clustered индексов", "clustered index не влияет на физический порядок строк", "heap в SQL Server всегда имеет clustered index"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "one_clustered_limit",
+      "title": "Знает лимит одного clustered и роль PRIMARY KEY",
+      "expected": "Кандидат объясняет: один clustered на таблицу, потому что один физический порядок; SQL Server/InnoDB создают clustered на PK автоматически; до ~999 non-clustered в SQL Server.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "follow-up: почему только один clustered",
+        "impliesCheckpointFloors": [{ "checkpointKey": "clustered_nonclustered_definition", "floorFraction": 0.45 }],
+        "mustConcepts": ["один clustered", "максимум один", "физический порядок", "PRIMARY KEY", "PK", "SQL Server", "InnoDB", "автоматическ", "999", "non-clustered", "heap", "вторая копия", "покрывающий"],
+        "falseClaims": ["можно создать два clustered index на одной таблице", "PRIMARY KEY никогда не создаёт clustered автоматически", "InnoDB хранит таблицу как heap без clustered", "лимит non-clustered — один на таблицу"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "range_scan_vs_lookup",
+      "title": "Сравнивает range scan clustered и bookmark lookup",
+      "expected": "Кандидат описывает: range по clustered ключу — одно прохождение дерева, последовательные страницы; non-clustered seek + bookmark lookup — два hop на строку; covering index убирает второй hop.",
+      "score": 2.0,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Key difference — range scan vs bookmark lookup из ITLead",
+        "probeConceptGroups": [{ "match": ["bookmark", "lookup", "covering"], "ask": "что такое bookmark lookup и как INCLUDE его убирает" }],
+        "mustConcepts": ["range scan", "диапазон", "BETWEEN", "последовательн", "страниц", "seek", "bookmark lookup", "второй hop", "clustered key", "CustomerID", "OrderID", "covering", "INCLUDE", "покрывающ", "два проход", "I/O"],
+        "falseClaims": ["non-clustered всегда быстрее clustered на range scan", "bookmark lookup не нужен если есть WHERE по indexed колонке", "covering index всё равно ходит в clustered за каждой строкой", "range scan по non-clustered не требует bookmark lookup"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use_index_type",
+      "title": "Выбирает тип индекса по паттерну запросов",
+      "expected": "Кандидат называет: clustered на частый range/sort (OrderID, date); non-clustered на вторичные фильтры; write-heavy — минимум non-clustered; read-heavy reporting — composite non-clustered осторожно.",
+      "score": 1.0,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "When to use из ITLead Theory",
+        "mustConcepts": ["range", "OrderDate", "OrderID", "вторичн", "фильтр", "CustomerID", "write-heavy", "read-heavy", "INSERT", "composite", "отчёт", "sort", "3-5", "columnstore"],
+        "falseClaims": ["clustered ставят на каждую колонку WHERE", "write-heavy таблицам нужно больше non-clustered для скорости INSERT", "non-clustered не обновляется при INSERT", "clustered всегда лучше для точечного поиска по email"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "covering_index_elimination",
+      "title": "Понимает покрывающий индекс и устранение bookmark lookup",
+      "expected": "Кандидат объясняет INCLUDE columns, covering index; пример logs(level) INCLUDE(message) — минуты vs секунды на 10M строк.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Senior trap: SELECT * через narrow index",
+        "mustConcepts": ["covering", "покрывающ", "INCLUDE", "bookmark", "SELECT", "message", "level", "TEXT", "10M", "sequential", "non-clustered scan", "Index Only Scan", "широк", "узк"],
+        "falseClaims": ["INCLUDE добавляет колонки в clustered index", "SELECT * использует covering index без bookmark lookup", "INCLUDE работает только в clustered index", "covering index всегда меньше table scan по I/O"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "index_common_mistakes",
+      "title": "Знает типичные ошибки индексирования",
+      "expected": "Кандидат называет: clustered на low-cardinality (gender); random GUID/NEWID; SELECT * + narrow index; 15+ non-clustered; sys.dm_db_index_usage_stats.",
+      "score": 2.0,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — частая senior ловушка",
+        "mustConcepts": ["gender", "кардинальност", "hotspot", "page split", "GUID", "NEWID", "NEWSEQUENTIALID", "ULID", "фрагментац", "SELECT *", "15+", "TPS", "sys.dm_db_index_usage_stats", "unused", "REBUILD", "REORGANIZE"],
+        "falseClaims": ["GUID всегда лучше INT для clustered PK", "page splits не влияют на INSERT performance", "больше индексов всегда ускоряет INSERT", "gender — хороший clustered key"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "fragmentation_senior",
+      "title": "Диагностирует фрагментацию и проектирует индексы на fact table",
+      "expected": "Кандидат упоминает sys.dm_db_index_physical_stats, REBUILD >30%, REORGANIZE 10-30%; star schema: columnstore + B-tree на FK с INCLUDE мер.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "advanced",
+        "weightRationale": "Senior follow-up: 1B row fact table",
+        "impliesCheckpointFloors": [{ "checkpointKey": "index_common_mistakes", "floorFraction": 0.4 }],
+        "mustConcepts": ["фрагментац", "sys.dm_db_index_physical_stats", "avg_fragmentation", "REBUILD", "REORGANIZE", "columnstore", "fact table", "star schema", "FK", "delta store", "batch scan"],
+        "falseClaims": ["REORGANIZE всегда быстрее REBUILD при любой фрагментации", "columnstore подходит для random single-row INSERT без delta store", "фрагментация не влияет на range scan"],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    { "exampleType": "good", "exampleText": "Clustered — строки в листьях B+ дерева, один на таблицу на PK; non-clustered — отдельное дерево с bookmark lookup. Range по OrderID — sequential pages; по CustomerID — IX_CustomerID + hop в clustered. На logs(level) INCLUDE(message) убрал 10M bookmark lookup.", "sortOrder": 0 },
+    { "exampleType": "good", "exampleText": "ну clustered это как телефонная книга — данные уже отсортированы. non-clustered — указатель в конце книги. один clustered max, на write-heavy не плодим индексы.", "sortOrder": 1 },
+    { "exampleType": "good", "exampleText": "InnoDB clustered всегда на PK. Random GUID — page splits, NEWSEQUENTIALID лучше. sys.dm_db_index_usage_stats — дропаю unread indexes.", "sortOrder": 2 },
+    { "exampleType": "bad", "exampleText": "Clustered и non-clustered — оба хранят полные строки в листьях. Можно три clustered на таблице.", "sortOrder": 0 },
+    { "exampleType": "bad", "exampleText": "Non-clustered всегда быстрее для range scan. SELECT * через индекс на level — оптимально.", "sortOrder": 1 },
+    { "exampleType": "bad", "exampleText": "На write-heavy таблицу добавляю 20 non-clustered — чем больше индексов, тем быстрее INSERT.", "sortOrder": 2 },
+    { "checkpointKey": "clustered_nonclustered_definition", "exampleType": "good", "exampleText": "Clustered: листья B+ дерева содержат строки; non-clustered — ключ + указатель.", "sortOrder": 10 },
+    { "checkpointKey": "clustered_nonclustered_definition", "exampleType": "good", "exampleText": "clustered = данные в индексе, non-clustered = указатель на данные", "sortOrder": 11 },
+    { "checkpointKey": "clustered_nonclustered_definition", "exampleType": "bad", "exampleText": "Non-clustered и clustered хранят данные одинаково в листьях.", "sortOrder": 30 },
+    { "checkpointKey": "one_clustered_limit", "exampleType": "good", "exampleText": "Один clustered — один физический порядок; PK в SQL Server создаёт clustered автоматически.", "sortOrder": 12 },
+    { "checkpointKey": "one_clustered_limit", "exampleType": "good", "exampleText": "один clustered потому что строки физически в одном порядке только", "sortOrder": 13 },
+    { "checkpointKey": "one_clustered_limit", "exampleType": "bad", "exampleText": "Два clustered index на одной таблице — стандартная практика.", "sortOrder": 31 },
+    { "checkpointKey": "range_scan_vs_lookup", "exampleType": "good", "exampleText": "Range по clustered OrderID — contiguous pages; WHERE CustomerID — seek + bookmark lookup.", "sortOrder": 14 },
+    { "checkpointKey": "range_scan_vs_lookup", "exampleType": "good", "exampleText": "range по PK — одно дерево; по вторичному ключу — два hop если не covering", "sortOrder": 15 },
+    { "checkpointKey": "range_scan_vs_lookup", "exampleType": "bad", "exampleText": "Bookmark lookup не нужен при любом indexed WHERE.", "sortOrder": 32 },
+    { "checkpointKey": "when_to_use_index_type", "exampleType": "good", "exampleText": "Clustered на OrderID/date для range; non-clustered на CustomerID; write-heavy — 3-5 max.", "sortOrder": 16 },
+    { "checkpointKey": "when_to_use_index_type", "exampleType": "good", "exampleText": "даты и ID — clustered, фильтры — non-clustered", "sortOrder": 17 },
+    { "checkpointKey": "when_to_use_index_type", "exampleType": "bad", "exampleText": "Clustered index на status для равномерного распределения.", "sortOrder": 33 },
+    { "checkpointKey": "covering_index_elimination", "exampleType": "good", "exampleText": "IX_level ON logs(level) INCLUDE (message) — covering, без clustered access.", "sortOrder": 18 },
+    { "checkpointKey": "covering_index_elimination", "exampleType": "good", "exampleText": "INCLUDE message — bookmark lookup исчез, 4 минуты стало 8 секунд", "sortOrder": 19 },
+    { "checkpointKey": "covering_index_elimination", "exampleType": "bad", "exampleText": "INCLUDE добавляет колонки только в clustered index.", "sortOrder": 34 },
+    { "checkpointKey": "index_common_mistakes", "exampleType": "good", "exampleText": "Clustered на gender — hotspot; NEWID() GUID — фрагментация; 12-й index — TPS -80%.", "sortOrder": 20 },
+    { "checkpointKey": "index_common_mistakes", "exampleType": "good", "exampleText": "random GUID убивает clustered, gender clustered — плохая идея", "sortOrder": 21 },
+    { "checkpointKey": "index_common_mistakes", "exampleType": "bad", "exampleText": "15 non-clustered на INSERT-heavy таблице ускоряют запись.", "sortOrder": 35 },
+    { "checkpointKey": "fragmentation_senior", "exampleType": "good", "exampleText": "dm_db_index_physical_stats: >30% REBUILD; fact 1B — columnstore + B-tree на FK.", "sortOrder": 22 },
+    { "checkpointKey": "fragmentation_senior", "exampleType": "good", "exampleText": "фрагментация через physical_stats, columnstore на факты", "sortOrder": 23 },
+    { "checkpointKey": "fragmentation_senior", "exampleType": "bad", "exampleText": "REORGANIZE и REBUILD — одно и то же при 50% фрагментации.", "sortOrder": 36 }
+  ],
+  "itlead": {
+    "slug": "shcho-take-clustered-i-non-clustered-indeksy",
+    "apiUrl": "https://api.itlead.org/api/questions/shcho-take-clustered-i-non-clustered-indeksy",
+    "pageUrl": "https://itlead.org/interview-questions/general/shcho-take-clustered-i-non-clustered-indeksy",
+    "difficulty": "SENIOR",
+    "titleEn": "What are clustered and non-clustered indexes?",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T20:30:00.000Z"
+  }
+}

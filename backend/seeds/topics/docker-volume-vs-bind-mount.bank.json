@@ -1,0 +1,521 @@
+{
+  "topic": {
+    "code": "docker_volume_vs_bind_mount",
+    "name": "Docker volume vs bind mount",
+    "skillCode": "docker",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Чем отличается Docker volume от bind mount и когда что использовать?",
+    "shortAnswer": "Named volume — хранилище с логическим именем, которым управляет Docker (`/var/lib/docker/volumes/<name>/_data`); bind mount — прямое отображение произвольного пути хоста в контейнер. Volume портативен и декларативен; bind mount привязывает контейнер к конкретной файловой системе хоста. Для prod-состояния (БД, uploads) — volume; для dev live-reload, инжекта конфигов и специальных mount — bind.",
+    "idealAnswer": "Volume и bind mount — два способа дать контейнеру доступ к данным вне слоёв image; в CLI оба задаются флагом `-v`, но семантика разная. Named volume — Docker-managed директория с логическим именем, физически под `/var/lib/docker/volumes/<name>/_data`; создаётся через `docker volume create` или при первом `docker run -v name:/path`; lifecycle у Docker (`volume rm`, `volume prune`). Bind mount — прямое отображение абсолютного (или относительного) пути хоста в путь контейнера; Docker только монтирует, lifecycle на хосте (`rm -rf`, `mv`). Третий тип — tmpfs mount в RAM, volatile, для секретов и scratch. Портативность: volume легко пересоздать на новом хосте из compose; bind mount зависит от точного layout хоста. На Linux скорость одинаковая; на macOS/Windows bind mount медленнее из-за синхронизации host↔VM, volume живёт внутри Linux VM. При первом монтировании на пустой volume Docker копирует существующий контент из image в volume (friendly init); bind mount просто накладывается — содержимое image в этой точке затеняется (пустая host-директория → пустой mount внутри). Volume — БД в prod, user uploads, stateful CI с предсказуемым cleanup. Bind mount — live source в dev (`./src:/app/src`), read-only конфиги (`./nginx.conf:/etc/nginx/nginx.conf:ro`), NFS/NVMe на хосте, ротация секретов без rebuild. Типичные ошибки: bind несуществующего пути — Docker auto-создаёт root-owned директорию на хосте; UID mismatch — контейнер root пишет UID 0, на хосте файлы недоступны пользователю (fix: `--user $(id -u):$(id -g)`); медленные Mac/Win builds из-за bind `node_modules` (workaround: named volume для deps); bind mount там, где достаточно volume без host coupling. Read-only: суффикс `:ro` для обоих типов. Dev compose: bind для кода, named volume для `node_modules` и pgdata. Миграция bind→volume: stop, `cp -a` через временный alpine-контейнер. Бэкап volume — tar через sidecar; bind — tar хост-пути напрямую.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "volume_vs_bind_core",
+      "title": "Определяет volume и bind mount",
+      "expected": "Кандидат объясняет: named volume — логическое имя, Docker управляет хранением; bind mount — прямой host path в контейнер; один флаг `-v`, разная привязка; может упомянуть tmpfs как третий тип.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — ядро темы для junior",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "volume_vs_bind_core",
+            "oftenConfusedWith": [
+              "storage_lifecycle_portability",
+              "when_to_use"
+            ],
+            "anchorTermsExpected": [
+              "named volume",
+              "bind mount",
+              "логическ",
+              "host path",
+              "Docker-managed",
+              "-v"
+            ],
+            "anchorTermsWrongTopic": [
+              "overlay network",
+              "image layer",
+              "docker cp"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "volume",
+              "bind",
+              "-v"
+            ],
+            "ask": "один флаг -v — как Docker понимает volume vs bind mount"
+          }
+        ],
+        "mustConcepts": [
+          "named volume",
+          "volume",
+          "bind mount",
+          "bind",
+          "логическ",
+          "имя",
+          "host path",
+          "путь хост",
+          "Docker-managed",
+          "Docker управ",
+          "прям",
+          "отображ",
+          "-v",
+          "tmpfs",
+          "RAM",
+          "volatile",
+          "image layer",
+          "вне image"
+        ],
+        "falseClaims": [
+          "volume и bind mount — это одно и то же",
+          "bind mount управляется Docker так же как named volume",
+          "named volume требует абсолютный путь хоста",
+          "tmpfs mount сохраняет данные на диск после stop",
+          "флаг -v всегда создаёт bind mount"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "storage_lifecycle_portability",
+      "title": "Знает где хранятся данные и lifecycle",
+      "expected": "Кандидат называет: volume в `/var/lib/docker/volumes/.../_data`; bind — где указали на хосте; lifecycle volume — Docker (rm/prune), bind — хост; volume портативнее между хостами.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "таблица сравнения ITLead — storage и portability",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "volume_vs_bind_core",
+            "floorFraction": 0.4
+          }
+        ],
+        "mustConcepts": [
+          "/var/lib/docker/volumes",
+          "_data",
+          "Docker-managed",
+          "host filesystem",
+          "lifecycle",
+          "жизненн",
+          "docker volume rm",
+          "volume prune",
+          "rm -rf",
+          "портатив",
+          "portable",
+          "compose",
+          "пересозда",
+          "layout хост",
+          "Linux",
+          "Mac",
+          "Windows",
+          "VM",
+          "медлен",
+          "sync"
+        ],
+        "falseClaims": [
+          "bind mount хранится в /var/lib/docker/volumes",
+          "volume нельзя перенести на другой хост через compose",
+          "lifecycle bind mount управляет Docker через volume rm",
+          "на Mac bind mount быстрее volume из-за прямого доступа к host FS",
+          "volume и bind одинаково зависят от layout конкретного хоста"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Выбирает volume или bind mount",
+      "expected": "Кандидат называет: volume — prod state (БД, uploads), portable persistent data; bind — dev live-reload source, config injection `:ro`, NFS/special FS, CI workspace mount.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "When to pick volume / bind — decision rule из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "volume_vs_bind_core",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Postgres",
+              "dev",
+              "live reload",
+              "config"
+            ],
+            "ask": "Postgres в prod и ./src в dev — volume или bind и почему"
+          },
+          {
+            "match": [
+              ":ro",
+              "nginx.conf",
+              "prometheus"
+            ],
+            "ask": "как инжектить конфиг без rebuild image"
+          }
+        ],
+        "mustConcepts": [
+          "production",
+          "prod",
+          "баз",
+          "Postgres",
+          "Mongo",
+          "Redis",
+          "upload",
+          "state",
+          "persistent",
+          "docker rm",
+          "dev",
+          "live reload",
+          "source code",
+          "src",
+          "config",
+          "инжект",
+          ":ro",
+          "read-only",
+          "NFS",
+          "CI",
+          "workspace",
+          "compose.dev"
+        ],
+        "falseClaims": [
+          "в production всегда bind mount для БД",
+          "bind mount портативнее volume между серверами",
+          "volume нельзя использовать в dev",
+          "для live-reload обязательно named volume",
+          "config injection требует rebuild image"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "first_mount_behavior",
+      "title": "Понимает первое монтирование с контентом image",
+      "expected": "Кандидат объясняет: пустой volume при первом mount — Docker копирует файлы из image; bind mount на пустую host-директорию — image content затеняется, внутри пусто.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "subtlest difference ITLead — first mount with content",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "копир",
+              "copy",
+              "затен",
+              "shadow",
+              "empty",
+              "index.html"
+            ],
+            "ask": "nginx с default index.html — volume vs bind на пустую директорию, что увидишь внутри"
+          }
+        ],
+        "mustConcepts": [
+          "перв",
+          "first mount",
+          "копир",
+          "copy",
+          "image content",
+          "содержим",
+          "image",
+          "пуст",
+          "empty volume",
+          "затен",
+          "shadow",
+          "remap",
+          "наклад",
+          "index.html",
+          "nginx",
+          "friendly",
+          "init"
+        ],
+        "falseClaims": [
+          "bind mount копирует содержимое image в host-директорию автоматически",
+          "volume mount затеняет image content как bind mount",
+          "при bind mount Docker всегда копирует файлы из image в host path",
+          "первое монтирование volume и bind ведут себя одинаково",
+          "пустой bind mount показывает default файлы из image"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат опровергает: auto-create missing bind path (root-owned); UID mismatch bind mount; медленный bind на Mac/Win для node_modules; bind вместо volume когда host coupling не нужен.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Common mistakes ITLead — UID, auto-create, Mac sync",
+        "falseClaimCapFraction": 0,
+        "probeConceptGroups": [
+          {
+            "match": [
+              "UID",
+              "permission",
+              "root",
+              "--user"
+            ],
+            "ask": "контейнер root пишет в bind mount — что видит пользователь на хосте"
+          },
+          {
+            "match": [
+              "node_modules",
+              "Mac",
+              "cached",
+              "delegated"
+            ],
+            "ask": "почему bind node_modules на Mac медленный и как обойти"
+          }
+        ],
+        "mustConcepts": [
+          "несуществ",
+          "auto-create",
+          "авто-созда",
+          "root-owned",
+          "UID",
+          "GID",
+          "mismatch",
+          "permission",
+          "права",
+          "--user",
+          "id -u",
+          "chown",
+          "node_modules",
+          "Mac",
+          "Windows",
+          "Docker Desktop",
+          "cross-VM",
+          "sync",
+          "cached",
+          "delegated",
+          "named volume",
+          "host coupling",
+          "привяз"
+        ],
+        "falseClaims": [
+          "Docker не создаёт отсутствующий host path при bind mount",
+          "UID mismatch невозможен с bind mount",
+          "bind mount на Mac всегда быстрее volume",
+          "если не редактируешь файлы на хосте — bind mount всё равно лучше volume",
+          "контейнер по умолчанию пишет файлы с UID хост-пользователя"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "dev_compose_pattern",
+      "title": "Знает dev compose паттерн",
+      "expected": "Кандидат описывает: bind `./src` для live code; named volume для `node_modules` и pgdata; read-only bind для package.json/config; mix типов в одном сервисе.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "dev compose example ITLead — практический паттерн",
+        "mustConcepts": [
+          "compose.dev",
+          "compose",
+          "bind",
+          "./src",
+          "live code",
+          "node_modules",
+          "named volume",
+          "pgdata",
+          "Postgres",
+          "package.json",
+          ":ro",
+          "mix",
+          "смеш",
+          "dep cache",
+          "persistent state",
+          "npm run dev"
+        ],
+        "falseClaims": [
+          "в dev compose всё должно быть bind mount",
+          "node_modules всегда bind mount с хоста",
+          "named volume нельзя смешивать с bind в одном сервисе",
+          "pgdata в dev лучше bind mount на /tmp",
+          "read-only bind mount невозможен в compose"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Named volume — Docker хранит под /var/lib/docker/volumes/pgdata/_data, управляет lifecycle. Bind mount — `-v /home/me/src:/app/src`, привязка к конкретному пути хоста. БД в prod — volume; live-reload кода в dev — bind. Один `-v`, но volume по имени, bind по пути.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В compose.dev: `./api/src:/app/src` bind для hot reload, `api_node_modules:/app/node_modules` volume чтобы Mac не тормозил, `pgdata:/var/lib/postgresql/data` для state. Конфиг prometheus — bind `:ro`. Пустой volume на nginx html — Docker скопирует index.html из image; пустой bind — увидишь пустую папку.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну volume = docker сам знает где лежит, переносишь compose на новый сервер — ок. bind = конкретная папка на машине, для dev когда правишь код в IDE. root в контейнере пишет в bind — на хосте uid 0, фикс --user",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Volume и bind mount — одно и то же, разница только в имени. Для Postgres в production лучше bind /opt/data. Bind mount на Mac быстрее volume для node_modules.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "При bind mount Docker копирует файлы из image в host-директорию. UID mismatch невозможен — контейнер всегда пишет от имени текущего пользователя хоста.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Named volume хранится там же куда укажешь bind path. Первое монтирование volume затеняет index.html из nginx image как bind mount.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "volume_vs_bind_core",
+      "exampleType": "good",
+      "exampleText": "Volume: `-v pgdata:/var/lib/postgresql/data` — логическое имя, Docker-managed. Bind: `-v /home/me/code:/app/code` — точный host path.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "volume_vs_bind_core",
+      "exampleType": "good",
+      "exampleText": "tmpfs — третий тип в RAM, для секретов; volume и bind — persistent, tmpfs — volatile",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "volume_vs_bind_core",
+      "exampleType": "bad",
+      "exampleText": "Bind mount — это когда Docker создаёт volume с автогenerated именем.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "storage_lifecycle_portability",
+      "exampleType": "good",
+      "exampleText": "Volume живёт в /var/lib/docker/volumes/name/_data, удаляешь docker volume rm. Bind — rm -rf на хосте. Compose на новом сервере пересоздаёт named volumes; bind требует те же пути.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "storage_lifecycle_portability",
+      "exampleType": "good",
+      "exampleText": "на linux скорость одинаковая, на mac bind через vm sync медленный — node_modules лучше volume",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "storage_lifecycle_portability",
+      "exampleType": "bad",
+      "exampleText": "Bind mount портативнее named volume между production-хостами.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Postgres prod — named volume pgdata. Dev `./src:/app/src` bind для instant reload. `./prometheus.yml:ro` — config без rebuild.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "uploads и redis AOF — volume; CI `-v $PWD:/work` bind workspace; NFS уже смонтирован на хосте — bind этот path",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Если данные не нужны после docker rm — всё равно bind mount на /opt/data лучше volume.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "first_mount_behavior",
+      "exampleType": "good",
+      "exampleText": "Пустой volume на /usr/share/nginx/html — Docker копирует index.html из image. Пустой bind /tmp/webroot — внутри контейнера пусто, default html затенён.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "first_mount_behavior",
+      "exampleType": "good",
+      "exampleText": "volume friendly init — первый раз наполняет из image; bind literal mount-over без копирования",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "first_mount_behavior",
+      "exampleType": "bad",
+      "exampleText": "Bind mount на пустую папку покажет default index.html из nginx image.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Bind /tmp/does-not-exist — Docker создаст root-owned dir на хосте. Fix UID: docker run --user $(id -u):$(id -g). Mac node_modules — named volume вместо bind.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "если host path только storage и не трогаешь руками — volume чище чем bind /opt/myapp/data",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Docker откажется монтировать несуществующий bind path — auto-create не происходит.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "dev_compose_pattern",
+      "exampleType": "good",
+      "exampleText": "compose.dev: bind src + ro package.json, volume node_modules и pgdata — типичный dev stack из ITLead.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "dev_compose_pattern",
+      "exampleType": "good",
+      "exampleText": "prometheus: bind config :ro, volume promdata для TSDB — два типа в одном run",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "dev_compose_pattern",
+      "exampleType": "bad",
+      "exampleText": "В dev всё через bind, named volumes в compose.dev не используют.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "docker-volume-vs-bind-mount",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-volume-vs-bind-mount",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-volume-vs-bind-mount",
+    "difficulty": "JUNIOR",
+    "titleEn": "Docker volume vs bind mount: what is the difference?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T20:00:00.000Z"
+  }
+}

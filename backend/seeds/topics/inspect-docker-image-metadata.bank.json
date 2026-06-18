@@ -1,0 +1,497 @@
+{
+  "topic": {
+    "code": "inspect_docker_image_metadata",
+    "name": "Проверка метаданных Docker-образа",
+    "skillCode": "docker",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Как проверить метаданные Docker-образа?",
+    "shortAnswer": "Три основные команды: `docker inspect <image>` — полный JSON с конфигом, слоями, размером и платформой; `docker history <image>` — хронология слоёв с инструкциями сборки; `docker manifest inspect <image>` — манифест в registry (multi-arch). Для интерактивного просмотра файлов в слоях — сторонний `dive`. Ключевое: inspect показывает, что образ сделает при запуске (CMD, ENV, EXPOSE, USER); history — как собран; dive — что лежит в каждом слое.",
+    "idealAnswer": "Проверка метаданных Docker-образа нужна перед pull, после pull, при отладке роста размера и перед деплоем — чтобы понять, что образ обещает сделать при запуске. Три встроенные CLI-команды покрывают большую часть задач. `docker inspect` — основной инструмент: возвращает JSON 100+ строк с полным описанием образа. Важные поля: `.Id` — content digest образа; `.RepoTags` и `.RepoDigests` — теги и digest в registry; `.Architecture`, `.Os` — целевая платформа (amd64/linux); `.Size` — размер в байтах; `.Created` — время сборки; `.Config.*` — runtime-конфиг (Cmd, Entrypoint, Env, Labels, ExposedPorts, User, WorkingDir, Volumes, Healthcheck); `.RootFS.Layers` — digest слоёв по порядку; `.History` — шаги сборки. Флаг `--format` извлекает конкретные поля: `{{.Config.Cmd}}`, `{{json .Config.Env}} | jq`, `{{.Config.User}}` (пусто = root). `docker image inspect` — явная форма для образов, вывод тот же. `docker history` показывает слои от старых к новым с инструкцией и размером каждого; `--no-trunc` — полные команды; `<missing>` в колонке IMAGE — не ошибка, а промежуточный слой без локального ID. `docker manifest inspect` работает против registry без локального pull: показывает multi-arch manifest list с digest и platform (amd64, arm64 и т.д.) — полезно перед pull на mixed-кластер. `dive` (сторонний) — интерактивный TUI: слои, file tree с diff, efficiency score; для «почему образ 2 GB». Практические паттерны: Cmd/Entrypoint через `--format`; biggest layer — `docker history --format '{{.Size}}\t{{.CreatedBy}}' --no-trunc | sort -h`; content digest — `{{index .RepoDigests 0}}` для pin в prod вместо mutable tag. Типичные ошибки: путать `docker inspect` образа и контейнера (разные схемы — у контейнера `.State`, `.NetworkSettings`, `.Mounts`); читать `<missing>` как поломку; думать что history показывает файлы (только Dockerfile-шаги — для файлов dive или `docker save` + tar); пытаться `docker inspect` удалённого образа без `docker pull` (нужен локальный кеш или manifest inspect). Id vs RepoDigest: Id — локальный hash config blob; RepoDigest — registry-side hash манифеста для pull-by-digest. Реальное применение: pre-deploy проверка CMD/USER/EXPOSE; compliance-аудит OCI labels и non-root; расследование размера через history/dive; multi-arch проверка перед деплоем; воспроизведение билда по history vs Dockerfile. Для CI: скрипт с inspect + jq — assert User не пустой, labels present, Size под порогом; `dive --ci` для efficiency score.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "inspect_tools_overview",
+      "title": "Называет основные инструменты inspect",
+      "expected": "Кандидат перечисляет: docker inspect (полный JSON метаданных), docker history (слои и инструкции сборки), docker manifest inspect (registry/manifest, multi-arch); упоминает dive для интерактивного просмотра содержимого слоёв.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — ядро темы: три команды + dive",
+        "mustConcepts": [
+          "docker inspect",
+          "docker history",
+          "docker manifest inspect",
+          "dive",
+          "метадан",
+          "JSON",
+          "слои",
+          "layer",
+          "registry",
+          "multi-arch",
+          "манифест",
+          "интерактив",
+          "TUI",
+          "inspect",
+          "history",
+          "manifest"
+        ],
+        "falseClaims": [
+          "для метаданных образа достаточно только docker ps",
+          "docker history показывает содержимое файлов в слоях",
+          "docker manifest inspect требует локальный pull образа",
+          "dive встроен в Docker CLI по умолчанию"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "docker_inspect_fields",
+      "title": "Знает поля docker inspect",
+      "expected": "Кандидат описывает ключевые поля JSON: Config (Cmd, Entrypoint, Env, User, ExposedPorts, Labels), Size, Architecture/Os, RootFS.Layers, Id/RepoDigests; использует --format для извлечения полей.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "основной inspect + --format из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "inspect_tools_overview",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "--format",
+              "Config.Cmd",
+              "Config.User"
+            ],
+            "ask": "как через docker inspect узнать CMD, USER и ENV без чтения всего JSON"
+          }
+        ],
+        "mustConcepts": [
+          "docker inspect",
+          "--format",
+          "Config",
+          "Cmd",
+          "Entrypoint",
+          "Env",
+          "User",
+          "ExposedPorts",
+          "Labels",
+          "Size",
+          "Architecture",
+          "RootFS",
+          "Layers",
+          "Id",
+          "RepoDigests",
+          "RepoTags",
+          "Created",
+          "WorkingDir",
+          "Healthcheck",
+          "docker image inspect"
+        ],
+        "falseClaims": [
+          "docker inspect образа возвращает .State и .NetworkSettings как у контейнера",
+          "Config.User пустой означает non-root пользователь",
+          "Size в inspect показывает только размер последнего слоя",
+          "docker inspect и docker image inspect дают разный вывод для образа"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "docker_history_layers",
+      "title": "Понимает docker history",
+      "expected": "Кандидат объясняет: history показывает слои от старых к новым с инструкцией и размером; --no-trunc для полных команд; `<missing>` — промежуточный слой без локального ID, не ошибка.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "docker history + missing из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "missing",
+              "<missing>",
+              "history"
+            ],
+            "ask": "что означает <missing> в docker history и это проблема?"
+          }
+        ],
+        "mustConcepts": [
+          "docker history",
+          "--no-trunc",
+          "слои",
+          "layer",
+          "CREATED BY",
+          "SIZE",
+          "missing",
+          "промежуточн",
+          "инструкц",
+          "Dockerfile",
+          "хронолог",
+          "старый",
+          "новый",
+          "sort -h"
+        ],
+        "falseClaims": [
+          "<missing> в docker history означает повреждённый образ",
+          "docker history показывает дерево файлов в каждом слое",
+          "history работает только для образов собранных локально",
+          "размер 0B в history всегда означает пустой слой без смысла"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "manifest_inspect",
+      "title": "Знает docker manifest inspect",
+      "expected": "Кандидат объясняет: manifest inspect обращается к registry, показывает multi-arch варианты (architecture, digest); полезно до pull и для pin per-platform digest; не требует локального образа.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "registry-side manifest из ITLead",
+        "mustConcepts": [
+          "docker manifest inspect",
+          "registry",
+          "multi-arch",
+          "manifest list",
+          "platform",
+          "architecture",
+          "arm64",
+          "amd64",
+          "digest",
+          "pull",
+          "без pull",
+          "remote",
+          "schemaVersion",
+          "mediaType"
+        ],
+        "falseClaims": [
+          "docker manifest inspect работает только с локально скачанными образами",
+          "manifest inspect показывает CMD и ENV образа",
+          "multi-arch информация доступна только через docker inspect локально"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат опровергает: путать inspect образа и контейнера; читать missing как ошибку; ожидать файлы в history; inspect без pull; пустой User = root.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes ITLead — критичные заблуждения junior",
+        "falseClaimCapFraction": 0,
+        "probeConceptGroups": [
+          {
+            "match": [
+              "образ",
+              "контейнер",
+              "inspect"
+            ],
+            "ask": "чем отличается docker inspect образа от docker inspect контейнера"
+          },
+          {
+            "match": [
+              "pull",
+              "локальн",
+              "кеш"
+            ],
+            "ask": "можно ли docker inspect образа который ещё не pull'нули"
+          }
+        ],
+        "mustConcepts": [
+          "образ",
+          "контейнер",
+          "разные схем",
+          "State",
+          "NetworkSettings",
+          "Mounts",
+          "missing",
+          "не ошибка",
+          "Dockerfile шаги",
+          "не файлы",
+          "docker pull",
+          "локальный кеш",
+          "manifest inspect",
+          "User пустой",
+          "root",
+          "dive",
+          "docker save"
+        ],
+        "falseClaims": [
+          "docker inspect образа и контейнера возвращают одинаковые поля",
+          "<missing> в history значит образ сломан и его нельзя запускать",
+          "docker history показывает какие файлы добавил каждый слой",
+          "docker inspect работает с remote образом без pull"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "useful_patterns",
+      "title": "Применяет практические паттерны",
+      "expected": "Кандидат называет паттерны: --format для Cmd/Env/User/ExposedPorts; biggest layer через history + sort; RepoDigest для immutable pin; pre-deploy audit CMD/USER/labels; отличие Id от RepoDigest.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Useful patterns + follow-up Id vs RepoDigest",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "docker_inspect_fields",
+            "floorFraction": 0.4
+          }
+        ],
+        "mustConcepts": [
+          "--format",
+          "Cmd",
+          "Entrypoint",
+          "Env",
+          "ExposedPorts",
+          "User",
+          "sort -h",
+          "biggest layer",
+          "RepoDigest",
+          "Id",
+          "sha256",
+          "immutable",
+          "tag",
+          "pin",
+          "pre-deploy",
+          "compliance",
+          "OCI labels",
+          "jq",
+          "config blob",
+          "manifest hash"
+        ],
+        "falseClaims": [
+          "Id и RepoDigest всегда совпадают",
+          "mutable tag безопаснее digest в production",
+          "для biggest layer достаточно docker inspect Size без history",
+          "пустой Config.User означает что образ запустится от dedicated service user"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "dive_tool",
+      "title": "Знает инструмент dive",
+      "expected": "Кандидат объясняет: dive — сторонний TUI для просмотра файлов в каждом слое, diff между слоями, efficiency score; для расследования размера образа; альтернатива — docker save + tar.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "dive third-party — бонус junior",
+        "mustConcepts": [
+          "dive",
+          "TUI",
+          "file tree",
+          "diff",
+          "efficiency",
+          "wasted space",
+          "слой",
+          "размер образа",
+          "docker save",
+          "tar",
+          "dive --ci"
+        ],
+        "falseClaims": [
+          "dive входит в стандартную поставку Docker Engine",
+          "dive заменяет docker history для просмотра инструкций сборки",
+          "без dive нельзя узнать содержимое слоёв вообще"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "docker inspect — полный JSON: Cmd, Env, User, Size, Architecture, слои. docker history — как собран, размер каждого слоя. docker manifest inspect — multi-arch в registry без pull. dive — интерактивно смотреть файлы в слоях если образ раздулся.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Перед деплоем: docker inspect --format '{{.Config.User}} {{.Config.Cmd}}' — пустой User = root, опасно. RepoDigest pin вместо latest. history + sort -h — найти слой с npm install на 100MB.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну inspect = json метаданные, history = слои снизу вверх, manifest = какие arch есть в registry. missing в history — норм, не баг",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Метаданные образа смотрю через docker ps и docker logs. docker history показывает список файлов в каждом слое.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker inspect контейнера и образа — одно и то же, всегда есть .State.Running. <missing> в history — образ повреждён.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker inspect nginx:latest работает без pull если образ только в Docker Hub. Пустой User в Config — значит образ безопасный non-root.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "inspect_tools_overview",
+      "exampleType": "good",
+      "exampleText": "Три команды: inspect — что образ сделает при run; history — как собран; manifest inspect — multi-arch в registry. dive — бонус для файлов в слоях.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "inspect_tools_overview",
+      "exampleType": "good",
+      "exampleText": "inspect json, history слои, manifest remote — покрывают 90% аудита образа",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "inspect_tools_overview",
+      "exampleType": "bad",
+      "exampleText": "Для метаданных достаточно docker images — там вся информация про Cmd и Env.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "docker_inspect_fields",
+      "exampleType": "good",
+      "exampleText": "docker inspect nginx:1.27 --format '{{.Config.Cmd}} {{.Architecture}} {{.Size}}' — Cmd, платформа, размер без 100 строк JSON.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "docker_inspect_fields",
+      "exampleType": "good",
+      "exampleText": "Config.Env через {{json .Config.Env}} | jq; RootFS.Layers — digest слоёв; RepoDigests — для pin в prod",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "docker_inspect_fields",
+      "exampleType": "bad",
+      "exampleText": "docker inspect образа возвращает .State.Status и .NetworkSettings.IPAddress как у контейнера.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "docker_history_layers",
+      "exampleType": "good",
+      "exampleText": "docker history --no-trunc nginx:alpine — полные RUN/CMD инструкции; <missing> — промежуточный слой без ID, образ рабочий.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "docker_history_layers",
+      "exampleType": "good",
+      "exampleText": "history снизу вверх: ADD base 7MB, потом apk add 8MB, CMD 0B — видно что раздувает образ",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "docker_history_layers",
+      "exampleType": "bad",
+      "exampleText": "<missing> в IMAGE колонке — надо пересобрать образ, metadata потеряна.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "manifest_inspect",
+      "exampleType": "good",
+      "exampleText": "docker manifest inspect nginx:1.27 | jq '.manifests[] | {arch: .platform.architecture, digest: .digest}' — amd64/arm64 до pull.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "manifest_inspect",
+      "exampleType": "good",
+      "exampleText": "manifest inspect с registry — multi-arch без локального кеша, удобно перед деплоем в mixed кластер",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "manifest_inspect",
+      "exampleType": "bad",
+      "exampleText": "docker manifest inspect показывает Config.Cmd и ExposedPorts образа из registry.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "inspect myimg vs mycontainer — разные объекты: у контейнера State/Mounts, у образа Config/RootFS. history — шаги Dockerfile, не файлы; для файлов dive.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "локальный inspect без pull не сработает — сначала pull или manifest inspect для remote",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "docker inspect hub-образа работает напрямую с Docker Hub без pull. history показывает file tree каждого слоя.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "useful_patterns",
+      "exampleType": "good",
+      "exampleText": "Pre-deploy: inspect User/Cmd/ExposedPorts. Biggest layer: history --format + sort -h. Prod: image@sha256:digest вместо :latest.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "useful_patterns",
+      "exampleType": "good",
+      "exampleText": "Id — локальный hash config; RepoDigest — registry manifest hash для pull-by-digest, они разные",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "useful_patterns",
+      "exampleType": "bad",
+      "exampleText": "Id и RepoDigest одно и то же — можно путать в production manifests.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "dive_tool",
+      "exampleType": "good",
+      "exampleText": "dive nginx:alpine — TUI: слои сверху, file diff снизу, efficiency score справа. Для «почему 2GB».",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "dive_tool",
+      "exampleType": "good",
+      "exampleText": "без dive: docker save img -o img.tar && tar xf — руками по слоям, но dive быстрее",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "dive_tool",
+      "exampleType": "bad",
+      "exampleText": "dive встроен в docker CLI рядом с docker history, ставить отдельно не нужно.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "inspect-docker-image-metadata",
+    "apiUrl": "https://api.itlead.org/api/questions/inspect-docker-image-metadata",
+    "pageUrl": "https://itlead.org/interview-questions/docker/inspect-docker-image-metadata",
+    "difficulty": "JUNIOR",
+    "titleEn": "How to inspect Docker image metadata?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T20:00:00.000Z"
+  }
+}

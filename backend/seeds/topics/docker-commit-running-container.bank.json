@@ -1,0 +1,626 @@
+{
+  "topic": {
+    "code": "docker_commit_running_container",
+    "name": "Docker commit из контейнера",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как создать Docker-образ из запущенного (или остановленного) контейнера?",
+    "shortAnswer": "`docker commit` делает snapshot текущего состояния контейнера и сохраняет его как новый образ — writable-слой плюс базовые слои исходного image. Полезно для debug-снимков и исследовательской работы, но не для production: образ непрозрачен, нет Dockerfile и воспроизводимого рецепта.",
+    "idealAnswer": "`docker commit [OPTIONS] CONTAINER [REPOSITORY[:TAG]]` превращает контейнер (running или stopped) в новый образ — snapshot writable-слоя поверх базовых слоёв исходного image. Внутри контейнера установленные пакеты, изменённые конфиги и файлы попадают в новый слой. Флаги: `-m` message (видно в docker history), `-a` author, `-p`/`--pause=false` (по умолчанию контейнер паузится на время commit для консистентности). Пример: `docker run -it --name explore alpine sh` → `apk add curl` → `docker commit -m 'added curl' explore my-explorer:0.1` → `docker run my-explorer:0.1` видит curl. Для production — антипаттерн: нет Dockerfile, нет reproducibility (потерял image — не пересобрать), нет code review (PR на Dockerfile vs ad-hoc commit), скрытые side effects (логи, scratch-файлы в writable-слое), bloat без layer cache и .dockerignore, drift между Dockerfile в git и реальным prod image. Правильный prod-путь: Dockerfile в git → CI build → push. Допустимые сценарии: debug snapshot проблемного prod-контейнера (`docker commit broken-prod debug:broken-2026-04-30` + push в private registry для offline-анализа); exploration — итерируешь в контейнере, commit как stepping stone, потом переводишь в Dockerfile; disaster recovery — ручной hotfix ещё не в Dockerfile, commit перед redeploy чтобы не потерять состояние. Флаг `-c` применяет подмножество Dockerfile-инструкций (CMD, ENTRYPOINT, ENV, EXPOSE, LABEL, USER, VOLUME, WORKDIR) без входа в shell. Типичные ошибки: deploy через `docker exec` + `docker commit` + push вместо Dockerfile+CI; забыть что pause по умолчанию виден на high-throughput сервисах; commit контейнера с `-e DB_PASSWORD=...` — секрет попадает в image config и утекает при push; цепочка commit-tweak-commit без diff между образами. Отличия: `docker commit` создаёт НОВЫЙ image из container; `docker save` экспортирует существующий image в tarball — другие use case. `docker diff <container>` ДО commit показывает изменения writable-слоя; после commit — один большой слой в docker history. Stopped container можно commit — writable-слой жив до `docker rm`. Новый image наследует CMD, ENV и config от базового image; override через `-c`. Commit как deployment mechanism опасен: Dockerfile в repo перестаёт отражать prod, аудиты проваливаются, «works on the server» magic.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "commit_definition",
+      "title": "Понимает docker commit",
+      "expected": "Кандидат объясняет: `docker commit` сохраняет текущее состояние контейнера как новый образ — snapshot writable-слоя поверх базовых слоёв; работает для running и stopped контейнера.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — snapshot container state → new image",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "commit_definition",
+            "oftenConfusedWith": [
+              "commit_vs_related",
+              "production_antipattern"
+            ],
+            "anchorTermsExpected": [
+              "snapshot",
+              "writable",
+              "слой",
+              "образ",
+              "контейнер",
+              "docker commit",
+              "состоян"
+            ],
+            "anchorTermsWrongTopic": [
+              "docker save создаёт образ",
+              "commit пересобирает Dockerfile",
+              "commit только для running"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "docker commit",
+              "snapshot",
+              "writable"
+            ],
+            "ask": "что именно попадает в новый образ при docker commit"
+          }
+        ],
+        "mustConcepts": [
+          "docker commit",
+          "snapshot",
+          "снимок",
+          "writable",
+          "записываем",
+          "слой",
+          "layer",
+          "образ",
+          "image",
+          "контейнер",
+          "container",
+          "состоян",
+          "state",
+          "базов",
+          "underlying",
+          "новый образ",
+          "running",
+          "stopped"
+        ],
+        "falseClaims": [
+          "docker commit пересобирает образ из Dockerfile",
+          "commit работает только с running контейнером",
+          "commit не включает изменения writable-слоя",
+          "docker commit и docker save делают одно и то же",
+          "commit создаёт только diff без базовых слоёв"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "commit_syntax_flags",
+      "title": "Знает синтаксис и флаги",
+      "expected": "Кандидат называет синтаксис `docker commit [OPTIONS] CONTAINER [REPOSITORY[:TAG]]` и флаги `-m`, `-a`, `-p`/`--pause=false`.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Syntax и quick example из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "-m",
+              "-a",
+              "pause"
+            ],
+            "ask": "для чего флаги -m, -a и --pause=false при commit"
+          }
+        ],
+        "mustConcepts": [
+          "docker commit",
+          "CONTAINER",
+          "REPOSITORY",
+          "TAG",
+          "repository:tag",
+          "-m",
+          "message",
+          "сообщен",
+          "-a",
+          "author",
+          "автор",
+          "-p",
+          "--pause",
+          "pause=false",
+          "пауз",
+          "docker history",
+          "OPTIONS"
+        ],
+        "falseClaims": [
+          "-m задаёт имя образа вместо message",
+          "commit всегда требует запущенный контейнер без флагов",
+          "--pause=false делает commit медленнее без пользы",
+          "repository:tag необязателен и образ нельзя тегировать"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "production_antipattern",
+      "title": "Понимает антипаттерн для prod",
+      "expected": "Кандидат объясняет: commit в production — антипаттерн; нет Dockerfile, reproducibility, code review; скрытые side effects, bloat, drift; правильно — Dockerfile + CI.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевой вывод ITLead — anti-pattern for production",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "commit_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "production_antipattern",
+            "oftenConfusedWith": [
+              "legitimate_uses"
+            ],
+            "anchorTermsExpected": [
+              "антипаттерн",
+              "production",
+              "Dockerfile",
+              "reproduc",
+              "CI",
+              "review",
+              "drift"
+            ],
+            "anchorTermsWrongTopic": [
+              "commit всегда плох",
+              "Dockerfile не нужен никогда",
+              "commit заменяет docker build в CI"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "production",
+              "антипаттерн",
+              "Dockerfile"
+            ],
+            "ask": "почему docker commit не подходит для production-образов"
+          },
+          {
+            "match": [
+              "reproduc",
+              "review",
+              "drift"
+            ],
+            "ask": "что теряется без Dockerfile: reproducibility, review, drift"
+          }
+        ],
+        "mustConcepts": [
+          "антипаттерн",
+          "production",
+          "прод",
+          "Dockerfile",
+          "reproduc",
+          "воспроизвод",
+          "code review",
+          "peer review",
+          "CI",
+          "build",
+          "side effect",
+          "скрыт",
+          "bloat",
+          "разду",
+          "drift",
+          "дрейф",
+          "рецепт",
+          "recipe",
+          "git",
+          "opaque",
+          "непрозрач"
+        ],
+        "falseClaims": [
+          "docker commit в prod — нормальная практика как docker build",
+          "commit-образ так же воспроизводим как Dockerfile",
+          "Dockerfile в git не нужен если есть commit-image",
+          "commit проходит code review как PR на Dockerfile",
+          "commit-образы не раздуваются и кешируются как build"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "legitimate_uses",
+      "title": "Знает допустимые сценарии",
+      "expected": "Кандидат называет: debug snapshot проблемного контейнера; exploration с последующим Dockerfile; disaster recovery перед redeploy; commit — stepping stone, не финальный артефакт.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Legitimate uses из ITLead — debug, exploration, disaster recovery",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "debug",
+              "snapshot",
+              "exploration"
+            ],
+            "ask": "когда commit оправдан: debug snapshot, exploration, hotfix до Dockerfile"
+          }
+        ],
+        "mustConcepts": [
+          "debug",
+          "snapshot",
+          "снимок",
+          "exploration",
+          "исслед",
+          "exploratory",
+          "Dockerfile",
+          "stepping stone",
+          "промежут",
+          "disaster recovery",
+          "hotfix",
+          "ручн",
+          "redeploy",
+          "offline",
+          "анализ",
+          "sandbox",
+          "push",
+          "registry",
+          "private"
+        ],
+        "falseClaims": [
+          "commit никогда не имеет смысла",
+          "exploration commit заменяет Dockerfile навсегда",
+          "debug snapshot нужно деплоить в prod",
+          "commit для onboarding dev container — production deploy"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: deploy через exec+commit+push; pause по умолчанию; секреты в env попадают в image config; цепочка commit-tweak-commit без истории.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes ITLead — deploy, pause, secrets, drift chain",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "production_antipattern",
+            "floorFraction": 0.4
+          }
+        ],
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "secret",
+              "env",
+              "password",
+              "DB_PASSWORD"
+            ],
+            "ask": "как commit с runtime env утечёт секрет при push"
+          },
+          {
+            "match": [
+              "pause",
+              "deploy",
+              "npm install"
+            ],
+            "ask": "почему exec + commit + push в prod — типичная ошибка"
+          }
+        ],
+        "mustConcepts": [
+          "docker exec",
+          "deploy",
+          "деплой",
+          "npm install",
+          "pause",
+          "пауз",
+          "по умолчанию",
+          "secret",
+          "секрет",
+          "env",
+          "DB_PASSWORD",
+          "Config.Env",
+          "docker inspect",
+          "push",
+          "утеч",
+          "commit-tweak",
+          "цепочк",
+          "works on the server",
+          "audit",
+          "аудит"
+        ],
+        "falseClaims": [
+          "секреты в env не попадают в commit-образ",
+          "pause при commit никогда не влияет на сервис",
+          "exec + commit + push — нормальный CI/CD pipeline",
+          "два commit-образа легко diff как Dockerfile layers",
+          "commit-image immutable history как git log Dockerfile"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "commit_c_flag",
+      "title": "Знает флаг `-c`",
+      "expected": "Кандидат объясняет: `-c` применяет Dockerfile-подобные инструкции (CMD, ENV, LABEL, USER, WORKDIR и др.) при commit без входа в shell.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Apply Dockerfile-style changes via -c из ITLead",
+        "mustConcepts": [
+          "-c",
+          "CMD",
+          "ENTRYPOINT",
+          "ENV",
+          "EXPOSE",
+          "LABEL",
+          "USER",
+          "VOLUME",
+          "WORKDIR",
+          "Dockerfile",
+          "инструкц",
+          "metadata",
+          "метадан",
+          "override",
+          "переопредел",
+          "config"
+        ],
+        "falseClaims": [
+          "-c принимает любую Dockerfile-инструкцию включая RUN и COPY",
+          "-c меняет только writable-слой без image config",
+          "CMD через -c требует пересборки образа docker build"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "commit_vs_related",
+      "title": "Отличает commit от save/diff",
+      "expected": "Кандидат различает: commit создаёт новый image из container; save экспортирует image в tarball; docker diff до commit показывает writable changes; stopped container commit возможен; config наследуется, override через `-c`.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Follow-up questions ITLead — commit vs save, diff, stopped, config",
+        "confusionPairs": [
+          {
+            "checkpointKey": "commit_vs_related",
+            "oftenConfusedWith": [
+              "commit_definition"
+            ],
+            "anchorTermsExpected": [
+              "docker save",
+              "docker diff",
+              "tarball",
+              "новый image",
+              "stopped",
+              "наслед"
+            ],
+            "anchorTermsWrongTopic": [
+              "save создаёт образ из контейнера",
+              "diff после commit показывает построчные изменения",
+              "stopped container нельзя commit"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "docker save",
+          "tarball",
+          "экспорт",
+          "docker diff",
+          "writable",
+          "до commit",
+          "docker history",
+          "новый image",
+          "stopped",
+          "остановлен",
+          "docker rm",
+          "наслед",
+          "config",
+          "CMD",
+          "ENV",
+          "-c",
+          "override"
+        ],
+        "falseClaims": [
+          "docker save и docker commit делают одно и то же",
+          "docker diff работает только после commit",
+          "stopped container теряет writable-слой сразу",
+          "commit не наследует CMD и ENV от базового image"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "`docker commit` — snapshot writable-слоя контейнера в новый image. Для debug-снимка проблемного api — ок: commit, tag, push в private registry, разбираешь offline. В prod всегда Dockerfile + CI build, иначе drift и нет reproducibility.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В lab контейнере ставлю пакеты, `docker commit lab my-lab:0.1` — черновик. Потом пишу Dockerfile с теми же RUN apk/pip. Commit — stepping stone, не артефакт деплоя. `-m` message видно в history, pause по умолчанию — учитываю на live сервисе.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "commit ≠ save: commit из container → новый image; save — tarball существующего image. `docker diff` до commit показывает изменения. Stopped container commit можно — слой жив до rm. С `-e DB_PASSWORD` commit — секрет в Config.Env, push = утечка.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В prod делаю docker exec npm install, docker commit, docker push — быстрее Dockerfile. Образ так же воспроизводим и проходит review.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker commit и docker save — одно и то же, оба создают образ из контейнера. Секреты в env не попадают в image config.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Commit только для running. Stopped container commit невозможен — writable-слой уже удалён. В prod commit — best practice вместо Dockerfile.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "commit_definition",
+      "exampleType": "good",
+      "exampleText": "docker commit explore my-explorer:0.1 — snapshot того что накопилось в writable-слое поверх alpine, новый image с curl и конфигом.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "commit_definition",
+      "exampleType": "good",
+      "exampleText": "ну commit сохраняет текущее состояние контейнера как образ — все изменения в верхнем слое плюс базовые слои снизу",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "commit_definition",
+      "exampleType": "bad",
+      "exampleText": "docker commit пересобирает Dockerfile заново и не включает runtime-изменения контейнера.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "commit_syntax_flags",
+      "exampleType": "good",
+      "exampleText": "docker commit -m 'added curl' -a 'alice' explore my-org/explorer:0.1 — message в history, author в metadata.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "commit_syntax_flags",
+      "exampleType": "good",
+      "exampleText": "на high-throughput сервисе --pause=false если готов к inconsistency, иначе default pause на время commit",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "commit_syntax_flags",
+      "exampleType": "bad",
+      "exampleText": "Флаг -m задаёт имя контейнера, а repository:tag commit не поддерживает.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "production_antipattern",
+      "exampleType": "good",
+      "exampleText": "Prod image только из Dockerfile в git + CI. Commit — opaque snapshot без рецепта, side effects, bloat, Dockerfile в repo перестаёт отражать prod.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "production_antipattern",
+      "exampleType": "good",
+      "exampleText": "commit в prod = потеря reproducibility и audit trail, PR на Dockerfile не заменить ad-hoc commit",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "production_antipattern",
+      "exampleType": "bad",
+      "exampleText": "docker commit myreg/api:1.1 в production — нормально, образ так же reviewable как Dockerfile PR.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "legitimate_uses",
+      "exampleType": "good",
+      "exampleText": "OOM на prod api — commit debug:api-oom-2026-04-30, push в private registry, команда копает offline в sandbox.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "legitimate_uses",
+      "exampleType": "good",
+      "exampleText": "hotfix в prod ещё не в Dockerfile — commit saved:before-redeploy, параллельно PR с RUN/COPY, потом деплой из Dockerfile",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "legitimate_uses",
+      "exampleType": "bad",
+      "exampleText": "Exploration commit my-lab:0.1 — финальный prod artifact, Dockerfile не нужен.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "docker exec api npm install + commit + push — через полгода никто не знает что в myreg/api:1.1. Секрет -e DB_PASSWORD попадёт в inspect Config.Env.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "цепочка image A → tweak → commit → B → tweak → C — diff между commit-образами почти бесполезен, drift накапливается",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Pause при commit никогда не заметен. Env-секреты не сохраняются в image config при commit.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "commit_c_flag",
+      "exampleType": "good",
+      "exampleText": "docker commit -c 'CMD [\"/bin/bash\"]' -c 'ENV TZ=UTC' explore tweaked:0.1 — metadata без shell.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "commit_c_flag",
+      "exampleType": "good",
+      "exampleText": "-c принимает CMD ENV LABEL USER WORKDIR — подмножество Dockerfile, не RUN/COPY",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "commit_c_flag",
+      "exampleType": "bad",
+      "exampleText": "Через -c можно добавить RUN apt-get install в commit без пересборки — полный Dockerfile синтаксис.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "commit_vs_related",
+      "exampleType": "good",
+      "exampleText": "commit container → новый image; save image → tar. docker diff до commit — что изменилось в writable. Stopped — commit ok до docker rm.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "commit_vs_related",
+      "exampleType": "good",
+      "exampleText": "новый image наследует CMD/env базового, -c override при commit",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "commit_vs_related",
+      "exampleType": "bad",
+      "exampleText": "docker save создаёт новый image из running container так же как commit.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-commit-running-container",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-commit-running-container",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-commit-running-container",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to create a Docker image from a running container?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T21:30:00.000Z"
+  }
+}

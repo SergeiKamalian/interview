@@ -1,0 +1,508 @@
+{
+  "topic": {
+    "code": "troubleshoot_docker_networking",
+    "name": "Диагностика Docker networking",
+    "skillCode": "docker",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как диагностировать сетевые проблемы между Docker контейнерами?",
+    "shortAnswer": "Top-down: same network (inspect) → DNS (getent, 127.0.0.11) → ping IP → nc port → ss bind → iptables DOCKER-USER → tcpdump. Default bridge без DNS. 127.0.0.1 bind — classic error.",
+    "idealAnswer": "Checklist: 1) inspect Networks same? network connect if not. 2) DNS getent hosts db — only user-defined bridge, 127.0.0.11 resolver. Default bridge no DNS. 3) ping IP. 4) nc -vz port — refused vs timeout. 5) ss -tlnp — 127.0.0.1:5432 unreachable from peers, fix 0.0.0.0. 6) iptables DOCKER-USER, UFW. 7) tcpdump br-*. Overlay: MTU 1450, UDP 4789. host network Linux only; Mac → host.docker.internal. netshoot --network=container:app. Ошибки: default bridge; 127.0.0.1 bind; iptables outside DOCKER-USER; --link.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "diagnostic_order",
+      "title": "Знает порядок диагностики layer-by-layer",
+      "expected": "Кandidat: network → DNS → IP ping → port nc → service bind → firewall → tcpdump.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Diagnostic checklist",
+        "mustConcepts": [
+          "DNS",
+          "IP",
+          "port",
+          "firewall",
+          "layer-by-layer",
+          "network",
+          "ping",
+          "nc",
+          "tcpdump",
+          "checklist",
+          "top-down",
+          "resolution",
+          "reachability",
+          "diagnostic",
+          "order",
+          "seven steps"
+        ],
+        "falseClaims": [
+          "сразу tcpdump",
+          "skip DNS check",
+          "port before network",
+          "random order ok"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "same_network_dns",
+      "title": "Проверяет same network и DNS",
+      "expected": "Кandidat: docker inspect Networks; user-defined bridge has DNS 127.0.0.11; getent hosts db; network connect.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Same network and DNS",
+        "mustConcepts": [
+          "docker inspect",
+          "Networks",
+          "127.0.0.11",
+          "embedded DNS",
+          "getent hosts",
+          "network connect",
+          "user-defined",
+          "Aliases",
+          "IPAddress",
+          "same network",
+          "db",
+          "resolver"
+        ],
+        "falseClaims": [
+          "default bridge has DNS",
+          "127.0.0.11 on default bridge",
+          "different networks auto-connect"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "default_bridge_limit",
+      "title": "Знает ограничения default bridge",
+      "expected": "Кandidat: default bridge no DNS between containers; --link deprecated; create user-defined network.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Default bridge no DNS",
+        "mustConcepts": [
+          "default bridge",
+          "no DNS",
+          "--link",
+          "deprecated",
+          "user-defined",
+          "docker network create",
+          "toy",
+          "historical",
+          "compatibility",
+          "names don't resolve"
+        ],
+        "falseClaims": [
+          "default bridge resolves container names",
+          "--link recommended",
+          "Compose uses default bridge no DNS"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "port_reachability",
+      "title": "Диагностирует port-level",
+      "expected": "Кandidat: nc -vz db 5432; refused=not listening; timeout=firewall; ss -tlnp inside container.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Port reachability",
+        "mustConcepts": [
+          "nc -vz",
+          "Connection refused",
+          "timeout",
+          "ss -tlnp",
+          "LISTEN",
+          "5432",
+          "postgresql",
+          "port open",
+          "firewall drop",
+          "SYN-ACK",
+          "service listening"
+        ],
+        "falseClaims": [
+          "refused means firewall",
+          "timeout means service down",
+          "nc not useful"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "bind_localhost",
+      "title": "Знает ошибку bind 127.0.0.1",
+      "expected": "Кandidat: service bound localhost unreachable from peers; fix listen 0.0.0.0 or listen_addresses=*.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Bind localhost mistake",
+        "mustConcepts": [
+          "127.0.0.1",
+          "0.0.0.0",
+          "listen_addresses",
+          "Postgres",
+          "bind",
+          "localhost",
+          "container interface",
+          "peer",
+          "unreachable",
+          "classic mistake",
+          "ss -tlnp"
+        ],
+        "falseClaims": [
+          "127.0.0.1 reachable from other containers",
+          "bind localhost ok for Docker",
+          "0.0.0.0 less secure always wrong"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "firewall_iptables",
+      "title": "Диагностирует firewall и iptables",
+      "expected": "Кandidat: iptables DOCKER-USER DOCKER; UFW interferes; custom rules in DOCKER-USER chain.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "advanced",
+        "weightRationale": "Firewall iptables",
+        "mustConcepts": [
+          "iptables",
+          "DOCKER-USER",
+          "DOCKER",
+          "UFW",
+          "firewalld",
+          "drop",
+          "LOG",
+          "dmesg",
+          "bridge",
+          "custom rules",
+          "daemon restart"
+        ],
+        "falseClaims": [
+          "Docker never touches iptables",
+          "UFW compatible always",
+          "manual iptables persistent"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "overlay_mtu",
+      "title": "Знает overlay MTU и host network",
+      "expected": "Кandidat: VXLAN +50 bytes MTU 1450; UDP 4789; host network Linux vs Docker Desktop Mac.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "advanced",
+        "weightRationale": "Overlay MTU host network",
+        "mustConcepts": [
+          "overlay",
+          "MTU",
+          "1450",
+          "1500",
+          "VXLAN",
+          "4789",
+          "7946",
+          "Swarm",
+          "host network",
+          "Docker Desktop",
+          "host.docker.internal",
+          "Mac",
+          "VM",
+          "encapsulation"
+        ],
+        "falseClaims": [
+          "overlay MTU 1500 ok always",
+          "host network same Mac and Linux",
+          "4789 not needed Swarm"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "netshoot_tools",
+      "title": "Знает netshoot и tcpdump",
+      "expected": "Кandidat: nicolaka/netshoot --network=container:app; tcpdump on br- bridge.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Diagnostic tools",
+        "mustConcepts": [
+          "netshoot",
+          "tcpdump",
+          "br-",
+          "bridge",
+          "network=container",
+          "dig",
+          "mtr",
+          "iperf",
+          "tshark",
+          "packet capture",
+          "forensics"
+        ],
+        "falseClaims": [
+          "netshoot requires host network",
+          "tcpdump inside container always works"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки networking",
+      "expected": "FIXMARK; 127.0.0.1 bind; manual iptables outside DOCKER-USER; --link deprecated.",
+      "score": 0.5,
+      "sortOrder": 8,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes",
+        "mustConcepts": [
+          "default bridge",
+          "127.0.0.1",
+          "DOCKER-USER",
+          "--link",
+          "deprecated",
+          "user-defined",
+          "0.0.0.0",
+          "manual iptables"
+        ],
+        "falseClaims": [
+          "user-defined optional",
+          "--link modern approach"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "1) inspect same network 2) getent hosts 3) ping 4) nc port 5) ss bind 6) iptables 7) tcpdump.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Default bridge — no DNS. User-defined или Compose auto-network.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Postgres 127.0.0.1:5432 — peers can't connect. Fix listen 0.0.0.0.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "default bridge resolves names",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "127.0.0.1 bind ok for inter-container",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "skip DNS go straight tcpdump",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "inspect Networks",
+      "sortOrder": 10,
+      "checkpointKey": "same_network_dns"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "127.0.0.11 user-defined DNS",
+      "sortOrder": 11,
+      "checkpointKey": "same_network_dns"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "default bridge DNS",
+      "sortOrder": 42,
+      "checkpointKey": "same_network_dns"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "127.0.0.1 unreachable peers",
+      "sortOrder": 14,
+      "checkpointKey": "bind_localhost"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "listen 0.0.0.0 fix",
+      "sortOrder": 15,
+      "checkpointKey": "bind_localhost"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "localhost bind ok",
+      "sortOrder": 46,
+      "checkpointKey": "bind_localhost"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "nc refused vs timeout",
+      "sortOrder": 18,
+      "checkpointKey": "port_reachability"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ss -tlnp inside db",
+      "sortOrder": 19,
+      "checkpointKey": "port_reachability"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "refused = firewall",
+      "sortOrder": 50,
+      "checkpointKey": "port_reachability"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает порядок диагностики layer-by-layer»: Кandidat: network → DNS → IP ping → port nc → service bind → firewall → tcpdump.…",
+      "sortOrder": 51,
+      "checkpointKey": "diagnostic_order"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает порядок диагностики layer-by-layer»: Кandidat: network → DNS → IP ping → port nc → service bind → firewall → tcpdump.…",
+      "sortOrder": 52,
+      "checkpointKey": "diagnostic_order"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Неверно: сразу tcpdump",
+      "sortOrder": 40,
+      "checkpointKey": "diagnostic_order"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает ограничения default bridge»: Кandidat: default bridge no DNS between containers; --link deprecated; create user-defined network.…",
+      "sortOrder": 53,
+      "checkpointKey": "default_bridge_limit"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает ограничения default bridge»: Кandidat: default bridge no DNS between containers; --link deprecated; create user-defined network.…",
+      "sortOrder": 54,
+      "checkpointKey": "default_bridge_limit"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Неверно: default bridge resolves container names",
+      "sortOrder": 41,
+      "checkpointKey": "default_bridge_limit"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Диагностирует firewall и iptables»: Кandidat: iptables DOCKER-USER DOCKER; UFW interferes; custom rules in DOCKER-USER chain.…",
+      "sortOrder": 55,
+      "checkpointKey": "firewall_iptables"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Диагностирует firewall и iptables»: Кandidat: iptables DOCKER-USER DOCKER; UFW interferes; custom rules in DOCKER-USER chain.…",
+      "sortOrder": 56,
+      "checkpointKey": "firewall_iptables"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Неверно: Docker never touches iptables",
+      "sortOrder": 42,
+      "checkpointKey": "firewall_iptables"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает overlay MTU и host network»: Кandidat: VXLAN +50 bytes MTU 1450; UDP 4789; host network Linux vs Docker Desktop Mac.…",
+      "sortOrder": 57,
+      "checkpointKey": "overlay_mtu"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает overlay MTU и host network»: Кandidat: VXLAN +50 bytes MTU 1450; UDP 4789; host network Linux vs Docker Desktop Mac.…",
+      "sortOrder": 58,
+      "checkpointKey": "overlay_mtu"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Неверно: overlay MTU 1500 ok always",
+      "sortOrder": 43,
+      "checkpointKey": "overlay_mtu"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает netshoot и tcpdump»: Кandidat: nicolaka/netshoot --network=container:app; tcpdump on br- bridge.…",
+      "sortOrder": 59,
+      "checkpointKey": "netshoot_tools"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает netshoot и tcpdump»: Кandidat: nicolaka/netshoot --network=container:app; tcpdump on br- bridge.…",
+      "sortOrder": 60,
+      "checkpointKey": "netshoot_tools"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Неверно: netshoot requires host network",
+      "sortOrder": 44,
+      "checkpointKey": "netshoot_tools"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает типичные ошибки networking»: FIXMARK; 127.0.0.1 bind; manual iptables outside DOCKER-USER; --link deprecated.…",
+      "sortOrder": 61,
+      "checkpointKey": "common_mistakes"
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Верно по «Знает типичные ошибки networking»: FIXMARK; 127.0.0.1 bind; manual iptables outside DOCKER-USER; --link deprecated.…",
+      "sortOrder": 62,
+      "checkpointKey": "common_mistakes"
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Неверно: user-defined optional",
+      "sortOrder": 45,
+      "checkpointKey": "common_mistakes"
+    }
+  ],
+  "itlead": {
+    "slug": "troubleshoot-docker-networking",
+    "categorySlug": "docker",
+    "apiUrl": "https://api.itlead.org/api/questions/troubleshoot-docker-networking",
+    "pageUrl": "https://itlead.org/interview-questions/docker/troubleshoot-docker-networking",
+    "difficulty": "SENIOR",
+    "titleEn": "How to troubleshoot network problems between Docker containers?",
+    "syncedAt": "2026-06-18T14:47:42.000Z"
+  }
+}

@@ -1,0 +1,577 @@
+{
+  "topic": {
+    "code": "docker_compose_profiles",
+    "name": "Docker Compose profiles",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое Docker Compose profiles и как их использовать?",
+    "shortAnswer": "Profiles помечают сервисы как opt-in: сервис с `profiles:` стартует только при явной активации через `--profile name` или переменную `COMPOSE_PROFILES`. Сервис без profiles всегда активен. Это позволяет держать один compose.yaml для базового стека и опциональных инструментов (pgadmin, миграции, load test) без нескольких файлов.",
+    "idealAnswer": "Docker Compose profiles — способ пометить сервисы как opt-in. По умолчанию сервис в compose.yaml стартует при `docker compose up`. Если добавить `profiles: [\"debug\"]`, сервис не запускается, пока профиль не активирован. Активация: CLI `docker compose --profile debug up` или env `COMPOSE_PROFILES=debug docker compose up`; можно включить несколько профилей (`--profile cache --profile workers` или `COMPOSE_PROFILES=cache,workers`). Сервис без ключа `profiles` — always-active. Сервис с profiles активен, если хотя бы один из его профилей совпал с активированными. Сервис может быть в нескольких профилях — достаточно активировать любой один. Неактивные сервисы игнорируются: не build, не pull, не start. Указание имени сервиса auto-активирует его профиль: `docker compose up pgadmin` поднимет pgadmin даже без `--profile debug`, если pgadmin в profile debug. Зависимости: always-active сервис не может `depends_on` profiled-сервис, который не активирован — Compose выдаст ошибку. Fix: убрать profile с dependency или перенести зависимый сервис в тот же profile. Profiled-сервис может depends_on always-active (db) или другого profiled в том же profile. Use cases: pgadmin/redis-commander/mailhog как debug; migrate/seed как one-shot `profiles: [\"tools\"]` + `docker compose --profile tools run --rm migrate`; k6/locust для perf; Jaeger/Prometheus при расследовании; e2e в CI через `COMPOSE_PROFILES=e2e`. Типичные ошибки: app depends_on queue, queue в profile workers — `up` падает; profiles для разных env vars/image tags — лучше compose.override.yaml или `-f compose.prod.yaml`; `down` без тех же `--profile` оставляет profiled-контейнеры — нужны те же флаги или `--remove-orphans`. `docker compose ps` показывает только текущую selection; все сервисы — `docker compose config --services`. `build` и `watch` следуют тем же правилам отбора. Profiles не вкладываются — flat list; meta-profile через несколько значений в env. Когда profiles не хватает: разный config одного сервиса между окружениями (теги, replicas, env) — несколько compose-файлов через `-f`; profiles и override не взаимоисключающие.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "profiles_definition",
+      "title": "Понимает назначение profiles",
+      "expected": "Кандидат объясняет: profiles помечают сервисы opt-in; один compose.yaml вместо нескольких файлов или закомментированных блоков; базовый стек всегда up, опциональные инструменты по запросу.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — opt-in сервисы и один источник правды из ITLead TL;DR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "profiles_definition",
+            "oftenConfusedWith": [
+              "profiles_limitations"
+            ],
+            "anchorTermsExpected": [
+              "opt-in",
+              "profiles",
+              "опциональн",
+              "один compose",
+              "debug",
+              "pgadmin"
+            ],
+            "anchorTermsWrongTopic": [
+              "profiles заменяют override",
+              "profiles для разных image tag",
+              "profiles это environment"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "profile",
+              "opt-in",
+              "опциональн"
+            ],
+            "ask": "зачем profiles вместо второго compose-файла или закомментированного pgadmin"
+          }
+        ],
+        "mustConcepts": [
+          "profiles",
+          "profile",
+          "opt-in",
+          "опциональн",
+          "compose.yaml",
+          "один файл",
+          "debug",
+          "pgadmin",
+          "mailhog",
+          "redis-commander",
+          "load test",
+          "k6",
+          "locust",
+          "Jaeger",
+          "Prometheus",
+          "migrate",
+          "dormant",
+          "неактивн",
+          "закомментир",
+          "несколько файлов"
+        ],
+        "falseClaims": [
+          "profiles обязательны для каждого сервиса",
+          "profiles заменяют docker compose override для env-specific config",
+          "без profiles сервис никогда не стартует",
+          "profiles автоматически создают отдельные compose-файлы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "activation_methods",
+      "title": "Знает способы активации",
+      "expected": "Кандидат называет: `docker compose --profile name up`, `COMPOSE_PROFILES=name` (comma-separated), несколько `--profile` флагов; примеры для dev и CI.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый CLI и env из ITLead activation rules",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "--profile",
+              "COMPOSE_PROFILES"
+            ],
+            "ask": "как включить profile debug через CLI и через переменную окружения в CI"
+          }
+        ],
+        "mustConcepts": [
+          "--profile",
+          "COMPOSE_PROFILES",
+          "docker compose up",
+          "env",
+          "переменн",
+          "comma",
+          "запят",
+          "несколько profile",
+          "cache",
+          "workers",
+          "debug",
+          "CI",
+          "github actions"
+        ],
+        "falseClaims": [
+          "profiles активируются только через docker-compose.yml, не через CLI",
+          "COMPOSE_PROFILES принимает только один profile",
+          "profiles включаются через docker profile enable",
+          "--profile работает только с docker run, не compose"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "selection_rules",
+      "title": "Понимает правила отбора сервисов",
+      "expected": "Кандидат объясняет: без profiles — always-active; с profiles — только при совпадении; сервис в нескольких profiles; targeting по имени auto-активирует profile; неактивные не build/pull/start.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "selection rules — ключевая механика из ITLead Theory",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "profiles_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "always-active",
+              "всегда",
+              "без profile"
+            ],
+            "ask": "что стартует при обычном docker compose up без флагов"
+          },
+          {
+            "match": [
+              "несколько profile",
+              "multiple",
+              "jaeger"
+            ],
+            "ask": "сервис в profiles tracing и observability — когда он активен"
+          }
+        ],
+        "mustConcepts": [
+          "always-active",
+          "всегда актив",
+          "без profiles",
+          "совпад",
+          "matching",
+          "несколько profile",
+          "multiple profiles",
+          "любой один",
+          "targeting",
+          "up pgadmin",
+          "auto-activ",
+          "автоактив",
+          "не build",
+          "не pull",
+          "не start",
+          "ignored",
+          "игнорир",
+          "selection",
+          "отбор"
+        ],
+        "falseClaims": [
+          "profiled-сервис стартует по умолчанию вместе с app",
+          "нужно активировать все profiles сервиса одновременно",
+          "docker compose up pgadmin не активирует profile автоматически",
+          "неактивные profiled-сервисы всё равно pull и build при up"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "depends_on_constraints",
+      "title": "Понимает profiles и depends_on",
+      "expected": "Кандидат объясняет: always-active не может depends_on неактивного profiled-сервиса — ошибка; fix — убрать profile или перенести зависимый сервис; profiled может depends_on always-active или соседа в том же profile.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "частая production-ошибка из ITLead Profiles + depends_on и Common mistakes",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "depends_on",
+              "queue",
+              "workers"
+            ],
+            "ask": "app always-active depends_on queue в profile workers — что будет при docker compose up"
+          },
+          {
+            "match": [
+              "pgadmin",
+              "db",
+              "always-active"
+            ],
+            "ask": "может ли profiled pgadmin depends_on always-active db"
+          }
+        ],
+        "mustConcepts": [
+          "depends_on",
+          "always-active",
+          "profiled",
+          "ошибк",
+          "error",
+          "fail",
+          "queue",
+          "workers",
+          "redis",
+          "cache",
+          "fix",
+          "убрать profile",
+          "перенест",
+          "тот же profile",
+          "service_healthy",
+          "condition",
+          "pgadmin",
+          "db"
+        ],
+        "falseClaims": [
+          "depends_on автоматически активирует profile зависимости",
+          "always-active может спокойно depends_on profiled redis без profile",
+          "Compose игнорирует depends_on для profiled-сервисов",
+          "depends_on работает только между always-active сервисами всегда без ошибок"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "practical_patterns",
+      "title": "Знает практические паттерны",
+      "expected": "Кандидат приводит: dev/debug split (app+db vs pgadmin); migrate как one-shot `run --rm` с profile tools; CI через COMPOSE_PROFILES=e2e; комбинация cache+workers+perf.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "примеры dev/debug, migrate, CI из ITLead Examples",
+        "mustConcepts": [
+          "pgadmin",
+          "debug",
+          "migrate",
+          "tools",
+          "run --rm",
+          "one-shot",
+          "одноразов",
+          "e2e",
+          "CI",
+          "COMPOSE_PROFILES",
+          "cache",
+          "workers",
+          "perf",
+          "locust",
+          "healthcheck",
+          "service_healthy",
+          "seed"
+        ],
+        "falseClaims": [
+          "migrate должен быть always-active и стартовать при каждом up",
+          "profiles нельзя использовать с docker compose run",
+          "CI всегда должен поднимать все profiles",
+          "one-shot сервисы не могут иметь profiles"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: depends_on на неактивный profiled; profiles вместо override для env config; down без тех же profile оставляет контейнеры; up pgadmin поднимает весь profile.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — depends_on, override, down, auto-activation",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "down",
+              "remove-orphans",
+              "orphan"
+            ],
+            "ask": "подняли с --profile debug, сделали down без profile — что останется"
+          },
+          {
+            "match": [
+              "override",
+              "compose.override",
+              "staging"
+            ],
+            "ask": "когда profiles — плохой выбор и лучше override или второй -f файл"
+          }
+        ],
+        "mustConcepts": [
+          "depends_on",
+          "queue",
+          "workers",
+          "override",
+          "compose.override",
+          "staging",
+          "env var",
+          "image tag",
+          "down",
+          "--profile",
+          "remove-orphans",
+          "orphan",
+          "pgadmin",
+          "auto-activ",
+          "сюрприз",
+          "comment-out",
+          "закомментир"
+        ],
+        "falseClaims": [
+          "docker compose down всегда останавливает все контейнеры проекта включая profiled",
+          "profiles — лучший способ менять image tag между staging и prod",
+          "up pgadmin запустит только pgadmin без других сервисов того же profile",
+          "depends_on constraint можно игнорировать если сервис нужен app"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "profiles_limitations",
+      "title": "Понимает ограничения и альтернативы",
+      "expected": "Кандидат упоминает: build/ps/watch следуют selection; profiles flat — нет вложенности; для разного config сервиса между env — несколько compose через -f; profiles + override решают разные задачи.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up senior из ITLead — когда profiles не хватает, build/watch/ps",
+        "mustConcepts": [
+          "build",
+          "docker compose build",
+          "ps",
+          "config --services",
+          "watch",
+          "flat",
+          "вложен",
+          "meta-profile",
+          "несколько compose",
+          "-f compose.prod",
+          "override",
+          "replica",
+          "image tag",
+          "environment",
+          "разный config",
+          "dormant"
+        ],
+        "falseClaims": [
+          "profile может активировать другой profile автоматически",
+          "docker compose ps показывает все profiled-сервисы даже dormant",
+          "profiles заменяют merge нескольких compose-файлов для prod",
+          "watch мониторит все сервисы файла независимо от profiles"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Profiles помечают сервисы opt-in: pgadmin с profiles: [\"debug\"] не стартует при обычном docker compose up. Включаю через --profile debug или COMPOSE_PROFILES=debug. Сервис без profiles — always-active. Если app depends_on queue, а queue в profile workers — up упадёт, пока не активирую workers или не уберу profile.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Держу один compose: app+db всегда, pgadmin и mailhog в debug, migrate в tools. Ежедневно docker compose up. Миграции: docker compose --profile tools run --rm migrate. В CI COMPOSE_PROFILES=e2e docker compose run --rm e2e. Down с теми же --profile или --remove-orphans, иначе debug-контейнеры останутся.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Profiles — для опциональных сервисов, не для разных image tag между staging и prod — там -f compose.yaml -f compose.prod.yaml. build и watch учитывают только active selection. docker compose config --services показывает все defined, ps — только текущие.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Profiles — это способ задать разные environment variables для одного сервиса в dev и prod. Все сервисы с profiles стартуют по умолчанию при docker compose up.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "app может depends_on redis даже если redis в profile cache без активации — Compose сам поднимет redis. docker compose down всегда убивает pgadmin из debug profile.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Чтобы включить debug, достаточно раскомментировать pgadmin — profiles не нужны. Profile debug автоматически активирует profile perf.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "profiles_definition",
+      "exampleType": "good",
+      "exampleText": "Profiles — opt-in метки: один compose.yaml, базовый стек всегда, pgadmin/k6/Jaeger только когда нужны.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "profiles_definition",
+      "exampleType": "good",
+      "exampleText": "ну profiles чтобы не плодить compose.debug.yaml — debug tools включаешь флагом когда надо",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "profiles_definition",
+      "exampleType": "bad",
+      "exampleText": "Profiles обязательны для каждого сервиса, иначе compose не валидируется.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "activation_methods",
+      "exampleType": "good",
+      "exampleText": "docker compose --profile debug up или COMPOSE_PROFILES=debug,workers для cache и workers вместе.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "activation_methods",
+      "exampleType": "good",
+      "exampleText": "в github actions: compose up -d app db, потом COMPOSE_PROFILES=e2e compose run --rm e2e",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "activation_methods",
+      "exampleType": "bad",
+      "exampleText": "Profiles включаются только правкой compose.yaml, CLI --profile не существует.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "selection_rules",
+      "exampleType": "good",
+      "exampleText": "Без profiles — always-active. С profiles — только если profile совпал. jaeger в [tracing, observability] — хватит любого из двух.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "selection_rules",
+      "exampleType": "good",
+      "exampleText": "docker compose up pgadmin сам активирует profile debug. Неактивные сервисы не build и не pull.",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "selection_rules",
+      "exampleType": "bad",
+      "exampleText": "Profiled-сервисы всё равно pull образы при обычном up без profile.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "depends_on_constraints",
+      "exampleType": "good",
+      "exampleText": "app depends_on queue, queue profiles workers — docker compose up fail. Fix: workers profile при up или убрать profile с queue.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "depends_on_constraints",
+      "exampleType": "good",
+      "exampleText": "pgadmin в debug depends_on db — ок, db always-active. pgadmin-monitor depends_on pgadmin — оба в debug, тоже ок.",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "depends_on_constraints",
+      "exampleType": "bad",
+      "exampleText": "depends_on автоматически включает profile redis если app на него ссылается.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "practical_patterns",
+      "exampleType": "good",
+      "exampleText": "migrate profiles tools, command npm run migrate, запуск compose --profile tools run --rm migrate после healthy db.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "practical_patterns",
+      "exampleType": "good",
+      "exampleText": "ежедневно up app db, иногда --profile debug для pgadmin, нагрузку locust в profile perf",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "practical_patterns",
+      "exampleType": "bad",
+      "exampleText": "migrate должен быть always-active и крутиться постоянно вместе с app.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "--profile debug up поднял 4 сервиса, down без profile остановит 3 — pgadmin останется, нужен down --profile debug или --remove-orphans.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "для разных image tag между env — compose.override или -f staging, profiles только для opt-in сервисов",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "profiles — idiomatic способ менять replicas и env vars между staging и production.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "profiles_limitations",
+      "exampleType": "good",
+      "exampleText": "profiles flat — нельзя debug активировать perf. Для prod config — -f compose.yaml -f compose.prod.yaml. build без profile не собирает profiled.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "profiles_limitations",
+      "exampleType": "good",
+      "exampleText": "ps не показывает dormant pgadmin, config --services — все. watch только active selection.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "profiles_limitations",
+      "exampleType": "bad",
+      "exampleText": "docker compose ps показывает все сервисы из yaml включая неактивные profiles.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-compose-profiles",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-compose-profiles",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-compose-profiles",
+    "difficulty": "MIDDLE",
+    "titleEn": "What are Docker Compose profiles and how to use them?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

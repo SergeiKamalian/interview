@@ -1,0 +1,703 @@
+{
+  "topic": {
+    "code": "shcho_take_circuit_breaker",
+    "name": "Circuit Breaker",
+    "skillCode": "architecture",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое circuit breaker и как он защищает распределённую систему?",
+    "shortAnswer": "Circuit breaker — паттерн, который обнаруживает повторяющиеся сбои при вызове удалённого сервиса и временно прекращает отправку запросов, чтобы одна медленная зависимость не уронила всю систему. Три состояния: Closed (трафик проходит, считаются ошибки), Open (мгновенный отказ или fallback), Half-Open (пробные запросы для проверки восстановления). В отличие от retry, breaker полностью режет трафик до сигнала восстановления.",
+    "idealAnswer": "Circuit breaker — паттерн устойчивости для вызовов удалённых сервисов (API, БД, микросервисы). Аналогия: автоматический выключатель в доме — при перегрузке разрывает цепь, потом пробует включить снова. Три состояния: Closed — нормальная работа, запросы проходят, ошибки считаются в скользящем окне; при превышении порога → Open. Open — вызовы даже не отправляются, сразу reject или fallback, запускается таймер resetTimeout. Half-Open — после таймера пропускаются 1–2 probe-запроса: успех → Closed, провал → снова Open. Внутри breaker хранит sliding window (часто ring buffer / RingBitSet): биты 0/1 success/failure, формула (failures/total)*100 > errorThresholdPercentage, но только если total >= volumeThreshold — без volumeThreshold один сбой из одного вызова даёт 100% и ложно открывает breaker. Отличие от retry: retry шлёт больше запросов в падающий сервис и усугубляет нагрузку; breaker останавливает весь трафик. Они дополняют друг друга: exponential backoff retry внутри breaker для transient ошибок, открытие breaker при стойких сбоях. Когда использовать: высоколатентные remote calls, failure rate 10–20%+, микросервисы; service mesh (Istio/Linkerd) — breaker на уровне Envoy. Не нужен: in-process вызовы, редкие batch-джобы (достаточно retry), стабильный failure rate <5–10%. Каждая зависимость — свой экземпляр breaker; общий breaker на все сервисы блокирует здоровые потоки. Обязателен fallback (кэш Redis, дефолтное значение) — иначе пользователь видит 500 вместо stale data. Типичные ошибки: errorThresholdPercentage без volumeThreshold; нет fallback; один global breaker; resetTimeout слишком короткий (hammering) или длинный (долгая деградация). В кластере 100 pod'ов при Half-Open все могут probe одновременно — thundering herd; фикс: stagger probes (podIndex % N), leader election, shared state в Redis, Istio consecutiveErrors/outlier_detection. Реальные инструменты: Netflix Hystrix (legacy), Resilience4j в Spring Boot, opossum в Node.js, AWS API Gateway throttling, Istio DestinationRule.",
+    "maxScore": 10,
+    "skills": [
+      "architecture"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "circuit_breaker_definition",
+      "title": "Понимает определение circuit breaker",
+      "expected": "Кандидат объясняет: паттерн обнаруживает повторяющиеся сбои удалённого сервиса и временно прекращает запросы, чтобы одна зависимость не уронила всю систему; упоминает аналогию с электрическим автоматом и защиту от каскадных сбоев.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — определение и назначение из ITLead TL;DR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "circuit_breaker_definition",
+            "oftenConfusedWith": [
+              "three_states",
+              "breaker_vs_retry"
+            ],
+            "anchorTermsExpected": [
+              "circuit breaker",
+              "паттерн",
+              "удалённ",
+              "зависимост",
+              "каскад",
+              "временно прекращ",
+              "защит"
+            ],
+            "anchorTermsWrongTopic": [
+              "breaker это retry",
+              "breaker только в hardware",
+              "breaker заменяет load balancer"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "circuit breaker",
+              "автомат",
+              "выключатель"
+            ],
+            "ask": "зачем нужен circuit breaker при вызове удалённого сервиса и чем он защищает систему"
+          }
+        ],
+        "mustConcepts": [
+          "circuit breaker",
+          "паттерн",
+          "design pattern",
+          "удалённ",
+          "remote",
+          "зависимост",
+          "микросервис",
+          "повторяющ",
+          "сбой",
+          "failure",
+          "временно",
+          "прекращ",
+          "запрос",
+          "каскад",
+          "cascade",
+          "защит",
+          "перегруз",
+          "автомат",
+          "выключатель"
+        ],
+        "falseClaims": [
+          "circuit breaker — это только retry с таймаутом",
+          "breaker нужен для in-process вызовов функций",
+          "circuit breaker заменяет API Gateway",
+          "breaker ускоряет медленный сервис",
+          "circuit breaker и rate limiting — одно и то же"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "three_states",
+      "title": "Знает три состояния и переходы",
+      "expected": "Кандидат описывает Closed (трафик проходит, считаются ошибки), Open (мгновенный reject/fallback, таймер), Half-Open (probe 1–2 запроса → Closed или снова Open); объясняет переходы по порогу и resetTimeout.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "модель состояний — центральная часть ITLead Theory",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "circuit_breaker_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "three_states",
+            "oftenConfusedWith": [
+              "failure_tracking",
+              "distributed_half_open"
+            ],
+            "anchorTermsExpected": [
+              "Closed",
+              "Open",
+              "Half-Open",
+              "probe",
+              "resetTimeout",
+              "мгновенн",
+              "отклон"
+            ],
+            "anchorTermsWrongTopic": [
+              "Open пропускает все запросы",
+              "Half-Open это Closed",
+              "Closed отклоняет запросы"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Closed",
+              "Open",
+              "Half-Open",
+              "Half Open"
+            ],
+            "ask": "опиши три состояния circuit breaker и переходы между ними без кода"
+          },
+          {
+            "match": [
+              "probe",
+              "resetTimeout",
+              "таймер"
+            ],
+            "ask": "что происходит в Half-Open и как breaker решает вернуться в Closed"
+          }
+        ],
+        "mustConcepts": [
+          "Closed",
+          "Open",
+          "Half-Open",
+          "Half Open",
+          "состоян",
+          "state",
+          "трафик проход",
+          "счита",
+          "ошибк",
+          "порог",
+          "threshold",
+          "мгновенн",
+          "reject",
+          "отклон",
+          "fallback",
+          "resetTimeout",
+          "таймер",
+          "probe",
+          "пробн",
+          "восстанов",
+          "recovery"
+        ],
+        "falseClaims": [
+          "в Open breaker всё равно ждёт таймаут downstream",
+          "Half-Open пропускает весь трафик как Closed",
+          "Closed сразу отклоняет запросы при первой ошибке",
+          "переход Open→Closed без probe-фазы",
+          "Half-Open и Open — одно состояние"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "breaker_vs_retry",
+      "title": "Отличает circuit breaker от retry",
+      "expected": "Кандидат объясняет: retry усиливает нагрузку на падающий сервис; breaker полностью останавливает трафик до восстановления; они complementary — retry с backoff внутри breaker для transient ошибок.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевое отличие из ITLead TL;DR и follow-up Q",
+        "confusionPairs": [
+          {
+            "checkpointKey": "breaker_vs_retry",
+            "oftenConfusedWith": [
+              "circuit_breaker_definition"
+            ],
+            "anchorTermsExpected": [
+              "retry",
+              "усилива",
+              "нагрузк",
+              "останавлива",
+              "трафик",
+              "complementary",
+              "backoff"
+            ],
+            "anchorTermsWrongTopic": [
+              "retry заменяет breaker",
+              "breaker делает больше retry"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "retry",
+              "backoff",
+              "повтор"
+            ],
+            "ask": "чем circuit breaker отличается от retry и можно ли их использовать вместе"
+          }
+        ],
+        "mustConcepts": [
+          "retry",
+          "повтор",
+          "усилива",
+          "нагрузк",
+          "load",
+          "падающ",
+          "failing",
+          "останавлива",
+          "режет",
+          "трафик",
+          "восстанов",
+          "recovery",
+          "complementary",
+          "дополня",
+          "exponential backoff",
+          "transient",
+          "временн",
+          "стойк",
+          "persistent"
+        ],
+        "falseClaims": [
+          "retry и circuit breaker решают одну задачу одинаково",
+          "circuit breaker отправляет больше запросов при сбоях",
+          "retry полностью заменяет breaker в микросервисах",
+          "breaker и retry нельзя комбинировать"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "failure_tracking",
+      "title": "Понимает скользящее окно и пороги",
+      "expected": "Кандидат описывает sliding window / ring buffer (RingBitSet), формулу (failures/total)*100, errorThresholdPercentage и volumeThreshold; объясняет, зачем volumeThreshold нужен до оценки процента.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "внутренняя механика и math из ITLead How it tracks failures",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "volumeThreshold",
+              "errorThresholdPercentage",
+              "sliding window"
+            ],
+            "ask": "как считается errorThresholdPercentage и зачем volumeThreshold"
+          },
+          {
+            "match": [
+              "RingBitSet",
+              "ring buffer",
+              "скользящ"
+            ],
+            "ask": "как breaker хранит последние N исходов вызовов"
+          }
+        ],
+        "mustConcepts": [
+          "sliding window",
+          "скользящ",
+          "окно",
+          "ring buffer",
+          "RingBitSet",
+          "Hystrix",
+          "failures",
+          "total",
+          "процент",
+          "errorThresholdPercentage",
+          "volumeThreshold",
+          "порог",
+          "1 из 1",
+          "100%",
+          "opossum",
+          "Resilience4j",
+          "бит",
+          "success",
+          "failure"
+        ],
+        "falseClaims": [
+          "процент ошибок считается с первого же вызова без минимума",
+          "volumeThreshold не нужен при низком errorThresholdPercentage",
+          "breaker считает только последнюю ошибку, не окно",
+          "errorThresholdPercentage — абсолютное число ошибок, не процент"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда применять breaker",
+      "expected": "Кандидат называет: remote API/БД/микросервисы с высокой латентностью и failure rate 10–20%+; service mesh на уровне proxy; не нужен для in-process и low-volume batch; отдельный breaker на каждую зависимость.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use таблица из ITLead",
+        "mustConcepts": [
+          "remote",
+          "удалённ",
+          "API",
+          "микросервис",
+          "БД",
+          "database",
+          "latency",
+          "латент",
+          "10-20%",
+          "failure rate",
+          "Istio",
+          "Linkerd",
+          "Envoy",
+          "service mesh",
+          "in-process",
+          "batch",
+          "retry достаточно",
+          "на зависимость",
+          "per dependency",
+          "inventory",
+          "payment"
+        ],
+        "falseClaims": [
+          "breaker нужен на каждый HTTP-запрос внутри одного процесса",
+          "один breaker на все downstream сервисы — правильный паттерн",
+          "при failure rate 2% всегда нужен breaker",
+          "service mesh делает application-level breaker ненужным всегда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки настройки",
+      "expected": "Кандидат называет: errorThresholdPercentage без volumeThreshold; отсутствие fallback; один global breaker на все сервисы; неправильный resetTimeout (слишком короткий/длинный).",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — частые production-ошибки",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "failure_tracking",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "volumeThreshold",
+              "1 из 1",
+              "100%"
+            ],
+            "ask": "почему breaker открывается после одного сбоя и как это исправить"
+          },
+          {
+            "match": [
+              "fallback",
+              "кэш",
+              "cache",
+              "Redis"
+            ],
+            "ask": "что видит пользователь без fallback при Open"
+          },
+          {
+            "match": [
+              "global",
+              "общий breaker",
+              "resetTimeout"
+            ],
+            "ask": "почему один breaker на inventory и payment — antipattern"
+          }
+        ],
+        "mustConcepts": [
+          "volumeThreshold",
+          "errorThresholdPercentage",
+          "1 из 1",
+          "fallback",
+          "кэш",
+          "cache",
+          "Redis",
+          "500",
+          "unhandled",
+          "global breaker",
+          "общий",
+          "inventory",
+          "payment",
+          "resetTimeout",
+          "hammering",
+          "30 секунд",
+          "2 минут",
+          "cold-start",
+          "staging"
+        ],
+        "falseClaims": [
+          "fallback не обязателен — достаточно reject",
+          "volumeThreshold можно не настраивать никогда",
+          "resetTimeout 1 секунда — всегда лучше для быстрого recovery",
+          "global breaker упрощает архитектуру без побочных эффектов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "distributed_half_open",
+      "title": "Понимает распределённый Half-Open",
+      "expected": "Кандидат объясняет thundering herd при probe из всех pod'ов; фиксы: stagger probes, leader election, shared state в Redis; упоминает Istio/Envoy outlier_detection или consecutiveErrors.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "senior follow-up: 100 pods, shared state, service mesh",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "three_states",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "distributed_half_open",
+            "oftenConfusedWith": [
+              "three_states"
+            ],
+            "anchorTermsExpected": [
+              "thundering herd",
+              "pod",
+              "Redis",
+              "leader election",
+              "Istio",
+              "outlier_detection"
+            ],
+            "anchorTermsWrongTopic": [
+              "каждый pod держит свой Open независимо — это норма без координации",
+              "Half-Open автоматически координируется без настройки"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "thundering herd",
+              "100 pod",
+              "кластер"
+            ],
+            "ask": "как избежать thundering herd в Half-Open при 100 репликах"
+          },
+          {
+            "match": [
+              "Redis",
+              "pub/sub",
+              "leader election",
+              "consistent hashing"
+            ],
+            "ask": "как разделить состояние breaker между 50 инстансами одного сервиса"
+          }
+        ],
+        "mustConcepts": [
+          "thundering herd",
+          "stampede",
+          "pod",
+          "реплик",
+          "кластер",
+          "Half-Open",
+          "probe",
+          "stagger",
+          "podIndex",
+          "leader election",
+          "Redis",
+          "pub/sub",
+          "consistent hashing",
+          "shared state",
+          "распредел",
+          "Istio",
+          "Envoy",
+          "outlier_detection",
+          "consecutiveErrors",
+          "DestinationRule"
+        ],
+        "falseClaims": [
+          "в кластере каждый pod независимо probe — это всегда безопасно",
+          "shared breaker state не нужен между инстансами",
+          "Half-Open координируется автоматически в любом фреймворке",
+          "service mesh не может решить thundering herd"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Circuit breaker — как автомат в щитке: при серии сбоев удалённого inventory-сервиса переходит в Open, сразу отдаёт fallback из Redis, не держит потоки в таймауте. После resetTimeout Half-Open пропускает пару probe — успех, снова Closed. Retry внутри breaker только для transient, при стойком падении — Open.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Closed считает ошибки в sliding window; если (failures/total)*100 > 50 и total >= volumeThreshold 10 — Open. В Open axios даже не вызываем — opossum fallback с last-known stock. На каждую зависимость свой breaker: inventory и payment отдельно. В k8s на Half-Open probe только podIndex % 10 === 0, иначе thundering herd.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для вызова payment API ставлю breaker: timeout 200ms, errorThreshold 25%, volumeThreshold 10, resetTimeout 30–60s. Без volumeThreshold один cold-start таймаут откроет breaker зря. В Istio DestinationRule outlier_detection делает то же на sidecar без кода в приложении.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Circuit breaker — это просто retry три раза с задержкой. Один breaker на все HTTP-вызовы приложения — так проще. volumeThreshold не нужен, достаточно errorThresholdPercentage 1%.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В Open breaker всё равно ждёт ответ сервиса 30 секунд. Half-Open пропускает весь трафик как Closed. Fallback не нужен — пользователь пусть видит 500.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Breaker нужен для вызовов функций внутри одного Node-процесса. Retry хуже breaker потому что breaker тоже шлёт больше запросов. В кластере 100 pod'ов все одновременно probe — это нормально и помогает быстрее восстановиться.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "circuit_breaker_definition",
+      "exampleType": "good",
+      "exampleText": "Паттерн: при повторных сбоях remote-сервиса временно прекращаем вызовы, чтобы каскад не положил checkout и catalog.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "circuit_breaker_definition",
+      "exampleType": "good",
+      "exampleText": "ну breaker как предохранитель — если api inventory тухнет, не держим все потоки в ожидании, режем трафик",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "circuit_breaker_definition",
+      "exampleType": "bad",
+      "exampleText": "Circuit breaker — это load balancer который распределяет запросы между инстансами.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "three_states",
+      "exampleType": "good",
+      "exampleText": "Closed — всё идёт, считаем ошибки; порог — Open, мгновенный reject; таймер — Half-Open с 1–2 probe; успех — Closed, fail — снова Open.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "three_states",
+      "exampleType": "good",
+      "exampleText": "open значит даже не звоним в downstream — сразу fallback. half-open — пробуем ожил ли сервис",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "three_states",
+      "exampleType": "bad",
+      "exampleText": "Open пропускает все запросы, Closed их блокирует. Half-Open — это когда breaker выключен.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "breaker_vs_retry",
+      "exampleType": "good",
+      "exampleText": "Retry долбит падающий сервис сильнее; breaker обрубает трафик целиком. Вместе: backoff retry на transient внутри, Open при persistent failure.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "breaker_vs_retry",
+      "exampleType": "good",
+      "exampleText": "retry не заменяет breaker — при 50% 500 от api retry только усугубит, breaker даст кэш",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "breaker_vs_retry",
+      "exampleType": "bad",
+      "exampleText": "Circuit breaker и retry — одно и то же, breaker просто делает больше повторов.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "failure_tracking",
+      "exampleType": "good",
+      "exampleText": "RingBitSet последних N вызовов: (failures/total)*100 > 50 только если total >= volumeThreshold 10 — иначе 1/1 = 100% ложный Open.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "failure_tracking",
+      "exampleType": "good",
+      "exampleText": "sliding window в opossum — кольцевой буфер исходов, процент ошибок пересчитывается на каждый fire()",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "failure_tracking",
+      "exampleType": "bad",
+      "exampleText": "errorThresholdPercentage — это абсолютное число ошибок за минуту, volumeThreshold не влияет на расчёт.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Breaker на inventory HTTP и payment gRPC; не на локальный helper. Failure rate >10–20% — да; hourly cron — хватит retry. Istio mesh — breaker в Envoy.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "отдельный breaker на каждый downstream — inventory упал, профиль и shipping не блокируем",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Ставлю один global breaker на все вызовы — и internal функции, и внешние API.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Без volumeThreshold первый cold-start timeout открывает breaker на 5 минут. fallback в Redis — available:false лучше чем 500.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "globalBreaker на inventory+payment — inventory упал, оплаты тоже reject. resetTimeout 1s — hammering recovering service.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "errorThresholdPercentage: 1 без volumeThreshold — нормальная prod-настройка. Fallback опционален.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "distributed_half_open",
+      "exampleType": "good",
+      "exampleText": "100 pod'ов в Half-Open одновременно — thundering herd; probe только podIndex % 10 === 0 или state в Redis + leader election.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "distributed_half_open",
+      "exampleType": "good",
+      "exampleText": "в istio consecutiveErrors и outlier_detection на destination rule — без кода в express",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "distributed_half_open",
+      "exampleType": "bad",
+      "exampleText": "Каждый pod независимо открывает и закрывает breaker — координация не нужна, так быстрее recovery.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "shcho-take-circuit-breaker",
+    "apiUrl": "https://api.itlead.org/api/questions/shcho-take-circuit-breaker",
+    "pageUrl": "https://itlead.org/interview-questions/architecture/shcho-take-circuit-breaker",
+    "difficulty": "SENIOR",
+    "titleEn": "What is a circuit breaker?",
+    "categorySlug": "architecture",
+    "syncedAt": "2026-06-18T15:00:00.000Z"
+  }
+}

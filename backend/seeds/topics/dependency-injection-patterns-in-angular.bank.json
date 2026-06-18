@@ -1,0 +1,696 @@
+{
+  "topic": {
+    "code": "dependency_injection_patterns_angular",
+    "name": "Продвинутые паттерны Dependency Injection в Angular",
+    "skillCode": "angular",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Какие продвинутые паттерны Dependency Injection используются в Angular помимо базовой регистрации сервисов?",
+    "shortAnswer": "Продвинутый DI в Angular строится на multi-providers (массив реализаций на один токен), useFactory с inject() на момент резолюции, иерархии инжекторов и декораторах @Self/@SkipSelf/@Optional. Без multi: true второй HTTP interceptor молча перезапишет первый.",
+    "idealAnswer": "Базовый DI: один токен — один экземпляр. Продвинутый DI меняет смысл «одного»: multi-providers собирают все записи токена в массив при обходе дерева инжекторов; factory-провайдеры выполняют функцию в момент резолюции вместо new; абстрактный класс как токен даёт стабильный контракт без привязки к конкретной реализации. Angular строит дерево Injector: platform → root app → module → component. inject(Token) или constructor-параметр ищут провайдер с текущего узла вверх; для multi — собирают все совпадения в порядке регистрации; для обычных — первое совпадение. Provider на уровне компонента затеняет root для поддерева этого компонента, соседи видят root. HTTP_INTERCEPTORS — классический multi: true; без флага второй interceptor перезаписывает первый без warning. useFactory позволяет условную логику (browser vs SSR через PLATFORM_ID), inject() внутри factory — OK; useClass делегирует Angular конструкторную инъекцию. @Self() — только текущий инжектор, иначе throw; @SkipSelf() — с родителя; @Optional() — null вместо ошибки. TypeScript interface нельзя использовать как DI-токен — стирается при компиляции; abstract class остаётся как constructor function. Типичные ошибки: забытый multi на interceptors; inject() в методе сервиса вне injection context; циклы A↔B в useFactory; ожидание видимости lazy-module providers в sibling routes — для shared сервиса нужен providedIn: 'root'. Один экземпляр на инжектор: providedIn: 'root' — singleton в root; component providers — новый экземпляр на каждый компонент. Route-level override в lazy-маршруте действует только в его поддереве; sibling route получит root instance. Паттерны: APP_CONFIG через InjectionToken + useValue; env-logger через useFactory; white-label API через override на route providers.",
+    "maxScore": 10,
+    "skills": [
+      "angular",
+      "typescript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "di_injector_hierarchy",
+      "title": "Понимает иерархию инжекторов и резолюцию",
+      "expected": "Кандидат описывает дерево Injector (platform → root → module → component), поиск токена с текущего узла вверх, затенение component-level provider для поддерева, сбор multi-записей при обходе.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро senior DI — как Angular находит зависимость в дереве",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "di_injector_hierarchy",
+            "oftenConfusedWith": [
+              "injector_scoping",
+              "multi_providers"
+            ],
+            "anchorTermsExpected": [
+              "Injector",
+              "дерев",
+              "root",
+              "component",
+              "вверх",
+              "затен",
+              "shadow",
+              "поддерев"
+            ],
+            "anchorTermsWrongTopic": [
+              "multi всегда один экземпляр",
+              "providedIn module создаёт новый на каждый inject"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Injector",
+              "дерев",
+              "root",
+              "component"
+            ],
+            "ask": "как Angular ищет токен от component injector вверх и что происходит с multi-providers"
+          }
+        ],
+        "mustConcepts": [
+          "Injector",
+          "инжектор",
+          "дерев",
+          "platform",
+          "root",
+          "module injector",
+          "component injector",
+          "вверх",
+          "поиск",
+          "затен",
+          "shadow",
+          "поддерев",
+          "sibling",
+          "сосед",
+          "provide",
+          "резолюц",
+          "resolution",
+          "registration order",
+          "порядок регистрац"
+        ],
+        "falseClaims": [
+          "Angular ищет зависимость только в root injector",
+          "component provider виден всем компонентам приложения",
+          "multi-provider возвращает только последнюю регистрацию",
+          "sibling components делят component-level provider"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "multi_providers",
+      "title": "Знает multi-providers и HTTP_INTERCEPTORS",
+      "expected": "Кандидат объясняет: multi: true собирает все провайдеры токена в массив; без multi второй перезаписывает первый молча; HTTP_INTERCEPTORS — цепочка interceptors.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "самая частая production DI-ошибка из ITLead Common mistakes",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "multi_providers",
+            "oftenConfusedWith": [
+              "factory_providers"
+            ],
+            "anchorTermsExpected": [
+              "multi",
+              "HTTP_INTERCEPTORS",
+              "массив",
+              "перезапис",
+              "chain",
+              "цепочк"
+            ],
+            "anchorTermsWrongTopic": [
+              "useFactory собирает массив",
+              "multi создаёт singleton"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "multi",
+              "HTTP_INTERCEPTORS",
+              "interceptor"
+            ],
+            "ask": "что произойдёт если добавить второй interceptor без multi: true"
+          },
+          {
+            "match": [
+              "массив",
+              "collect",
+              "собир"
+            ],
+            "ask": "как multi: true взаимодействует с иерархией инжекторов и порядком в массиве"
+          }
+        ],
+        "mustConcepts": [
+          "multi",
+          "multi: true",
+          "HTTP_INTERCEPTORS",
+          "interceptor",
+          "массив",
+          "array",
+          "перезапис",
+          "overwrite",
+          "молча",
+          "без warning",
+          "цепочк",
+          "chain",
+          "AuthInterceptor",
+          "LoggingInterceptor",
+          "collect",
+          "собир",
+          "registration order",
+          "плагин",
+          "validator"
+        ],
+        "falseClaims": [
+          "Angular предупреждает когда второй provider перезаписывает первый",
+          "HTTP_INTERCEPTORS работает без multi: true для нескольких interceptors",
+          "multi: true создаёт отдельный singleton на каждый provide",
+          "multi-providers возвращают только root-регистрации"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "factory_providers",
+      "title": "Отличает useFactory от useClass и useValue",
+      "expected": "Кандидат сравнивает: useClass — new + автоматическая constructor injection; useFactory — функция в момент резолюции с inject() и условной логикой; useValue/useExisting для конфига и алиасов.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "useFactory + PLATFORM_ID — ключевой SSR/env паттерн ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "di_injector_hierarchy",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useFactory",
+              "useClass",
+              "inject"
+            ],
+            "ask": "useClass vs useFactory — когда factory, и можно ли inject() внутри factory"
+          },
+          {
+            "match": [
+              "PLATFORM_ID",
+              "browser",
+              "SSR"
+            ],
+            "ask": "как useFactory выбирает реализацию logger для browser vs SSR"
+          }
+        ],
+        "mustConcepts": [
+          "useFactory",
+          "useClass",
+          "useValue",
+          "useExisting",
+          "factory",
+          "фабрик",
+          "resolution time",
+          "момент резолюц",
+          "inject()",
+          "new",
+          "constructor injection",
+          "PLATFORM_ID",
+          "isPlatformBrowser",
+          "InjectionToken",
+          "LOGGER",
+          "APP_CONFIG",
+          "условн",
+          "conditional",
+          "environment",
+          "runtime"
+        ],
+        "falseClaims": [
+          "useClass и useFactory полностью эквивалентны",
+          "useFactory выполняется на каждый inject() вызов в runtime методе",
+          "inject() можно вызывать в любом методе сервиса",
+          "useValue создаёт новый объект на каждый запрос"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "injection_decorators",
+      "title": "Знает @Self, @SkipSelf и @Optional",
+      "expected": "Кандидат объясняет: @Self — только текущий injector, иначе error; @SkipSelf — поиск с родителя; @Optional — null если не найден; декораторы управляют областью поиска, не типом токена.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "scope search — типичный senior follow-up из ITLead",
+        "confusionPairs": [
+          {
+            "checkpointKey": "injection_decorators",
+            "oftenConfusedWith": [
+              "di_injector_hierarchy"
+            ],
+            "anchorTermsExpected": [
+              "@Self",
+              "@SkipSelf",
+              "@Optional",
+              "текущ",
+              "родител",
+              "null"
+            ],
+            "anchorTermsWrongTopic": [
+              "@Optional меняет токен",
+              "@Self ищет в root"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "@Self",
+              "FormService",
+              "component"
+            ],
+            "ask": "когда нужен @Self() и что произойдёт если сервис не в providers компонента"
+          },
+          {
+            "match": [
+              "@SkipSelf",
+              "родител",
+              "parent"
+            ],
+            "ask": "зачем @SkipSelf() если у child есть свой provider"
+          }
+        ],
+        "mustConcepts": [
+          "@Self",
+          "@SkipSelf",
+          "@Optional",
+          "Self",
+          "SkipSelf",
+          "Optional",
+          "текущ",
+          "current injector",
+          "родител",
+          "parent",
+          "null",
+          "throw",
+          "ошибк",
+          "область поиска",
+          "scope",
+          "FormService",
+          "LoggerService",
+          "feature flag",
+          "analytics",
+          "не зарегистрир"
+        ],
+        "falseClaims": [
+          "@Optional создаёт mock-реализацию автоматически",
+          "@SkipSelf ищет только в root injector",
+          "@Self позволяет получить parent instance",
+          "декораторы меняют тип injectable token"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "abstract_class_token",
+      "title": "Понимает abstract class как DI-токен",
+      "expected": "Кандидат объясняет: interface стирается при компиляции и не годится как token; abstract class остаётся constructor function; provide Abstract + useClass для подмены реализации.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "interface vs abstract — базовый контракт из ITLead Theory",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "interface",
+              "abstract",
+              "token"
+            ],
+            "ask": "почему TypeScript interface нельзя использовать как DI token"
+          }
+        ],
+        "mustConcepts": [
+          "abstract class",
+          "абстракт",
+          "interface",
+          "интерфейс",
+          "token",
+          "токен",
+          "compile time",
+          "компиляц",
+          "erase",
+          "стира",
+          "constructor function",
+          "StorageService",
+          "LocalStorageService",
+          "SessionStorageService",
+          "useClass",
+          "контракт",
+          "swap",
+          "подмен"
+        ],
+        "falseClaims": [
+          "можно inject(TypeScript interface) если указать generic",
+          "abstract class создаёт экземпляр напрямую без useClass",
+          "interface и abstract class одинаково работают как DI key",
+          "InjectionToken заменяет abstract class во всех случаях без trade-off"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные DI-ошибки",
+      "expected": "Кандидат называет: забытый multi на interceptors; inject() вне injection context (метод сервиса); circular deps в useFactory; lazy-module providers невидимы sibling routes — shared сервис в root.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "multi_providers",
+            "floorFraction": 0.4
+          },
+          {
+            "checkpointKey": "factory_providers",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "inject()",
+              "someMethod",
+              "injection context"
+            ],
+            "ask": "почему inject() в методе сервиса падает и где inject() разрешён"
+          },
+          {
+            "match": [
+              "circular",
+              "цикл",
+              "A",
+              "B"
+            ],
+            "ask": "как разорвать circular dependency в useFactory"
+          },
+          {
+            "match": [
+              "lazy",
+              "sibling",
+              "providedIn root"
+            ],
+            "ask": "почему сервис из lazy module не виден в соседнем route"
+          }
+        ],
+        "mustConcepts": [
+          "multi: true",
+          "забыл",
+          "inject()",
+          "injection context",
+          "field initializer",
+          "constructor",
+          "someMethod",
+          "runtime error",
+          "circular",
+          "цикл",
+          "useFactory",
+          "Injector",
+          "lazy module",
+          "lazy-loaded",
+          "sibling route",
+          "providedIn: 'root'",
+          "child injector",
+          "перезапис",
+          "interceptor"
+        ],
+        "falseClaims": [
+          "inject() работает в любом lifecycle hook без ограничений",
+          "lazy module providers автоматически глобальны",
+          "Angular всегда даёт понятное сообщение при circular dependency в prod",
+          "один interceptor без multi — Angular запустит оба через merge"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "injector_scoping",
+      "title": "Понимает scope экземпляров и route override",
+      "expected": "Кандидат объясняет: один экземпляр на injector; providedIn root — singleton; component provider — новый на каждый компонент; route-level override только для поддерева lazy route, sibling получает root.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "senior follow-up про lazy route override — бонусный scope checkpoint",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "providedIn",
+              "root",
+              "singleton"
+            ],
+            "ask": "когда Angular создаёт новый экземпляр сервиса vs переиспользует"
+          },
+          {
+            "match": [
+              "route",
+              "override",
+              "sibling",
+              "lazy"
+            ],
+            "ask": "route-level providers переопределяют root — что получит sibling route"
+          }
+        ],
+        "mustConcepts": [
+          "один экземпляр",
+          "per injector",
+          "providedIn: 'root'",
+          "singleton",
+          "component providers",
+          "новый экземпляр",
+          "destroy",
+          "уничтож",
+          "route providers",
+          "override",
+          "переопредел",
+          "lazy route",
+          "sibling",
+          "поддерев",
+          "FeatureApiService",
+          "white-label",
+          "multi-tenant"
+        ],
+        "falseClaims": [
+          "route override меняет сервис глобально для всего приложения",
+          "component provider создаёт singleton на всё приложение",
+          "providedIn root создаёт новый экземпляр на каждый компонент",
+          "sibling lazy routes делят route-level override"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Multi-providers: HTTP_INTERCEPTORS с multi: true — Angular собирает Auth и Logging в массив, цепочка Auth → Logging → HttpClient. useFactory с inject(PLATFORM_ID) выбирает ConsoleLogger в browser и NoopLogger в SSR. @SkipSelf() берёт LoggerService родителя, игнорируя локальный override.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для плагинов валидаторов делаю InjectionToken + multi: true — каждый feature-module добавляет свой validator без перезаписи. APP_CONFIG через useValue в bootstrapApplication. Abstract StorageService + LocalStorageService в providers — consumer inject(StorageService), реализацию меняю в одном месте.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Injector tree: root singleton ApiService. На lazy route providers: [{ provide: ApiService, useClass: FeatureApiService }] — только feature subtree. Соседний route inject ApiService — root instance. inject() только в constructor/field initializer/useFactory, не в someMethod().",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Два HTTP interceptor регистрирую без multi — Angular сам их объединит. inject(OtherService) вызываю в ngAfterViewInit — это нормальный паттерн. Interface StorageService использую как DI token через provide: StorageService.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Lazy module providers видны всем routes автоматически. @Self() ищет сервис начиная с root injector. useFactory выполняется при каждом вызове метода сервиса.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Route-level override ApiService меняет реализацию для всего приложения включая sibling routes. multi: true нужен только для NgRx, HTTP interceptors работают и без него.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "di_injector_hierarchy",
+      "exampleType": "good",
+      "exampleText": "Angular walk up от component injector к root; первый match для обычного token; component provider shadow root только для subtree.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "di_injector_hierarchy",
+      "exampleType": "good",
+      "exampleText": "ну дерево инжекторов — platform, root app, потом component; соседние компоненты root singleton делят, свой providers — отдельный экземпляр",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "di_injector_hierarchy",
+      "exampleType": "bad",
+      "exampleText": "Angular всегда резолвит зависимости только из root, component providers игнорируются.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "multi_providers",
+      "exampleType": "good",
+      "exampleText": "HTTP_INTERCEPTORS + multi: true — массив [Auth, Logging], без multi второй молча заменит первый.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "multi_providers",
+      "exampleType": "good",
+      "exampleText": "кастомный VALIDATORS token с multi — каждый модуль добавляет validator, inject получает массив всех",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "multi_providers",
+      "exampleType": "bad",
+      "exampleText": "Добавил второй interceptor — Angular warning покажет что первый перезаписан, оба не нужны.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "factory_providers",
+      "exampleType": "good",
+      "exampleText": "useFactory: () => isPlatformBrowser(inject(PLATFORM_ID)) ? new ConsoleLogger() : new NoopLogger() — логика выбора в одном месте.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "factory_providers",
+      "exampleType": "good",
+      "exampleText": "useClass — Angular сам inject в constructor; useFactory — когда нужен if/switch и inject внутри функции",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "factory_providers",
+      "exampleType": "bad",
+      "exampleText": "useFactory и useClass всегда делают одно и то же, inject() можно вызвать в любом методе сервиса.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "injection_decorators",
+      "exampleType": "good",
+      "exampleText": "@Self() FormService — только providers этого компонента, иначе NullInjectorError. @Optional() Analytics — null если не зарегистрирован.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "injection_decorators",
+      "exampleType": "good",
+      "exampleText": "@SkipSelf() logger — беру parent LoggerService, свой local provider детям, но не себе",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "injection_decorators",
+      "exampleType": "bad",
+      "exampleText": "@Optional() автоматически создаёт stub-сервис если токен не найден.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "abstract_class_token",
+      "exampleType": "good",
+      "exampleText": "abstract StorageService как token + useClass LocalStorageService — interface нельзя, стирается при compile.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "abstract_class_token",
+      "exampleType": "good",
+      "exampleText": "меняю SessionStorageService в providers — все inject(StorageService) без правок consumer кода",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "abstract_class_token",
+      "exampleType": "bad",
+      "exampleText": "provide: IStorageService interface работает как DI token в runtime без InjectionToken.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "BadService: inject в field OK, в someMethod() — runtime throw; circular A↔B factory — Injector.get lazy или рефакторинг графа.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "shared сервис для нескольких lazy routes — providedIn: 'root', не providers lazy module",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "забыл multi на втором interceptor — auth пропал молча, logging остался один",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "inject(Dep) в setInterval callback — нормальный способ получить сервис асинхронно.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "injector_scoping",
+      "exampleType": "good",
+      "exampleText": "providedIn root — один ApiService; route providers FeatureApiService только в feature subtree; sibling — root.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "injector_scoping",
+      "exampleType": "good",
+      "exampleText": "component providers FormService — новый экземпляр на каждый FormComponent, уничтожается с компонентом",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "injector_scoping",
+      "exampleType": "bad",
+      "exampleText": "Route override ApiService меняет сервис для sibling lazy routes тоже.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "dependency-injection-patterns-in-angular",
+    "apiUrl": "https://api.itlead.org/api/questions/dependency-injection-patterns-in-angular",
+    "pageUrl": "https://itlead.org/interview-questions/angular/dependency-injection-patterns-in-angular",
+    "difficulty": "SENIOR",
+    "titleEn": "Advanced dependency injection patterns in Angular",
+    "categorySlug": "angular",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

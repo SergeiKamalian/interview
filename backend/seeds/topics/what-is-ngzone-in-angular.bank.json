@@ -1,0 +1,648 @@
+{
+  "topic": {
+    "code": "what_is_ngzone_angular",
+    "name": "NgZone в Angular",
+    "skillCode": "angular",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое NgZone в Angular и как он связан с change detection?",
+    "shortAnswer": "NgZone — сервис Angular, обёртка над Zone.js: патчит браузерные async API (setTimeout, Promise, fetch, события), чтобы при завершении задачи внутри Angular-зоны автоматически запускался change detection. runOutsideAngular() выводит тяжёлые циклы из зоны; run() возвращает колбэки сторонних библиотек обратно в зону для обновления UI.",
+    "idealAnswer": "NgZone — обёртка Angular над Zone.js, которая патчит 40+ браузерных async API при bootstrap и автоматически триггерит change detection, когда задачи завершаются внутри Angular-зоны. Внутри зоны setTimeout/fetch/Promise после завершения уведомляют NgZoneImpl, Angular планирует ApplicationRef.tick() через queueMicrotask и обходит дерево компонентов. Вне зоны async-результаты игнорируются — шаблон не обновится. runOutsideAngular() — для тяжёлых циклов (requestAnimationFrame, setInterval 60fps), где UI меняется только в конце; run() — вернуть WebSocket, third-party или Promise в зону для одного tick. Zone.js не патчит все пути: WebSocket.onmessage, нативный rAF и многие library callbacks по умолчанию вне зоны — главный источник «замороженного» UI. Типичные ошибки: WebSocket без ngZone.run(); setInterval с counter++ только в runOutsideAngular; интервал создавать внутри зоны (zone следит весь lifecycle); вложенный run() внутри зоны — двойной tick (проверять isInAngularZone()). Production: NgbModal/PrimeNG scroll — runOutsideAngular; Material overlay — run(); RxJS tap+run когда observable вне зоны. ChangeDetectorRef.detectChanges() — локальная альтернатива без обхода всего дерева; NgZone — когда триггер из сервиса или cross-component async. Angular 17+ zoneless с signals использует scheduler вместо zone-патчинга; NgZone остаётся мостом для legacy и third-party. OnPush + async pipe: pipe делает markForCheck(), но tick из zone всё равно нужен если observable пришёл вне зоны. SSR: isInAngularZone() перед DOM-мутациями. Отладка: ng.probe($0).injector.get(NgZone).isInAngularZone() — false значит обернуть в run().",
+    "maxScore": 10,
+    "skills": [
+      "angular",
+      "typescript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "ngzone_definition",
+      "title": "Понимает определение NgZone",
+      "expected": "Кандидат объясняет: NgZone — обёртка Angular над Zone.js; внутри зоны async-активность автоматически запускает change detection; вне зоны Angular не видит изменений и UI не обновляется.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — TL;DR и quick example ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "ngzone_definition",
+            "oftenConfusedWith": [
+              "zone_internal_mechanism",
+              "run_outside_vs_run"
+            ],
+            "anchorTermsExpected": [
+              "NgZone",
+              "Zone.js",
+              "зона",
+              "change detection",
+              "async",
+              "автоматическ"
+            ],
+            "anchorTermsWrongTopic": [
+              "NgZone заменяет ChangeDetectorRef",
+              "Zone.js это Angular сервис без библиотеки",
+              "NgZone это OnPush strategy"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "NgZone",
+              "Zone.js",
+              "зона"
+            ],
+            "ask": "чем setTimeout внутри зоны отличается от setTimeout в runOutsideAngular"
+          }
+        ],
+        "mustConcepts": [
+          "NgZone",
+          "Zone.js",
+          "зона",
+          "execution context",
+          "контекст выполн",
+          "change detection",
+          "виявлен",
+          "async",
+          "асинхрон",
+          "setTimeout",
+          "Promise",
+          "fetch",
+          "автоматическ",
+          "триггер",
+          "внутри зоны",
+          "вне зоны",
+          "шаблон",
+          "обновлен"
+        ],
+        "falseClaims": [
+          "NgZone и Zone.js — разные несвязанные технологии",
+          "change detection запускается только при клике, NgZone не участвует",
+          "вне Angular-зоны UI всё равно обновляется автоматически",
+          "NgZone патчит DOM напрямую без change detection"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "zone_internal_mechanism",
+      "title": "Знает внутренний механизм Zone.js",
+      "expected": "Кандидат описывает: Zone.js подменяет нативные API при bootstrap; setTimeout/addEventListener форкают child zone; по завершении уведомляется NgZoneImpl → queueMicrotask → ApplicationRef.tick(); OnPush проверяет только помеченные поддеревья.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "senior — патчи, NgZoneImpl, tick pipeline из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "ngzone_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "patch",
+              "патч",
+              "setTimeout",
+              "addEventListener"
+            ],
+            "ask": "как Zone.js патчит setTimeout и addEventListener — runGuarded, child zone"
+          },
+          {
+            "match": [
+              "NgZoneImpl",
+              "microtask",
+              "tick",
+              "ApplicationRef"
+            ],
+            "ask": "цепочка от завершения async-задачи до ApplicationRef.tick()"
+          }
+        ],
+        "mustConcepts": [
+          "Zone.js",
+          "patch",
+          "патч",
+          "bootstrap",
+          "setTimeout",
+          "addEventListener",
+          "runGuarded",
+          "child zone",
+          "дочерн",
+          "NgZoneImpl",
+          "queueMicrotask",
+          "microtask",
+          "ApplicationRef",
+          "tick",
+          "дерев",
+          "компонент",
+          "OnPush",
+          "поддерев",
+          "40+",
+          "браузерн"
+        ],
+        "falseClaims": [
+          "Zone.js не патчит setTimeout, только Promise",
+          "tick() вызывается синхронно в том же stack frame что и callback",
+          "NgZoneImpl обходит только Default компоненты, OnPush игнорирует zone",
+          "Zone.js патчит WebSocket.onmessage полностью как setTimeout"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "run_outside_vs_run",
+      "title": "Различает runOutsideAngular и run()",
+      "expected": "Кандидат объясняет: runOutsideAngular — fork зоны без CD (тяжёлые циклы, rAF); run() — вернуть callback в зону для одного tick; quick example: setTimeout в зоне обновляет шаблон, вне зоны count растёт но UI = 0.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевой API — когда выходить и возвращаться в зону",
+        "confusionPairs": [
+          {
+            "checkpointKey": "run_outside_vs_run",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "runOutsideAngular",
+              "run()",
+              "fork",
+              "вне зоны",
+              "в зону"
+            ],
+            "anchorTermsWrongTopic": [
+              "runOutsideAngular триггерит CD",
+              "run() отключает change detection"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "runOutsideAngular",
+              "run("
+            ],
+            "ask": "progress bar на 1000 rAF — как runOutsideAngular + финальный run()"
+          }
+        ],
+        "mustConcepts": [
+          "runOutsideAngular",
+          "run()",
+          "ngZone.run",
+          "fork",
+          "форк",
+          "вне зоны",
+          "в зону",
+          "вернут",
+          "change detection",
+          "не триггер",
+          "один tick",
+          "тяжел",
+          "цикл",
+          "requestAnimationFrame",
+          "rAF",
+          "third-party",
+          "сторонн",
+          "колбэк"
+        ],
+        "falseClaims": [
+          "runOutsideAngular() всё равно запускает change detection на каждой итерации",
+          "run() нужен только в production, в dev zone не нужна",
+          "runOutsideAngular и run() делают одно и то же",
+          "run() можно вызывать вложенно без проверки isInAngularZone без последствий"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки NgZone",
+      "expected": "Кандидат называет: WebSocket без run() — данные в памяти, UI frozen; runOutsideAngular на код с UI updates; setInterval внутри зоны для 60fps; nested run() → двойной tick — проверять isInAngularZone().",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "4 mistake-паттерна ITLead — частые production-баги",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "run_outside_vs_run",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "WebSocket",
+              "onmessage"
+            ],
+            "ask": "real-time chart: WebSocket данные приходят, график не обновляется — почему"
+          },
+          {
+            "match": [
+              "setInterval",
+              "runOutsideAngular",
+              "counter"
+            ],
+            "ask": "counter в setInterval внутри runOutsideAngular — как вернуть tick"
+          },
+          {
+            "match": [
+              "isInAngularZone",
+              "nested",
+              "вложен"
+            ],
+            "ask": "зачем проверять isInAngularZone() перед ngZone.run()"
+          }
+        ],
+        "mustConcepts": [
+          "WebSocket",
+          "onmessage",
+          "не патч",
+          "заморож",
+          "frozen",
+          "массив раст",
+          "шаблон не",
+          "runOutsideAngular",
+          "UI",
+          "setInterval",
+          "60fps",
+          "интервал",
+          "внутри зоны",
+          "isInAngularZone",
+          "вложен",
+          "nested",
+          "двойной tick",
+          "ngOnDestroy",
+          "clearInterval"
+        ],
+        "falseClaims": [
+          "WebSocket.onmessage всегда внутри Angular zone",
+          "runOutsideAngular с setInterval counter++ обновит шаблон автоматически",
+          "nested run() внутри зоны безопасен и не дублирует tick",
+          "Zone.js следит за setInterval созданным в runOutsideAngular так же как внутри зоны"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда применять NgZone",
+      "expected": "Кандидат называет: runOutsideAngular для animation loops/setInterval без промежуточного UI; run() для WebSocket/third-party; SSR — isInAngularZone() перед DOM; async с @Input/@Output — оставаться в зоне.",
+      "score": 0.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use таблица ITLead — краткий senior контекст",
+        "mustConcepts": [
+          "анимац",
+          "setInterval",
+          "runOutsideAngular",
+          "WebSocket",
+          "third-party",
+          "SSR",
+          "Universal",
+          "isInAngularZone",
+          "DOM",
+          "гидрат",
+          "@Input",
+          "@Output",
+          "по умолчанию",
+          "зона"
+        ],
+        "falseClaims": [
+          "runOutsideAngular нужен для любого setTimeout",
+          "в SSR NgZone не используется",
+          "все async API Angular патчит одинаково включая WebSocket"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "real_world_patterns",
+      "title": "Знает production-паттерны",
+      "expected": "Кандидат упоминает: NgbModal runOutsideAngular для 60fps; PrimeNG virtual scroll вне зоны; Material overlay через run(); RxJS tap+run; CDR.detectChanges() как локальная альтернатива без full tree walk.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "real-world usage из ITLead — senior breadth",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ChangeDetectorRef",
+              "detectChanges",
+              "markForCheck"
+            ],
+            "ask": "когда NgZone, а когда ChangeDetectorRef.detectChanges()"
+          }
+        ],
+        "mustConcepts": [
+          "NgbModal",
+          "PrimeNG",
+          "virtual scroll",
+          "Material",
+          "CDK",
+          "overlay",
+          "RxJS",
+          "tap",
+          "observable",
+          "сервис",
+          "ChangeDetectorRef",
+          "detectChanges",
+          "локальн",
+          "дерев",
+          "cross-component",
+          "60fps",
+          "scroll"
+        ],
+        "falseClaims": [
+          "detectChanges() всегда лучше NgZone для любого async",
+          "PrimeNG и Material не используют NgZone",
+          "RxJS observable всегда внутри zone без run()"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "zoneless_signals",
+      "title": "Знает zoneless и signals",
+      "expected": "Кандидат объясняет: Angular 17+ zoneless через signals и scheduler вместо zone-патчинга; NgZone остаётся мостом для legacy-кода и third-party с ожиданием zones.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up ITLead — актуальный senior контекст",
+        "mustConcepts": [
+          "zoneless",
+          "без зоны",
+          "signals",
+          "сигнал",
+          "scheduler",
+          "планиров",
+          "Angular 17",
+          "legacy",
+          "third-party",
+          "мост",
+          "альтернатив",
+          "Zone.js",
+          "отказ"
+        ],
+        "falseClaims": [
+          "signals полностью заменили NgZone во всех Angular 17+ apps по умолчанию",
+          "zoneless apps всё ещё требуют run() для WebSocket",
+          "NgZone удалён из Angular 17"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "onpush_async_debug",
+      "title": "OnPush, async pipe и отладка",
+      "expected": "Кандидат объясняет: async pipe делает markForCheck(), но observable вне зоны требует ngZone.run() для tick; отладка frozen UI — isInAngularZone() через ng.probe.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "senior follow-up — OnPush + debug из ITLead",
+        "mustConcepts": [
+          "OnPush",
+          "async pipe",
+          "markForCheck",
+          "observable",
+          "вне зоны",
+          "ngZone.run",
+          "tick",
+          "dirty",
+          "ng.probe",
+          "isInAngularZone",
+          "отлад",
+          "debug",
+          "сторонн",
+          "библиотек"
+        ],
+        "falseClaims": [
+          "async pipe в OnPush полностью заменяет NgZone для любого observable",
+          "markForCheck() запускает tick без zone",
+          "isInAngularZone() всегда true для library callbacks"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "NgZone — обёртка Zone.js: патчит setTimeout/Promise/fetch, по завершении задачи в зоне вызывается ApplicationRef.tick(). WebSocket onmessage вне зоны — оборачиваю в ngZone.run(). Тяжёлый rAF-цикл — runOutsideAngular, финальный render через run().",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На дашборде WebSocket без run() — массив рос, UI frozen. Обернул onmessage в ngZone.run(). Для virtual scroll PrimeNG-стиля — scroll handler вне зоны, данные в зону только после fetch. Angular 17 zoneless с signals — NgZone мост для legacy libs.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "setTimeout в зоне — count++ виден в шаблоне. runOutsideAngular setTimeout — count в памяти, UI 0. Перед run() проверяю isInAngularZone() чтобы не было двойного tick. CDR.detectChanges() — когда нужен локальный check, NgZone — cross-service async.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "NgZone — это просто alias для ChangeDetectorRef. Zone.js не нужен в Angular 17+, всё на signals автоматически.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "WebSocket.onmessage всегда в Angular zone, run() не нужен. runOutsideAngular триггерит CD на каждом кадре — идеально для counter в setInterval.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "async pipe в OnPush заменяет NgZone полностью. Если UI frozen после upgrade lib — просто перезагрузи страницу, zone тут ни при чём.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "ngzone_definition",
+      "exampleType": "good",
+      "exampleText": "NgZone + Zone.js: async внутри зоны → автоматический change detection; вне зоны Angular не видит изменений.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "ngzone_definition",
+      "exampleType": "good",
+      "exampleText": "ну зона как датчик движения — setTimeout внутри, angular сам проверит ui; снаружи — нет",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "ngzone_definition",
+      "exampleType": "bad",
+      "exampleText": "NgZone вручную патчит каждый компонент через @Input, Zone.js не участвует.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "zone_internal_mechanism",
+      "exampleType": "good",
+      "exampleText": "Zone.js подменяет setTimeout при bootstrap, форкает child zone, по done → NgZoneImpl → queueMicrotask → ApplicationRef.tick().",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "zone_internal_mechanism",
+      "exampleType": "good",
+      "exampleText": "addEventListener handler в прокси с runGuarded; OnPush — tick только помеченные поддеревья",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "zone_internal_mechanism",
+      "exampleType": "bad",
+      "exampleText": "tick() вызывается только при DOM click, setTimeout в zone его не триггерит.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "run_outside_vs_run",
+      "exampleType": "good",
+      "exampleText": "1000 rAF в runOutsideAngular — 0 CD; финальный ngZone.run() — один render progress=100.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "run_outside_vs_run",
+      "exampleType": "good",
+      "exampleText": "fetchMore вне зоны, ngZone.run после await — один tick на пакет items",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "run_outside_vs_run",
+      "exampleType": "bad",
+      "exampleText": "runOutsideAngular и run() — синонимы, оба запускают full tree CD каждый кадр.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "WebSocket: socket.onmessage = e => ngZone.run(() => this.data = e.data) — иначе chart frozen.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "setInterval counter в runOutsideAngular — counter++ без run() шаблон не меняется; или run() на каждом tick если нужен live UI",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "if (!ngZone.isInAngularZone()) ngZone.run(update) else update() — избегаю двойного tick",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Создаю setInterval в ngOnInit внутри зоны для 60fps animation — zone следит, это оптимально.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Animation loop — runOutsideAngular; WebSocket callback — run(); SSR — isInAngularZone() перед DOM touch.",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "@Input async update — по умолчанию в зоне, не выношу в runOutside без причины",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Любой setTimeout всегда оборачиваю в runOutsideAngular для performance.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "real_world_patterns",
+      "exampleType": "good",
+      "exampleText": "NgbModal — runOutsideAngular на animation frames; RxJS из WebWorker — tap(() => ngZone.run(() => update())).",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "real_world_patterns",
+      "exampleType": "good",
+      "exampleText": "detectChanges() на одном компоненте быстрее; NgZone.run когда триггер из сервиса без ViewRef",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "real_world_patterns",
+      "exampleType": "bad",
+      "exampleText": "Material CDK overlay не использует NgZone, только signals.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "zoneless_signals",
+      "exampleType": "good",
+      "exampleText": "Angular 17 zoneless: signals + scheduler без Zone.js; legacy third-party — NgZone как мост.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "zoneless_signals",
+      "exampleType": "good",
+      "exampleText": "новый код на signals, старый chart lib всё ещё через run() пока не мигрируем",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "zoneless_signals",
+      "exampleType": "bad",
+      "exampleText": "После Angular 17 NgZone удалён, run() больше не существует.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "onpush_async_debug",
+      "exampleType": "good",
+      "exampleText": "OnPush + async pipe: markForCheck от pipe, но observable вне zone — нужен ngZone.run для tick.",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "onpush_async_debug",
+      "exampleType": "good",
+      "exampleText": "frozen ui после lib upgrade — ng.probe($0).injector.get(NgZone).isInAngularZone() === false → wrap run()",
+      "sortOrder": 26
+    },
+    {
+      "checkpointKey": "onpush_async_debug",
+      "exampleType": "bad",
+      "exampleText": "async pipe сам планирует ApplicationRef.tick без zone для любого источника.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "what-is-ngzone-in-angular",
+    "apiUrl": "https://api.itlead.org/api/questions/what-is-ngzone-in-angular",
+    "pageUrl": "https://itlead.org/interview-questions/angular/what-is-ngzone-in-angular",
+    "difficulty": "SENIOR",
+    "titleEn": "What is ngzone in Angular?",
+    "categorySlug": "angular",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

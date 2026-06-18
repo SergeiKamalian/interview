@@ -1,0 +1,560 @@
+{
+  "topic": {
+    "code": "docker_compose_scale_services",
+    "name": "Масштабирование сервисов в Docker Compose",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как масштабировать сервисы в Docker Compose?",
+    "shortAnswer": "Используй `docker compose up --scale <service>=N` или задай `deploy.replicas` в compose-файле — Compose запустит N контейнеров одного сервиса на том же хосте. Важно: масштабирование в Compose только single-host; несколько реплик с фиксированным `ports:` конфликтуют — используй `expose:` и reverse proxy (nginx/Traefik) спереди. Для multi-host — Swarm или Kubernetes.",
+    "idealAnswer": "Масштабирование в Docker Compose — запуск нескольких контейнеров одного сервиса на одном хосте. Декларативно: `deploy.replicas: N` в compose.yaml (Compose v2+). Императивно в runtime: `docker compose up -d --scale api=10` — флаг переопределяет replicas для этого прогона; Compose стартует или останавливает контейнеры до нужного числа, не трогая остальные сервисы. Можно масштабировать несколько сервисов: `--scale api=5 --scale worker=10`. Все реплики работают на одном хосте — Compose не распределяет контейнеры по машинам; потолок — CPU/RAM этого хоста. Для multi-host нужны Swarm (`docker stack deploy`) или Kubernetes. Реплики делят project network; embedded DNS по имени сервиса возвращает все IP реплик — многие HTTP-клиенты делают round-robin по A-записям. Главная ловушка: `ports: \"3000:3000\"` при replicas > 1 — два контейнера не могут bind на один host-порт, Compose выдаст ошибку. Решения: только `expose:` (внутренний доступ) + reverse proxy с одним published port; случайные host-порты (`ports: [\"3000\"]` без mapping); диапазон `3000-3009:3000`. Production-паттерн — nginx или Traefik: api с `expose: [\"3000\"]` и replicas: 5, web/nginx на `ports: [\"80:80\"]`, upstream `api:3000` резолвится в несколько IP. Traefik через Docker socket auto-discovery подхватывает новые реплики при `--scale`. Compose scaling не даёт: health-aware load balancing (DNS отдаёт IP healthy и unhealthy), auto-scaling по CPU, multi-host scheduling, контролируемые rolling updates. Типичные ошибки: scale сервиса с published port; scale stateful (postgres replicas: 3 на одном volume = corruption); workers без idempotency при параллельной обработке очереди; `--scale` не персистит — следующий `docker compose up` без флага вернёт `deploy.replicas`. Реальные кейсы: worker pool за Redis queue, stateless API за proxy, CI runners по числу CPU. Scale до нуля: `--scale api=0`. Для burst на single-host — cron + `--scale` или переход на Swarm/K8s с HPA.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "scale_mechanisms",
+      "title": "Знает `--scale` и `deploy.replicas`",
+      "expected": "Кандидат называет оба способа: `docker compose up --scale service=N` и `deploy.replicas` в YAML; понимает, что `--scale` переопределяет replicas на один прогон и не персистит.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — два механизма из ITLead TL;DR",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "--scale",
+              "replicas",
+              "deploy"
+            ],
+            "ask": "чем отличается `docker compose up --scale` от `deploy.replicas` в YAML"
+          }
+        ],
+        "mustConcepts": [
+          "--scale",
+          "docker compose up",
+          "deploy.replicas",
+          "replicas",
+          "compose.yaml",
+          "императив",
+          "декларатив",
+          "переопредел",
+          "override",
+          "runtime",
+          "не персист",
+          "N контейнер",
+          "несколько реплик",
+          "scale api",
+          "Compose v2"
+        ],
+        "falseClaims": [
+          "`--scale` сохраняет количество реплик навсегда в compose-файле",
+          "`deploy.replicas` работает только в Swarm, не в обычном Compose",
+          "масштабирование требует пересоздания всего стека",
+          "нельзя масштабировать несколько сервисов одной командой"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "single_host_scope",
+      "title": "Понимает ограничение single-host",
+      "expected": "Кандидат объясняет: все реплики на одном хосте; Compose не планирует контейнеры на другие машины; для multi-host — Swarm или Kubernetes.",
+      "score": 1.0,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "scope Compose vs оркестраторы — базовый контекст ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "single-host",
+              "один хост",
+              "Swarm",
+              "Kubernetes"
+            ],
+            "ask": "почему Compose scaling не заменяет Kubernetes на нескольких серверах"
+          }
+        ],
+        "mustConcepts": [
+          "single-host",
+          "один хост",
+          "та же машина",
+          "не multi-host",
+          "Swarm",
+          "Kubernetes",
+          "K8s",
+          "docker stack",
+          "распредел",
+          "scheduling",
+          "CPU",
+          "память",
+          "потолок",
+          "кластер"
+        ],
+        "falseClaims": [
+          "Compose автоматически распределяет реплики по нескольким серверам",
+          "масштабирование Compose даёт высокую доступность при падении хоста",
+          "Swarm и Compose scale — полностью одно и то же по scope"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "dns_load_balancing",
+      "title": "Понимает DNS и балансировку реплик",
+      "expected": "Кандидат объясняет: embedded DNS возвращает все IP реплик по имени сервиса; клиенты часто round-robin; балансировка зависит от поведения клиента, не health-aware.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "механизм доступа к репликам через Docker DNS из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "DNS",
+              "round-robin",
+              "A record",
+              "IP"
+            ],
+            "ask": "как другой контейнер достучится до нескольких реплик api по имени сервиса"
+          }
+        ],
+        "mustConcepts": [
+          "DNS",
+          "embedded DNS",
+          "round-robin",
+          "A record",
+          "IP",
+          "имя сервиса",
+          "service name",
+          "все реплик",
+          "несколько IP",
+          "nslookup",
+          "project network",
+          "HTTP клиент",
+          "load balance",
+          "балансир"
+        ],
+        "falseClaims": [
+          "DNS возвращает только один IP даже при нескольких репликах",
+          "Docker DNS сам проверяет health перед отдачей IP",
+          "round-robin гарантирован для любого клиента без исключений"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "port_conflict_expose",
+      "title": "Знает конфликт портов при scale",
+      "expected": "Кандидат объясняет: фиксированный `ports: host:container` не работает при нескольких репликах; решение — `expose:` без published port, случайные порты или диапазон; production — internal-only + proxy.",
+      "score": 2.0,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "самая частая ошибка при scale — published port conflict",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "scale_mechanisms",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "port_conflict_expose",
+            "oftenConfusedWith": [
+              "reverse_proxy_pattern"
+            ],
+            "anchorTermsExpected": [
+              "ports",
+              "expose",
+              "конфликт",
+              "host port",
+              "reverse proxy",
+              "published"
+            ],
+            "anchorTermsWrongTopic": [
+              "каждая реплика на своём хосте",
+              "DNS решает конфликт портов"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ports",
+              "3000:3000",
+              "конфликт",
+              "bind"
+            ],
+            "ask": "почему `ports: 3000:3000` ломается при replicas: 3 и как исправить"
+          }
+        ],
+        "mustConcepts": [
+          "ports",
+          "expose",
+          "published",
+          "host port",
+          "конфликт",
+          "bind",
+          "занят",
+          "only one",
+          "случайн",
+          "random port",
+          "диапазон",
+          "range",
+          "3000-3009",
+          "internal",
+          "внутренн",
+          "не публик",
+          "replicas"
+        ],
+        "falseClaims": [
+          "можно публиковать один и тот же host port для всех реплик",
+          "Docker автоматически пробрасывает разные host ports при `3000:3000`",
+          "`expose` открывает порт наружу на хосте так же как `ports`",
+          "конфликт портов решается только Swarm, в Compose scale невозможен"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "reverse_proxy_pattern",
+      "title": "Знает паттерн reverse proxy",
+      "expected": "Кандидат описывает: реплики с `expose` только внутри сети; nginx/Traefik с одним published port; upstream по имени сервиса резолвится в все IP; Traefik auto-discovery при scale.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "production-паттерн из ITLead nginx/Traefik examples",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "port_conflict_expose",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "nginx",
+              "Traefik",
+              "upstream",
+              "proxy"
+            ],
+            "ask": "как nginx или Traefik балансирует трафик на несколько api-реплик в Compose"
+          }
+        ],
+        "mustConcepts": [
+          "reverse proxy",
+          "nginx",
+          "Traefik",
+          "upstream",
+          "proxy_pass",
+          "loadbalancer",
+          "expose",
+          "80:80",
+          "один published",
+          "auto-discovery",
+          "docker.sock",
+          "labels",
+          "healthcheck",
+          "api:3000",
+          "внутренн"
+        ],
+        "falseClaims": [
+          "каждая реплика должна иметь свой published port на хосте",
+          "reverse proxy не нужен — клиенты сами найдут все реплики снаружи",
+          "Traefik требует ручного обновления конфига при каждом scale"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "compose_limitations",
+      "title": "Знает ограничения Compose scaling",
+      "expected": "Кандидат называет: нет health-aware LB, auto-scaling, multi-host; DNS не фильтрует unhealthy; rolling updates без контролируемого parallelism; для HA нужен другой оркестратор.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "честный scope — что Compose не делает из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "auto-scaling",
+              "health",
+              "HA",
+              "HPA"
+            ],
+            "ask": "чего не хватает Compose scaling для production HA и elasticity"
+          }
+        ],
+        "mustConcepts": [
+          "health-aware",
+          "unhealthy",
+          "auto-scaling",
+          "HPA",
+          "multi-host",
+          "rolling update",
+          "parallelism",
+          "HA",
+          "высокая доступ",
+          "один хост",
+          "ручн",
+          "target_cpu",
+          "Swarm",
+          "Kubernetes",
+          "production-ready"
+        ],
+        "falseClaims": [
+          "Compose сам масштабирует по CPU на 70%",
+          "DNS не отдаёт IP unhealthy реплик — они автоматически исключаются",
+          "Compose scaling production-ready для HA на нескольких зонах",
+          "rolling update в Compose всегда zero-downtime с контролем batch size"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: scale stateful (postgres на одном volume), workers без idempotency, забытый `--scale` не персистит, scale сервиса с published port; scale до нуля как valid кейс.",
+      "score": 1.0,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes блок ITLead — stateful, queue, persistence",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "postgres",
+              "stateful",
+              "volume",
+              "idempotent"
+            ],
+            "ask": "почему нельзя просто поставить postgres replicas: 3 в Compose"
+          },
+          {
+            "match": [
+              "worker",
+              "очеред",
+              "idempotent"
+            ],
+            "ask": "зачем workers при scale из очереди должны быть идемпотентными"
+          }
+        ],
+        "mustConcepts": [
+          "stateful",
+          "postgres",
+          "volume",
+          "corruption",
+          "корруп",
+          "идемпотент",
+          "idempotent",
+          "очеред",
+          "queue",
+          "worker",
+          "не персист",
+          "--scale",
+          "deploy.replicas",
+          "scale api=0",
+          "published port",
+          "Redis"
+        ],
+        "falseClaims": [
+          "можно масштабировать postgres replicas: 3 на одном named volume",
+          "workers в очереди можно scale без idempotency — дубликаты безопасны всегда",
+          "`docker compose up --scale api=5` навсегда фиксирует 5 реплик",
+          "stateful сервисы масштабируются в Compose так же как stateless API"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Масштабирую через `deploy.replicas: 5` или `docker compose up -d --scale api=5`. Все реплики на одном хосте. API без `ports:` — только `expose: 3000`, снаружи nginx на 80:80 балансирует на `api:3000`; Docker DNS отдаёт все IP реплик. Для нескольких серверов — Swarm или K8s.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Worker pool: redis + worker с replicas: 10, каждый тянет job из очереди. API stateless за Traefik — labels на сервис, при `--scale api=8` Traefik сам подхватывает новые контейнеры. `--scale` не сохраняется — для постоянного числа replicas пишу в YAML.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "`docker compose up --scale api=10 --scale worker=5` — меняю только нужные сервисы. Фиксированный `3000:3000` при scale упадёт — делаю expose + proxy. Postgres не scale так — одна БД на volume. Scale до нуля: `--scale api=0`.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Просто ставлю `ports: 3000:3000` и `replicas: 5` — Docker сам разрулит порты на разных хостах кластера.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Compose scale распределяет контейнеры по нескольким машинам и автоматически масштабирует по CPU. DNS не отдаёт unhealthy реплики.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для HA ставлю postgres replicas: 3 с одним volume — три независимые базы синхронизируются сами. `--scale` один раз — и навсегда 5 api.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "scale_mechanisms",
+      "exampleType": "good",
+      "exampleText": "`deploy.replicas: 3` в YAML — декларативно; `docker compose up -d --scale api=10` — императивно на один запуск, override replicas.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "scale_mechanisms",
+      "exampleType": "good",
+      "exampleText": "ну scale api=5 поднимает пять контейнеров api, без рестарта worker; следующий up без --scale вернёт replicas из yaml",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "scale_mechanisms",
+      "exampleType": "bad",
+      "exampleText": "`--scale` записывает число реплик в compose.yaml автоматически и работает только в Swarm mode.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "single_host_scope",
+      "exampleType": "good",
+      "exampleText": "Compose scale — только один хост; 20 api-реплик делят CPU/RAM этой машины. Multi-host — `docker stack` или Kubernetes.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "single_host_scope",
+      "exampleType": "good",
+      "exampleText": "все реплики на той же ноде, scheduling между серверами compose не умеет",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "single_host_scope",
+      "exampleType": "bad",
+      "exampleText": "Compose автоматически добавляет второй сервер когда replicas > 10.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "dns_load_balancing",
+      "exampleType": "good",
+      "exampleText": "nslookup api из web-контейнера возвращает три IP — embedded DNS все реплики; nginx upstream api:3000 round-robin между ними.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "dns_load_balancing",
+      "exampleType": "good",
+      "exampleText": "dns по имени сервиса отдаёт все ip реплик, http клиент часто round-robin — но это не health check",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "dns_load_balancing",
+      "exampleType": "bad",
+      "exampleText": "Docker DNS всегда возвращает один IP — load balancer обязателен даже внутри сети для двух реплик.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "port_conflict_expose",
+      "exampleType": "good",
+      "exampleText": "`ports: 3000:3000` + replicas: 3 → ERROR bind; убираю published port, ставлю `expose: [\"3000\"]` — реплики только внутри сети.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "port_conflict_expose",
+      "exampleType": "good",
+      "exampleText": "альтернатива — `ports: [\"3000\"]` без mapping, docker выберет случайные host ports; в prod проще expose + один nginx на 80",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "port_conflict_expose",
+      "exampleType": "bad",
+      "exampleText": "Можно смело публиковать один host port для пяти api-реплик — Docker мультиплексирует TCP автоматически.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "reverse_proxy_pattern",
+      "exampleType": "good",
+      "exampleText": "api expose 3000, replicas 5; nginx ports 80:80, upstream api_backend { server api:3000; } — lookup даёт все IP, proxy_pass балансирует.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "reverse_proxy_pattern",
+      "exampleType": "good",
+      "exampleText": "Traefik с docker provider — labels на api, scale до 8, routes обновляются без правки конфига",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "reverse_proxy_pattern",
+      "exampleType": "bad",
+      "exampleText": "Reverse proxy не нужен — каждую реплику api публикую на 3001, 3002, 3003 и клиент сам выбирает.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "compose_limitations",
+      "exampleType": "good",
+      "exampleText": "Compose не делает HPA, DNS не фильтрует unhealthy, все реплики на одном хосте — падение хоста = падение всего. Для HA — K8s.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "compose_limitations",
+      "exampleType": "good",
+      "exampleText": "нет auto-scale по cpu, rolling update без batch control — compose up пересоздаёт параллельно",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "compose_limitations",
+      "exampleType": "bad",
+      "exampleText": "Compose scaling production-ready для multi-AZ HA и автоматически исключает упавшие реплики из DNS.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "postgres replicas: 3 на одном volume — три независимые БД, corruption; workers из Redis должны быть idempotent при параллельном scale.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "забыл что --scale не персистит — после обычного compose up api снова 1; для постоянного числа — deploy.replicas в yaml",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Stateful db scale через replicas норм — volume общий, postgres сам синхронизирует. Workers без idempotency ок, очередь не дублирует.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-compose-scale-services",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-compose-scale-services",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-compose-scale-services",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to scale services in Docker Compose?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

@@ -1,0 +1,165 @@
+{
+  "topic": {
+    "code": "shcho_take_referential_actions_v_sql",
+    "name": "Referential actions в SQL",
+    "skillCode": "architecture",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Что такое referential actions в SQL и какие типы бывают?",
+    "shortAnswer": "Referential actions определяют, что БД автоматически делает с дочерними строками при DELETE или UPDATE родителя по foreign key: CASCADE, RESTRICT, NO ACTION, SET NULL, SET DEFAULT. CASCADE — когда дети без родителя не имеют смысла; RESTRICT/SET NULL — когда дети могут существовать отдельно.",
+    "idealAnswer": "Referential actions — правила ON DELETE / ON UPDATE для foreign key. CASCADE копирует операцию: удалил user — удалились posts; обновил id — обновились ссылки. RESTRICT блокирует операцию если есть дети — защита от случайной потери. NO ACTION как RESTRICT в MySQL/PostgreSQL; в PostgreSQL с deferred constraints можно временно нарушить целостность до COMMIT. SET NULL пишет NULL в FK колонку — child остаётся без автора; колонка должна допускать NULL. SET DEFAULT сбрасывает FK на default (guest user_id=0). Когда: удаление аккаунта → CASCADE orders; комментарий без автора → SET NULL; активный customer → RESTRICT. Внутри: engine сканирует индекс FK на child, применяет action под row locks. Ошибки: SET NULL на NOT NULL; CASCADE только direct children — orders→order_items каскад удалит тысячи строк; забыли ON UPDATE; NO ACTION vs RESTRICT в разных БД; миграция SET FOREIGN_KEY_CHECKS=0 / session_replication_role=replica. Примеры: Supabase CASCADE profiles; WooCommerce RESTRICT orders.user_id.",
+    "maxScore": 10,
+    "skills": ["architecture"]
+  },
+  "checkpoints": [
+    {
+      "key": "referential_actions_definition",
+      "title": "Понимает определение referential actions",
+      "expected": "Кандидат объясняет: автоматическое поведение БД с child rows при DELETE/UPDATE parent через FK; аналогия с бронированием ресторана.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро определения из TL;DR",
+        "mustConcepts": ["referential actions", "foreign key", "FK", "родитель", "дочерн", "child", "parent", "DELETE", "UPDATE", "автоматическ", "ON DELETE", "ON UPDATE", "бронирован", "ресторан", "правил"],
+        "falseClaims": ["referential actions выполняются только в application code", "foreign key без ON DELETE всегда CASCADE", "referential actions работают только на INSERT", "DELETE parent никогда не затрагивает child", "referential actions — это триггеры PostgreSQL"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "five_action_types",
+      "title": "Знает пять типов действий",
+      "expected": "Кандидат перечисляет CASCADE, RESTRICT, NO ACTION, SET NULL, SET DEFAULT и кратко описывает каждый.",
+      "score": 2.0,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "The five actions — центральный junior блок",
+        "impliesCheckpointFloors": [{ "checkpointKey": "referential_actions_definition", "floorFraction": 0.45 }],
+        "mustConcepts": ["CASCADE", "RESTRICT", "NO ACTION", "SET NULL", "SET DEFAULT", "копирует", "блокирует", "NULL", "default", "guest", "deferred", "COMMIT", "foreign key violation", "удаляет детей", "очищает ссылку"],
+        "falseClaims": ["SET DEFAULT работает без DEFAULT на колонке всегда", "NO ACTION и RESTRICT различаются во всех БД одинаково", "CASCADE обновляет только parent без children", "RESTRICT удаляет children автоматически", "существует только CASCADE и RESTRICT"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use_actions",
+      "title": "Выбирает action по бизнес-смыслу данных",
+      "expected": "Кандидат приводит: CASCADE для orders/user; SET NULL для articles/author; RESTRICT для active customer; SET DEFAULT для category fallback.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "When to use из ITLead",
+        "mustConcepts": ["аккаунт", "orders", "комментар", "автор", "RESTRICT", "активн", "SET NULL", "CASCADE", "audit log", "soft delete", "категор", "default", "без родителя", "самостоятельн"],
+        "falseClaims": ["всегда ставят CASCADE для простоты", "SET NULL подходит для NOT NULL колонок", "RESTRICT и NO ACTION никогда не используют", "audit log лучше CASCADE при удалении parent"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "cascade_depth_trap",
+      "title": "Понимает глубину CASCADE",
+      "expected": "Кандидat предупреждает: CASCADE на orders→order_items удалит все три таблицы; COUNT(*) перед DELETE; PostgreSQL 12+ detects cycles.",
+      "score": 1.0,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistake CASCADE depth",
+        "mustConcepts": ["CASCADE", "order_items", "рекурс", "тысяч", "COUNT", "цикл", "self-referencing", "manager_id", "PostgreSQL 12", "не только прямых детей", "каскад", "глубин"],
+        "falseClaims": ["CASCADE затрагивает только прямых children одного уровня", "удаление одного user безопасно без проверки COUNT", "циклический CASCADE невозможен", "CASCADE не работает через несколько таблиц"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "referential_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидat: SET NULL на NOT NULL; забыли ON UPDATE; NO ACTION deferred только PostgreSQL; FOREIGN_KEY_CHECKS=0 на миграции.",
+      "score": 2.0,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes",
+        "mustConcepts": ["SET NULL", "NOT NULL", "rollback", "ON UPDATE", "NO ACTION", "RESTRICT", "MySQL", "PostgreSQL", "deferred", "FOREIGN_KEY_CHECKS", "session_replication_role", "миграц", "constraint violation", "accidental"],
+        "falseClaims": ["SET NULL на NOT NULL column работает", "ON UPDATE не нужен если id never changes", "NO ACTION и RESTRICT идентичны в PostgreSQL всегда", "FOREIGN_KEY_CHECKS=0 безопасно оставить включённым навсегда"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "restrict_vs_no_action",
+      "title": "Отличает RESTRICT от NO ACTION",
+      "expected": "Кандидat: одинаково immediate check в MySQL/standard PG; NO ACTION deferrable в PostgreSQL до COMMIT.",
+      "score": 1.0,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Follow-up RESTRICT vs NO ACTION",
+        "mustConcepts": ["RESTRICT", "NO ACTION", "immediate", "deferred", "COMMIT", "транзакц", "PostgreSQL", "MySQL", "одинаков", "отложен", "проверк"],
+        "falseClaims": ["RESTRICT можно defer в PostgreSQL как NO ACTION", "NO ACTION никогда не блокирует DELETE", "MySQL defer NO ACTION по умолчанию", "RESTRICT и NO ACTION — разные протоколы SQL"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "internal_mechanism",
+      "title": "Понимает внутренний механизм enforcement",
+      "expected": "Кандидat: scan child FK index, row locks, deferred check at commit в PostgreSQL.",
+      "score": 1.0,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "How it works internally",
+        "mustConcepts": ["индекс", "foreign key", "scan", "row lock", "race", "deferred", "commit", "блокиров", "движок", "enforce", "целостност"],
+        "falseClaims": ["FK проверяется только при SELECT", "referential actions не используют индексы", "deferred constraints проверяются до каждого statement"],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    { "exampleType": "good", "exampleText": "Referential actions — ON DELETE/UPDATE: CASCADE удаляет posts с user; RESTRICT блокирует DELETE customer с orders; SET NULL оставляет article без author_id.", "sortOrder": 0 },
+    { "exampleType": "good", "exampleText": "пять типов: cascade restrict no action set null set default. orders к user — cascade, comments — set null если контент живёт", "sortOrder": 1 },
+    { "exampleType": "good", "exampleText": "перед DELETE user делаю COUNT orders — cascade на order_items снесёт всё. ON UPDATE CASCADE если меняем PK.", "sortOrder": 2 },
+    { "exampleType": "bad", "exampleText": "Referential actions — это только триггеры. Всегда CASCADE. SET NULL работает на NOT NULL колонках.", "sortOrder": 0 },
+    { "exampleType": "bad", "exampleText": "CASCADE только один уровень. ON UPDATE не существует. NO ACTION = DELETE children.", "sortOrder": 1 },
+    { "exampleType": "bad", "exampleText": "RESTRICT и NO ACTION разные во всех БД одинаково — defer везде.", "sortOrder": 2 },
+    { "checkpointKey": "referential_actions_definition", "exampleType": "good", "exampleText": "Правила что БД делает с child при DELETE/UPDATE parent по FK.", "sortOrder": 10 },
+    { "checkpointKey": "referential_actions_definition", "exampleType": "good", "exampleText": "автоматика на foreign key — не руками в коде", "sortOrder": 11 },
+    { "checkpointKey": "referential_actions_definition", "exampleType": "bad", "exampleText": "Referential actions только в ORM, не в SQL.", "sortOrder": 30 },
+    { "checkpointKey": "five_action_types", "exampleType": "good", "exampleText": "CASCADE, RESTRICT, NO ACTION, SET NULL, SET DEFAULT — пять стандартных.", "sortOrder": 12 },
+    { "checkpointKey": "five_action_types", "exampleType": "good", "exampleText": "cascade копирует, restrict блокирует, set null обнуляет FK", "sortOrder": 13 },
+    { "checkpointKey": "five_action_types", "exampleType": "bad", "exampleText": "Существуют только CASCADE и RESTRICT.", "sortOrder": 31 },
+    { "checkpointKey": "when_to_use_actions", "exampleType": "good", "exampleText": "Удаление аккаунта — CASCADE orders; статья без автора — SET NULL.", "sortOrder": 14 },
+    { "checkpointKey": "when_to_use_actions", "exampleType": "good", "exampleText": "активный покупатель — restrict на delete", "sortOrder": 15 },
+    { "checkpointKey": "when_to_use_actions", "exampleType": "bad", "exampleText": "Всегда CASCADE — проще всего.", "sortOrder": 32 },
+    { "checkpointKey": "cascade_depth_trap", "exampleType": "good", "exampleText": "user→orders→order_items CASCADE — один DELETE, три таблицы пустые.", "sortOrder": 16 },
+    { "checkpointKey": "cascade_depth_trap", "exampleType": "good", "exampleText": "count перед delete — cascade неожиданно", "sortOrder": 17 },
+    { "checkpointKey": "cascade_depth_trap", "exampleType": "bad", "exampleText": "CASCADE не идёт глубже одного уровня.", "sortOrder": 33 },
+    { "checkpointKey": "referential_mistakes", "exampleType": "good", "exampleText": "SET NULL на NOT NULL user_id — transaction rollback.", "sortOrder": 18 },
+    { "checkpointKey": "referential_mistakes", "exampleType": "good", "exampleText": "забыл ON UPDATE — смена PK user падает", "sortOrder": 19 },
+    { "checkpointKey": "referential_mistakes", "exampleType": "bad", "exampleText": "SET NULL на NOT NULL — нормально, NULL игнорируется.", "sortOrder": 34 },
+    { "checkpointKey": "restrict_vs_no_action", "exampleType": "good", "exampleText": "MySQL одинаково immediate; PG NO ACTION defer до commit.", "sortOrder": 20 },
+    { "checkpointKey": "restrict_vs_no_action", "exampleType": "good", "exampleText": "deferred no action — временно нарушить в транзакции", "sortOrder": 21 },
+    { "checkpointKey": "restrict_vs_no_action", "exampleType": "bad", "exampleText": "RESTRICT deferrable в PostgreSQL по умолчанию.", "sortOrder": 35 },
+    { "checkpointKey": "internal_mechanism", "exampleType": "good", "exampleText": "Engine scan child FK index, row locks, deferred at commit.", "sortOrder": 22 },
+    { "checkpointKey": "internal_mechanism", "exampleType": "good", "exampleText": "проверка целостности на delete/update parent", "sortOrder": 23 },
+    { "checkpointKey": "internal_mechanism", "exampleType": "bad", "exampleText": "FK проверяется только при INSERT child.", "sortOrder": 36 }
+  ],
+  "itlead": {
+    "slug": "shcho-take-referential-actions-v-sql",
+    "apiUrl": "https://api.itlead.org/api/questions/shcho-take-referential-actions-v-sql",
+    "pageUrl": "https://itlead.org/interview-questions/general/shcho-take-referential-actions-v-sql",
+    "difficulty": "JUNIOR",
+    "titleEn": "What are referential actions in SQL?",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

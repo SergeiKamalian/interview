@@ -1,0 +1,594 @@
+{
+  "topic": {
+    "code": "chy_mozhna_vidpravlyaty_body_v_get_zapyti",
+    "name": "Body в GET-запросе",
+    "skillCode": "javascript",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Можно ли отправлять body в GET-запросе?",
+    "shortAnswer": "Технически body в GET можно отправить — он уйдёт на TCP-уровне, но RFC 7231 не определяет его семантику. Большинство серверов (Nginx, Express body-parser, AWS ALB) отбрасывают тело до того, как оно дойдёт до кода приложения. Для простых фильтров используй query params, для сложных данных — POST.",
+    "idealAnswer": "GET request body — в коде можно прикрепить, и он уйдёт по TCP, но RFC 7231 section 4.3.1 говорит: «payload within a GET request message has no defined semantics» — сервер не обязан его читать, игнорировать, проксировать или ответить 411. GET должен быть safe и idempotent; полагаться на фильтрацию через body — значит зависеть от поведения, которое спецификация не гарантирует. Nginx (с v0.7) отбрасывает GET body в ngx_http_core_module до приложения. Express body-parser проверяет req.method и пропускает GET/HEAD — req.body на GET-маршруте всегда {}. AWS ALB, Varnish, CloudFront строят cache key только из URL, не из body — два клиента с одним URL и разными телами получат один кешированный ответ (баг корректности данных). Правила: простые фильтры → query params (/users?active=true); сложные объекты или >~2KB → POST /search; кеширование → только query (RFC 7234); GraphQL → POST (GET с variables ненадёжен, Apollo убрал до v3). Типичные ошибки: filter в req.body на Express GET (undefined, фильтрация молча не работает); большой body в GET (Safari может 400/413); ожидание CDN-кеша с разными телами; локально работает (Flask/plain Node парсит всё), в prod за Nginx/ALB body отрезается — 200 OK, но фильтрация пропала. Исключения: Elasticsearch _search принимает JSON body на GET для Query DSL (осознанное решение ES, POST предпочтительнее); Apollo pre-3.0, Splunk — legacy, не паттерн для нового кода. HTTP/2 не меняет семантику методов. fetch и Axios шлют body на TCP; Axios иногда warn, fetch молчит — решает сервер.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "get_body_overview",
+      "title": "Понимает техническую vs семантическую сторону",
+      "expected": "Кандидат объясняет: body в GET можно отправить на уровне TCP/клиента, но на уровне HTTP-семантики его смысл не определён; большинство стеков отбрасывают тело без ошибки — «тихий» баг.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — технически да, семантически нет, тишина опасна",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "get_body_overview",
+            "oftenConfusedWith": [
+              "rfc7231_semantics",
+              "server_proxy_handling"
+            ],
+            "anchorTermsExpected": [
+              "TCP",
+              "семантик",
+              "RFC",
+              "no defined",
+              "отбрасыва",
+              "тих",
+              "без ошибк"
+            ],
+            "anchorTermsWrongTopic": [
+              "GET запрещён RFC",
+              "body всегда парсится",
+              "POST и GET одинаковы для фильтров"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "TCP",
+              "техническ",
+              "отправ"
+            ],
+            "ask": "чем отличается «body ушёл по сети» от «сервер его прочитал и применил»"
+          }
+        ],
+        "mustConcepts": [
+          "GET body",
+          "тело GET",
+          "TCP",
+          "техническ",
+          "семантик",
+          "no defined semantics",
+          "не определ",
+          "отбрасыва",
+          "discard",
+          "игнорир",
+          "без ошибк",
+          "тих",
+          "silence",
+          "fetch",
+          "curl -d",
+          "клиент отправ"
+        ],
+        "falseClaims": [
+          "RFC полностью запрещает body в GET",
+          "если fetch не выбросил ошибку — сервер точно прочитал body",
+          "GET body и POST body семантически эквивалентны",
+          "body в GET всегда доходит до route handler"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "rfc7231_semantics",
+      "title": "Знает RFC 7231: safe, idempotent, no semantics",
+      "expected": "Кандидат цитирует суть RFC 7231 §4.3.1: payload в GET «has no defined semantics»; GET safe и idempotent; полагаться на body для фильтрации — негарантированное поведение.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "источник путаницы — одно предложение RFC 7231",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "get_body_overview",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "RFC 7231",
+              "safe",
+              "idempotent"
+            ],
+            "ask": "что RFC говорит про safe/idempotent GET и почему body для фильтрации спорен"
+          }
+        ],
+        "mustConcepts": [
+          "RFC 7231",
+          "4.3.1",
+          "no defined semantics",
+          "не определ",
+          "safe",
+          "безопасн",
+          "idempotent",
+          "идемпотент",
+          "не меняет состоян",
+          "payload",
+          "411",
+          "не обязан",
+          "сервер решает",
+          "ignore",
+          "forward",
+          "reject"
+        ],
+        "falseClaims": [
+          "RFC 7231 явно запрещает любой payload в GET",
+          "GET с body нарушает idempotent только если сервер его парсит",
+          "safe означает что body безопасен для передачи фильтров",
+          "RFC 7234 включает body в cache key"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "server_proxy_handling",
+      "title": "Знает поведение Nginx, Express, ALB, CDN",
+      "expected": "Кандидат называет: Nginx дропает GET body до app; Express body-parser skip GET/HEAD → req.body {}; AWS ALB strip; CDN cache key только URL.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "production stack из ITLead — nginx express ALB Varnish CloudFront",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Nginx",
+              "Express",
+              "body-parser"
+            ],
+            "ask": "что происходит с GET body в Nginx и Express body-parser"
+          },
+          {
+            "match": [
+              "ALB",
+              "CDN",
+              "Varnish",
+              "CloudFront"
+            ],
+            "ask": "как прокси и CDN обрабатывают GET body и cache key"
+          }
+        ],
+        "mustConcepts": [
+          "Nginx",
+          "ngx_http_core",
+          "Express",
+          "body-parser",
+          "req.method",
+          "GET",
+          "HEAD",
+          "req.body",
+          "пуст",
+          "{}",
+          "AWS ALB",
+          "Lambda",
+          "Varnish",
+          "CloudFront",
+          "CDN",
+          "cache key",
+          "ключ кеш",
+          "URL",
+          "strip",
+          "отбрасыва",
+          "type: '*/*'"
+        ],
+        "falseClaims": [
+          "express.json() всегда парсит body независимо от метода",
+          "Nginx передаёт GET body в upstream по умолчанию",
+          "CDN учитывает body при формировании cache key",
+          "AWS ALB прозрачно форвардит GET body в Lambda"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "decision_query_vs_post",
+      "title": "Знает когда query params, когда POST /search",
+      "expected": "Кандидат даёт правила: простые фильтры → query; сложные/большие (>~2KB) → POST /search или /query; GraphQL → POST; кеш → query only.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "decision rules — практический выход из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "query",
+              "POST",
+              "search"
+            ],
+            "ask": "когда query params достаточно, а когда нужен POST /search"
+          },
+          {
+            "match": [
+              "GraphQL",
+              "2KB",
+              "Safari"
+            ],
+            "ask": "почему GraphQL и большие фильтры не через GET body"
+          }
+        ],
+        "mustConcepts": [
+          "query params",
+          "query string",
+          "req.query",
+          "POST",
+          "/search",
+          "/query",
+          "2KB",
+          "413",
+          "GraphQL",
+          "Apollo",
+          "variables",
+          "фильтр",
+          "сложн",
+          "больш",
+          "кешир",
+          "RFC 7234",
+          "read operation",
+          "ETag",
+          "Cache-Control"
+        ],
+        "falseClaims": [
+          "любой объём фильтров можно надёжно передать в GET body",
+          "GraphQL spec рекомендует GET body для больших variables",
+          "POST /search всегда нарушает REST семантику чтения",
+          "query params не кешируются CDN"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки и dev/prod gap",
+      "expected": "Кандидат называет: req.body пустой на Express GET; Safari/бrowsers лимиты на GET body; CDN один cache entry на разные bodies; локально работает, в prod за proxy — фильтрация молча ломается.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — Express, Safari, CDN, dev/prod из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "req.body",
+              "undefined",
+              "Express"
+            ],
+            "ask": "почему filter из req.body на GET route в Express не работает"
+          },
+          {
+            "match": [
+              "локально",
+              "production",
+              "Flask",
+              "dev"
+            ],
+            "ask": "почему curl -d GET работает локально, но не в prod за Nginx"
+          },
+          {
+            "match": [
+              "tenant",
+              "cache",
+              "Acme",
+              "Contoso"
+            ],
+            "ask": "пример: два tenant в GET body — один URL — что вернёт CDN"
+          }
+        ],
+        "mustConcepts": [
+          "req.body",
+          "undefined",
+          "Express",
+          "body-parser",
+          "Safari",
+          "400",
+          "413",
+          "Payload Too Large",
+          "CDN",
+          "tenant",
+          "кеш",
+          "один URL",
+          "локально",
+          "production",
+          "Flask",
+          "Node HTTP",
+          "Nginx",
+          "фильтрац",
+          "молча",
+          "200",
+          "dev/prod"
+        ],
+        "falseClaims": [
+          "если ответ 200 — фильтрация точно применилась",
+          "express.json({ type: '*/*' }) — рекомендуемый паттерн для GET body",
+          "Safari без ограничений на размер GET body",
+          "локальное поведение dev-сервера гарантирует prod за load balancer"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "real_world_exceptions",
+      "title": "Знает исключения (Elasticsearch) vs паттерн",
+      "expected": "Кандидат упоминает Elasticsearch _search GET+body для Query DSL как осознанное исключение; Apollo pre-3 legacy; не копировать в новый код — POST предпочтительнее.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Real-World Usage — ES exception, не general pattern",
+        "mustConcepts": [
+          "Elasticsearch",
+          "_search",
+          "Query DSL",
+          "Apollo",
+          "GraphQL",
+          "legacy",
+          "Splunk",
+          "GitHub Enterprise",
+          "исключен",
+          "не паттерн",
+          "POST preferred",
+          "официальн",
+          "JS client",
+          "POST под капотом"
+        ],
+        "falseClaims": [
+          "Elasticsearch доказывает что GET body — стандарт для всех search API",
+          "Apollo v3+ рекомендует GET body для variables",
+          "если ES так делает — можно так же в любом REST API",
+          "Splunk GET body — best practice для новых сервисов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "http2_clients",
+      "title": "Знает HTTP/2 и поведение fetch/Axios",
+      "expected": "Кандидат: HTTP/2 не меняет семантику GET body; fetch и Axios шлют на TCP; Axios может warn; решает сервер.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Follow-up Q HTTP/2 и клиенты — бонус senior",
+        "mustConcepts": [
+          "HTTP/2",
+          "HTTP/3",
+          "фрейм",
+          "multiplex",
+          "семантик метод",
+          "fetch",
+          "Axios",
+          "warn",
+          "предупрежден",
+          "TCP",
+          "сервер решает"
+        ],
+        "falseClaims": [
+          "HTTP/2 разрешает и стандартизирует GET body",
+          "fetch блокирует body в GET на клиенте",
+          "Axios всегда отклоняет GET с body"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Технически fetch может отправить body в GET — пакет уйдёт по TCP. Но RFC 7231 не определяет семантику payload в GET. Nginx и Express body-parser отбрасывают его, req.body на GET — {}. Простые фильтры кладу в query, сложный search — POST /orders/search.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "GET safe и idempotent — полагаться на body для фильтрации нельзя: CDN строит cache key только из URL. Два tenant в body с одним URL получат один кеш. GraphQL variables — только POST. ES _search с GET body — их осознанный виняток, не шаблон для REST.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Локально Flask парсил GET body — curl -d работал. В prod ALB/Nginx режет тело до Lambda, 200 OK, но фильтр из body не применился. Safari режет большие GET body. HTTP/2 семантику методов не меняет.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "RFC запрещает body в GET, поэтому fetch выбросит ошибку если передать body.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "express.json() парсит body на GET — req.body.filter всегда доступен. CDN кеширует отдельно для каждого body при одном URL.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "10KB фильтра в GET body — нормальная практика, GraphQL так и шлёт variables. Elasticsearch значит все API должны так делать.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "get_body_overview",
+      "exampleType": "good",
+      "exampleText": "Body уходит с клиента по TCP, но HTTP-семантика GET body не определена — сервер может проигнорировать без ошибки.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "get_body_overview",
+      "exampleType": "good",
+      "exampleText": "ну fetch шлёт get с body, пакет доходит, но приложение часто его даже не видит — тихий баг",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "get_body_overview",
+      "exampleType": "bad",
+      "exampleText": "Если TCP доставил body — route handler гарантированно получит распарсенный JSON в req.body.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "rfc7231_semantics",
+      "exampleType": "good",
+      "exampleText": "RFC 7231 §4.3.1: payload in GET has no defined semantics — сервер не обязан его обрабатывать; GET safe и idempotent.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "rfc7231_semantics",
+      "exampleType": "good",
+      "exampleText": "спека не запрещает body, но и не гарантирует фильтрацию через него — поэтому разные серверы ведут себя по-разному",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "rfc7231_semantics",
+      "exampleType": "bad",
+      "exampleText": "RFC 7231 явно запрещает любой байт после headers в GET — это syntax error.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "server_proxy_handling",
+      "exampleType": "good",
+      "exampleText": "Nginx дропает GET body до upstream; express.json() skip GET — req.body {} на app.get('/users').",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "server_proxy_handling",
+      "exampleType": "good",
+      "exampleText": "ALB и CloudFront: cache key = URL, body не участвует — два GET /api/data с разными tenant в body → один cached response.",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "server_proxy_handling",
+      "exampleType": "bad",
+      "exampleText": "Varnish форвардит GET body и включает его в cache key по умолчанию.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "decision_query_vs_post",
+      "exampleType": "good",
+      "exampleText": "status=pending&userId=42 в query для простого фильтра; POST /orders/search с { filters, sort, pagination } для сложного.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "decision_query_vs_post",
+      "exampleType": "good",
+      "exampleText": "graphql variables большие — post с content-type json, не get body — safari и spec так",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "decision_query_vs_post",
+      "exampleType": "bad",
+      "exampleText": "Любой фильтр надёжнее передать в GET body — query string устарел.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "app.get('/users', ...) const { filter } = req.body — всегда undefined, body-parser не парсит GET.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "работало на локальном node http, после nginx в prod фильтр перестал — 200 но все записи, без ошибки",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "GET /api/data body tenant acme vs contoso — CDN отдаст один кеш, contoso увидит данные acme",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Добавлю express.json({ type: '*/*' }) — это правильный способ поддержать GET body в production.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "real_world_exceptions",
+      "exampleType": "good",
+      "exampleText": "Elasticsearch _search принимает Query DSL в GET body — их документированный виняток; официальный JS client шлёт POST.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "real_world_exceptions",
+      "exampleType": "good",
+      "exampleText": "apollo до v3 get body для variables — legacy, в новом коде не копирую",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "real_world_exceptions",
+      "exampleType": "bad",
+      "exampleText": "Раз ES и Splunk используют GET body — это industry standard для search endpoints.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "http2_clients",
+      "exampleType": "good",
+      "exampleText": "HTTP/2 меняет framing, не method semantics — GET body по-прежнему undefined на app layer.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "http2_clients",
+      "exampleType": "good",
+      "exampleText": "axios может warn на get+body, fetch молчит — оба шлют tcp, nginx решает",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "http2_clients",
+      "exampleType": "bad",
+      "exampleText": "В HTTP/2 GET body стал частью стандарта и все прокси его обязаны парсить.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "chy-mozhna-vidpravlyaty-body-v-get-zapyti",
+    "apiUrl": "https://api.itlead.org/api/questions/chy-mozhna-vidpravlyaty-body-v-get-zapyti",
+    "pageUrl": "https://itlead.org/interview-questions/general/chy-mozhna-vidpravlyaty-body-v-get-zapyti",
+    "difficulty": "SENIOR",
+    "titleEn": "Can you send a body in a GET request?",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

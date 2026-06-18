@@ -1,0 +1,495 @@
+{
+  "topic": {
+    "code": "dockerfile_cmd_vs_entrypoint",
+    "name": "CMD vs ENTRYPOINT в Dockerfile",
+    "skillCode": "docker",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "В чём разница между CMD и ENTRYPOINT в Dockerfile?",
+    "shortAnswer": "CMD и ENTRYPOINT оба задают, что запускается при старте контейнера. CMD полностью заменяется аргументами docker run. ENTRYPOINT фиксирован — аргументы после имени образа становятся его параметрами (или подставляется CMD, если аргументов нет). Связка ENTRYPOINT + CMD — стандарт для CLI-образов: фиксированная команда с заменяемыми дефолтами. В production используй exec form ([\"prog\", \"arg\"]), не shell form.",
+    "idealAnswer": "CMD и ENTRYPOINT — две инструкции Dockerfile, определяющие команду при старте контейнера. Разница проявляется, когда пользователь передаёт аргументы в docker run. CMD [\"prog\", \"arg\"] — команда по умолчанию, полностью заменяемая: docker run img otherCmd полностью подменяет CMD. ENTRYPOINT [\"prog\"] — фиксированная первая часть команды: всё после docker run img ... становится аргументами ENTRYPOINT (или подставляется CMD, если аргументов нет). Комбо ENTRYPOINT + CMD — канонический паттерн CLI-образов: фиксированный entrypoint, дефолтные аргументы, которые можно переопределить. --entrypoint на docker run заменяет ENTRYPOINT; CMD переопределяется просто trailing args. Пример: ENTRYPOINT [\"echo\"], CMD [\"hello\"] → docker run demo → echo hello; docker run demo bye → echo bye; docker run --entrypoint /bin/sh demo -c 'ls /' → shell с args. Четыре паттерна: (1) только CMD — сервис без аргументов (nginx, postgres daemon); docker run img sh полностью заменяет CMD. (2) только ENTRYPOINT — образ как CLI (curl); пользователь передаёт флаги напрямую. (3) ENTRYPOINT + CMD — CLI с дефолтом (curl --help). (4) shell form — избегать в production: CMD nginx -g \"daemon off;\" оборачивается в /bin/sh -c, sh становится PID 1, SIGTERM не доходит до приложения, docker stop ждёт grace period и SIGKILL. Exec form [\"prog\", \"arg\"] — execve(), программа PID 1, сигналы работают. Shell form не раскрывает $VAR в exec form — CMD [\"echo\", \"$HOME\"] печатает буквально $HOME; нужен shell явно: [\"/bin/sh\", \"-c\", \"echo $HOME\"]. Два CMD или два ENTRYPOINT — побеждает только последний, без warning. С ENTRYPOINT docker run img sh запускает my-app sh, а не shell — нужен --entrypoint sh. Реальный мир: сервисы (nginx, redis) — CMD only; CLI (aws-cli, git) — ENTRYPOINT; hybrid (postgres:16) — ENTRYPOINT [\"docker-entrypoint.sh\"] + CMD [\"postgres\"]: скрипт делает init (env validation, initdb, /docker-entrypoint-initdb.d/*), затем exec \"$@\" чтобы postgres стал PID 1 и получал сигналы. Override обоих: docker run --entrypoint /bin/sh myimg -c 'echo hi'. Когда НЕ использовать жёсткий ENTRYPOINT: debug/general-purpose образ, где docker run img sh должен просто работать.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "cmd_entrypoint_core",
+      "title": "Называет главное отличие CMD и ENTRYPOINT",
+      "expected": "Кандидат объясняет: CMD — дефолтная команда, полностью заменяется аргументами docker run; ENTRYPOINT — фиксированная команда, trailing args становятся её параметрами; CMD при ENTRYPOINT — дефолтные аргументы.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — ядро темы для junior",
+        "mustConcepts": [
+          "CMD",
+          "ENTRYPOINT",
+          "дефолт",
+          "замен",
+          "override",
+          "фиксирован",
+          "docker run",
+          "аргумент",
+          "trailing",
+          "полностью",
+          "команда по умолчанию",
+          "параметр",
+          "entrypoint",
+          "cmd",
+          "разниц"
+        ],
+        "falseClaims": [
+          "CMD и ENTRYPOINT делают одно и то же",
+          "ENTRYPOINT полностью заменяется trailing args как CMD",
+          "CMD нельзя переопределить через docker run",
+          "ENTRYPOINT и CMD всегда выполняются как две отдельные команды подряд"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "docker_run_override",
+      "title": "Объясняет поведение docker run с аргументами",
+      "expected": "Кандидат описывает: docker run img foo bar заменяет CMD на foo bar; при ENTRYPOINT foo bar идут как args; --entrypoint X заменяет ENTRYPOINT; trailing args после образа — новый CMD/args.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "quick example ITLead — три docker run, три поведения",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "cmd_entrypoint_core",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "--entrypoint",
+              "docker run",
+              "trailing"
+            ],
+            "ask": "чем отличается docker run img sh от docker run --entrypoint sh img"
+          }
+        ],
+        "mustConcepts": [
+          "docker run",
+          "--entrypoint",
+          "trailing args",
+          "замен",
+          "CMD",
+          "ENTRYPOINT",
+          "аргумент",
+          "после имени образа",
+          "override",
+          "foo bar",
+          "явно",
+          "переопредел"
+        ],
+        "falseClaims": [
+          "docker run img sh всегда открывает shell независимо от ENTRYPOINT",
+          "--entrypoint меняет только CMD, не ENTRYPOINT",
+          "аргументы docker run игнорируются если задан ENTRYPOINT",
+          "CMD нельзя переопределить если есть ENTRYPOINT"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "entrypoint_cmd_combo",
+      "title": "Знает паттерн ENTRYPOINT + CMD",
+      "expected": "Кандидат объясняет combo: фиксированный ENTRYPOINT + CMD как дефолтные args; docker run без args → ENTRYPOINT + CMD; с args → ENTRYPOINT + новые args вместо CMD.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "canonical CLI pattern из ITLead Pattern 3",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ENTRYPOINT",
+              "CMD",
+              "curl",
+              "--help"
+            ],
+            "ask": "docker run mycurl без args и с URL — что выполнится при ENTRYPOINT curl и CMD --help"
+          }
+        ],
+        "mustConcepts": [
+          "ENTRYPOINT",
+          "CMD",
+          "combo",
+          "связка",
+          "дефолт",
+          "аргумент",
+          "CLI",
+          "curl",
+          "--help",
+          "override",
+          "замен",
+          "фиксирован",
+          "default args",
+          "без аргументов"
+        ],
+        "falseClaims": [
+          "ENTRYPOINT и CMD нельзя использовать вместе",
+          "при combo trailing args добавляются к CMD, а не заменяют его",
+          "CMD при ENTRYPOINT всегда игнорируется",
+          "combo означает что выполняются две команды последовательно"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "usage_patterns",
+      "title": "Различает типовые паттерны использования",
+      "expected": "Кандидат называет: CMD only — сервис (nginx); ENTRYPOINT only — образ как CLI; ENTRYPOINT + CMD — CLI с дефолтом; когда какой выбирать.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "four patterns + comparison table ITLead",
+        "mustConcepts": [
+          "CMD only",
+          "ENTRYPOINT only",
+          "ENTRYPOINT + CMD",
+          "сервис",
+          "nginx",
+          "postgres",
+          "redis",
+          "CLI",
+          "образ как команда",
+          "aws-cli",
+          "git",
+          "дефолт",
+          "service",
+          "daemon",
+          "debug"
+        ],
+        "falseClaims": [
+          "все production-образы должны иметь ENTRYPOINT",
+          "для nginx всегда нужен ENTRYPOINT + CMD",
+          "CLI-образы используют только CMD без ENTRYPOINT",
+          "shell form — рекомендуемый паттерн для сервисов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "exec_vs_shell_form",
+      "title": "Отличает exec form от shell form",
+      "expected": "Кандидат объясняет: exec form [\"prog\",\"arg\"] — execve(), программа PID 1, SIGTERM доходит; shell form prog arg → /bin/sh -c, sh PID 1, docker stop медленный, SIGKILL после grace.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "PID 1 и signal handling — критично для production",
+        "falseClaimCapFraction": 0,
+        "probeConceptGroups": [
+          {
+            "match": [
+              "exec form",
+              "shell form",
+              "PID 1"
+            ],
+            "ask": "почему shell form CMD ломает graceful docker stop"
+          }
+        ],
+        "mustConcepts": [
+          "exec form",
+          "shell form",
+          "JSON array",
+          "execve",
+          "/bin/sh",
+          "-c",
+          "PID 1",
+          "SIGTERM",
+          "SIGKILL",
+          "docker stop",
+          "grace period",
+          "signal",
+          "сигнал",
+          "production",
+          "nginx",
+          "оборачива"
+        ],
+        "falseClaims": [
+          "shell form и exec form одинаковы для обработки сигналов",
+          "при shell form SIGTERM сразу доходит до nginx",
+          "exec form оборачивает команду в /bin/sh -c",
+          "PID 1 при shell form — это nginx, а не sh"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат опровергает: $VAR не раскрывается в exec form; два CMD — побеждает последний; docker run img sh с ENTRYPOINT не даёт shell; shell form ломает signals.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes ITLead — env vars, duplicates, sh trap",
+        "falseClaimCapFraction": 0,
+        "probeConceptGroups": [
+          {
+            "match": [
+              "$HOME",
+              "$VAR",
+              "env"
+            ],
+            "ask": "почему CMD [\"echo\", \"$HOME\"] не раскрывает переменную"
+          },
+          {
+            "match": [
+              "docker run",
+              "sh",
+              "ENTRYPOINT"
+            ],
+            "ask": "почему docker run img sh не открывает shell при ENTRYPOINT my-app"
+          }
+        ],
+        "mustConcepts": [
+          "$HOME",
+          "$VAR",
+          "env var",
+          "переменн",
+          "exec form",
+          "literal",
+          "буквал",
+          "/bin/sh",
+          "-c",
+          "два CMD",
+          "два ENTRYPOINT",
+          "последн",
+          "wins",
+          "docker run sh",
+          "--entrypoint sh",
+          "my-app sh",
+          "warning",
+          "без ошибки"
+        ],
+        "falseClaims": [
+          "exec form автоматически раскрывает переменные окружения как shell",
+          "два CMD в Dockerfile вызовут ошибку сборки",
+          "docker run img sh всегда открывает интерактивный shell",
+          "shell form безопаснее exec form для production сервисов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "entrypoint_script",
+      "title": "Понимает паттерн docker-entrypoint.sh",
+      "expected": "Кандидат упоминает: ENTRYPOINT-скрипт делает setup (env, initdb, migrations), затем exec \"$@\" чтобы реальная команда стала PID 1; пример postgres/mysql/redis.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Postgres-style wrapper — follow-up ITLead, бонус junior",
+        "mustConcepts": [
+          "docker-entrypoint.sh",
+          "exec",
+          "$@",
+          "setup",
+          "init",
+          "initdb",
+          "postgres",
+          "mysql",
+          "redis",
+          "wrapper",
+          "обёртк",
+          "PID 1",
+          "migration"
+        ],
+        "falseClaims": [
+          "entrypoint script остаётся PID 1 навсегда без exec",
+          "exec \"$@\" не нужен если есть ENTRYPOINT script",
+          "postgres official image использует только CMD без entrypoint script"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "CMD — дефолт, полностью заменяется: docker run img sh → sh. ENTRYPOINT фиксирован: docker run img bye → echo bye при ENTRYPOINT echo. Combo ENTRYPOINT + CMD — CLI с дефолтом. В production только exec form [\"nginx\", \"-g\", \"daemon off;\"], не shell form — иначе sh PID 1 и docker stop не graceful.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "nginx-сервис — CMD [\"nginx\", \"-g\", \"daemon off;\"]. curl CLI — ENTRYPOINT [\"curl\"], CMD [\"--help\"]. Postgres наследует docker-entrypoint.sh + CMD postgres: init, потом exec postgres как PID 1.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну cmd заменяется args после имени образа, entrypoint — нет, только --entrypoint. shell form = sh -c, сигналы не доходят до app",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "CMD и ENTRYPOINT одно и то же — оба полностью заменяются docker run. Shell form лучше для nginx в production.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker run myapp sh всегда открывает shell даже с ENTRYPOINT [\"my-app\"]. CMD [\"echo\", \"$HOME\"] напечатает домашнюю директорию.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Два CMD в Dockerfile — Docker выберет первый. ENTRYPOINT + CMD нельзя комбинировать.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "cmd_entrypoint_core",
+      "exampleType": "good",
+      "exampleText": "CMD — команда по умолчанию, docker run полностью её подменяет. ENTRYPOINT — фиксирован; args после образа идут entrypoint'у.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "cmd_entrypoint_core",
+      "exampleType": "good",
+      "exampleText": "entrypoint не трогаешь args'ами, cmd — да. если оба — cmd это дефолтные параметры entrypoint",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "cmd_entrypoint_core",
+      "exampleType": "bad",
+      "exampleText": "ENTRYPOINT тоже полностью заменяется trailing args, как CMD.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "docker_run_override",
+      "exampleType": "good",
+      "exampleText": "docker run demo bye → echo bye (ENTRYPOINT echo, CMD заменён). docker run --entrypoint /bin/sh demo -c 'ls' → shell явно.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "docker_run_override",
+      "exampleType": "good",
+      "exampleText": "trailing args после image name = новый cmd. --entrypoint меняет именно entrypoint",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "docker_run_override",
+      "exampleType": "bad",
+      "exampleText": "docker run img sh при ENTRYPOINT my-app откроет sh, потому что sh заменяет CMD.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "entrypoint_cmd_combo",
+      "exampleType": "good",
+      "exampleText": "ENTRYPOINT [\"curl\"], CMD [\"--help\"]: без args → curl --help; docker run mycurl https://api.github.com → curl URL.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "entrypoint_cmd_combo",
+      "exampleType": "good",
+      "exampleText": "combo = образ как инструмент с дефолтным поведением, args переопределяют cmd часть",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "entrypoint_cmd_combo",
+      "exampleType": "bad",
+      "exampleText": "При ENTRYPOINT + CMD trailing args добавляются к CMD, не заменяют: curl --help https://x.com → curl --help https://x.com одновременно.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "usage_patterns",
+      "exampleType": "good",
+      "exampleText": "nginx/redis — CMD only сервис. aws-cli/git — ENTRYPOINT бинарь. curl с --help default — ENTRYPOINT + CMD.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "usage_patterns",
+      "exampleType": "good",
+      "exampleText": "сервис без args — cmd. cli tool — entrypoint. debug image — без жёсткого entrypoint",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "usage_patterns",
+      "exampleType": "bad",
+      "exampleText": "Любой Dockerfile обязан иметь и CMD, и ENTRYPOINT одновременно.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "exec_vs_shell_form",
+      "exampleType": "good",
+      "exampleText": "Exec [\"nginx\", \"-g\", \"daemon off;\"] — nginx PID 1, SIGTERM доходит. Shell CMD nginx ... → /bin/sh -c, stop ждёт 10с и SIGKILL.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "exec_vs_shell_form",
+      "exampleType": "good",
+      "exampleText": "exec form = execve напрямую, shell form ломает graceful shutdown — всегда json array в prod",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "exec_vs_shell_form",
+      "exampleType": "bad",
+      "exampleText": "Shell form CMD nginx безопаснее — nginx всё равно получит SIGTERM как PID 1.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "CMD [\"echo\", \"$HOME\"] — literal $HOME. Fix: [\"/bin/sh\", \"-c\", \"echo $HOME\"]. Два CMD — только последний, без warning.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "ENTRYPOINT my-app → docker run img sh = my-app sh, не shell. нужен --entrypoint sh",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Exec form сам подставляет env vars как bash. Два ENTRYPOINT — Docker упадёт при build.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "entrypoint_script",
+      "exampleType": "good",
+      "exampleText": "docker-entrypoint.sh: validate env, initdb, run init SQL, exec \"$@\" → postgres PID 1 с сигналами.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "entrypoint_script",
+      "exampleType": "good",
+      "exampleText": "entrypoint script = setup wrapper, в конце exec чтобы реальная команда стала pid 1",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "entrypoint_script",
+      "exampleType": "bad",
+      "exampleText": "Postgres entrypoint script просто вызывает postgres как subprocess и остаётся PID 1 — exec не нужен.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "dockerfile-cmd-vs-entrypoint",
+    "apiUrl": "https://api.itlead.org/api/questions/dockerfile-cmd-vs-entrypoint",
+    "pageUrl": "https://itlead.org/interview-questions/docker/dockerfile-cmd-vs-entrypoint",
+    "difficulty": "JUNIOR",
+    "titleEn": "CMD vs ENTRYPOINT in Dockerfile: what is the difference?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T20:00:00.000Z"
+  }
+}

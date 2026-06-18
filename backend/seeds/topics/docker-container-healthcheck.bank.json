@@ -1,0 +1,601 @@
+{
+  "topic": {
+    "code": "docker_container_healthcheck",
+    "name": "Health check Docker-контейнера",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как настроить health check для Docker-контейнера?",
+    "shortAnswer": "Health check — периодическая команда внутри контейнера: exit 0 → healthy, иначе unhealthy после retries неудач подряд. Задаётся в Dockerfile (`HEALTHCHECK`), при `docker run` (`--health-cmd`) или в Compose (`healthcheck:`). Состояние видно в `docker ps` (healthy / unhealthy / starting); Compose `depends_on: condition: service_healthy` ждёт готовности зависимости.",
+    "idealAnswer": "Health check отличает «процесс PID 1 жив» от «приложение реально работает». Docker периодически запускает команду внутри контейнера: exit code 0 — healthy, non-zero — failed attempt. Три состояния: starting (ещё в start_period), healthy, unhealthy (после retries подряд неудач). Настройка: HEALTHCHECK в Dockerfile, --health-cmd при docker run, healthcheck: в Compose. Четыре ключевых флага: --interval (как часто, default 30s), --timeout (макс. время команды), --retries (сколько fail подряд до unhealthy, default 3), --start-period (grace window при старте — fail в этом окне не считаются). Типичный web-сервис: interval=30s, timeout=3s, retries=3, start_period=10s; JVM/тяжёлые сервисы — start_period 60–120s. Compose test: CMD (без shell, быстрее), CMD-SHELL (shell-логика и env), NONE (отключить наследованный healthcheck). depends_on: condition: service_healthy — ждёт healthy у зависимости перед стартом (db → api), надёжнее простого списка depends_on. Частая ошибка: curl в HEALTHCHECK, но в alpine нет curl — check всегда падает. Решения: apk add curl, wget --spider (часто уже есть), node -e с http.get для Node, отдельный /healthcheck binary для distroless. Типичные ошибки: нет start_period при медленном warmup → unhealthy за 15s; healthcheck проверяет db вместе с app → transient db blip делает api unhealthy; внешний URL в check → health зависит от чужого uptime; наследованный healthcheck base image без переопределения. Отладка: docker ps Status, docker inspect --format '{{json .State.Health}}' — Log хранит последние 5 результатов с ExitCode и Output. Unhealthy сам по себе не рестартует plain docker run — решает orchestrator (Swarm) или мониторинг. Один healthcheck на контейнер; логику объединяют в одной CMD-SHELL. K8s использует свои liveness/readiness probes, не Docker healthcheck. Умный /health endpoint внутри приложения может проверять downstream readiness; сама shell-команда должна оставаться простой.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "healthcheck_definition",
+      "title": "Понимает суть healthcheck",
+      "expected": "Кандидат объясняет: периодическая команда внутри контейнера; exit 0 = healthy; три состояния starting/healthy/unhealthy; отличие от «PID 1 просто жив».",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — процесс up ≠ приложение работает",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "healthcheck_definition",
+            "oftenConfusedWith": [
+              "depends_on_service_healthy"
+            ],
+            "anchorTermsExpected": [
+              "healthcheck",
+              "exit 0",
+              "healthy",
+              "unhealthy",
+              "starting",
+              "PID 1",
+              "периодич"
+            ],
+            "anchorTermsWrongTopic": [
+              "depends_on сам перезапускает",
+              "unhealthy сразу SIGKILL",
+              "healthcheck это liveness probe K8s"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "healthy",
+              "unhealthy",
+              "starting"
+            ],
+            "ask": "какие три состояния healthcheck и когда контейнер становится unhealthy"
+          }
+        ],
+        "mustConcepts": [
+          "healthcheck",
+          "health check",
+          "exit 0",
+          "exit code",
+          "healthy",
+          "unhealthy",
+          "starting",
+          "start_period",
+          "retries",
+          "PID 1",
+          "процесс жив",
+          "приложение работ",
+          "периодич",
+          "команда внутри",
+          "контейнер",
+          "docker ps"
+        ],
+        "falseClaims": [
+          "если контейнер Up — healthcheck не нужен",
+          "unhealthy автоматически убивает контейнер при docker run",
+          "healthcheck проверяет процесс только на хосте",
+          "несколько healthcheck на один контейнер"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "healthcheck_setup",
+      "title": "Знает способы настройки и флаги",
+      "expected": "Кандидат называет HEALTHCHECK в Dockerfile, --health-cmd, Compose healthcheck:; объясняет interval, timeout, retries, start_period и типичные значения для web/JVM.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "четыре флага — основа практической настройки",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "healthcheck_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "interval",
+              "timeout",
+              "retries",
+              "start_period"
+            ],
+            "ask": "что делают interval, timeout, retries и start_period"
+          },
+          {
+            "match": [
+              "HEALTHCHECK",
+              "Dockerfile",
+              "Compose"
+            ],
+            "ask": "где задаётся healthcheck: Dockerfile, docker run, Compose"
+          }
+        ],
+        "mustConcepts": [
+          "HEALTHCHECK",
+          "Dockerfile",
+          "docker run",
+          "--health-cmd",
+          "Compose",
+          "healthcheck",
+          "interval",
+          "timeout",
+          "retries",
+          "start_period",
+          "start-period",
+          "30s",
+          "grace",
+          "warmup",
+          "JVM",
+          "web",
+          "curl -f",
+          "localhost",
+          "/health"
+        ],
+        "falseClaims": [
+          "start_period ускоряет первый healthcheck",
+          "timeout — это интервал между проверками",
+          "retries=1 значит unhealthy после первого fail",
+          "healthcheck можно задать только в Dockerfile"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "compose_test_forms",
+      "title": "Различает CMD, CMD-SHELL и NONE",
+      "expected": "Кандидат объясняет: CMD без shell (быстрее); CMD-SHELL для && || и env; NONE отключает наследованный healthcheck base image.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "три формы test из ITLead Compose syntax",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "CMD-SHELL",
+              "CMD",
+              "NONE"
+            ],
+            "ask": "когда CMD, когда CMD-SHELL и зачем NONE"
+          }
+        ],
+        "mustConcepts": [
+          "CMD",
+          "CMD-SHELL",
+          "NONE",
+          "test",
+          "shell",
+          "env",
+          "перемен",
+          "||",
+          "&&",
+          "наследован",
+          "base image",
+          "HEALTHCHECK NONE",
+          "отключ",
+          "postgres"
+        ],
+        "falseClaims": [
+          "CMD-SHELL быстрее CMD",
+          "NONE включает дефолтный healthcheck",
+          "CMD поддерживает env expansion как shell",
+          "можно задать два test в одном healthcheck"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "depends_on_service_healthy",
+      "title": "Использует depends_on: service_healthy",
+      "expected": "Кандидат объясняет: Compose ждёт healthy у зависимости перед стартом; типичный кейс db → api; надёжнее простого depends_on без condition.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "killer feature из ITLead — главный практический use case",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "depends_on",
+              "service_healthy",
+              "condition"
+            ],
+            "ask": "чем depends_on: condition: service_healthy лучше простого depends_on"
+          },
+          {
+            "match": [
+              "db",
+              "api",
+              "postgres",
+              "pg_isready"
+            ],
+            "ask": "как healthcheck db + service_healthy убирает race при старте api"
+          }
+        ],
+        "mustConcepts": [
+          "depends_on",
+          "condition",
+          "service_healthy",
+          "Compose",
+          "ждёт",
+          "healthy",
+          "зависим",
+          "db",
+          "api",
+          "postgres",
+          "pg_isready",
+          "race",
+          "connection refused",
+          "старт",
+          "порядок"
+        ],
+        "falseClaims": [
+          "depends_on без condition ждёт healthy",
+          "service_healthy перезапускает unhealthy контейнер",
+          "depends_on работает одинаково в docker run",
+          "service_healthy не нужен если есть restart: always"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "command_not_found",
+      "title": "Решает проблему «команда не найдена»",
+      "expected": "Кандидат объясняет: curl в alpine часто отсутствует; apk add curl, wget --spider, node -e http.get, /healthcheck binary для distroless.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "самая частая production-ошибка по ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "curl",
+              "alpine",
+              "wget",
+              "command not found"
+            ],
+            "ask": "почему HEALTHCHECK с curl падает в alpine и чем заменить"
+          },
+          {
+            "match": [
+              "node -e",
+              "distroless",
+              "healthcheck binary"
+            ],
+            "ask": "как сделать healthcheck без установки curl в minimal image"
+          }
+        ],
+        "mustConcepts": [
+          "curl",
+          "alpine",
+          "wget",
+          "spider",
+          "command not found",
+          "apk add",
+          "node -e",
+          "http.get",
+          "distroless",
+          "binary",
+          "/healthcheck",
+          "localhost",
+          "пакет",
+          "образ",
+          "всегда fail"
+        ],
+        "falseClaims": [
+          "curl всегда есть в официальных Docker-образах",
+          "если healthcheck fail — проблема в приложении, не в команде",
+          "distroless можно проверить curl из Dockerfile без binary",
+          "wget и curl — одно и то же для healthcheck без установки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки healthcheck",
+      "expected": "Кандидат называет: нет start_period при медленном старте; db в liveness check; внешний URL; наследованный healthcheck без переопределения; unhealthy ≠ auto-restart.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — start_period, deps, external URL",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "healthcheck_setup",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "start_period",
+              "warmup",
+              "60"
+            ],
+            "ask": "почему без start_period контейнер становится unhealthy при медленном старте"
+          },
+          {
+            "match": [
+              "pg_isready",
+              "зависим",
+              "readiness",
+              "liveness"
+            ],
+            "ask": "почему не стоит пинговать db в liveness healthcheck api"
+          },
+          {
+            "match": [
+              "внешн",
+              "external",
+              "example.com"
+            ],
+            "ask": "почему healthcheck не должен ходить на внешний URL"
+          }
+        ],
+        "mustConcepts": [
+          "start_period",
+          "warmup",
+          "grace",
+          "зависим",
+          "db",
+          "pg_isready",
+          "readiness",
+          "liveness",
+          "внешн",
+          "external",
+          "наследован",
+          "base image",
+          "HEALTHCHECK NONE",
+          "unhealthy",
+          "restart",
+          "Swarm",
+          "transient",
+          "endpoint",
+          "/readyz",
+          "/livez"
+        ],
+        "falseClaims": [
+          "unhealthy контейнер docker run сам перезапускается",
+          "healthcheck на внешний API — нормальная практика",
+          "db в liveness check — правильный паттерн",
+          "start_period не влияет на подсчёт retries"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "inspect_and_usage",
+      "title": "Отладка и real-world usage",
+      "expected": "Кандидат упоминает docker inspect State.Health.Log (5 записей), Swarm replacement, Traefik/nginx-proxy routing; K8s probes отдельно от Docker healthcheck.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "inspect + orchestration — бонус middle",
+        "mustConcepts": [
+          "docker inspect",
+          "State.Health",
+          "Log",
+          "ExitCode",
+          "Output",
+          "5",
+          "Swarm",
+          "Traefik",
+          "nginx-proxy",
+          "orchestr",
+          "K8s",
+          "liveness",
+          "readiness",
+          "probe",
+          "монитор"
+        ],
+        "falseClaims": [
+          "K8s использует Docker healthcheck напрямую",
+          "docker inspect не хранит историю healthcheck",
+          "Traefik не смотрит на Docker health state"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Healthcheck — периодическая команда внутри контейнера: exit 0 → healthy. Задаю в Compose с interval 30s, start_period 60s для JVM. depends_on db: condition: service_healthy — api не стартует пока pg_isready не пройдёт. В alpine вместо curl — wget --spider или node -e с http.get.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Без healthcheck docker ps показывает только Up — процесс жив, но /health может отдавать 500. Три состояния: starting в start_period, потом healthy/unhealthy после retries. Отладка: docker inspect — Log с последними 5 exit code и stdout. Unhealthy сам не рестартует при обычном docker run.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Compose stack: db healthcheck pg_isready, api depends_on service_healthy — нет connection refused на первом запуске. Ошибку ловил: curl в HEALTHCHECK на alpine — всегда fail, поставил apk add curl. Не пихаю db ping в liveness api — transient blip db не должен рестартить api.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Healthcheck — это restart policy. depends_on ждёт healthy автоматически даже без condition. В alpine curl всегда установлен.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "HEALTHCHECK CMD curl https://api.example.com/health — нормально, так проверяем реальную доступность. start_period не нужен, retries=3 при interval 5s хватит для JVM за минуту warmup.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Unhealthy контейнер docker run сразу убивает и пересоздаёт. Можно задать два healthcheck — один на HTTP, второй на db.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "healthcheck_definition",
+      "exampleType": "good",
+      "exampleText": "Docker периодически запускает CMD внутри контейнера: 0 — healthy, иначе fail; после retries подряд — unhealthy. starting пока идёт start_period.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "healthcheck_definition",
+      "exampleType": "good",
+      "exampleText": "ну healthcheck отличает «pid жив» от «приложение отвечает» — без него только Up в docker ps",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "healthcheck_definition",
+      "exampleType": "bad",
+      "exampleText": "Healthy значит контейнер не упадёт никогда; unhealthy сразу SIGKILL.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "healthcheck_setup",
+      "exampleType": "good",
+      "exampleText": "HEALTHCHECK --interval=30s --timeout=3s --retries=3 --start-period=10s CMD wget -q --spider http://localhost:3000/health. В Compose те же поля в healthcheck:.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "healthcheck_setup",
+      "exampleType": "good",
+      "exampleText": "start_period — grace при старте, fail там не считаются; для тяжёлого сервиса ставлю 60–120s вместо 10s",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "healthcheck_setup",
+      "exampleType": "bad",
+      "exampleText": "timeout — это пауза между проверками, interval — сколько ждать exit code.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "compose_test_forms",
+      "exampleType": "good",
+      "exampleText": "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8080/health\"] — без shell. CMD-SHELL когда нужен || exit 1. NONE — отключить healthcheck от postgres base image.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "compose_test_forms",
+      "exampleType": "good",
+      "exampleText": "cmd быстрее без sh; cmd-shell если переменные окружения в url",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "compose_test_forms",
+      "exampleType": "bad",
+      "exampleText": "NONE включает стандартный Docker healthcheck поверх образа.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "depends_on_service_healthy",
+      "exampleType": "good",
+      "exampleText": "depends_on: db: condition: service_healthy — api стартует только когда pg_isready прошёл; без condition api может стартовать раньше db.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "depends_on_service_healthy",
+      "exampleType": "good",
+      "exampleText": "главный кейс compose — db healthy, потом api, иначе connection refused на первом up",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "depends_on_service_healthy",
+      "exampleType": "bad",
+      "exampleText": "depends_on: [db, api] уже ждёт healthy у db — condition не нужен.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "command_not_found",
+      "exampleType": "good",
+      "exampleText": "HEALTHCHECK CMD curl на node:alpine — curl нет, всегда unhealthy. Fix: apk add curl или node -e \"require('http').get(..., r => process.exit(r.statusCode===200?0:1))\".",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "command_not_found",
+      "exampleType": "good",
+      "exampleText": "в alpine часто wget уже есть: wget -q --spider url; distroless — свой /healthcheck binary",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "command_not_found",
+      "exampleType": "bad",
+      "exampleText": "Если healthcheck падает — значит приложение сломано, команда точно на месте.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Без start_period JVM 60s warmup → 3 fail за 15s → unhealthy. Не смешиваю pg_isready в liveness api — db blip не должен рестартить api. Healthcheck только localhost /health.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "unhealthy при docker run не рестартует сам — нужен swarm или монитор. умный /health внутри app, shell-команда простая curl",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Liveness api должен проверять db и redis в одной shell-команде — иначе не надёжно.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "inspect_and_usage",
+      "exampleType": "good",
+      "exampleText": "docker inspect api --format '{{json .State.Health}}' — Log с 5 последними ExitCode/Output. Swarm убивает unhealthy replica.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "inspect_and_usage",
+      "exampleType": "good",
+      "exampleText": "k8s liveness/readiness отдельно — docker healthcheck k8s не использует",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "inspect_and_usage",
+      "exampleType": "bad",
+      "exampleText": "История healthcheck не сохраняется — только текущий healthy/unhealthy без логов.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-container-healthcheck",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-container-healthcheck",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-container-healthcheck",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to set up a health check for a Docker container?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

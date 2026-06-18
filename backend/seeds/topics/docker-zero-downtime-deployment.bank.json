@@ -1,0 +1,608 @@
+{
+  "topic": {
+    "code": "docker_zero_downtime_deployment",
+    "name": "Zero-downtime deployment с Docker",
+    "skillCode": "docker",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Какие есть подходы к zero-downtime deployment с Docker в production?",
+    "shortAnswer": "Три основные стратегии: rolling update (постепенная замена реплик, дешевле), blue-green (два полных окружения, атомарный cutover и мгновенный rollback, 2× ресурсов) и canary (малый % трафика на новую версию, ramp по метрикам). Независимо от стратегии нужны healthcheck/readiness, graceful shutdown по SIGTERM с drain in-flight запросов, expand-then-contract миграции БД и connection draining.",
+    "idealAnswer": "Zero-downtime deployment — обновление работающего сервиса без потери запросов, сессий и ошибок во время rollout. С Docker три стратегии покрывают большинство случаев. Rolling update: постепенно заменяет реплики (Swarm `docker service update --update-parallelism 1 --update-delay 30s --update-failure-action rollback`; K8s rolling update). Дешевле, медленнее cutover, частичное смешение версий во время rollout. Blue-green: два полных окружения; трафик переключается атомарно через reverse proxy (Traefik labels, nginx upstream). Мгновенный rollback, но 2× ресурсов на время деплоя. Canary: небольшая доля трафика на новую версию (Traefik weighted routing 90/10), ramp при хороших метриках; ловит медленные регрессии; Argo Rollouts/Flagger автоматизируют rollback по error rate. Стратегия — половина картины; вторая — plumbing: healthchecks (readiness возвращает false до прогрева DB/кеша; liveness — «жив ли процесс»; `/health` проверяет зависимости, не только TCP-порт), graceful shutdown (orchestrator шлёт SIGTERM, ждёт `stop_grace_period`, затем SIGKILL; приложение закрывает listening socket, дожидается in-flight, закрывает пул БД), expand-then-contract миграции (expand — добавить колонку; migrate code — обе версии coexist; contract — удалить старое после ухода v1; никогда breaking DROP во время cutover), connection draining (`stop_grace_period: 30s` + handler в приложении). Для WebSocket/gRPC: client reconnect, GOAWAY, длинный grace period или sticky pool старых реплик. Без healthcheck LB шлёт на неготовый контейнер → 502; без SIGTERM-handler in-flight обрываются; breaking migration ломает старый код. Проверка zero-downtime: synthetic load (k6, vegeta) во время deploy, error rate 0%. Real-world: rolling для routine releases; blue-green для major; canary для рискованных фич; expand-then-contract всегда для DB-heavy сервисов.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "zero_downtime_definition",
+      "title": "Понимает zero-downtime и prerequisites",
+      "expected": "Кандидат объясняет: обновление без dropped requests и ошибок; перечисляет обязательные ингредиенты — healthchecks, graceful shutdown, backward-compatible миграции, connection draining; стратегия без plumbing не даёт zero-downtime.",
+      "score": 1,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "определение и cross-cutting requirements из ITLead TL;DR",
+        "mustConcepts": [
+          "zero-downtime",
+          "без простоя",
+          "без ошибок",
+          "healthcheck",
+          "graceful shutdown",
+          "миграц",
+          "expand",
+          "connection draining",
+          "drain",
+          "plumbing",
+          "стратег",
+          "сесс",
+          "in-flight",
+          "запрос"
+        ],
+        "falseClaims": [
+          "zero-downtime достигается только выбором rolling update",
+          "стратегия деплоя заменяет healthcheck и graceful shutdown",
+          "zero-downtime означает отсутствие смешения версий во время rollout",
+          "достаточно restart policy без readiness"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "deploy_strategies",
+      "title": "Сравнивает rolling, blue-green и canary",
+      "expected": "Кандидат описывает три стратегии: rolling (постепенная замена, дешевле, partial state), blue-green (атомарный flip, 2× ресурсов, instant rollback), canary (% трафика, ramp по метрикам); знает когда какую применять.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ядро вопроса — три семейства deploy-стратегий",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "zero_downtime_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "deploy_strategies",
+            "oftenConfusedWith": [
+              "zero_downtime_definition"
+            ],
+            "anchorTermsExpected": [
+              "rolling",
+              "blue-green",
+              "canary",
+              "parallelism",
+              "cutover",
+              "rollback",
+              "weight",
+              "метрик"
+            ],
+            "anchorTermsWrongTopic": [
+              "immutable infrastructure",
+              "docker commit",
+              "volume bind mount"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "rolling",
+              "blue-green",
+              "canary"
+            ],
+            "ask": "когда rolling, когда blue-green, когда canary — trade-offs по cost и rollback"
+          },
+          {
+            "match": [
+              "Swarm",
+              "update-parallelism",
+              "Traefik",
+              "weighted"
+            ],
+            "ask": "как rolling update выглядит в Swarm и canary в Traefik weighted routing"
+          }
+        ],
+        "mustConcepts": [
+          "rolling update",
+          "rolling",
+          "blue-green",
+          "canary",
+          "реplica",
+          "parallelism",
+          "cutover",
+          "flip",
+          "rollback",
+          "атомар",
+          "2x",
+          "ресурс",
+          "weight",
+          "метрик",
+          "ramp",
+          "Swarm",
+          "Traefik",
+          "K8s",
+          "Flagger",
+          "Argo Rollouts",
+          "partial",
+          "постепен"
+        ],
+        "falseClaims": [
+          "rolling update и blue-green дают одинаковую скорость rollback",
+          "canary сразу переводит 100% трафика на новую версию",
+          "blue-green не требует двух полных окружений",
+          "rolling update всегда атомарен",
+          "canary дешевле rolling по ресурсам всегда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "healthchecks_readiness",
+      "title": "Healthcheck: liveness vs readiness",
+      "expected": "Кандидат различает liveness (жив ли процесс, restart) и readiness (готов ли к трафику, убрать из LB); readiness false при старте до прогрева; `/health` проверяет DB и зависимости, не только TCP.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "readiness — ключ к zero-downtime; без него LB шлёт на неготовый контейнер",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "readiness",
+              "liveness",
+              "healthcheck"
+            ],
+            "ask": "чем readiness отличается от liveness и почему readiness важнее для zero-downtime"
+          },
+          {
+            "match": [
+              "/health",
+              "HEALTHCHECK",
+              "start-period"
+            ],
+            "ask": "что должно проверять /health и зачем start-period"
+          }
+        ],
+        "mustConcepts": [
+          "healthcheck",
+          "HEALTHCHECK",
+          "liveness",
+          "readiness",
+          "готов",
+          "трафик",
+          "load balancer",
+          "LB",
+          "/health",
+          "200",
+          "start-period",
+          "start_period",
+          "DB",
+          "прогрев",
+          "warmup",
+          "TCP",
+          "502",
+          "orchestrator",
+          "rotation"
+        ],
+        "falseClaims": [
+          "healthcheck по TCP-порту достаточен для readiness",
+          "liveness и readiness — одно и то же",
+          "readiness можно пропустить если контейнер слушает порт",
+          "health endpoint обязан быть публичным без ограничений",
+          "HEALTHCHECK в Dockerfile заменяет readiness probe в orchestrator"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "graceful_shutdown",
+      "title": "Graceful shutdown по SIGTERM",
+      "expected": "Кандидат описывает: SIGTERM → stop accepting new → finish in-flight → close DB pool → exit; `stop_grace_period` до SIGKILL; явные signal handlers в Node/Go; без handler in-flight обрываются.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "SIGTERM/drain — обязательный plumbing из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "healthchecks_readiness",
+            "floorFraction": 0.4
+          }
+        ],
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "SIGTERM",
+              "graceful",
+              "shutdown"
+            ],
+            "ask": "что приложение должно делать между SIGTERM и SIGKILL"
+          },
+          {
+            "match": [
+              "stop_grace_period",
+              "server.close",
+              "Shutdown"
+            ],
+            "ask": "зачем stop_grace_period и как реализовать drain in-flight в Node или Go"
+          }
+        ],
+        "mustConcepts": [
+          "SIGTERM",
+          "SIGKILL",
+          "graceful shutdown",
+          "stop_grace_period",
+          "stop grace",
+          "in-flight",
+          "drain",
+          "server.close",
+          "Shutdown",
+          "signal handler",
+          "обработчик сигнал",
+          "listening socket",
+          "pool.end",
+          "DB pool",
+          "exit",
+          "Node.js",
+          "Go",
+          "orchestrator",
+          "10s",
+          "30s"
+        ],
+        "falseClaims": [
+          "Docker сразу SIGKILL без ожидания",
+          "Node.js по умолчанию корректно drain'ит in-flight на SIGTERM",
+          "graceful shutdown не нужен при rolling update",
+          "stop_grace_period относится только к healthcheck",
+          "достаточно kill контейнера без SIGTERM-обработки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "db_migrations_expand_contract",
+      "title": "Expand-then-contract миграции БД",
+      "expected": "Кандидат объясняет паттерн: expand (добавить структуру) → migrate code (v1 и v2 coexist) → contract (удалить старое); breaking DROP во время deploy ломает старый код; decouple migration job от deploy app.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "DB discipline — частая причина «сломанного» deploy из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "expand",
+              "contract",
+              "ALTER TABLE"
+            ],
+            "ask": "почему DROP COLUMN во время cutover опасен и как expand-then-contract решает это"
+          },
+          {
+            "match": [
+              "Flyway",
+              "Liquibase",
+              "migration job"
+            ],
+            "ask": "как decouple long-running migration от deploy новой версии app"
+          }
+        ],
+        "mustConcepts": [
+          "expand",
+          "contract",
+          "expand-then-contract",
+          "backward compatible",
+          "обратн",
+          "совместим",
+          "DROP COLUMN",
+          "ADD COLUMN",
+          "coexist",
+          "overlap",
+          "v1",
+          "v2",
+          "backfill",
+          "breaking",
+          "migration job",
+          "Flyway",
+          "Liquibase",
+          "golang-migrate",
+          "feature flag",
+          "схем"
+        ],
+        "falseClaims": [
+          "можно DROP COLUMN в том же deploy что и новый код",
+          "старый и новый код могут требовать несовместимую схему одновременно",
+          "expand-then-contract делается за один deploy",
+          "rollback без учёта частично applied migration безопасен всегда",
+          "DB migration всегда атомарна с docker service update"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "connection_draining",
+      "title": "Connection draining и long-lived connections",
+      "expected": "Кандидат знает: stop_grace_period + graceful handler для HTTP; WebSocket/gRPC не drain за 30s — client reconnect, GOAWAY, длинный grace или sticky pool старых реплик.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "draining и WebSocket edge cases из ITLead examples",
+        "mustConcepts": [
+          "connection draining",
+          "draining",
+          "stop_grace_period",
+          "WebSocket",
+          "gRPC",
+          "HTTP/2",
+          "GOAWAY",
+          "reconnect",
+          "long-lived",
+          "долгожив",
+          "sticky",
+          "rotation",
+          "Connection: close"
+        ],
+        "falseClaims": [
+          "WebSocket gracefully drain за 30 секунд всегда",
+          "connection draining не нужен при blue-green",
+          "HTTP/2 streams не требуют особой обработки при shutdown",
+          "stop_grace_period 10s достаточен для всех gRPC streams"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Типичные ошибки zero-downtime",
+      "expected": "Кандидат называет: TCP-only healthcheck; игнор SIGTERM; sticky in-memory sessions; нет rollback plan; путаница «стратегия = zero-downtime» без plumbing; public /health без защиты.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes block из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "sticky",
+              "session",
+              "Redis",
+              "JWT"
+            ],
+            "ask": "почему in-memory sessions ломаются при deploy и как externalize"
+          },
+          {
+            "match": [
+              "k6",
+              "vegeta",
+              "synthetic",
+              "error rate"
+            ],
+            "ask": "как проверить что deploy был реально zero-downtime"
+          }
+        ],
+        "mustConcepts": [
+          "TCP healthcheck",
+          "SIGTERM ignored",
+          "sticky session",
+          "in-memory",
+          "Redis",
+          "JWT",
+          "rollback plan",
+          "rehearsed",
+          "стратегия",
+          "plumbing",
+          "k6",
+          "vegeta",
+          "synthetic load",
+          "error rate",
+          "502",
+          "public health"
+        ],
+        "falseClaims": [
+          "rolling update без graceful shutdown всё равно zero-downtime",
+          "in-memory sessions переживают redeploy реплики",
+          "rollback — просто push старый image без учёта schema",
+          "zero-downtime проверяют только глазами на dashboard"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Zero-downtime — три стратегии: rolling (Swarm update-parallelism 1), blue-green (Traefik flip), canary (weighted 90/10). Плюс обязательно readiness healthcheck, SIGTERM-handler с drain in-flight, expand-then-contract для БД и stop_grace_period для draining.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Routine релизы — rolling 4 реплики по одной с healthcheck-gated update. Major quarterly — blue-green для мгновенного rollback. Рискованная фича — canary 5% на сутки, смотрим error rate, ramp или откат weight в 0. Миграции всегда expand → backfill → contract, никогда DROP пока старый код жив.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну zero-downtime это когда при деплое юзеры не видят 502. rolling дешевле, blue-green flip атомарный, canary ловит медленные баги. без readiness и graceful shutdown любая стратегия всё равно роняет запросы",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Zero-downtime — это когда делаешь docker-compose up --force-recreate. Healthcheck не нужен, Docker сам знает когда контейнер готов.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Rolling update достаточен всегда. Blue-green и canary — маркeting. Миграции можно DROP COLUMN в том же deploy что и новый image.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Node.js на SIGTERM сам дожидается in-flight. Readiness и liveness — одно и то же. WebSocket drain за 10 секунд по умолчанию.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "zero_downtime_definition",
+      "exampleType": "good",
+      "exampleText": "Zero-downtime — upgrade без dropped requests; нужны healthcheck, graceful shutdown, backward-compatible migrations и draining — стратегия alone не спасает.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "zero_downtime_definition",
+      "exampleType": "good",
+      "exampleText": "стратегия деплоя половина, plumbing — readiness, sigterm handler, expand-contract миграции",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "zero_downtime_definition",
+      "exampleType": "bad",
+      "exampleText": "Zero-downtime = rolling update, больше ничего не нужно.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "deploy_strategies",
+      "exampleType": "good",
+      "exampleText": "Rolling: Swarm update-parallelism 1, delay 30s, rollback on failure — дешево, partial mix версий. Blue-green: два env, Traefik label flip — atomic rollback, 2× cost. Canary: weighted 10% canary, ramp по метрикам — ловит slow regressions.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "deploy_strategies",
+      "exampleType": "good",
+      "exampleText": "microservice по умолчанию rolling; major release blue-green; risky feature canary 5% 24h",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "deploy_strategies",
+      "exampleType": "bad",
+      "exampleText": "Blue-green и canary — одно и то же, оба постепенно меняют реплики по одной.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "healthchecks_readiness",
+      "exampleType": "good",
+      "exampleText": "Readiness false пока DB и cache не прогреты — LB не шлёт трафик. Liveness — restart если процесс мёртв. /health проверяет downstream, не только TCP listen.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "healthchecks_readiness",
+      "exampleType": "good",
+      "exampleText": "HEALTHCHECK start-period 30s — даём время на warmup; readiness важнее liveness для zero-downtime",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "healthchecks_readiness",
+      "exampleType": "bad",
+      "exampleText": "Healthcheck — curl на порт 8080, если слушает — ready. Readiness не нужен в Swarm.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "graceful_shutdown",
+      "exampleType": "good",
+      "exampleText": "SIGTERM → server.close() stop new → await in-flight → pool.end() → exit. stop_grace_period 30s если shutdown длинный. Node без handler exit сразу — in-flight падают.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "graceful_shutdown",
+      "exampleType": "good",
+      "exampleText": "Go: signal.Notify SIGTERM, server.Shutdown(ctx) с timeout 25s — ждёт in-flight HTTP",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "graceful_shutdown",
+      "exampleType": "bad",
+      "exampleText": "Docker kill сразу без SIGTERM. Graceful shutdown не нужен если есть healthcheck.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "db_migrations_expand_contract",
+      "exampleType": "good",
+      "exampleText": "Deploy 1: ADD email_canonical. Deploy 2: код читает новое, пишет оба. Deploy 3: DROP email. Каждый deploy безопасен и rollbackable.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "db_migrations_expand_contract",
+      "exampleType": "good",
+      "exampleText": "long migration — отдельный one-shot container Flyway до deploy app; feature flag dark пока migration не verified",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "db_migrations_expand_contract",
+      "exampleType": "bad",
+      "exampleText": "ALTER DROP COLUMN и docker service update одновременно — v1 ещё query'ит column, но это ok.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "connection_draining",
+      "exampleType": "good",
+      "exampleText": "stop_grace_period 30s + SIGTERM handler — HTTP in-flight завершаются. WebSocket — client reconnect на новую replica, server GOAWAY или long grace 10m.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "connection_draining",
+      "exampleType": "good",
+      "exampleText": "compose stop_grace_period и healthcheck вместе с app shutdown handler",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "connection_draining",
+      "exampleType": "bad",
+      "exampleText": "Connection draining — только для blue-green, rolling не нужен drain.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Ошибки: TCP-only healthcheck; Node без SIGTERM handler; in-memory sessions — externalize Redis/JWT; нет rehearsed rollback; проверка k6 load во время deploy — error rate 0%.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "rolling без graceful shutdown всё ещё downtime per replica — strategy + plumbing вместе",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Sticky sessions in-memory ok при rolling. Rollback — docker pull old tag, schema не важна.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-zero-downtime-deployment",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-zero-downtime-deployment",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-zero-downtime-deployment",
+    "difficulty": "SENIOR",
+    "titleEn": "Zero-downtime deployment approaches with Docker",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

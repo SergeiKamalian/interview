@@ -1,0 +1,548 @@
+{
+  "topic": {
+    "code": "common_rxjs_operators_angular",
+    "name": "RxJS операторы в Angular",
+    "skillCode": "angular",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Какие RxJS операторы чаще всего используются в Angular и когда применять каждый?",
+    "shortAnswer": "Операторы RxJS трансформируют, фильтруют и комбинируют Observable-потоки через pipe(). Ключевые: map (трансформация), switchMap (поиск — отменяет предыдущий запрос), mergeMap (параллельные запросы), concatMap (последовательная очередь), filter, debounceTime, combineLatest, forkJoin, catchError. Для type-ahead: debounceTime + switchMap.",
+    "idealAnswer": "Операторы RxJS — чистые функции, которые строят цепочки Observable через pipe() для трансформации, фильтрации и комбинирования асинхронных потоков в Angular. Источник Observable не мутируется — каждый оператор возвращает новый поток. Категории: трансформация (map — изменить каждую эмиссию; filter — только при условии), flattening (switchMap — при новой эмиссии отменяет предыдущий inner Observable, идеал для поиска; mergeMap — все inner параллельно, риск race condition со stale данными; concatMap — очередь, один за другим, порядок важен), фильтрация по времени (debounceTime — пауза после ввода; distinctUntilChanged — пропуск если значение не изменилось), комбинирование (combineLatest — эмит при любом источнике с последними значениями всех; forkJoin — ждёт complete всех, разовый параллельный batch), ошибки (catchError — fallback; retry), подписка (take(1) для одноразового HTTP; takeUntil(destroy$) для очистки при destroy компонента). Правило выбора: поиск — debounceTime + switchMap; параллельные независимые fetch — mergeMap или forkJoin; упорядоченные save — concatMap; submit-кнопка во время запроса — exhaustMap (игнор новых кликов, не cancel in-flight). Типичные ошибки: .map() без pipe() в RxJS 6+; switchMap без debounceTime — flood сервера; nested subscribe вместо switchMap; catchError на внешнем потоке убивает всё после первой ошибки — нужен внутри inner pipe; router.events.subscribe без takeUntil — memory leak. Zone.js патчит async, async pipe триггерит change detection без detectChanges(). Реальные кейсы: Material autocomplete, NgRx Effects, AngularFire combineLatest, route guards switchMap.",
+    "maxScore": 10,
+    "skills": [
+      "angular",
+      "typescript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "operators_pipe_basics",
+      "title": "Понимает pipe и неизменяемость потока",
+      "expected": "Кандидат объясняет: операторы — чистые функции в pipe(); каждый возвращает новый Observable; источник не мутируется; в RxJS 6+ map/filter только через pipe, не как метод Observable.",
+      "score": 1,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый механизм pipe из ITLead quick example",
+        "mustConcepts": [
+          "pipe",
+          "оператор",
+          "Observable",
+          "чистая функция",
+          "не мутирует",
+          "новый Observable",
+          "subscribe",
+          "источник",
+          "цепочка",
+          "rxjs/operators",
+          "rxjs 6"
+        ],
+        "falseClaims": [
+          "операторы мутируют исходный Observable",
+          "map можно вызвать напрямую на Observable без pipe в RxJS 6+",
+          "pipe и subscribe одно и то же",
+          "операторы выполняются только при subscribe"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "map_filter_transform",
+      "title": "Знает map и filter",
+      "expected": "Кандидат описывает: filter отсекает эмиссии по условию; map трансформирует каждое значение; порядок в pipe важен — filter до map сужает поток.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "трансформация — первый пример ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "map",
+              "filter",
+              "pipe"
+            ],
+            "ask": "чем map отличается от filter и как порядок операторов в pipe влияет на результат"
+          }
+        ],
+        "mustConcepts": [
+          "map",
+          "filter",
+          "трансформ",
+          "условие",
+          "эмиссия",
+          "порядок",
+          "pipe",
+          "downstream",
+          "извлеч",
+          "данные api",
+          "null guard"
+        ],
+        "falseClaims": [
+          "map и filter взаимозаменяемы",
+          "filter изменяет значение эмиссии",
+          "порядок map и filter в pipe не важен",
+          "map фильтрует по условию"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "flattening_operators",
+      "title": "Отличает switchMap, mergeMap и concatMap",
+      "expected": "Кандидат сравнивает: switchMap отменяет предыдущий inner при новой эмиссии (поиск); mergeMap — все inner параллельно; concatMap — очередь, строгий порядок; может упомянуть exhaustMap для submit.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ядро middle Angular interview — flattening operators",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "flattening_operators",
+            "oftenConfusedWith": [
+              "debounce_search"
+            ],
+            "anchorTermsExpected": [
+              "switchMap",
+              "mergeMap",
+              "concatMap",
+              "отмен",
+              "параллел",
+              "очеред",
+              "inner Observable"
+            ],
+            "anchorTermsWrongTopic": [
+              "debounceTime отменяет запрос",
+              "forkJoin для поиска",
+              "concatMap параллельно"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "switchMap",
+              "mergeMap",
+              "concatMap"
+            ],
+            "ask": "switchMap vs mergeMap vs concatMap — отмена, параллельность и порядок"
+          },
+          {
+            "match": [
+              "race",
+              "stale",
+              "застарел",
+              "mergeMap"
+            ],
+            "ask": "race condition в поиске с mergeMap и почему switchMap фиксит"
+          },
+          {
+            "match": [
+              "exhaustMap",
+              "submit",
+              "кнопк"
+            ],
+            "ask": "когда exhaustMap вместо switchMap на кнопке отправки"
+          }
+        ],
+        "mustConcepts": [
+          "switchMap",
+          "mergeMap",
+          "concatMap",
+          "exhaustMap",
+          "flatten",
+          "inner Observable",
+          "отмен",
+          "cancel",
+          "параллел",
+          "очеред",
+          "последователь",
+          "порядок",
+          "stale",
+          "застарел",
+          "race condition",
+          "поиск",
+          "finalize"
+        ],
+        "falseClaims": [
+          "mergeMap отменяет предыдущий запрос при новой эмиссии",
+          "switchMap запускает все inner параллельно",
+          "concatMap выполняет inner параллельно",
+          "switchMap и mergeMap поведение одинаковое для поиска",
+          "exhaustMap отменяет in-flight запрос как switchMap"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "debounce_search",
+      "title": "Знает debounceTime и паттерн type-ahead",
+      "expected": "Кандидат описывает: debounceTime ждёт паузу; distinctUntilChanged пропускает дубликаты; valueChanges + debounceTime + switchMap для autocomplete; switchMap без debounce — flood сервера.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "type-ahead — главный use case ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "flattening_operators",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "debounceTime",
+              "distinctUntilChanged",
+              "valueChanges"
+            ],
+            "ask": "зачем debounceTime + distinctUntilChanged перед switchMap в поиске"
+          }
+        ],
+        "mustConcepts": [
+          "debounceTime",
+          "distinctUntilChanged",
+          "valueChanges",
+          "FormControl",
+          "type-ahead",
+          "autocomplete",
+          "пауза",
+          "keystroke",
+          "клавиш",
+          "switchMap",
+          "async pipe",
+          "users$",
+          "запрос на каждый символ"
+        ],
+        "falseClaims": [
+          "switchMap без debounceTime норм для поиска",
+          "debounceTime отменяет HTTP запрос",
+          "distinctUntilChanged заменяет switchMap",
+          "debounceTime и throttleTime всегда одно и то же"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "combine_forkjoin",
+      "title": "Знает combineLatest и forkJoin",
+      "expected": "Кандидат объясняет: combineLatest эмитит при любом источнике с последними значениями всех; forkJoin ждёт complete всех — разовый параллельный batch HTTP.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "комбинирование потоков из таблицы ITLead",
+        "mustConcepts": [
+          "combineLatest",
+          "forkJoin",
+          "параллельн",
+          "несколько источник",
+          "complete",
+          "последние значения",
+          "batch",
+          "http",
+          "форма",
+          "multi-source",
+          "AngularFire"
+        ],
+        "falseClaims": [
+          "forkJoin эмитит при каждом изменении любого источника",
+          "combineLatest ждёт complete всех потоков",
+          "forkJoin и mergeMap для batch HTTP всегда взаимозаменяемы",
+          "combineLatest не работает с двумя потоками"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "catcherror_inner",
+      "title": "Правильно размещает catchError",
+      "expected": "Кандидат объясняет: catchError на внешнем потоке убивает stream после первой ошибки; внутри switchMap inner pipe — ошибка изолирована, внешний поток живёт; finalize для отладки cancel.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "типичная production-ошибка из ITLead common mistakes",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "catchError",
+              "внешн",
+              "внутрен",
+              "inner"
+            ],
+            "ask": "где ставить catchError чтобы 404 не убил весь поток"
+          }
+        ],
+        "mustConcepts": [
+          "catchError",
+          "inner Observable",
+          "внешний поток",
+          "switchMap",
+          "of([])",
+          "fallback",
+          "404",
+          "завершает поток",
+          "изоляц",
+          "finalize",
+          "скасован",
+          "retry"
+        ],
+        "falseClaims": [
+          "catchError на внешнем pipe изолирует ошибки inner запросов",
+          "одна ошибка в switchMap не влияет на следующие эмиссии если catchError снаружи",
+          "catchError автоматически retry запрос",
+          "finalize вызывается только при успешном complete"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки и очистку подписок",
+      "expected": "Кандидат называет: nested subscribe, pipe забыт, switchMap без debounce, catchError снаружи; takeUntil(destroy$) или async pipe; take(1) для одноразового HTTP; router.events без unsubscribe — leak.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "common mistakes блок ITLead + takeUntil",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "takeUntil",
+              "destroy$",
+              "ngOnDestroy"
+            ],
+            "ask": "как отписаться от router.events при destroy компонента"
+          },
+          {
+            "match": [
+              "nested",
+              "subscribe",
+              "вложен"
+            ],
+            "ask": "как заменить nested subscribe на switchMap"
+          }
+        ],
+        "mustConcepts": [
+          "takeUntil",
+          "destroy$",
+          "ngOnDestroy",
+          "memory leak",
+          "виток",
+          "nested subscribe",
+          "вложен",
+          "pipe забыл",
+          "take(1)",
+          "router.events",
+          "async pipe",
+          "callback hell",
+          "unsubscribe",
+          "Subject"
+        ],
+        "falseClaims": [
+          "router.events.subscribe без отписки безопасен",
+          "nested subscribe лучше switchMap для читаемости",
+          "async pipe не отписывается автоматически",
+          "take(1) оставляет подписку открытой после первой эмиссии"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Операторы в pipe() — чистые функции, источник не трогают. Поиск: valueChanges → debounceTime(300) → distinctUntilChanged → switchMap на HTTP — stale запросы отменяются. Параллельные профили — mergeMap или forkJoin. catchError внутри switchMap, не снаружи — 404 не убьёт поток.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "switchMap для autocomplete — последний запрос побеждает. concatMap для bulk save по порядку. router.events через takeUntil(destroy$). HTTP разовый — take(1). async pipe в шаблоне — Zone.js сам дергает CD.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "mergeMap в поиске — race: медленный A перезапишет быстрый B. switchMap cancel A. exhaustMap на submit — клики во время запроса игнор, не cancel.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "this.http.get('/users').map(res => res.data) — норм в RxJS 6. switchMap и mergeMap для поиска одно и то же.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "catchError после switchMap на внешнем потоке — каждая ошибка inner изолируется, поток живёт. Nested subscribe чище чем switchMap.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "debounceTime отменяет HTTP. forkJoin эмитит при каждом valueChanges. router.events subscribe в ngOnInit без отписки — Angular сам очистит.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "operators_pipe_basics",
+      "exampleType": "good",
+      "exampleText": "of(1,2,3).pipe(filter, map) — каждый оператор новый Observable, source не мутируется.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "operators_pipe_basics",
+      "exampleType": "good",
+      "exampleText": "в rxjs 6+ только pipe(map), не .map() на observable",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "operators_pipe_basics",
+      "exampleType": "bad",
+      "exampleText": "pipe мутирует исходный Observable и добавляет операторы в него напрямую.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "map_filter_transform",
+      "exampleType": "good",
+      "exampleText": "filter чётные, map удваивает — порядок: сначала filter, потом map.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "map_filter_transform",
+      "exampleType": "good",
+      "exampleText": "map(res => res.users) вытаскивает массив из обёртки API",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "map_filter_transform",
+      "exampleType": "bad",
+      "exampleText": "filter превращает каждое число в строку, map отсекает по условию.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "flattening_operators",
+      "exampleType": "good",
+      "exampleText": "switchMap — новый keystroke cancel предыдущий HTTP. mergeMap — три запроса параллельно. concatMap — save 1, потом save 2.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "flattening_operators",
+      "exampleType": "good",
+      "exampleText": "mergeMap в search — slow A приходит после B и портит UI, switchMap fix",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "flattening_operators",
+      "exampleType": "bad",
+      "exampleText": "concatMap запускает все inner параллельно, switchMap ставит в очередь.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "debounce_search",
+      "exampleType": "good",
+      "exampleText": "searchCtrl.valueChanges.pipe(debounceTime(300), distinctUntilChanged(), switchMap(q => http.get...))",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "debounce_search",
+      "exampleType": "good",
+      "exampleText": "debounce ждёт паузу, distinct — не слать если значение то же, потом switchMap",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "debounce_search",
+      "exampleType": "bad",
+      "exampleText": "switchMap на valueChanges без debounce — ок, сервер выдержит.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "combine_forkjoin",
+      "exampleType": "good",
+      "exampleText": "forkJoin([getUsers(), getRoles()]) — один раз все HTTP parallel, ждёт complete. combineLatest на двух FormControl — реакция при любом изменении.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "combine_forkjoin",
+      "exampleType": "good",
+      "exampleText": "AngularFire — combineLatest на несколько коллекций realtime",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "combine_forkjoin",
+      "exampleType": "bad",
+      "exampleText": "forkJoin эмитит при каждом emit любого источника с последними значениями.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "catcherror_inner",
+      "exampleType": "good",
+      "exampleText": "switchMap(val => http.get(...).pipe(catchError(() => of([]))) — outer input$ жив после 404.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "catcherror_inner",
+      "exampleType": "good",
+      "exampleText": "finalize в inner — видно cancel при switchMap switch",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "catcherror_inner",
+      "exampleType": "bad",
+      "exampleText": "catchError после switchMap на outer — каждая inner ошибка изолирована, stream не завершится.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "get user pipe switchMap orders — не nested subscribe. router.events takeUntil(destroy$), ngOnDestroy next+complete.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "одноразовый http — take(1). долгоживущий stream — takeUntil или async pipe",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "nested subscribe в ngOnInit — норм паттерн, Angular отпишет при destroy.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "common-rxjs-operators-in-angular",
+    "apiUrl": "https://api.itlead.org/api/questions/common-rxjs-operators-in-angular",
+    "pageUrl": "https://itlead.org/interview-questions/angular/common-rxjs-operators-in-angular",
+    "difficulty": "MIDDLE",
+    "titleEn": "Common RxJS operators in Angular",
+    "categorySlug": "angular",
+    "syncedAt": "2026-06-18T20:00:00.000Z"
+  }
+}

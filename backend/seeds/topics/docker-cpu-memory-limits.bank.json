@@ -1,0 +1,577 @@
+{
+  "topic": {
+    "code": "docker_cpu_memory_limits",
+    "name": "Лимиты CPU и памяти в Docker",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как ограничить ресурсы контейнера (CPU и память)?",
+    "shortAnswer": "Используй флаги `--memory` и `--cpus` в `docker run` (или `deploy.resources` в Compose). Лимиты enforced ядром через Linux cgroups. `--memory` — жёсткий cap: при превышении контейнер OOM-kill (exit 137). `--cpus` — throttling: процесс замедляется, но не убивается. Без лимитов один контейнер может занять весь хост.",
+    "idealAnswer": "Без resource limits один проблемный контейнер может съесть весь CPU или RAM хоста и destabilize остальные сервисы. Docker пробрасывает Linux cgroup limits через простые флаги — это базовая prod-гигиена. Память: `docker run -d --memory=512m myapp` — hard cap; при превышении kernel OOM-killer убивает процесс внутри контейнера, exit code 137, `docker inspect` показывает `OOMKilled: true`. `--memory-swap` задаёт сумму RAM+swap: равное `--memory` отключает swap (рекомендуется); `-1` — неограниченный swap (опасно). Единицы: b/k/m/g (KiB/MiB/GiB). CPU: `--cpus=0.5` — throttle до половины ядра в среднем (может кратковременно 100% одного core, но усреднённо 50%); `--cpus=2` — два полных core worth. В отличие от памяти, превышение CPU limit не убивает контейнер — просто меньше CPU slices. `--cpu-shares=1024` — относительный вес при contention (1024 vs 512 → 2:1); без конкуренции контейнер может использовать весь CPU — для предсказуемости лучше `--cpus`. `--cpuset-cpus=0,1` — pin на конкретные ядра. Compose v3+: `deploy.resources.limits` (cpus, memory) и `reservations` (минимум гарантированный; в Swarm влияет на placement; на single-host Compose reservations менее критичны). Legacy v2: `cpus:` и `mem_limit:` на top level — ещё работает. Limit = максимум (hard cap для памяти, throttle для CPU); reservation = минимум гарантированный под contention. Мониторинг: `docker stats --no-stream` — MEM USAGE / LIMIT, приближение к 100% → OOM вероятен; `docker inspect --format '{{.HostConfig.Memory}} {{.HostConfig.NanoCpus}}'`. Hot update без рестарта: `docker update --memory=1g --cpus=1 api`. Типичные ошибки: prod без лимитов; слишком низкий `--memory` для JVM/Node/Python runtime (64m для Java → OOM на старте); путать `--cpus` (absolute throttle) с `--cpu-shares` (relative weight только при contention); старые JVM (до Java 10) не видели cgroup limit и брали host RAM → OOM; для legacy JVM — `-XX:MaxRAMPercentage` или `-Xmx`. Sizing: load test без limits → peak в docker stats → limit = peak + 30–50% headroom. `--privileged` не снимает cgroup limits. Real-world: prod long-running — memory+CPU limits; multi-tenant — strict limits; CI runners — `--cpus=2 --memory=4g` per job; local dev — modest limits чтобы поймать memory leak раньше.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "cgroups_overview",
+      "title": "Понимает cgroups и дефолт",
+      "expected": "Кандидат объясняет: Docker использует Linux cgroups для enforce limits; по умолчанию контейнер unlimited и может занять весь хост; установка лимитов — базовая prod-гигиена.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — cgroups и риск без лимитов",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "cgroups",
+              "cgroup",
+              "без лимит",
+              "unlimited"
+            ],
+            "ask": "что происходит если запустить контейнер без memory и CPU limits на shared хосте"
+          }
+        ],
+        "mustConcepts": [
+          "cgroups",
+          "cgroup",
+          "Linux",
+          "лимит",
+          "enforce",
+          "kernel",
+          "ядро",
+          "unlimited",
+          "без лимит",
+          "весь хост",
+          "starve",
+          "замор",
+          "prod",
+          "гигиен",
+          "resource",
+          "ресурс"
+        ],
+        "falseClaims": [
+          "Docker сам ограничивает контейнеры по умолчанию",
+          "без лимитов контейнер не может использовать больше одного ядра",
+          "cgroups — это только Docker-специфичная абстракция без kernel",
+          "лимиты работают только в Swarm, не в docker run"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "memory_limits",
+      "title": "Знает лимиты памяти",
+      "expected": "Кандидат описывает `--memory` как hard cap, OOM-kill при превышении, exit 137, OOMKilled в inspect; понимает `--memory-swap` (RAM+swap, disable swap = memory-swap = memory).",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "OOM behavior и memory-swap — ключ middle topic",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "cgroups_overview",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "memory_limits",
+            "oftenConfusedWith": [
+              "limits_vs_reservations"
+            ],
+            "anchorTermsExpected": [
+              "hard cap",
+              "OOM",
+              "137",
+              "memory-swap",
+              "OOMKilled"
+            ],
+            "anchorTermsWrongTopic": [
+              "throttle",
+              "cpu-shares",
+              "reservation это hard cap"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "memory-swap",
+              "swap",
+              "OOM",
+              "137"
+            ],
+            "ask": "чем --memory отличается от --memory-swap и что значит exit 137"
+          }
+        ],
+        "mustConcepts": [
+          "--memory",
+          "hard cap",
+          "жёстк",
+          "OOM",
+          "OOM-kill",
+          "OOMKilled",
+          "137",
+          "exit code",
+          "memory-swap",
+          "swap",
+          "512m",
+          "MiB",
+          "KiB",
+          "GiB",
+          "docker inspect",
+          "превыш",
+          "убива",
+          "kernel"
+        ],
+        "falseClaims": [
+          "превышение memory limit только замедляет контейнер как CPU",
+          "memory-swap это только RAM без swap",
+          "exit 137 всегда означает kill -9 с хоста, никогда OOM",
+          "OOMKilled: false при OOM внутри контейнера"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "cpu_limits",
+      "title": "Знает лимиты CPU",
+      "expected": "Кандидат объясняет `--cpus` как absolute throttle (не kill); различает `--cpus` и `--cpu-shares` (relative weight только при contention); может упомянуть `--cpuset-cpus`.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "cpus vs cpu-shares — частая путаница из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "cgroups_overview",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "cpu_limits",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "--cpus",
+              "cpu-shares",
+              "throttle",
+              "contention",
+              "cpuset"
+            ],
+            "anchorTermsWrongTopic": [
+              "CPU limit убивает контейнер",
+              "cpu-shares это absolute cap"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "cpu-shares",
+              "cpus"
+            ],
+            "ask": "чем --cpus=0.5 отличается от --cpu-shares=512 и когда что использовать"
+          }
+        ],
+        "mustConcepts": [
+          "--cpus",
+          "cpu-shares",
+          "throttle",
+          "throttling",
+          "замедл",
+          "не убива",
+          "contention",
+          "конкурен",
+          "относительн",
+          "вес",
+          "1024",
+          "512",
+          "cpuset-cpus",
+          "pin",
+          "ядр",
+          "core",
+          "CPU slices",
+          "усредн"
+        ],
+        "falseClaims": [
+          "превышение CPU limit убивает контейнер как OOM",
+          "cpu-shares задаёт абсолютный cap 50% ядра всегда",
+          "без contention cpu-shares ограничивает до половины CPU",
+          "--cpus и --cpu-shares делают одно и то же"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "compose_resources",
+      "title": "Знает синтаксис Compose",
+      "expected": "Кандидат приводит `deploy.resources.limits` (cpus, memory) и `reservations` в compose.yaml; знает legacy v2 `cpus:` / `mem_limit:`.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Compose syntax из ITLead примеров",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "deploy.resources",
+              "compose"
+            ],
+            "ask": "как задать memory и CPU limits в docker-compose.yaml"
+          }
+        ],
+        "mustConcepts": [
+          "deploy.resources",
+          "limits",
+          "reservations",
+          "compose",
+          "compose.yaml",
+          "cpus",
+          "memory",
+          "512M",
+          "mem_limit",
+          "legacy",
+          "v2",
+          "v3",
+          "Swarm",
+          "yaml"
+        ],
+        "falseClaims": [
+          "deploy.resources работает только в Swarm и не в standalone Compose v3+",
+          "в Compose нельзя задать CPU limits",
+          "mem_limit в v2 не работает для backward compat"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "limits_vs_reservations",
+      "title": "Различает limit и reservation",
+      "expected": "Кандидат объясняет: limit — максимум (hard cap памяти, throttle CPU); reservation — минимум гарантированный; в Swarm reservations влияют на placement.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "limits vs reservations из ITLead Theory",
+        "mustConcepts": [
+          "limit",
+          "reservation",
+          "максимум",
+          "минимум",
+          "гарант",
+          "hard cap",
+          "throttle",
+          "placement",
+          "Swarm",
+          "scheduler",
+          "contention",
+          "single-host",
+          "deploy.resources.reservations"
+        ],
+        "falseClaims": [
+          "reservation — это hard cap сверху",
+          "limit и reservation — синонимы",
+          "reservation на single-host Compose полностью бесполезен для понимания модели"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "monitoring_update",
+      "title": "Мониторинг и docker update",
+      "expected": "Кандидат называет `docker stats` (MEM USAGE / LIMIT), `docker inspect` для лимитов; `docker update` меняет limits без рестарта running container.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "inspect/stats/update из ITLead operational section",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "docker stats",
+              "docker update",
+              "inspect"
+            ],
+            "ask": "как проверить текущие limits и usage и можно ли поднять memory без рестарта"
+          }
+        ],
+        "mustConcepts": [
+          "docker stats",
+          "docker inspect",
+          "docker update",
+          "MEM USAGE",
+          "LIMIT",
+          "NanoCpus",
+          "без рестарт",
+          "hot update",
+          "running",
+          "HostConfig",
+          "монитор",
+          "80%",
+          "Prometheus"
+        ],
+        "falseClaims": [
+          "изменить memory limit можно только через recreate контейнера",
+          "docker stats не показывает лимиты памяти",
+          "docker update требует restart контейнера"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: prod без limits; слишком низкий memory для JVM/Node; путать cpu-shares и cpus; JVM до Java 10 не видел cgroup — нужен MaxRAMPercentage/-Xmx; sizing peak+headroom.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Common mistakes и JVM caveat из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "memory_limits",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "JVM",
+              "Java",
+              "MaxRAM",
+              "Xmx"
+            ],
+            "ask": "почему Java-контейнер с --memory=512m может OOM-kill при старте и как это исправить"
+          },
+          {
+            "match": [
+              "без лимит",
+              "production",
+              "prod"
+            ],
+            "ask": "что случится если misbehaving-app без limits на shared node"
+          }
+        ],
+        "mustConcepts": [
+          "без лимит",
+          "production",
+          "prod",
+          "JVM",
+          "Java 10",
+          "MaxRAMPercentage",
+          "-Xmx",
+          "cgroup-aware",
+          "64m",
+          "runtime overhead",
+          "Node",
+          "Python",
+          "cpu-shares",
+          "--cpus",
+          "peak",
+          "headroom",
+          "30%",
+          "50%",
+          "load test",
+          "memory leak",
+          "privileged"
+        ],
+        "falseClaims": [
+          "--privileged снимает cgroup memory limits",
+          "JVM всегда автоматически видит container memory limit на любой версии",
+          "generous 4g limit хуже чем unlimited в prod",
+          "cpu-shares предсказуемее --cpus для SLA"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Лимиты через cgroups: `--memory=512m` — hard cap, при превышении OOM-kill и exit 137. `--cpus=0.5` — throttle, процесс замедляется, но не убивается. В Compose — `deploy.resources.limits`. Без лимитов один контейнер может съесть весь хост.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На prod каждый long-running сервис с memory и CPU limits. Смотрю peak в docker stats после load test, ставлю limit = peak + 40%. Для Java в контейнере проверяю что JVM container-aware или задаю -XX:MaxRAMPercentage. Emergency — docker update --memory=1g без рестарта.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Память убивает при cap, CPU только throttles. cpu-shares — relative weight при contention, для предсказуемости беру --cpus. memory-swap = memory отключает swap. Reservations в Swarm — минимум для placement.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Docker по умолчанию даёт каждому контейнеру половину RAM хоста. CPU limit убивает процесс как OOM. cpu-shares и --cpus — одно и то же.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В prod можно не ставить limits — Docker сам fair-share делит ресурсы. JVM всегда видит --memory без настроек. Чтобы поменять limit — только docker compose down && up.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "--memory-reservation=512m — это hard cap сверху. --privileged отключает cgroups. exit 137 — всегда только docker stop timeout.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "cgroups_overview",
+      "exampleType": "good",
+      "exampleText": "Docker enforce limits через Linux cgroups. Без флагов контейнер unlimited — misbehaving-app может OOM-kill random процессы на хосте.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "cgroups_overview",
+      "exampleType": "good",
+      "exampleText": "ну cgroups на уровне ядра, docker run просто флаги пробрасывает, без лимитов — плохая prod-гигиена",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "cgroups_overview",
+      "exampleType": "bad",
+      "exampleText": "Docker сам ограничивает CPU и RAM каждого контейнера fair-share алгоритмом по умолчанию.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "memory_limits",
+      "exampleType": "good",
+      "exampleText": "--memory=512m — hard cap. Превысил — OOM-killed, exit 137, inspect покажет OOMKilled: true. memory-swap=512m при memory=512m — без swap.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "memory_limits",
+      "exampleType": "good",
+      "exampleText": "memory-swap=1g при memory=512m — 512 RAM + 512 swap. memory-swap=-1 опасен — swap без лимита забьёт диск.",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "memory_limits",
+      "exampleType": "bad",
+      "exampleText": "При превышении --memory контейнер просто swap'ится бесконечно, OOM-kill не бывает.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "cpu_limits",
+      "exampleType": "good",
+      "exampleText": "--cpus=0.5 — absolute throttle до половины core в среднем. CPU limit не kill'ит — только меньше slices. cpu-shares=512 vs 1024 — 1:2 при contention.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "cpu_limits",
+      "exampleType": "good",
+      "exampleText": "для SLA беру --cpus, cpu-shares только когда приоритизирую между сервисами на забитом хосте. cpuset-cpus pin на конкретные ядра.",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "cpu_limits",
+      "exampleType": "bad",
+      "exampleText": "--cpu-shares=512 всегда ограничивает контейнер ровно 50% одного ядра даже когда хост пустой.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "compose_resources",
+      "exampleType": "good",
+      "exampleText": "В compose.yaml: deploy.resources.limits cpus/memory и reservations. Legacy v2 — cpus: и mem_limit: на top level сервиса.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "compose_resources",
+      "exampleType": "good",
+      "exampleText": "api limits 512M/1 cpu, db limits 1G memory — postgres кеширует working set, api cpu-tighter",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "compose_resources",
+      "exampleType": "bad",
+      "exampleText": "В Docker Compose v3 нельзя задать memory limits — только через docker run.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "limits_vs_reservations",
+      "exampleType": "good",
+      "exampleText": "Limit — максимум (memory hard cap, CPU throttle). Reservation — минимум гарантированный; в Swarm scheduler кладёт на node с достаточными ресурсами.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "limits_vs_reservations",
+      "exampleType": "good",
+      "exampleText": "на одном хосте reservation меньше влияет на placement, но модель та же — cap сверху, floor снизу",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "limits_vs_reservations",
+      "exampleType": "bad",
+      "exampleText": "Reservation — это жёсткий cap памяти, limit — soft minimum.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "monitoring_update",
+      "exampleType": "good",
+      "exampleText": "docker stats — MEM USAGE / LIMIT, близко к 100% → OOM скоро. docker update --memory=1g api — без рестарта. inspect — HostConfig.Memory и NanoCpus.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "monitoring_update",
+      "exampleType": "good",
+      "exampleText": "алерт если MEM% > 80% sustained, emergency поднимаю limit через docker update",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "monitoring_update",
+      "exampleType": "bad",
+      "exampleText": "Чтобы изменить CPU limit running контейнера — только recreate, docker update не поддерживает memory/cpus.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Prod без limits — misbehaving-app съедает RAM, OS OOM-kill random процессов. Java в --memory=64m — JVM не стартует. Старый JVM без cgroup awareness — MaxRAMPercentage или -Xmx.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "sizing: load test → peak в stats → limit peak+30-50%. Слишком tight — spike traffic убьёт, слишком loose — leak не заметишь.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "--privileged убирает memory limits. cpu-shares надёжнее --cpus для production SLA. Unlimited в prod ок если контейнеры trusted.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "docker-cpu-memory-limits",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-cpu-memory-limits",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-cpu-memory-limits",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to limit container CPU and memory resources?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

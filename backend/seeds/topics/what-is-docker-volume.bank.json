@@ -1,0 +1,532 @@
+{
+  "topic": {
+    "code": "what_is_docker_volume",
+    "name": "Docker volume и персистентность данных",
+    "skillCode": "docker",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Что такое Docker volume и зачем он нужен?",
+    "shortAnswer": "Docker volume — именованное хранилище, управляемое Docker, вне writable layer контейнера. Контейнеры можно удалять и пересоздавать; данные в volume сохраняются. Это рекомендуемый способ персистентного state (БД, uploads, логи).",
+    "idealAnswer": "Docker volume — стандартный способ сохранить данные между перезапусками и пересборками контейнеров. Контейнеры проектировались как заменяемые; volume — часть, которая не заменяется. Named Docker-managed директория вне filesystem любого контейнера: контейнер A пишет в /data через mount volume pgdata; docker rm A; контейнер B с тем же mount видит данные A. На Linux файлы лежат в /var/lib/docker/volumes/<name>/_data; на macOS/Windows — внутри Linux VM Docker Desktop. Создаётся через docker volume create или неявно при первом docker run -v name:path. Writable layer (OverlayFS upperdir) удаляется при docker rm — всё в нём теряется. Volume mount перехватывает записи к конкретному path и направляет их на хост вне union FS; docker rm не трогает volume. Команды lifecycle: create, ls, inspect, rm, prune; rm падает если volume in use. Синтаксис: -v pgdata:/var/lib/postgresql/data (компактный) vs --mount type=volume,source=pgdata,target=... (явный, для production). Типичные ошибки: state без -v (тихая потеря данных); неверный mount path (Postgres — /var/lib/postgresql/data); удаление volume in use; при первом запуске Docker копирует файлы image в пустой volume; anonymous volumes (UUID) легко потерять — prefer named. Реальное применение: prod БД, Compose volumes block, CI fixtures, uploads. Два контейнера могут шарить volume — координировать concurrent writes. Когда НЕ volume: ephemeral CI/tests; dev live-edit — bind mount; специфичный FS — volume driver или bind mount.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "volume_definition",
+      "title": "Понимает что такое Docker volume",
+      "expected": "Кандидат объясняет: named Docker-managed директория вне writable layer; данные переживают docker rm и пересоздание контейнера; стандартный способ персистентного state.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — volume vs replaceable container",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "volume_definition",
+            "oftenConfusedWith": [
+              "writable_layer_vs_volume",
+              "real_world_usage"
+            ],
+            "anchorTermsExpected": [
+              "named volume",
+              "Docker-managed",
+              "writable layer",
+              "docker rm",
+              "персистент",
+              "вне контейнера"
+            ],
+            "anchorTermsWrongTopic": [
+              "bind mount",
+              "image layer",
+              "overlay network"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "volume",
+              "том",
+              "pgdata",
+              "docker rm"
+            ],
+            "ask": "что произойдёт с данными Postgres после docker rm, если был mount -v pgdata:/var/lib/postgresql/data"
+          }
+        ],
+        "mustConcepts": [
+          "volume",
+          "том",
+          "named",
+          "именован",
+          "Docker-managed",
+          "управляем Docker",
+          "writable layer",
+          "writable-шар",
+          "персистент",
+          "docker rm",
+          "переживает",
+          "state",
+          "данные",
+          "заменяемый",
+          "replaceable",
+          "mount",
+          "вне контейнера",
+          "вне filesystem",
+          "pgdata",
+          "/var/lib/docker/volumes"
+        ],
+        "falseClaims": [
+          "volume это часть writable layer контейнера",
+          "docker rm сохраняет данные в writable layer",
+          "named volume удаляется автоматически вместе с контейнером",
+          "volume это read-only слой image",
+          "без volume данные БД переживают docker rm"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "writable_layer_vs_volume",
+      "title": "Отличает writable layer от volume mount",
+      "expected": "Кандидат описывает OverlayFS upperdir: запись в writable layer теряется при docker rm; volume mount перехватывает path и пишет на хост вне union FS.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "copy-on-write upperdir vs volume intercept — механизм потери данных",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "volume_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "OverlayFS",
+              "upperdir",
+              "writable"
+            ],
+            "ask": "куда попадают записи без volume mount и что случится при docker rm"
+          }
+        ],
+        "mustConcepts": [
+          "writable layer",
+          "writable-шар",
+          "OverlayFS",
+          "upperdir",
+          "copy-on-write",
+          "CoW",
+          "union FS",
+          "image layers",
+          "read-only",
+          "docker rm",
+          "volume mount",
+          "перехватывает",
+          "вне union",
+          "теряется",
+          "удаляется",
+          "хост",
+          "независимо"
+        ],
+        "falseClaims": [
+          "writable layer переживает docker rm",
+          "volume mount пишет в upperdir контейнера",
+          "запись в контейнер всегда идёт в volume",
+          "image layers хранят runtime-данные Postgres"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "volume_lifecycle",
+      "title": "Знает команды lifecycle volume",
+      "expected": "Кандидат перечисляет: docker volume create/ls/inspect/rm/prune; auto-create при первом docker run -v; rm — error if in use; inspect Mountpoint.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "lifecycle commands из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "inspect",
+              "Mountpoint",
+              "prune"
+            ],
+            "ask": "как узнать физический путь volume и как удалить неиспользуемые volumes"
+          }
+        ],
+        "mustConcepts": [
+          "docker volume create",
+          "docker volume ls",
+          "docker volume inspect",
+          "docker volume rm",
+          "docker volume prune",
+          "auto-create",
+          "первое использование",
+          "dangling",
+          "in use",
+          "используется",
+          "Mountpoint",
+          "--driver",
+          "--driver-opt",
+          "driver",
+          "labels"
+        ],
+        "falseClaims": [
+          "docker volume rm удаляет volume пока контейнер его использует",
+          "prune удаляет volumes attached к running containers",
+          "volume create обязателен перед каждым docker run -v",
+          "inspect показывает только имя без mountpoint"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "mount_syntax",
+      "title": "Понимает -v vs --mount",
+      "expected": "Кандидат сравнивает: -v компактный (name:path); --mount явный type=volume,source,target; production и Compose предпочитают --mount.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "mount syntax ITLead — -v vs --mount ambiguity",
+        "mustConcepts": [
+          "-v",
+          "--mount",
+          "type=volume",
+          "source",
+          "target",
+          "ambiguity",
+          "двусмыслен",
+          "host path",
+          "путь хоста",
+          "volume name",
+          "имя volume",
+          "Compose",
+          "volumes:",
+          "production",
+          "явный"
+        ],
+        "falseClaims": [
+          "--mount не поддерживает named volumes",
+          "-v name:path всегда создаёт bind mount",
+          "--mount работает только для bind mount",
+          "-v и --mount несовместимы с Compose"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с volumes",
+      "expected": "Кандидат называет: state в writable layer без -v; неверный mount path; rm volume in use; первый run копирует image files в empty volume; anonymous volumes теряются из виду.",
+      "score": 2.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes ITLead — silent data loss bugs",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "writable_layer_vs_volume",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "writable layer",
+              "без -v",
+              "postgres"
+            ],
+            "ask": "что случится с данными Postgres после docker rm без volume mount"
+          },
+          {
+            "match": [
+              "postgresql/data",
+              "неверный path",
+              "VOLUME"
+            ],
+            "ask": "почему mount неправильного path внутри контейнера не сохраняет данные БД"
+          },
+          {
+            "match": [
+              "anonymous",
+              "UUID",
+              "dangling"
+            ],
+            "ask": "чем anonymous volume отличается от named и почему named предпочтительнее"
+          }
+        ],
+        "mustConcepts": [
+          "writable layer",
+          "без -v",
+          "тихая потеря",
+          "silent",
+          "неверный path",
+          "postgresql/data",
+          "/data/db",
+          "/data",
+          "VOLUME directive",
+          "Dockerfile",
+          "volume in use",
+          "anonymous",
+          "UUID",
+          "dangling",
+          "первый run",
+          "image files",
+          "source of truth",
+          "upgrade image"
+        ],
+        "falseClaims": [
+          "postgres без -v сохраняет таблицы после docker rm",
+          "можно docker volume rm пока контейнер использует volume",
+          "mount /data вместо /var/lib/postgresql/data сохранит данные Postgres",
+          "anonymous volume безопаснее named для prod БД",
+          "после upgrade image новые файлы image автоматически попадут в volume"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "real_world_usage",
+      "title": "Применяет volumes в реальных сценариях",
+      "expected": "Кандидат упоминает: БД в prod; Compose volumes block и compose down -v; CI fixtures; uploads; shared volume между контейнерами; когда bind mount для dev; ephemeral без volume.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "real-world usage + when NOT volume из follow-up ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Compose",
+              "compose down",
+              "-v"
+            ],
+            "ask": "чем отличается docker compose down от docker compose down -v"
+          },
+          {
+            "match": [
+              "shared",
+              "два контейнера",
+              "bind mount"
+            ],
+            "ask": "когда два контейнера шарят volume и когда лучше bind mount для dev"
+          }
+        ],
+        "mustConcepts": [
+          "postgres",
+          "mysql",
+          "mongo",
+          "redis",
+          "Compose",
+          "compose.yaml",
+          "volumes:",
+          "compose down",
+          "compose down -v",
+          "kill switch",
+          "CI",
+          "fixtures",
+          "uploads",
+          "shared volume",
+          "два контейнера",
+          "bind mount",
+          "dev editing",
+          "live-reload",
+          "ephemeral",
+          "sidecar",
+          "log shipper",
+          "volume driver",
+          "NFS"
+        ],
+        "falseClaims": [
+          "docker compose down всегда удаляет named volumes",
+          "для dev редактирования кода всегда лучше named volume чем bind mount",
+          "uploads в writable layer переживут redeploy",
+          "два контейнера на одном volume безопасны без координации записей",
+          "prod БД можно держать без volume если контейнер не удалять"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Docker volume — именованное хранилище вне writable layer. Postgres с -v pgdata:/var/lib/postgresql/data: docker rm не трогает данные, новый контейнер с тем же mount видит таблицы. docker volume inspect pgdata покажет Mountpoint.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Без volume записи идут в upperdir OverlayFS — при docker rm всё пропадает. В Compose volumes: pgdata вверху файла; compose down без -v сохраняет state, down -v — деструктивный сброс.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "docker run -v pgdata:/path сам создаёт volume при первом запуске. В prod предпочитаю --mount type=volume,source=pgdata,target=/path — явнее чем -v. Anonymous volumes — prune, для БД всегда named.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Volume — это директория внутри контейнера; docker rm не удаляет данные, если в Dockerfile есть VOLUME. Bind mount и named volume — одно и то же.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker volume rm pgdata сработает, пока postgres-контейнер running — Docker сам остановит контейнер.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для Postgres достаточно смонтировать /data вместо /var/lib/postgresql/data — главное указать -v, путь не важен.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "volume_definition",
+      "exampleType": "good",
+      "exampleText": "Named Docker-managed directory: контейнер replaceable, volume — нет. Данные переживают docker rm и пересоздание.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "volume_definition",
+      "exampleType": "good",
+      "exampleText": "ну том pgdata — docker run -v pgdata:/var/lib/postgresql/data, rm контейнера, новый контейнер — те же данные на диске",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "volume_definition",
+      "exampleType": "bad",
+      "exampleText": "Volume — часть image layers, readonly, для runtime-данных не подходит.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "writable_layer_vs_volume",
+      "exampleType": "good",
+      "exampleText": "Writable layer — upperdir OverlayFS, docker rm удаляет upperdir. Volume mount роутит writes на /var/lib/docker/volumes вне union FS.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "writable_layer_vs_volume",
+      "exampleType": "good",
+      "exampleText": "copy-on-write в upperdir; без -v postgres пишет туда — rm и таблицы пропали. volume intercept — rm не трогает pgdata",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "writable_layer_vs_volume",
+      "exampleType": "bad",
+      "exampleText": "Writable layer переживает docker rm так же надёжно, как named volume.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "volume_lifecycle",
+      "exampleType": "good",
+      "exampleText": "create, ls, inspect, rm, prune. rm — Error: volume is in use. inspect --format '{{.Mountpoint}}' для пути на Linux.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "volume_lifecycle",
+      "exampleType": "good",
+      "exampleText": "явный volume create нужен для --driver и driver-opt; иначе run -v сам создаст при первом использовании",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "volume_lifecycle",
+      "exampleType": "bad",
+      "exampleText": "docker volume prune удаляет volumes, которые сейчас примонтированы к running containers.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "mount_syntax",
+      "exampleType": "good",
+      "exampleText": "-v pgdata:/var/lib/postgresql/data — компактно; --mount type=volume,source=pgdata,target=/var/lib/postgresql/data — явно для prod-скриптов.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "mount_syntax",
+      "exampleType": "good",
+      "exampleText": "в compose volumes: pgdata наверху + service mount — декларативно, без путаницы host path vs volume name",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "mount_syntax",
+      "exampleType": "bad",
+      "exampleText": "--mount type=volume работает только в swarm, для docker run нужен только -v.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Postgres без -v выглядит рабочим, но docker rm — silent data loss. Смотрю VOLUME в Dockerfile образа для правильного path.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "первый run named volume на непустой path — Docker копирует файлы image; потом volume source of truth, upgrade image не обновит volume",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "anonymous volume из Dockerfile VOLUME без имени — ls -f dangling=true, лучше явный named pgdata",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Anonymous volume надёжнее named — Docker сам не даст его случайно удалить.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "real_world_usage",
+      "exampleType": "good",
+      "exampleText": "Prod DB — named volume без исключений. Dev — bind mount ./src для live-reload. CI test Postgres — volume переиспользую между прогонами. compose down -v — осознанный kill switch.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "real_world_usage",
+      "exampleType": "good",
+      "exampleText": "два контейнера на pgdata — shared files, но concurrent writes координирую в приложении; uploads в named volume, иначе redeploy стирает",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "real_world_usage",
+      "exampleType": "bad",
+      "exampleText": "Uploads и логи можно писать в writable layer — redeploy контейнера их не трогает.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "what-is-docker-volume",
+    "apiUrl": "https://api.itlead.org/api/questions/what-is-docker-volume",
+    "pageUrl": "https://itlead.org/interview-questions/docker/what-is-docker-volume",
+    "difficulty": "JUNIOR",
+    "titleEn": "What is a Docker volume and why do you need it?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T21:30:00.000Z"
+  }
+}

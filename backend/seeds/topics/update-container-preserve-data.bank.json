@@ -1,0 +1,376 @@
+{
+  "topic": {
+    "code": "update_container_preserve_data",
+    "name": "Обновление контейнера без потери данных",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как обновить Docker-контейнер без потери данных?",
+    "shortAnswer": "Контейнер одноразовый, данные живут в volumes (или bind mounts). Паттерн: stop → rm → run с тем же volume и новым тегом образа. В Compose: pull + up -d пересоздаёт только изменённые сервисы. Major upgrade БД (Postgres 16→17) требует миграции, не только смены tag.",
+    "idealAnswer": "Writable layer контейнера одноразовый; состояние — в named/anonymous volumes и bind mounts. Обновление: docker pull нового tag; docker stop && docker rm; docker run с теми же -v и новым образом. Compose: сменить tag в yaml, docker compose pull && docker compose up -d — пересоздаёт api, volume pgdata не трогается. Переживает rm: named volumes, bind mounts, anonymous без --rm -v. Не переживает: writable layer, network alias, логи контейнера. Major upgrade Postgres: несовместимый формат данных — pg_dumpall/pg_upgrade, не просто postgres:17. Zero-downtime: blue-green, rolling Swarm/K8s, scale+healthcheck+LB; простой stop+rm = секунды простоя.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "update_pattern",
+      "title": "Базовый паттерн обновления",
+      "expected": "Кандидат описывает паттерн: pull → stop → rm → run с теми же volume mounts и новым тегом образа.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "simple update pattern ITLead",
+        "mustConcepts": [
+          "stop",
+          "rm",
+          "run",
+          "pull",
+          "same volume",
+          "новый tag",
+          "myapp:1.1",
+          "-v",
+          "api_data",
+          "replaceable container",
+          "disposable"
+        ],
+        "falseClaims": [
+          "restart container updates image",
+          "docker stop preserves old image running",
+          "change tag without recreate",
+          "volume tied to container id immutably",
+          "pull auto-restarts running container"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "volumes_survive",
+      "title": "Volumes переживают контейнер",
+      "expected": "Кандидат объясняет: named volume отделён от контейнера; docker rm не удаляет named volume.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "state in volumes not container",
+        "mustConcepts": [
+          "named volume",
+          "volume survives",
+          "docker rm",
+          "writable layer",
+          "bind mount",
+          "pgdata",
+          "отдельно",
+          "persist",
+          "state"
+        ],
+        "falseClaims": [
+          "docker rm deletes named volume always",
+          "data in writable layer safe",
+          "anonymous volume always deleted",
+          "bind mount deleted with container",
+          "volume inside container filesystem only"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "compose_update",
+      "title": "Обновление через Compose",
+      "expected": "Кандидат: смена tag в compose.yaml; docker compose pull && up -d; пересоздаёт только изменённый сервис.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "compose cleaner workflow",
+        "mustConcepts": [
+          "docker compose pull",
+          "docker compose up",
+          "recreate",
+          "compose.yaml",
+          "image tag",
+          "only changed",
+          "volume untouched",
+          "other services"
+        ],
+        "falseClaims": [
+          "compose up never recreates",
+          "must manual stop rm each service",
+          "compose down required before update",
+          "pull without up updates running",
+          "volumes reset on compose up"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "what_survives_table",
+      "title": "Что сохраняется при rm",
+      "expected": "Кандидат перечисляет: named/bind mount — да; writable layer, логи, network alias — нет.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "survival table ITLead",
+        "mustConcepts": [
+          "named volume yes",
+          "bind mount yes",
+          "writable layer no",
+          "logs no",
+          "network alias",
+          "anonymous --rm -v",
+          "survives",
+          "dies"
+        ],
+        "falseClaims": [
+          "logs survive rm",
+          "network alias persists",
+          "writable layer survives",
+          "anonymous always survives",
+          "bind mount deleted"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "db_version_caveat",
+      "title": "Major upgrade БД",
+      "expected": "Кандидат: Postgres 16→17 — несовместимый data dir; нужны pg_dumpall/pg_upgrade и backup.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "DB version bump caveat",
+        "mustConcepts": [
+          "postgres 16",
+          "postgres 17",
+          "major version",
+          "pg_dumpall",
+          "pg_upgrade",
+          "incompatible",
+          "data format",
+          "backup",
+          "mysql",
+          "mongo",
+          "migration"
+        ],
+        "falseClaims": [
+          "postgres major upgrade only tag change",
+          "same volume always works any version",
+          "pg 17 reads pg16 data automatically",
+          "no backup needed volume preserved",
+          "only docker matters not db version"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "probeConceptGroups": [
+          {
+            "match": [
+              "postgres 17",
+              "pg_upgrade"
+            ],
+            "ask": "почему volume от postgres:16 не стартует на postgres:17"
+          }
+        ],
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "zero_downtime",
+      "title": "Zero-downtime опции",
+      "expected": "Кандидат: stop+rm даёт краткий простой; zero-downtime — blue-green, rolling Swarm/K8s, scale+healthcheck+LB.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "zero downtime section",
+        "mustConcepts": [
+          "zero downtime",
+          "blue-green",
+          "rolling update",
+          "swarm",
+          "kubernetes",
+          "healthcheck",
+          "load balancer",
+          "scale",
+          "outage",
+          "brief"
+        ],
+        "falseClaims": [
+          "stop rm run zero downtime always",
+          "compose up never has outage",
+          "no healthcheck needed rolling",
+          "single container always zero downtime",
+          "docker update replaces without stop"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "checkpointKey": null,
+      "exampleType": "good",
+      "exampleText": "pull myapp:1.1; stop rm api; run с тем же -v api_data. Compose: pull && up -d — volume на месте.",
+      "sortOrder": 0
+    },
+    {
+      "checkpointKey": null,
+      "exampleType": "good",
+      "exampleText": "Named volume переживает rm. Postgres 16→17 — dump/upgrade, не только tag. stop+rm — секунды downtime.",
+      "sortOrder": 1
+    },
+    {
+      "checkpointKey": null,
+      "exampleType": "good",
+      "exampleText": "Bind mount на host survives. Anonymous с --rm -v удалится. Zero-downtime — blue-green или K8s rolling.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": null,
+      "exampleType": "bad",
+      "exampleText": "docker restart обновляет image до 1.1.",
+      "sortOrder": 0
+    },
+    {
+      "checkpointKey": null,
+      "exampleType": "bad",
+      "exampleText": "Postgres major upgrade — просто сменить tag в run.",
+      "sortOrder": 1
+    },
+    {
+      "checkpointKey": null,
+      "exampleType": "bad",
+      "exampleText": "Writable layer хранит production db.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "update_pattern",
+      "exampleType": "good",
+      "exampleText": "stop rm run same -v new image tag after pull.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "update_pattern",
+      "exampleType": "good",
+      "exampleText": "container disposable runtime volume data",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "update_pattern",
+      "exampleType": "bad",
+      "exampleText": "docker update in place without recreate",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "volumes_survive",
+      "exampleType": "good",
+      "exampleText": "Named volume outlives container rm.",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "volumes_survive",
+      "exampleType": "good",
+      "exampleText": "state in volume not writable layer",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "volumes_survive",
+      "exampleType": "bad",
+      "exampleText": "rm deletes named volume always",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "compose_update",
+      "exampleType": "good",
+      "exampleText": "compose pull up -d recreates changed service preserves volumes.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "compose_update",
+      "exampleType": "good",
+      "exampleText": "sed tag compose.yaml workflow",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "compose_update",
+      "exampleType": "bad",
+      "exampleText": "compose down required every update",
+      "sortOrder": 38
+    },
+    {
+      "checkpointKey": "what_survives_table",
+      "exampleType": "good",
+      "exampleText": "Named bind yes writable logs network alias no.",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "what_survives_table",
+      "exampleType": "good",
+      "exampleText": "table survives dies",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "what_survives_table",
+      "exampleType": "bad",
+      "exampleText": "logs in volume survive rm",
+      "sortOrder": 41
+    },
+    {
+      "checkpointKey": "db_version_caveat",
+      "exampleType": "good",
+      "exampleText": "Major pg needs dump upgrade not tag only.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "db_version_caveat",
+      "exampleType": "good",
+      "exampleText": "16 data dir rejected by 17",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "db_version_caveat",
+      "exampleType": "bad",
+      "exampleText": "tag change enough mysql major too",
+      "sortOrder": 44
+    },
+    {
+      "checkpointKey": "zero_downtime",
+      "exampleType": "good",
+      "exampleText": "Plain stop rm seconds outage; K8s rolling zero.",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "zero_downtime",
+      "exampleType": "good",
+      "exampleText": "blue green two replicas",
+      "sortOrder": 26
+    },
+    {
+      "checkpointKey": "zero_downtime",
+      "exampleType": "bad",
+      "exampleText": "single container never downtime",
+      "sortOrder": 47
+    }
+  ],
+  "itlead": {
+    "slug": "update-container-preserve-data",
+    "apiUrl": "https://api.itlead.org/api/questions/update-container-preserve-data",
+    "pageUrl": "https://itlead.org/interview-questions/docker/update-container-preserve-data",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to update a Docker container without losing data?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T14:44:01.314Z"
+  }
+}

@@ -1,0 +1,479 @@
+{
+  "topic": {
+    "code": "how_to_debug_application_and_find_memory_leaks",
+    "name": "Отладка приложений и поиск утечек памяти",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как отлаживать приложение и находить утечки памяти в браузере и Node.js?",
+    "shortAnswer": "Утечка памяти — когда выделенная память остаётся живой, потому что код держит на неё ссылку, и garbage collector не может её освободить. Типичные причины: setInterval без cleanup, fetch без AbortController, addEventListener без remove, Map вместо WeakMap. Поиск: подтвердить рост heap в Performance Monitor, снять два heap snapshot в DevTools Memory до и после сценария, сравнить diff; для Node — `node --heap-prof` или heapdump на SIGUSR2.",
+    "idealAnswer": "Утечка памяти — выделенная память не освобождается, потому что объект остаётся reachable для GC: замыкания, таймеры, event listeners или глобальные ссылки держат его дольше, чем нужно. V8 использует mark-and-sweep: от roots (globals, stack, active handles) помечает достижимое, остальное sweep. Young generation чистится Scavenge часто; объекты, пережившие Scavenge, попадают в old generation, где утечки накапливаются до OOM. Таймер в timer queue — root; callback с замыканием на 10MB массив держит массив, пока interval жив. Detached DOM — узел удалён из страницы, но JS/ref/listener всё ещё ссылается; в snapshot видно «Detached HTMLDivElement». Инструменты: Chrome DevTools Memory — heap snapshot до/после навигации, diff в Summary; allocation timeline для прерывистых утечек; Performance Monitor — рост JS Heap в реальном времени; React Profiler + Memory для компонентов; Node `node --heap-prof server.js`, clinic.js, heapdump.writeSnapshot() на SIGUSR2; Puppeteer tracing для CI. Типичные ошибки: useEffect с setInterval без return () => clearInterval; fetch + setState без AbortController на unmount; addEventListener без removeEventListener; Map кэш по userObject вместо WeakMap; Express handler с setInterval в замыкании на largeData без clear — ~10MB на запрос. Исправления: cleanup в useEffect return; controller.abort(); removeEventListener; WeakMap для кэша по объекту-ключу; res.on('finish', () => clearInterval(...)) в Node; закрывать WebSocket в cleanup. Workflow: подтвердить рост памяти (Task Manager / Performance Monitor) → snapshot → воспроизвести сценарий 5–10 мин → второй snapshot → diff closures/detached/timers → Performance record для flame chart. React StrictMode двойной mount помогает поймать cleanup без return — удвоенные timers в snapshot. Production: не хранить DOM nodes в Redux; Puppeteer — page.close(); factory per request вместо module singleton.",
+    "maxScore": 10,
+    "skills": [
+      "javascript",
+      "react"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "memory_leak_definition",
+      "title": "Понимает что такое утечка памяти",
+      "expected": "Кандидат объясняет: память не освобождается, потому что объект остаётся reachable для GC из‑за ссылок, замыканий, таймеров или listeners после конца полезного жизненного цикла.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — определение leak и роль GC",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "утечк",
+              "GC",
+              "reachable"
+            ],
+            "ask": "почему GC не освобождает объект при утечке памяти"
+          }
+        ],
+        "mustConcepts": [
+          "утечк",
+          "memory leak",
+          "GC",
+          "garbage",
+          "сборщик",
+          "reachable",
+          "достижим",
+          "ссылк",
+          "замык",
+          "closure",
+          "не освобож",
+          "heap",
+          "V8",
+          "таймер",
+          "listener",
+          "объект жив"
+        ],
+        "falseClaims": [
+          "GC всегда освобождает всё автоматически в JS",
+          "утечка — это только мгновенный OOM при первом запросе",
+          "утечки бывают только в C/C++, не в JavaScript",
+          "закрытие вкладки не влияет на timers в других вкладках того же origin"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "gc_mark_sweep",
+      "title": "Знает как V8/GC связан с утечками",
+      "expected": "Кандидат описывает mark-and-sweep, young/old generation, Scavenge vs Mark-Compact; таймеры и closures держат объекты в old gen; detached DOM как browser-вариант утечки.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Why GC doesn't save you + V8 internals из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "memory_leak_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "detached",
+              "Detached HTML"
+            ],
+            "ask": "что такое detached DOM node и почему он остаётся в heap"
+          },
+          {
+            "match": [
+              "old generation",
+              "Scavenge"
+            ],
+            "ask": "почему утечки в old generation опаснее чем в young"
+          }
+        ],
+        "mustConcepts": [
+          "mark-and-sweep",
+          "mark",
+          "sweep",
+          "young",
+          "old generation",
+          "Scavenge",
+          "Mark-Compact",
+          "root",
+          "корн",
+          "promoted",
+          "detached DOM",
+          "Detached HTML",
+          "timer queue",
+          "tenured",
+          "OOM"
+        ],
+        "falseClaims": [
+          "GC запускается на каждое присваивание переменной",
+          "detached DOM сразу удаляется из heap без ссылок в JS",
+          "утечки возможны только в young generation",
+          "stack variables живут в heap после return функции"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "debug_tools",
+      "title": "Знает инструменты профилирования памяти",
+      "expected": "Кандидат называет Chrome DevTools Memory (snapshot, diff, allocation timeline), Performance Monitor, React Profiler, node --heap-prof, clinic.js, heapdump; понимает когда какой инструмент применять.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "tool comparison и when to reach — ключевой практический блок",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "snapshot",
+              "heap"
+            ],
+            "ask": "чем heap snapshot отличается от allocation timeline"
+          },
+          {
+            "match": [
+              "heap-prof",
+              "heapdump"
+            ],
+            "ask": "как отладить утечку Node.js в production без рестарта"
+          }
+        ],
+        "mustConcepts": [
+          "DevTools",
+          "Memory tab",
+          "heap snapshot",
+          "snapshot",
+          "diff",
+          "Summary",
+          "allocation timeline",
+          "Performance Monitor",
+          "JS Heap",
+          "React Profiler",
+          "heap-prof",
+          "clinic",
+          "heapdump",
+          "SIGUSR2",
+          "Puppeteer",
+          "tracing",
+          "--inspect"
+        ],
+        "falseClaims": [
+          "достаточно console.log для поиска утечек памяти",
+          "snapshot и allocation timeline — одно и то же",
+          "React Profiler находит утечки timers вне React дерева",
+          "Performance Monitor показывает retainer chain детально"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_leak_patterns",
+      "title": "Знает типичные паттерны утечек",
+      "expected": "Кандидат называет setInterval без cleanup, fetch без AbortController, addEventListener без remove, Map vs WeakMap, Express handler с interval на largeData, debounce без clearTimeout, detached DOM через ref/listener.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — основной production контент ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "setInterval",
+              "useEffect"
+            ],
+            "ask": "почему interval без return cleanup — утечка после unmount компонента"
+          },
+          {
+            "match": [
+              "Map",
+              "WeakMap"
+            ],
+            "ask": "почему WeakMap помогает предотвратить утечку в кэше"
+          }
+        ],
+        "mustConcepts": [
+          "setInterval",
+          "clearInterval",
+          "setTimeout",
+          "clearTimeout",
+          "useEffect",
+          "cleanup",
+          "AbortController",
+          "abort",
+          "fetch",
+          "addEventListener",
+          "removeEventListener",
+          "Map",
+          "WeakMap",
+          "detached",
+          "Express",
+          "largeData",
+          "unmount",
+          "debounce"
+        ],
+        "falseClaims": [
+          "WeakMap сильнее держит ключ чем Map",
+          "AbortController не отменяет in-flight fetch",
+          "cleanup в useEffect не нужен для setInterval",
+          "pending promise не держит closure с setState"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "fix_patterns",
+      "title": "Знает правильные паттерны исправления",
+      "expected": "Кандидат описывает return cleanup в useEffect, controller.abort(), removeEventListener, WeakMap для кэша, res.on('finish') для clearInterval в Express, закрытие WebSocket, StrictMode для проверки cleanup.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "GOOD примеры и fix patterns из quick example ITLead",
+        "mustConcepts": [
+          "return () =>",
+          "cleanup",
+          "clearInterval",
+          "clearTimeout",
+          "controller.abort",
+          "removeEventListener",
+          "WeakMap",
+          "WebSocket",
+          "close socket",
+          "StrictMode",
+          "res.on",
+          "finish",
+          "page.close",
+          "WeakMap кэш",
+          "закрыть WebSocket",
+          "page.close Puppeteer",
+          "не хранить DOM в store"
+        ],
+        "falseClaims": [
+          "достаточно перезагрузить страницу вместо fix cleanup",
+          "global listener на window без remove — норма для SPA",
+          "suppressHydrationWarning исправляет утечку памяти",
+          "можно хранить DOM nodes в Redux state без последствий",
+          "cleanup не нужен в Strict Mode",
+          "global setInterval норма для SPA"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "debug_workflow",
+      "title": "Описывает workflow отладки утечки",
+      "expected": "Кандидат: подтвердить рост heap → snapshot до/после сценария навигации → diff Summary на closures/detached → Performance record для timers; для Node OOM — heapdump или remote inspect.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up interview questions — пошаговый debugging workflow",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "10 минут",
+              "навигац"
+            ],
+            "ask": "как отладить React app который тормозит после 10 минут навигации"
+          }
+        ],
+        "mustConcepts": [
+          "рост heap",
+          "навигац",
+          "snapshot до",
+          "snapshot после",
+          "diff",
+          "Summary",
+          "Performance",
+          "flame",
+          "OOM",
+          "Task Manager",
+          "retainer",
+          "StrictMode",
+          "двойной mount",
+          "Performance tab",
+          "retained size",
+          "Growing closures",
+          "шаг воспроизведения"
+        ],
+        "falseClaims": [
+          "сразу переписывают код без профилирования и измерений",
+          "одного snapshot достаточно без второго и без воспроизведения сценария",
+          "утечку можно подтвердить только после падения процесса с OOM",
+          "одного snapshot достаточно",
+          "fix без профилирования норма"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Утечка — объект остаётся reachable: setInterval callback держит closure после unmount. Подтверждаю рост JS Heap в Performance Monitor, делаю два heap snapshot до и после SPA-навигации, в diff ищу growing closures. Fix: return () => clearInterval в useEffect и AbortController.abort() для fetch.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В React после 10 минут routing память ползёт вверх — snapshot diff показывает Detached HTMLDivElement и удвоенные timers (StrictMode помог поймать cleanup без return). На Node API с 500 concurrent users Express handler с setInterval на 10MB буфер — ловлю через node --heap-prof и retainer chain до timer callback.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Map кэширует по userObject — strong ref, ключ никогда не соберётся. WeakMap отпускает ключ когда других ссылок нет. Для поиска: allocation timeline если leak прерывистый; два snapshot если стабильный рост при одном сценарии.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "GC в JavaScript всегда всё чистит сам, утечек не бывает. Достаточно перезагружать браузер раз в час в production.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Один heap snapshot сразу показывает утечку — второй снимок и воспроизведение сценария не нужны.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "fetch без abort не проблема — promise сам отменится когда компонент размонтируется, setState на мёртвый компонент безопасен.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "memory_leak_definition",
+      "exampleType": "good",
+      "exampleText": "Утечка памяти — выделенная память не освобождается, потому что ссылка из closure или timer queue держит объект reachable для GC.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "memory_leak_definition",
+      "exampleType": "good",
+      "exampleText": "ну утечка — когда объект уже не нужен, а GC его не sweep'ит, потому что interval или listener всё ещё на него ссылается",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "memory_leak_definition",
+      "exampleType": "bad",
+      "exampleText": "Утечка — это когда физическая RAM на сервере сломалась или закончилась на диске.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "gc_mark_sweep",
+      "exampleType": "good",
+      "exampleText": "Timer queue — root для GC; callback с замыканием на большой массив держит массив в old generation, пока interval не cleared.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "gc_mark_sweep",
+      "exampleType": "good",
+      "exampleText": "detached node — убрали из DOM, но ref или listener в JS держит — в snapshot видно Detached HTMLDivElement",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "gc_mark_sweep",
+      "exampleType": "bad",
+      "exampleText": "Detached DOM узлы мгновенно удаляются из heap сразу после removeChild, GC тут не при чём.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "debug_tools",
+      "exampleType": "good",
+      "exampleText": "Два heap snapshot, diff в Summary view — смотрю retained size и retainer chain; allocation timeline если утечка только при редких действиях.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "debug_tools",
+      "exampleType": "good",
+      "exampleText": "сначала Performance Monitor — если heap растёт, тогда Memory tab; на Node production — heapdump по SIGUSR2 без рестарта",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "debug_tools",
+      "exampleType": "bad",
+      "exampleText": "console.log показывает сколько байт удерживает каждый closure — DevTools не нужен.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "common_leak_patterns",
+      "exampleType": "good",
+      "exampleText": "useEffect(() => { const id = setInterval(fetchData, 5000); }, []) без return — interval живёт после unmount, closure держит component scope.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "common_leak_patterns",
+      "exampleType": "good",
+      "exampleText": "debounce search: без clearTimeout и abort каждый keystroke планирует timer с захватом users[] — heap растёт при быстром наборе",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "common_leak_patterns",
+      "exampleType": "bad",
+      "exampleText": "Map и WeakMap для кэша по объекту-ключу работают одинаково — GC одинаково собирает ключи.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "fix_patterns",
+      "exampleType": "good",
+      "exampleText": "return () => { clearInterval(id); controller.abort(); window.removeEventListener('resize', handleResize); }",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "fix_patterns",
+      "exampleType": "good",
+      "exampleText": "Express: res.on('finish', () => clearInterval(watcher)) — largeData освобождается после ответа, не копится на каждый запрос",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "fix_patterns",
+      "exampleType": "bad",
+      "exampleText": "Чтобы исправить утечку, просто выношу всё в глобальную переменную window — так GC точно не тронет.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "debug_workflow",
+      "exampleType": "good",
+      "exampleText": "10 минут навигации → Task Manager подтверждает рост → snapshot → сценарий → второй snapshot → diff closures и Detached → Performance record для interval callbacks.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "debug_workflow",
+      "exampleType": "good",
+      "exampleText": "StrictMode mount-cleanup-mount: если cleanup не сработал — в snapshot после второго mount увижу удвоенные allocations",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "debug_workflow",
+      "exampleType": "bad",
+      "exampleText": "Сразу рефакторю все useEffect без замеров — профилирование только для backend, frontend не нужен.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "how-to-debug-application-and-find-memory-leaks",
+    "apiUrl": "https://api.itlead.org/api/questions/how-to-debug-application-and-find-memory-leaks",
+    "pageUrl": "https://itlead.org/interview-questions/general/how-to-debug-application-and-find-memory-leaks",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to debug application and find memory leaks",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

@@ -1,0 +1,170 @@
+{
+  "topic": {
+    "code": "shcho_take_kompozytni_indeksy",
+    "name": "Композитные индексы",
+    "skillCode": "architecture",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое композитные индексы и как работает правило левого префикса?",
+    "shortAnswer": "Композитный индекс строится на двух и более колонках и читается слева направо: индекс на (status, created_at) ускоряет фильтрацию по status или status+created_at, но не по одному created_at. Порядок колонок — главное решение; equality-колонки ставят перед range.",
+    "idealAnswer": "Composite index — индекс на (col1, col2, col3), данные отсортированы сначала по col1, внутри группы по col2 и т.д. Leftmost prefix rule: индекс на (a,b,c) обслуживает запросы на a, (a,b), (a,b,c), но не на b или (b,c) — без col1 нет точки входа в дерево. Range condition (>, BETWEEN) на col2 обрывает цепочку: col3 в WHERE уже не использует индекс напрямую. Правило порядка: equality перед range — (user_id, created_at), не (created_at, user_id). Covering index содержит все колонки SELECT/WHERE/ORDER BY — Index Only Scan, I/O -80-90%, но шире индекс и медленнее INSERT. Типичные ошибки: фильтр только по второй колонке → full scan; range в середине — user_id после created_at range не индексируется; индекс (status, user_id) когда нужен (user_id, status); 5+ колонок «на всякий случай»; отдельный индекс на (a) когда уже есть (a,b). NULL индексируется в PostgreSQL/MySQL — WHERE col IS NULL может использовать индекс. Planner выбирает index vs seq scan по cost — EXPLAIN ANALYZE. Реальные кейсы: (user_id, status) orders; (tenant_id, resource_type, created_at) SaaS; (email, is_active) auth.",
+    "maxScore": 10,
+    "skills": ["architecture"]
+  },
+  "checkpoints": [
+    {
+      "key": "composite_definition",
+      "title": "Понимает определение композитного индекса",
+      "expected": "Кандидат объясняет: индекс на двух+ колонках, сортировка слева направо; один хорошо спроектированный composite заменяет несколько single-column.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR composite index",
+        "probePolicy": { "requireProbeBeforeFinalPartial": true, "minScoreAfterShallowAccept": 0.55 },
+        "probeConceptGroups": [{ "match": ["композит", "composite", "несколько колонок"], "ask": "чем композитный индекс отличается от индекса на одну колонку" }],
+        "mustConcepts": ["композит", "composite", "несколько колонок", "две колонки", "слева направо", "сортир", "last_name", "first_name", "CREATE INDEX", "отсортирован", "группа", "заменяет", "single-column", "один индекс"],
+        "falseClaims": ["композитный индекс работает для любого порядка колонок в WHERE", "порядок колонок в индексе не важен", "composite index — это только covering index", "индекс на (a,b) помогает запросу WHERE b=1 без a", "композитный индекс не влияет на INSERT"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "leftmost_prefix",
+      "title": "Знает правило левого префикса",
+      "expected": "Кандидат описывает: (a,b,c) = индексы на a, (a,b), (a,b,c); WHERE только b=1 — full scan; range на col2 обрывает использование col3.",
+      "score": 2.0,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "leftmost prefix — центральная senior тема",
+        "impliesCheckpointFloors": [{ "checkpointKey": "composite_definition", "floorFraction": 0.45 }],
+        "confusionPairs": [{ "checkpointKey": "leftmost_prefix", "oftenConfusedWith": ["column_ordering"], "anchorTermsExpected": ["левый префикс", "leftmost", "первая колонка", "full scan"], "anchorTermsWrongTopic": ["WHERE b=1 использует (a,b,c)", "порядок в SELECT важен"] }],
+        "probeConceptGroups": [{ "match": ["leftmost", "левый префикс", "первая колонка"], "ask": "почему WHERE first_name без last_name не использует idx(last_name, first_name)" }],
+        "mustConcepts": ["левый префикс", "leftmost prefix", "col1", "col2", "col3", "первая колонка", "точка входа", "full table scan", "full scan", "range", "диапазон", "обрывает", "цепочк", "status", "created_at", "customer_id", "WHERE"],
+        "falseClaims": ["индекс (a,b,c) обслуживает WHERE c=5 без a и b", "range на col2 не мешает использовать col3 в индексе", "leftmost prefix rule действует только в MySQL", "порядок колонок в SELECT определяет использование индекса"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "column_ordering",
+      "title": "Правильно упорядочивает колонки",
+      "expected": "Кандидат объясняет: equality перед range; (user_id, created_at) для user_id=5 AND created_at>date; высокая кардинальность — вторично после equality-before-range.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Column ordering из ITLead",
+        "mustConcepts": ["equality", "равенств", "range", "диапазон", "user_id", "created_at", "кардинальност", "высок", "низк", "status", "перед", "порядок колонок", "фильтрует вручную", "idx_orders_fixed"],
+        "falseClaims": ["(created_at, user_id) лучше для user_id=5 AND created_at>date", "кардинальность важнее правила equality-before-range", "range колонку ставят первой для скорости", "порядок колонок влияет только на covering index"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "covering_composite",
+      "title": "Отличает covering index от composite",
+      "expected": "Кандидат объясняет: все covering — composite, но не все composite покрывают запрос; Index Only Scan; trade-off размер vs I/O.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Covering indexes section",
+        "mustConcepts": ["covering", "покрывающ", "Index Only Scan", "Index Scan", "heap fetch", "SELECT", "order_id", "total_amount", "tenant_id", "I/O", "80-90%", "широк", "INSERT", "UPDATE", "storage"],
+        "falseClaims": ["covering index и composite index — синонимы", "covering index никогда не читает таблицу даже при SELECT *", "широкий covering index не замедляет запись", "Index Only Scan возможен без всех колонок в индексе"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "composite_mistakes",
+      "title": "Знает типичные ошибки композитных индексов",
+      "expected": "Кандидат называет: фильтр по non-leftmost; range в середине; лишние колонки 5+; дублирующий индекс на (a) при (a,b); NULL в индексе.",
+      "score": 2.0,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — частая prod и interview ошибка",
+        "mustConcepts": ["WHERE b=1", "non-leftmost", "range в середине", "status", "user_id", "created_at", "5+ колонок", "over-indexing", "legacy", "NULL", "IS NULL", "дублирующ", "отдельный индекс", "переиндексац"],
+        "falseClaims": ["WHERE status='active' использует idx(user_id, status)", "5+ колонок в индексе всегда быстрее 3-колоночного", "NULL не хранится в индексе PostgreSQL", "отдельный индекс на (a) нужен при наличии (a,b)"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "planner_explain",
+      "title": "Понимает выбор планировщика и EXPLAIN",
+      "expected": "Кандидат объясняет: planner сравнивает cost index vs seq scan; большая доля строк → seq scan; EXPLAIN ANALYZE; (a,b) обслуживает (a) без второго индекса.",
+      "score": 1.0,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Follow-up questions planner",
+        "probeConceptGroups": [{ "match": ["EXPLAIN", "planner", "планировщик"], "ask": "когда PostgreSQL выберет sequential scan вместо composite index" }],
+        "mustConcepts": ["EXPLAIN ANALYZE", "EXPLAIN", "planner", "планировщик", "cost", "sequential scan", "index scan", "большая доля", "random I/O", "seq I/O", "отдельный индекс", "over-indexing", "storage"],
+        "falseClaims": ["planner всегда выбирает composite index если он существует", "EXPLAIN показывает только синтаксис без cost", "нужны два индекса для (a) и (a,b)", "seq scan всегда медленнее index scan"],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "real_world_composite",
+      "title": "Приводит практические паттерны composite index",
+      "expected": "Кандидат называет: (user_id, status) orders; (tenant_id, resource_type, created_at) SaaS; (event_type, created_at) dashboards; sessions (user_id, status).",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Real-world usage из ITLead",
+        "mustConcepts": ["user_id", "status", "orders", "tenant_id", "SaaS", "multi-tenant", "event_type", "created_at", "dashboard", "email", "is_active", "sessions", "e-commerce", "auth"],
+        "falseClaims": ["composite index нужен только для JOIN", "в SaaS достаточно одного индекса на id", "real-world паттерны не связаны с leftmost prefix"],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    { "exampleType": "good", "exampleText": "Composite на (last_name, first_name): WHERE last_name='Kim' AND first_name='Alex' — полный индекс; только last_name — leftmost prefix; только first_name — full scan. Equality user_id перед range created_at.", "sortOrder": 0 },
+    { "exampleType": "good", "exampleText": "ну (tenant_id, status, id, amount) покрывает dashboard — Index Only Scan, без heap. WHERE status без tenant_id — idx не поможет, нужен отдельный на status.", "sortOrder": 1 },
+    { "exampleType": "good", "exampleText": "idx(status, user_id, created_at) вместо (status, created_at, user_id) — user_id equality после range created_at не индексировался. EXPLAIN ANALYZE показал fix.", "sortOrder": 2 },
+    { "exampleType": "bad", "exampleText": "Индекс (a,b,c) работает для WHERE c=5. Порядок колонок в SELECT определяет index usage. Нужен отдельный индекс на (a) при (a,b).", "sortOrder": 0 },
+    { "exampleType": "bad", "exampleText": "Covering index — это другое название composite, разницы нет. 8 колонок в индексе всегда лучше.", "sortOrder": 1 },
+    { "exampleType": "bad", "exampleText": "Range на created_at не мешает использовать user_id в том же индексе (status, created_at, user_id).", "sortOrder": 2 },
+    { "checkpointKey": "composite_definition", "exampleType": "good", "exampleText": "CREATE INDEX idx_users_name ON users (last_name, first_name) — сортировка сначала по фамилии.", "sortOrder": 10 },
+    { "checkpointKey": "composite_definition", "exampleType": "good", "exampleText": "композитный — несколько колонок в одном B-tree", "sortOrder": 11 },
+    { "checkpointKey": "composite_definition", "exampleType": "bad", "exampleText": "Composite index — индекс только с INCLUDE колонками.", "sortOrder": 30 },
+    { "checkpointKey": "leftmost_prefix", "exampleType": "good", "exampleText": "WHERE first_name='Alex' без last_name — idx(last_name, first_name) не используется.", "sortOrder": 12 },
+    { "checkpointKey": "leftmost_prefix", "exampleType": "good", "exampleText": "без первой колонки — как scan с середины дерева", "sortOrder": 13 },
+    { "checkpointKey": "leftmost_prefix", "exampleType": "bad", "exampleText": "Leftmost prefix — правило только для clustered index.", "sortOrder": 31 },
+    { "checkpointKey": "column_ordering", "exampleType": "good", "exampleText": "(user_id, created_at) для user_id=5 AND created_at>'2024-01-01', не наоборот.", "sortOrder": 14 },
+    { "checkpointKey": "column_ordering", "exampleType": "good", "exampleText": "равенство первым, диапазон последним", "sortOrder": 15 },
+    { "checkpointKey": "column_ordering", "exampleType": "bad", "exampleText": "Low-cardinality status всегда ставят первым в composite.", "sortOrder": 32 },
+    { "checkpointKey": "covering_composite", "exampleType": "good", "exampleText": "idx_orders_cover (tenant_id, status, id, total_amount) — Index Only Scan на dashboard.", "sortOrder": 16 },
+    { "checkpointKey": "covering_composite", "exampleType": "good", "exampleText": "covering = все колонки запроса в индексе, composite — просто multi-column", "sortOrder": 17 },
+    { "checkpointKey": "covering_composite", "exampleType": "bad", "exampleText": "Covering index не увеличивает размер индекса.", "sortOrder": 33 },
+    { "checkpointKey": "composite_mistakes", "exampleType": "good", "exampleText": "Поиск только по status при idx(user_id, status) — full scan; добавили idx(status).", "sortOrder": 18 },
+    { "checkpointKey": "composite_mistakes", "exampleType": "good", "exampleText": "видел prod баг — search по status, индекс был (user_id, status)", "sortOrder": 19 },
+    { "checkpointKey": "composite_mistakes", "exampleType": "bad", "exampleText": "WHERE col IS NULL никогда не использует composite index.", "sortOrder": 34 },
+    { "checkpointKey": "planner_explain", "exampleType": "good", "exampleText": "EXPLAIN ANALYZE: 90% rows — seq scan дешевле random index I/O.", "sortOrder": 20 },
+    { "checkpointKey": "planner_explain", "exampleType": "good", "exampleText": "(a,b) уже покрывает запросы только на a", "sortOrder": 21 },
+    { "checkpointKey": "planner_explain", "exampleType": "bad", "exampleText": "Planner игнорирует cardinality при выборе index.", "sortOrder": 35 },
+    { "checkpointKey": "real_world_composite", "exampleType": "good", "exampleText": "Multi-tenant SaaS: (tenant_id, resource_type, created_at) на почти каждой таблице.", "sortOrder": 22 },
+    { "checkpointKey": "real_world_composite", "exampleType": "good", "exampleText": "sessions (user_id, status) для active token lookup", "sortOrder": 23 },
+    { "checkpointKey": "real_world_composite", "exampleType": "bad", "exampleText": "Composite index используют только для UNIQUE constraint.", "sortOrder": 36 }
+  ],
+  "itlead": {
+    "slug": "shcho-take-kompozytni-indeksy",
+    "apiUrl": "https://api.itlead.org/api/questions/shcho-take-kompozytni-indeksy",
+    "pageUrl": "https://itlead.org/interview-questions/general/shcho-take-kompozytni-indeksy",
+    "difficulty": "SENIOR",
+    "titleEn": "What are composite indexes?",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

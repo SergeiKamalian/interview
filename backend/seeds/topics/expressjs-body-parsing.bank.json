@@ -1,0 +1,480 @@
+{
+  "topic": {
+    "code": "expressjs_body_parsing",
+    "name": "Парсинг тела запроса в Express.js",
+    "skillCode": "expressjs",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Как работает парсинг тела запроса (body parsing) в Express.js?",
+    "shortAnswer": "Body parsing в Express преобразует сырой поток байт HTTP-тела в JavaScript-объект на req.body. Добавь express.json() для JSON API и express.urlencoded({ extended: true }) для HTML-форм — обязательно до определения маршрутов. Без парсера req.body всегда undefined.",
+    "idealAnswer": "Тело HTTP-запроса приходит как поток байт. Без middleware-парсера req.body всегда undefined, даже если клиент отправил данные. express.json() обрабатывает application/json: буферизует чанки до лимита (1mb по умолчанию), проверяет Content-Type, вызывает JSON.parse и кладёт результат в req.body; битый JSON даёт 400 до route handler. express.urlencoded({ extended: true }) парсит HTML-формы (application/x-www-form-urlencoded); extended: true использует qs и поддерживает вложенные объекты, extended: false — только плоские пары через querystring. Парсеры регистрируют ДО маршрутов — поток читается один раз; app.use(express.json()) после app.post даёт undefined в handler. multipart/form-data (загрузка файлов) встроенные парсеры не обрабатывают — нужен multer; req.body будет {}. Для Stripe webhooks и HMAC-верификации — express.raw(), req.body как Buffer точных байт, не распарсенный объект. Лимит размера: по умолчанию 1mb; для публичных auth-эндпоинтов явно express.json({ limit: '10kb' }) — иначе DoS через огромный payload в памяти. До Express 4.16 нужен отдельный пакет body-parser; сейчас встроен в express, body-parser всё ещё можно для кастомных настроек. Типичные ошибки: парсер после route, клиент без Content-Type: application/json при fetch, встроенный парсер для file upload, extended: false с вложенными полями формы. Двойная регистрация express.json() — второй парсер получает пустой поток, бесполезная трата CPU. GET и static — парсеры не нужны. Реальные кейсы: REST API — express.json(); login/register формы — urlencoded; avatar upload — multer.single; webhook — express.raw.",
+    "maxScore": 10,
+    "skills": ["expressjs", "javascript", "nodejs"]
+  },
+  "checkpoints": [
+    {
+      "key": "body_parsing_basics",
+      "title": "Понимает суть body parsing и req.body",
+      "expected": "Кандидат объясняет: парсер читает поток байт и кладёт результат в req.body; без парсера req.body undefined; middleware до handler.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "ядро TL;DR — без парсера req.body undefined",
+        "probeConceptGroups": [
+          {
+            "match": ["req.body", "undefined", "парсер", "middleware"],
+            "ask": "почему req.body undefined без express.json()"
+          }
+        ],
+        "mustConcepts": [
+          "req.body",
+          "undefined",
+          "поток байт",
+          "stream",
+          "middleware",
+          "парсер",
+          "body parsing",
+          "парсинг тела",
+          "JavaScript объект",
+          "объект",
+          "handler",
+          "обработчик маршрута",
+          "Content-Type",
+          "заголовок"
+        ],
+        "falseClaims": [
+          "req.body заполняется автоматически без middleware",
+          "Express сам парсит JSON без express.json()",
+          "req.body доступен до route handler без парсера",
+          "body parsing работает только для POST"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "json_urlencoded_parsers",
+      "title": "Различает express.json() и express.urlencoded()",
+      "expected": "Кандидат: express.json() для application/json; express.urlencoded для HTML-форм; оба через app.use до routes.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "два основных встроенных парсера из ITLead quick example",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "body_parsing_basics",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "json_urlencoded_parsers",
+            "oftenConfusedWith": ["which_parser_when"],
+            "anchorTermsExpected": [
+              "express.json",
+              "express.urlencoded",
+              "application/json",
+              "HTML форм",
+              "urlencoded"
+            ],
+            "anchorTermsWrongTopic": [
+              "multer для JSON",
+              "urlencoded для file upload"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "express.json",
+          "express.urlencoded",
+          "application/json",
+          "application/x-www-form-urlencoded",
+          "HTML форм",
+          "форма",
+          "app.use",
+          "JSON.parse",
+          "name=Alice",
+          "querystring",
+          "qs",
+          "встроенн",
+          "body-parser"
+        ],
+        "falseClaims": [
+          "express.json() парсит multipart/form-data",
+          "urlencoded нужен только для GET запросов",
+          "express.json() и urlencoded взаимозаменяемы для любого формата"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "parser_order",
+      "title": "Регистрирует парсеры до маршрутов",
+      "expected": "Кандидат: app.use(express.json()) перед app.post; поток one-pass; парсер после route — req.body undefined.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "самая частая ошибка junior — порядок middleware",
+        "probeConceptGroups": [
+          {
+            "match": ["после", "до", "порядок", "undefined"],
+            "ask": "почему req.body undefined если express.json() ниже app.post"
+          }
+        ],
+        "mustConcepts": [
+          "до маршрут",
+          "перед route",
+          "порядок",
+          "one-pass",
+          "один раз",
+          "поток прочитан",
+          "stream consumed",
+          "app.use",
+          "app.post",
+          "too late",
+          "запоздал"
+        ],
+        "falseClaims": [
+          "порядок парсера и route не важен",
+          "поток можно прочитать дважды встроенным парсером",
+          "express.json() после handler всё равно заполнит req.body"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "which_parser_when",
+      "title": "Выбирает парсер под формат данных",
+      "expected": "Кандидат: JSON API — express.json(); формы — urlencoded; файлы — multer; webhooks — express.raw(); GET/static — без парсера.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "When to use each parser — multer vs raw vs built-in",
+        "confusionPairs": [
+          {
+            "checkpointKey": "which_parser_when",
+            "oftenConfusedWith": ["json_urlencoded_parsers"],
+            "anchorTermsExpected": [
+              "multer",
+              "multipart",
+              "express.raw",
+              "Buffer",
+              "Stripe"
+            ],
+            "anchorTermsWrongTopic": [
+              "express.json для file upload",
+              "multer для JSON API"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "multer",
+          "multipart/form-data",
+          "file upload",
+          "загрузк файл",
+          "express.raw",
+          "Buffer",
+          "Stripe",
+          "webhook",
+          "HMAC",
+          "сырые байт",
+          "GET",
+          "static",
+          "REST API",
+          "fetch",
+          "JSON.stringify"
+        ],
+        "falseClaims": [
+          "встроенный парсер обрабатывает multipart/form-data",
+          "express.json() подходит для Stripe webhook signature",
+          "multer заменяет express.json() для всех POST"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "extended_option",
+      "title": "Понимает опцию extended в urlencoded",
+      "expected": "Кандидат: extended: true — qs, вложенные объекты; extended: false — плоские строковые ключи user[name].",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "extended option из ITLead — типичная путаница junior",
+        "mustConcepts": [
+          "extended",
+          "extended: true",
+          "extended: false",
+          "qs",
+          "querystring",
+          "вложенн",
+          "nested",
+          "user[name]",
+          "плоск",
+          "flat",
+          "массив"
+        ],
+        "falseClaims": [
+          "extended: false парсит user[name] во вложенный объект",
+          "extended не влияет на результат urlencoded",
+          "extended: true использует querystring без qs"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "size_limits",
+      "title": "Знает лимиты размера тела",
+      "expected": "Кандидат: default 1mb; per-route limit; DoS через большой payload; express.json({ limit: '10kb' }) для auth.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "size limit и DoS vector из ITLead",
+        "mustConcepts": [
+          "limit",
+          "1mb",
+          "10kb",
+          "буфериз",
+          "память",
+          "memory",
+          "DoS",
+          "denial-of-service",
+          "per-route",
+          "на маршрут",
+          "untrusted",
+          "недоверенн",
+          "login"
+        ],
+        "falseClaims": [
+          "лимит по умолчанию безграничен",
+          "большой payload отклоняется до буферизации в памяти",
+          "limit не настраивается per-route"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки body parsing",
+      "expected": "Кандидат: парсер после route; нет Content-Type на клиенте; built-in для file upload; extended: false с nested forms; двойной express.json().",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production debugging",
+        "probeConceptGroups": [
+          {
+            "match": ["Content-Type", "fetch", "заголовок"],
+            "ask": "почему fetch без Content-Type оставляет req.body пустым"
+          },
+          {
+            "match": ["multer", "multipart", "файл"],
+            "ask": "почему req.body {} при upload через form enctype multipart"
+          }
+        ],
+        "mustConcepts": [
+          "Content-Type",
+          "fetch",
+          "заголовок",
+          "multipart",
+          "multer",
+          "дважды",
+          "двойн",
+          "пустой поток",
+          "network tab",
+          "логи",
+          "undefined",
+          "enctype"
+        ],
+        "falseClaims": [
+          "fetch с JSON.stringify всегда ставит Content-Type автоматически в Express",
+          "встроенный парсер достаточен для avatar upload",
+          "два express.json() ускоряют парсинг"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "app.use(express.json()) и express.urlencoded({ extended: true }) — до всех routes. POST /user читает req.body как объект. Без парсера req.body undefined. Для avatar — multer, не built-in.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "JSON API: express.json(). Форма логина: urlencoded extended true. Stripe webhook: express.raw — Buffer для HMAC. Login route: express.json({ limit: '10kb' }).",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Парсер буферизует stream до 1mb, смотрит Content-Type, JSON.parse в req.body. Парсер после app.post — классика: network ок, body undefined.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "req.body сам заполняется Express — middleware не нужен. Порядок парсера и route не важен.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для file upload достаточно express.json(). fetch с body JSON.stringify — Content-Type не нужен.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "extended: false норм для user[profile][name] — получится вложенный объект. Лимит body безграничный по умолчанию.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "body_parsing_basics",
+      "exampleType": "good",
+      "exampleText": "Body parsing — middleware читает поток и кладёт объект в req.body до handler.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "body_parsing_basics",
+      "exampleType": "good",
+      "exampleText": "без express.json req.body всегда undefined даже если curl шлёт json",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "body_parsing_basics",
+      "exampleType": "bad",
+      "exampleText": "Express автоматически парсит любое тело в req.body без middleware.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "json_urlencoded_parsers",
+      "exampleType": "good",
+      "exampleText": "express.json() для application/json API; urlencoded extended true для HTML login формы.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "json_urlencoded_parsers",
+      "exampleType": "good",
+      "exampleText": "оба через app.use в начале app — json и urlencoded параллельно",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "json_urlencoded_parsers",
+      "exampleType": "bad",
+      "exampleText": "express.json парсит multipart upload — встроенный умеет всё.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "parser_order",
+      "exampleType": "good",
+      "exampleText": "app.use(express.json()) сверху, потом app.post — иначе stream уже consumed.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "parser_order",
+      "exampleType": "good",
+      "exampleText": "поток one-pass — парсер ниже route бесполезен, body undefined",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "parser_order",
+      "exampleType": "bad",
+      "exampleText": "можно app.post сначала, express.json после — Express перечитает поток.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "which_parser_when",
+      "exampleType": "good",
+      "exampleText": "REST fetch JSON — express.json. Avatar form multipart — multer.single. Stripe — express.raw Buffer.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "which_parser_when",
+      "exampleType": "good",
+      "exampleText": "GET и static files — парсеры не вешаю, экономия памяти",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "which_parser_when",
+      "exampleType": "bad",
+      "exampleText": "Stripe webhook — express.json, HMAC по распарсенному объекту ок.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "extended_option",
+      "exampleType": "good",
+      "exampleText": "extended true + qs: user[name]=Alice → { user: { name: 'Alice' } }",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "extended_option",
+      "exampleType": "good",
+      "exampleText": "extended false — только плоские ключи 'user[name]' строкой",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "extended_option",
+      "exampleType": "bad",
+      "exampleText": "extended false вложенные формы парсит нормально — qs не нужен.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "size_limits",
+      "exampleType": "good",
+      "exampleText": "default 1mb; /login express.json({ limit: '10kb' }) против DoS.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "size_limits",
+      "exampleType": "good",
+      "exampleText": "500mb payload буферится в память до reject — явный limit на public routes",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "size_limits",
+      "exampleType": "bad",
+      "exampleText": "лимит нельзя задать per-route — только глобально один раз.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "fetch без headers Content-Type — парсер не матчится, body пустой.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "два express.json подряд — второй пустой stream, лишний CPU",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "multipart upload через express.urlencoded — req.body заполнится файлом.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "expressjs-body-parsing",
+    "apiUrl": "https://api.itlead.org/api/questions/expressjs-body-parsing",
+    "pageUrl": "https://itlead.org/interview-questions/expressjs/expressjs-body-parsing",
+    "difficulty": "JUNIOR",
+    "titleEn": "How does body parsing work in Express.js?",
+    "categorySlug": "expressjs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

@@ -1,0 +1,457 @@
+{
+  "topic": {
+    "code": "docker_restart_policy",
+    "name": "Restart policy в Docker",
+    "skillCode": "docker",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Что такое restart policy в Docker и какие варианты существуют?",
+    "shortAnswer": "Restart policy задаёт, когда Docker daemon автоматически перезапускает остановившийся контейнер. Четыре варианта: `no` (по умолчанию), `on-failure[:N]`, `always`, `unless-stopped`. Для долгоживущих сервисов в production обычно берут `unless-stopped`: переживает crash и reboot хоста, но уважает ручной `docker stop`.",
+    "idealAnswer": "Restart policy — правило для Docker daemon: перезапускать ли контейнер после его exit. Задаётся флагом `--restart=<policy>` в `docker run` или ключом `restart:` в Compose. Четыре значения: `no` (дефолт — контейнер остаётся exited), `on-failure[:N]` (только при ненулевом exit code, до N попыток; не переживает reboot хоста), `always` (рестарт при любом exit, после reboot и даже после ручного `docker stop` — чтобы остановить надо `docker rm`), `unless-stopped` (как always, но ручной stop сохраняется — production default для ~95% long-running сервисов). Политика срабатывает на exit процесса контейнера (и clean 0, и error); фильтр по коду — только у `on-failure`. При рестарте daemon (`systemctl restart docker`) или reboot хоста поднимаются контейнеры с `always` и `unless-stopped`, если они были running; `on-failure` — нет. Между retry daemon использует exponential backoff: 100ms, 200ms, 400ms… до cap — защита от crash-loop. В Compose `\"no\"` в YAML нужно в кавычках, иначе парсится как boolean false. Типичные ошибки: не указать policy на prod-сервисе (после reboot всё лежит); `always` и удивление что `docker stop` не держится; `on-failure` для сервиса, который должен пережить reboot; `always` для job с exit 0 — бесконечный рестарт. Restart policy реагирует на exit процесса, не на unhealthy healthcheck — зависший но живой контейнер Docker сам не перезапустит (нужен autoheal/Swarm/K8s). Swarm использует свой `deploy.restart_policy`, флаг `--restart` для standalone. В K8s/kubelet Docker restart policy игнорируется — один restart authority на контейнер. CI/one-shot — default `no`; workers — `on-failure:N`; prod API — `unless-stopped`. Проверка: `docker inspect <name> --format '{{.HostConfig.RestartPolicy.Name}}'`.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "restart_policy_basics",
+      "title": "Понимает restart policy",
+      "expected": "Кандидат объясняет: policy говорит daemon когда автоматически перезапускать exited контейнер; задаётся `--restart` или `restart:` в Compose; называет четыре значения: no, on-failure[:N], always, unless-stopped.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — определение и четыре опции",
+        "mustConcepts": [
+          "restart policy",
+          "политик",
+          "перезапуск",
+          "daemon",
+          "docker run",
+          "--restart",
+          "Compose",
+          "restart:",
+          "no",
+          "on-failure",
+          "always",
+          "unless-stopped",
+          "exited",
+          "контейнер",
+          "автомат",
+          "четыре"
+        ],
+        "falseClaims": [
+          "restart policy перезапускает running контейнер без exit",
+          "по умолчанию Docker всегда перезапускает контейнеры",
+          "restart policy настраивается только в docker-compose.yml",
+          "в Docker только две политики: always и no"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "policy_no_and_on_failure",
+      "title": "Знает no и on-failure",
+      "expected": "Кандидат объясняет: `no` — дефолт, контейнер остаётся exited; `on-failure[:N]` — рестарт только при ненулевом exit code, до N попыток; подходит для batch/job, не переживает reboot хоста.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "no default и on-failure[:N] — базовая таблица ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "on-failure",
+              "exit code",
+              "код"
+            ],
+            "ask": "когда on-failure перезапустит контейнер, а когда нет"
+          }
+        ],
+        "mustConcepts": [
+          "no",
+          "дефолт",
+          "default",
+          "on-failure",
+          "exit code",
+          "код выхода",
+          "ненулев",
+          "non-zero",
+          ":N",
+          "лимит",
+          "retry",
+          "batch",
+          "job",
+          "reboot",
+          "не пережива",
+          "exited"
+        ],
+        "falseClaims": [
+          "on-failure перезапускает при exit code 0",
+          "no — это явная политика always-off, не дефолт docker run",
+          "on-failure автоматически поднимает контейнер после reboot хоста",
+          "on-failure без :N никогда не останавливает retry"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "always_vs_unless_stopped",
+      "title": "Различает always и unless-stopped",
+      "expected": "Кандидат объясняет: оба переживают crash и reboot; `always` рестартит даже после `docker stop`; `unless-stopped` уважает ручной stop — production default для long-running сервисов.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевое prod-различие из таблицы и follow-up ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "restart_policy_basics",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "always_vs_unless_stopped",
+            "oftenConfusedWith": [
+              "policy_no_and_on_failure"
+            ],
+            "anchorTermsExpected": [
+              "always",
+              "unless-stopped",
+              "docker stop",
+              "ручной stop",
+              "reboot",
+              "production"
+            ],
+            "anchorTermsWrongTopic": [
+              "on-failure переживает reboot",
+              "always уважает docker stop"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "always",
+              "unless-stopped",
+              "docker stop"
+            ],
+            "ask": "чем always отличается от unless-stopped после ручного docker stop"
+          }
+        ],
+        "mustConcepts": [
+          "always",
+          "unless-stopped",
+          "docker stop",
+          "ручной stop",
+          "manual stop",
+          "reboot",
+          "crash",
+          "production",
+          "prod",
+          "default",
+          "пережива",
+          "рестарт",
+          "docker rm",
+          "long-running",
+          "сервис"
+        ],
+        "falseClaims": [
+          "always и unless-stopped одинаково ведут себя после docker stop",
+          "unless-stopped не перезапускает после crash",
+          "always — рекомендуемый дефолт для всех prod-сервисов",
+          "чтобы остановить always-контейнер достаточно docker stop навсегда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "daemon_reboot_backoff",
+      "title": "Знает поведение daemon и backoff",
+      "expected": "Кандидат описывает: policy проверяется при exit контейнера; after daemon/host restart поднимаются always и unless-stopped (если были running); exponential backoff между retry (100ms, 200ms, 400ms…).",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "How it interacts with the daemon — TL;DR junior+",
+        "mustConcepts": [
+          "daemon",
+          "exit",
+          "reboot",
+          "host",
+          "systemctl restart docker",
+          "always",
+          "unless-stopped",
+          "on-failure",
+          "running",
+          "exponential backoff",
+          "backoff",
+          "100ms",
+          "200ms",
+          "400ms",
+          "retry",
+          "crash-loop",
+          "hot-loop"
+        ],
+        "falseClaims": [
+          "on-failure поднимает контейнер после reboot хоста",
+          "daemon рестартит контейнер без задержки при каждом crash",
+          "restart policy не применяется при reboot хоста",
+          "backoff отсутствует — retry идут мгновенно бесконечно"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: забыть policy на prod (после reboot сервис down); `always` и surprise после stop; `on-failure` для сервиса которому нужен reboot survival; restart policy не реагирует на unhealthy healthcheck без exit.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes и healthcheck nuance из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "healthcheck",
+              "unhealthy",
+              "health"
+            ],
+            "ask": "перезапустит ли Docker контейнер если healthcheck unhealthy но процесс не упал"
+          },
+          {
+            "match": [
+              "забыл",
+              "не указал",
+              "reboot"
+            ],
+            "ask": "что случится с контейнером без restart policy после reboot хоста"
+          }
+        ],
+        "mustConcepts": [
+          "забыл",
+          "не указал",
+          "reboot",
+          "down",
+          "always",
+          "docker stop",
+          "surprise",
+          "on-failure",
+          "reboot survival",
+          "healthcheck",
+          "unhealthy",
+          "exit",
+          "процесс",
+          "autoheal",
+          "crash-loop",
+          "exit 0"
+        ],
+        "falseClaims": [
+          "Docker автоматически рестартит unhealthy контейнер по healthcheck",
+          "без --restart контейнер всё равно поднимется после reboot",
+          "always — лучший выбор когда нужно уважать docker stop",
+          "on-failure подходит для prod API который должен пережить reboot"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "compose_and_usage",
+      "title": "Знает Compose и практику",
+      "expected": "Кандидат показывает `restart:` в Compose (кавычки для \"no\"); разные policy per service; prod — unless-stopped, CI — no, worker — on-failure:N; inspect для проверки policy.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Compose syntax и real-world usage из ITLead examples",
+        "mustConcepts": [
+          "Compose",
+          "restart:",
+          "кавычк",
+          "\"no\"",
+          "YAML",
+          "unless-stopped",
+          "on-failure",
+          "worker",
+          "migrator",
+          "one-shot",
+          "CI",
+          "docker inspect",
+          "RestartPolicy",
+          "api",
+          "profiles"
+        ],
+        "falseClaims": [
+          "restart: no в YAML без кавычек работает корректно",
+          "в Compose нельзя задать разные restart policy для разных сервисов",
+          "docker inspect не показывает restart policy",
+          "для CI job нужен unless-stopped"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Restart policy — когда daemon перезапускает контейнер после exit. Четыре варианта: no (дефолт), on-failure[:N], always, unless-stopped. Для prod API ставлю unless-stopped: crash и reboot переживает, docker stop — остаётся stopped.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В compose api — restart: unless-stopped, worker — on-failure, migrator — restart: \"no\" one-shot. always не беру: после docker stop контейнер снова поднимется, нужен docker rm.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "on-failure:3 для flaky job — три ненулевых exit и daemon сдаётся. Без policy на single-host deploy после ночного reboot сервис не поднимется — классическая ops-ошибка.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Restart policy — это healthcheck. Docker сам перезапустит контейнер если curl /health упал, даже если процесс жив.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "always и unless-stopped одинаковые. on-failure поднимает сервис после reboot хоста. Дефолт docker run — unless-stopped.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker stop навсегда останавливает контейнер с --restart=always. Restart policy работает в Swarm через флаг --restart на service.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "restart_policy_basics",
+      "exampleType": "good",
+      "exampleText": "Policy задаётся --restart=unless-stopped или restart: в compose. Четыре значения: no, on-failure, always, unless-stopped.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "restart_policy_basics",
+      "exampleType": "good",
+      "exampleText": "ну это правило когда докер сам поднимает упавший контейнер, флаг --restart",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "restart_policy_basics",
+      "exampleType": "bad",
+      "exampleText": "Restart policy включается автоматически для всех detached контейнеров, отдельно настраивать не нужно.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "policy_no_and_on_failure",
+      "exampleType": "good",
+      "exampleText": "no — дефолт, контейнер exited и лежит. on-failure:5 — до пяти retry только при exit != 0, для batch job.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "policy_no_and_on_failure",
+      "exampleType": "good",
+      "exampleText": "CI one-shot — docker run --rm без restart, default no. on-failure без лимита retry бесконечно при каждом crash.",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "policy_no_and_on_failure",
+      "exampleType": "bad",
+      "exampleText": "on-failure рестартит и при exit 0, и после reboot хоста поднимает контейнер автоматически.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "always_vs_unless_stopped",
+      "exampleType": "good",
+      "exampleText": "unless-stopped — prod default: crash/reboot ok, docker stop — stays stopped. always рестартит даже после stop, пока не docker rm.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "always_vs_unless_stopped",
+      "exampleType": "good",
+      "exampleText": "оба переживают reboot, разница только в ручном stop — always игнорирует намерение ops",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "always_vs_unless_stopped",
+      "exampleType": "bad",
+      "exampleText": "unless-stopped не перезапускает после crash, только always это делает.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "daemon_reboot_backoff",
+      "exampleType": "good",
+      "exampleText": "При exit daemon смотрит policy. После reboot поднимутся unless-stopped/always если были running. Retry с exponential backoff 100→200→400ms.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "daemon_reboot_backoff",
+      "exampleType": "good",
+      "exampleText": "systemctl restart docker — unless-stopped контейнеры вернутся, on-failure job — нет",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "daemon_reboot_backoff",
+      "exampleType": "bad",
+      "exampleText": "on-failure всегда поднимается после reboot хоста так же как unless-stopped.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Забыл --restart на api — работало до reboot, потом down. always + docker stop — контейнер снова в ps. Healthcheck unhealthy без exit — policy не сработает.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "always на job с exit 0 — бесконечный рестарт, лучше on-failure. Для unhealthy без падения — autoheal sidecar.",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Docker restart policy и healthcheck — одно и то же, unhealthy всегда триггерит restart.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "compose_and_usage",
+      "exampleType": "good",
+      "exampleText": "services: api restart unless-stopped, migrator restart: \"no\" — кавычки обязательны. Проверка: docker inspect --format '{{.HostConfig.RestartPolicy.Name}}'.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "compose_and_usage",
+      "exampleType": "good",
+      "exampleText": "prod single-host — unless-stopped везде, ci build — no, worker — on-failure",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "compose_and_usage",
+      "exampleType": "bad",
+      "exampleText": "restart: no в yaml без кавычек — норм, yaml сам поймёт строку no.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "docker-restart-policy",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-restart-policy",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-restart-policy",
+    "difficulty": "JUNIOR",
+    "titleEn": "What is a Docker restart policy and what options exist?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

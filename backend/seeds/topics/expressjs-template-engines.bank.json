@@ -1,0 +1,398 @@
+{
+  "topic": {
+    "code": "expressjs_template_engines",
+    "name": "Шаблонизаторы в Express.js",
+    "skillCode": "expressjs",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Как использовать шаблонизаторы (template engines) в Express.js?",
+    "shortAnswer": "Шаблонизатор рендерит HTML на сервере, объединяя файл шаблона с объектом данных. Установите engine (`npm install ejs`), настройте `app.set('view engine', 'ejs')` и `app.set('views', path.join(__dirname, 'views'))`, затем вызывайте `res.render('view', data)` в обработчиках маршрутов.",
+    "idealAnswer": "Template engine генерирует динамический HTML на сервере: вместо конкатенации строк в `res.send()` разметка живёт в `.ejs`/`.pug`/`.hbs` файлах, а route handler вызывает `res.render('view', data)`. Express не включает engine из коробки — сначала `npm install ejs` (или pug, handlebars, nunjucks), иначе `Cannot find module 'ejs'`. Базовая настройка: `app.set('view engine', 'ejs')` и `app.set('views', path.join(__dirname, 'views'))` — абсолютный путь через `path.join`, относительный `./views` ломается при запуске из другой директории. Популярные engines: EJS (HTML + `<% %>` — самый простой старт), Pug (indent-синтаксис, меньше boilerplate), Handlebars (`{{ }}`, logic-less), Nunjucks (Jinja2-like). EJS-теги: `<% code %>` — выполняет JS без вывода; `<%= value %>` — вывод с HTML-экранированием (безопасно для user input); `<%- value %>` — сырой HTML без escape (XSS при недоверенных данных); `<%- include('partial') %>` — partials для header/footer. `app.locals` — глобальные данные для всех шаблонов (siteName, year); `res.locals` — per-request через middleware (currentUser). `res.render('dashboard', data)` загружает файл, компилирует в JS-функцию, кеширует в памяти; в `NODE_ENV=production` recompile не нужен, в dev перекомпилирует каждый запрос. `res.render` vs `res.send`: render — template + data → HTML; send — готовая строка/buffer без файла шаблона. Когда использовать: блог, admin dashboard, email/HTML-отчёты с данными из БД. Не нужен для JSON API (`res.json`) и SPA с React/Vue на клиенте. Типичные ошибки: не установить npm-пакет engine; относительный путь views; `<%- user.name` — XSS; `res.render('users')` без data → undefined; `res.render()` и `res.json()` в одном handler → `Cannot set headers after they are sent`. Данные между запросами не протекают: кешируется compiled function, каждый вызов получает свежие locals; в `app.locals` только статика.",
+    "maxScore": 10,
+    "skills": ["expressjs", "javascript", "nodejs"]
+  },
+  "checkpoints": [
+    {
+      "key": "template_engine_setup",
+      "title": "Настраивает view engine и res.render",
+      "expected": "Кандидат описывает: npm install ejs; app.set('view engine', 'ejs'); app.set('views', path.join(__dirname, 'views')); res.render('home', { title, users }) объединяет шаблон с данными и отправляет HTML.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "ядро TL;DR и Quick setup из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": ["res.render", "view engine", "app.set"],
+            "ask": "что делает res.render и какие два app.set нужны для EJS"
+          }
+        ],
+        "mustConcepts": [
+          "template engine",
+          "шаблонизатор",
+          "view engine",
+          "app.set",
+          "views",
+          "res.render",
+          "ejs",
+          "npm install",
+          "path.join",
+          "__dirname",
+          "HTML на сервере",
+          "динамическ",
+          "объект данных",
+          "route handler",
+          "Cannot find module"
+        ],
+        "falseClaims": [
+          "view engine встроен в express без npm-пакета",
+          "res.render работает без app.set('views')",
+          "template engines нужны для JSON API",
+          "Express автоматически устанавливает ejs"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "ejs_syntax",
+      "title": "Знает синтаксис EJS и partials",
+      "expected": "Кандидат различает `<% %>`, `<%= %>` (escaped), `<%- %>` (raw HTML), `<%- include('partial') %>`; понимает зачем include для header/footer.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "EJS tag reference — ключевая таблица ITLead",
+        "probeConceptGroups": [
+          {
+            "match": ["<%=", "<%-", "<%"],
+            "ask": "разница между <% %>, <%= %> и <%- %> в EJS"
+          }
+        ],
+        "mustConcepts": [
+          "<%=",
+          "<%-",
+          "<%",
+          "escaped",
+          "экранир",
+          "unescaped",
+          "сырой HTML",
+          "include",
+          "partial",
+          "partials",
+          "header",
+          "footer",
+          "forEach",
+          "логика",
+          "без вывода"
+        ],
+        "falseClaims": [
+          "<%- безопасен для данных от пользователя",
+          "<%= не экранирует HTML-символы",
+          "partials невозможны в EJS",
+          "include требует отдельный npm-пакет"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "partials_locals",
+      "title": "Использует app.locals и res.locals",
+      "expected": "Кандидат: app.locals для статики (siteName, year) во всех шаблонах; res.locals через middleware для per-request данных (currentUser); partial видит locals без явной передачи.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Partials and global variables — dashboard example ITLead",
+        "mustConcepts": [
+          "app.locals",
+          "res.locals",
+          "middleware",
+          "currentUser",
+          "siteName",
+          "глобальн",
+          "на каждый запрос",
+          "per-request",
+          "auth",
+          "статическ",
+          "конфиг",
+          "partial",
+          "include",
+          "без явной передачи"
+        ],
+        "falseClaims": [
+          "app.locals хранит user-specific данные между запросами безопасно",
+          "res.locals сохраняется между разными HTTP-запросами как session",
+          "partials не видят res.locals из middleware"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use_render",
+      "title": "Понимает когда нужен engine и render vs send/json",
+      "expected": "Кандидат: res.render для server-rendered HTML (блог, dashboard, email); res.json для API; SPA React/Vue — engine не нужен; res.send — готовая строка без шаблона.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "When to use + res.render vs res.send из follow-up ITLead",
+        "mustConcepts": [
+          "res.render",
+          "res.send",
+          "res.json",
+          "JSON API",
+          "SSR",
+          "HTML page",
+          "admin",
+          "dashboard",
+          "блог",
+          "React",
+          "Vue",
+          "SPA",
+          "клиент рендерит",
+          "email",
+          "прототип",
+          "SEO"
+        ],
+        "falseClaims": [
+          "res.render возвращает JSON для REST-клиентов",
+          "template engines заменяют React SPA во всех случаях",
+          "res.send и res.render делают одно и то же с шаблоном",
+          "engine нужен для Express API backend с React frontend"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "xss_safety",
+      "title": "Понимает XSS и безопасный вывод",
+      "expected": "Кандидат: user/database/form data только через `<%= %>`; `<%- %>` только для доверенного HTML; `<%- user.name` рендерит script как исполняемый HTML.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Safe vs unsafe output — критичная security-секция ITLead",
+        "mustConcepts": [
+          "XSS",
+          "escape",
+          "экранир",
+          "<%=",
+          "<%-",
+          "user input",
+          "данные пользователя",
+          "база данных",
+          "доверен",
+          "trusted",
+          "script",
+          "injection",
+          "сырой HTML",
+          "безопасн",
+          "comment.text"
+        ],
+        "falseClaims": [
+          "<%- user.name безопасен от XSS",
+          "EJS автоматически блокирует XSS в <%-",
+          "XSS невозможен в server-side templates",
+          "экранирование не нужно для данных из БД"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "template_mistakes",
+      "title": "Знает типичные ошибки и кеширование",
+      "expected": "Кандидат: forgot npm install; relative views path; res.render без data; render+json в одном route; production кеширует compiled template, dev перекомпилирует; данные запросов не протекают между render.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Common mistakes + caching follow-up ITLead",
+        "mustConcepts": [
+          "Cannot find module",
+          "относительн",
+          "path.join",
+          "views path",
+          "Cannot set headers",
+          "res.render без data",
+          "undefined",
+          "NODE_ENV",
+          "production",
+          "кеш",
+          "compiled",
+          "перекомпил",
+          "development",
+          "свежие locals",
+          "не протекают"
+        ],
+        "falseClaims": [
+          "Express включает EJS из коробки",
+          "views path опционален и Express всегда найдёт ./views",
+          "данные одного res.render попадают в следующий запрос через кеш функции",
+          "в production нужно вручную включать кеш шаблонов"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "npm install ejs; app.set('view engine', 'ejs'); app.set('views', path.join(__dirname, 'views')); res.render('users', { title: 'Список', users }). Шаблон в views/users.ejs — <%= для имён, <% forEach для списка. Для JSON API — res.json, engine не нужен.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "app.locals.siteName на старте; middleware кладёт res.locals.currentUser; в dashboard.ejs <%- include('partials/header') %> — header видит оба locals. User comment через <%= comment.text — XSS-safe.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "res.render компилирует ejs в функцию и кеширует в production; res.send шлёт готовую строку без файла шаблона. Admin panel — render; React SPA backend — только json.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "app.set('view engine', 'ejs') без npm install — Express сам подтянет engine. <%- req.query.comment — нормальный вывод комментариев.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "app.set('views', './views') — всегда работает. res.render и res.json в одном handler — ок, клиент выберет что нужно.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Template engines нужны для Express API с React frontend. Pug всегда быстрее EJS под нагрузкой — это главный критерий выбора.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "template_engine_setup",
+      "exampleType": "good",
+      "exampleText": "npm install ejs → app.set view engine → path.join views → res.render('home', { title: 'Hello', users: ['Alice', 'Bob'] })",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "template_engine_setup",
+      "exampleType": "good",
+      "exampleText": "ну сначала ejs ставишь, потом res.render — express сам не знает как рендерить без пакета",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "template_engine_setup",
+      "exampleType": "bad",
+      "exampleText": "view engine встроен в express, npm install ejs не нужен.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "ejs_syntax",
+      "exampleType": "good",
+      "exampleText": "<%= user.name — escaped; <% if (users.length === 0) — logic; <%- include('partials/header') — partial",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "ejs_syntax",
+      "exampleType": "good",
+      "exampleText": "<%- только для trusted html который сам сгенерил на сервере, user data — всегда <%=",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "ejs_syntax",
+      "exampleType": "bad",
+      "exampleText": "<%- user.name — безопасный вывод, EJS сам санитизирует.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "partials_locals",
+      "exampleType": "good",
+      "exampleText": "app.locals.year = new Date().getFullYear() — в каждом шаблоне; res.locals.currentUser из auth middleware — только этот request",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "partials_locals",
+      "exampleType": "good",
+      "exampleText": "header partial через include — siteName и currentUser уже доступны без передачи в каждый render",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "partials_locals",
+      "exampleType": "bad",
+      "exampleText": "res.locals.currentUser сохраняется между запросами всех пользователей как глобальная переменная.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use_render",
+      "exampleType": "good",
+      "exampleText": "Блог с постами из БД — res.render; REST API для мобилки — res.json; React SPA — static + json, engine не нужен.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use_render",
+      "exampleType": "good",
+      "exampleText": "res.render — файл шаблона + data; res.send — готовый html string без ejs файла",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use_render",
+      "exampleType": "bad",
+      "exampleText": "Для Express + React всегда нужен EJS на бэкенде для рендера UI.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "xss_safety",
+      "exampleType": "good",
+      "exampleText": "<%= comment.text — script в тексте покажется как текст, не выполнится; <%- comment.text — XSS",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "xss_safety",
+      "exampleType": "good",
+      "exampleText": "любые данные из формы и бд — через <%=, <%- только если html прошёл sanitizer на сервере",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "xss_safety",
+      "exampleType": "bad",
+      "exampleText": "<%- req.body.bio — удобнее и безопасно для профиля пользователя.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "template_mistakes",
+      "exampleType": "good",
+      "exampleText": "Cannot find module ejs — забыли npm install; ./views ломается — path.join(__dirname, 'views'); render без data — users undefined",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "template_mistakes",
+      "exampleType": "good",
+      "exampleText": "production кеширует compiled template после первого render; dev перекомпилирует — правки видны без рестарта",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "template_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Кеш compiled function значит данные Alice из прошлого запроса попадут в Bob на следующем render.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "expressjs-template-engines",
+    "apiUrl": "https://api.itlead.org/api/questions/expressjs-template-engines",
+    "pageUrl": "https://itlead.org/interview-questions/expressjs/expressjs-template-engines",
+    "difficulty": "JUNIOR",
+    "titleEn": "How to use template engines in Express.js?",
+    "categorySlug": "expressjs",
+    "syncedAt": "2026-06-18T16:30:00.000Z"
+  }
+}

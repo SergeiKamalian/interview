@@ -1,0 +1,538 @@
+{
+  "topic": {
+    "code": "docker_swarm_rolling_update",
+    "name": "Rolling update в Docker Swarm",
+    "skillCode": "docker",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как выполнить rolling update в Docker Swarm?",
+    "shortAnswer": "`docker service update --image` запускает rolling update: Swarm заменяет task батчами по политике `update_config` — parallelism, delay, monitor, failure-action. Healthcheck определяет, когда батч healthy; при превышении `max_failure_ratio` можно auto-rollback. `update-order start-first` поднимает новый task до остановки старого для zero-downtime.",
+    "idealAnswer": "Rolling update в Docker Swarm заменяет running task батчами, ожидая health между батчами. Триггер — `docker service update --image myorg/api:1.1` или повторный `docker stack deploy` с новым тегом в stack-файле. Swarm читает `update_config` (или флаги `--update-*`): `parallelism` — сколько task заменять за раз (default 1); `delay` — пауза между батчами; `monitor` — сколько наблюдать батч на failures; `failure_action` — continue/pause/rollback; `max_failure_ratio` — доля упавших task до срабатывания action; `order` — stop-first (default, краткий gap) или start-first (новый task рядом со старым, zero-downtime при tolerant app). Во время update трафик идёт на healthy реплики через routing mesh. Без `healthcheck` Swarm считает started=healthy — сломанный образ может раскатиться на все реплики. Health gating: контейнер стартовал без exit в monitor-период; при healthcheck — статус healthy; не больше max_failure_ratio failures в батче. Rollback: `docker service rollback api` вручную или `failure_action: rollback` автоматически; `rollback_config` — отдельные параметры обратного отката (часто медленнее forward update). Типичные ошибки: rollout без healthcheck; parallelism слишком высокий (мало healthy task под нагрузкой); только update_config без rollback_config; тег `latest` — rollback не отличит версии. Императивно: `docker service update --update-parallelism 1 --update-delay 30s --update-monitor 30s --update-failure-action rollback --update-order start-first`. Декларативно: `deploy.update_config` и `rollback_config` в compose/stack. Для сервиса с долгим warmup: `healthcheck.start_period` > warmup, `monitor` > start_period, parallelism=1, failure_action=rollback. In-flight запросы: SIGTERM + stop_grace_period, drain до exit; mesh уводит трафик с stopping task. DB-миграции — отдельный one-off job, не через rolling update app. Canary: parallelism=1, длинный monitor, потом увеличить parallelism.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "rolling_update_basics",
+      "title": "Понимает rolling update в Swarm",
+      "expected": "Кандидат объясняет: Swarm заменяет task батчами; триггер — `docker service update --image` или redeploy stack; трафик продолжает идти на healthy реплики; встроенный механизм с auto-rollback.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — что такое rolling update и как запускается",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "service update",
+              "rolling",
+              "батч"
+            ],
+            "ask": "как запустить rolling update и что происходит с репликами по батчам"
+          }
+        ],
+        "mustConcepts": [
+          "rolling update",
+          "rolling",
+          "docker service update",
+          "service update",
+          "--image",
+          "task",
+          "батч",
+          "batch",
+          "реплик",
+          "replica",
+          "Swarm",
+          "stack deploy",
+          "healthy",
+          "трафик",
+          "routing mesh",
+          "update_config",
+          "замен"
+        ],
+        "falseClaims": [
+          "rolling update пересоздаёт все реплики одновременно без батчей",
+          "для rolling update нужен docker compose up на каждой ноде",
+          "Swarm останавливает весь сервис на время update",
+          "rolling update работает только через kubectl"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "update_config_params",
+      "title": "Знает ключевые параметры update_config",
+      "expected": "Кандидат называет parallelism, delay, monitor, failure_action (continue/pause/rollback), max_failure_ratio; знает CLI-флаги `--update-*` и блок `deploy.update_config` в stack.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевые флаги из ITLead CLI и stack примеров",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "parallelism",
+              "delay",
+              "monitor"
+            ],
+            "ask": "что делают parallelism, delay и monitor при rolling update"
+          },
+          {
+            "match": [
+              "failure_action",
+              "max_failure_ratio",
+              "rollback"
+            ],
+            "ask": "когда сработает failure_action и что такое max_failure_ratio"
+          }
+        ],
+        "mustConcepts": [
+          "parallelism",
+          "delay",
+          "monitor",
+          "failure_action",
+          "failure-action",
+          "continue",
+          "pause",
+          "rollback",
+          "max_failure_ratio",
+          "max-failure-ratio",
+          "--update-parallelism",
+          "--update-delay",
+          "--update-monitor",
+          "update_config",
+          "deploy",
+          "stack",
+          "батч",
+          "CLI",
+          "флаг"
+        ],
+        "falseClaims": [
+          "parallelism — это общее число реплик сервиса",
+          "delay — время ожидания healthcheck внутри контейнера",
+          "monitor=0 отключает наблюдение за failures",
+          "failure_action rollback работает без healthcheck"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "update_order",
+      "title": "Различает stop-first и start-first",
+      "expected": "Кандидат объясняет: stop-first (default) — сначала stop старого, краткий gap; start-first — новый task рядом со старым, zero-downtime если app терпит overlap двух версий.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "stop-first vs start-first — ключевой trade-off zero-downtime",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "rolling_update_basics",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "update_order",
+            "oftenConfusedWith": [
+              "rolling_update_basics"
+            ],
+            "anchorTermsExpected": [
+              "stop-first",
+              "start-first",
+              "zero-downtime",
+              "overlap",
+              "gap"
+            ],
+            "anchorTermsWrongTopic": [
+              "start-first всегда без overlap",
+              "stop-first даёт zero-downtime"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "start-first",
+              "stop-first",
+              "order"
+            ],
+            "ask": "когда выбрать start-first вместо stop-first и какие риски overlap"
+          }
+        ],
+        "mustConcepts": [
+          "stop-first",
+          "start-first",
+          "order",
+          "update-order",
+          "zero-downtime",
+          "gap",
+          "overlap",
+          "две версии",
+          "stateless",
+          "API",
+          "worker",
+          "singleton",
+          "default",
+          "дефолт",
+          "drain"
+        ],
+        "falseClaims": [
+          "start-first всегда безопасен для любого worker с singleton",
+          "stop-first гарантирует zero-downtime",
+          "order влияет только на rollback, не на forward update",
+          "start-first сначала убивает все старые task, потом поднимает новые"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "healthcheck_gating",
+      "title": "Понимает health-driven gating",
+      "expected": "Кандидат объясняет: без healthcheck Swarm считает started=healthy; с healthcheck батч ждёт healthy; start_period для warmup; иначе сломанный образ раскатывается дальше.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "health gating — обязательное условие безопасного rollout из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "healthcheck",
+              "healthy",
+              "started"
+            ],
+            "ask": "как Swarm решает что батч healthy и что без healthcheck"
+          },
+          {
+            "match": [
+              "start_period",
+              "warmup",
+              "прогрев"
+            ],
+            "ask": "как настроить healthcheck для сервиса с долгим прогревом 90 секунд"
+          }
+        ],
+        "mustConcepts": [
+          "healthcheck",
+          "healthy",
+          "started",
+          "gating",
+          "gate",
+          "readiness",
+          "start_period",
+          "warmup",
+          "прогрев",
+          "monitor",
+          "exit",
+          "misbehav",
+          "без healthcheck",
+          "started=healthy",
+          "curl",
+          "interval",
+          "retries"
+        ],
+        "falseClaims": [
+          "без healthcheck Swarm всё равно ждёт HTTP 200 перед следующим батчем",
+          "healthcheck не влияет на rolling update, только на restart_policy",
+          "контейнер который стартовал но падает на запросах считается unhealthy без healthcheck",
+          "start_period не нужен при долгом warmup"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "rollback_mechanism",
+      "title": "Знает rollback и rollback_config",
+      "expected": "Кандидат описывает: `docker service rollback`; auto rollback через failure_action; rollback_config отдельно от update_config; версионные теги для отката; monitor + max_failure_ratio триггерят откат всего сервиса.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "rollback first-class feature — manual и auto из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "update_config_params",
+            "floorFraction": 0.35
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "rollback_mechanism",
+            "oftenConfusedWith": [
+              "update_config_params"
+            ],
+            "anchorTermsExpected": [
+              "rollback_config",
+              "update_config",
+              "service rollback",
+              "failure_action rollback",
+              "предыдущ"
+            ],
+            "anchorTermsWrongTopic": [
+              "rollback использует update_config",
+              "rollback_config и update_config одно и то же"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "rollback",
+              "service rollback",
+              "failure_action"
+            ],
+            "ask": "чем отличается manual rollback от auto rollback и что такое rollback_config"
+          }
+        ],
+        "mustConcepts": [
+          "rollback",
+          "docker service rollback",
+          "service rollback",
+          "failure_action",
+          "auto-rollback",
+          "rollback_config",
+          "update_config",
+          "предыдущ",
+          "previous image",
+          "тег",
+          "верси",
+          "SHA",
+          "monitor",
+          "max_failure_ratio",
+          "откат",
+          "reverse"
+        ],
+        "falseClaims": [
+          "rollback_config наследует все поля из update_config автоматически",
+          "docker service rollback работает если обе версии tagged latest",
+          "auto rollback срабатывает только после полного завершения update",
+          "rollback пересоздаёт сервис с нуля вне Swarm"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Типичные ошибки rolling update",
+      "expected": "Кандидат называет: update без healthcheck; слишком высокий parallelism; забытый rollback_config; тег latest ломает rollback; DB-миграции не через rolling update.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production pitfalls",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "healthcheck_gating",
+            "floorFraction": 0.4
+          }
+        ],
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "parallelism",
+              "healthcheck",
+              "latest"
+            ],
+            "ask": "типичные ошибки при rolling update: healthcheck, parallelism, теги"
+          }
+        ],
+        "mustConcepts": [
+          "без healthcheck",
+          "parallelism слишком",
+          "высокий parallelism",
+          "rollback_config",
+          "забыл",
+          "latest",
+          "same tag",
+          "No previous image",
+          "нагрузк",
+          "healthy task",
+          "миграц",
+          "migrator",
+          "one-off",
+          "canary",
+          "hotfix"
+        ],
+        "falseClaims": [
+          "parallelism равный числу реплик безопасен под любой нагрузкой",
+          "latest tag не мешает docker service rollback",
+          "rollback_config необязателен — всегда достаточно update_config",
+          "схему БД можно менять через rolling update app без отдельного job"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Обновляю образ через `docker service update --image api:1.1` с parallelism=2, delay=30s, monitor=60s, failure_action=rollback. Healthcheck на /health гейтит батчи. start-first даёт zero-downtime для stateless API. При failure_ratio > 0.2 Swarm откатывает сам; rollback_config задаю отдельно — медленнее forward update.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В stack меняю тег с 1.0 на 1.1, `docker stack deploy` — rolling по update_config. Смотрю `docker service ps`. Теги только semver/SHA, не latest — иначе rollback не найдёт previous. Миграции БД — отдельный migrator job, потом update app.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну swarm катает по одному-двум таскам, ждёт healthy, потом следующий батч. без healthcheck он думает started=ок и может разнести битый образ на все реплики",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Rolling update — это docker-compose up --force-recreate на всех нодах сразу. Healthcheck не нужен, Swarm сам проверяет HTTP.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Ставлю parallelism=10 на 10 реплик и latest тег — rollback через service rollback всегда сработает. rollback_config дублирует update_config автоматически.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "start-first сначала убивает все старые контейнеры, потом поднимает новые — это zero-downtime по умолчанию. Миграцию схемы БД катаю вместе с app rolling update.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "rolling_update_basics",
+      "exampleType": "good",
+      "exampleText": "service update --image триггерит замену task батчами; трафик на healthy реплики через mesh.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "rolling_update_basics",
+      "exampleType": "good",
+      "exampleText": "редеплой stack с новым тегом — тот же rolling, конфиг в deploy.update_config",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "rolling_update_basics",
+      "exampleType": "bad",
+      "exampleText": "Swarm останавливает весь сервис, потом поднимает все реплики с новым образом одновременно.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "update_config_params",
+      "exampleType": "good",
+      "exampleText": "parallelism=2 — два task за батч; delay=30s между батчами; monitor=60s смотрит failures; max_failure_ratio=0.2 — больше 20% упавших → failure_action.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "update_config_params",
+      "exampleType": "good",
+      "exampleText": "в cli те же вещи: --update-parallelism 1 --update-delay 10s --update-failure-action rollback",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "update_config_params",
+      "exampleType": "bad",
+      "exampleText": "delay — это интервал healthcheck внутри контейнера, parallelism — число реплик сервиса.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "update_order",
+      "exampleType": "good",
+      "exampleText": "start-first поднимает v1.1 рядом с v1.0, потом гасит старый — zero-downtime для stateless API при кратком overlap.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "update_order",
+      "exampleType": "good",
+      "exampleText": "stop-first дефолт — сначала stop, короткий gap; для worker с singleton start-first может быть опасен",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "update_order",
+      "exampleType": "bad",
+      "exampleText": "stop-first всегда даёт zero-downtime, start-first не создаёт overlap двух версий.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "healthcheck_gating",
+      "exampleType": "good",
+      "exampleText": "Без healthcheck started=healthy — битый образ едет дальше. С curl -f /health и start_period=120s для warmup батч ждёт реальной готовности.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "healthcheck_gating",
+      "exampleType": "good",
+      "exampleText": "monitor 180s > start_period 120s — даём прогреться до подсчёта failures",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "healthcheck_gating",
+      "exampleType": "bad",
+      "exampleText": "Healthcheck опционален — Swarm и так ждёт HTTP 200 перед следующим батчем.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "rollback_mechanism",
+      "exampleType": "good",
+      "exampleText": "`docker service rollback api` откатывает на previous tag; failure_action: rollback при превышении ratio; rollback_config с parallelism=2 и delay=10s — отдельно от forward update.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "rollback_mechanism",
+      "exampleType": "good",
+      "exampleText": "теги 1.0 и 1.1, не latest — иначе No previous image to roll back to",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "rollback_mechanism",
+      "exampleType": "bad",
+      "exampleText": "rollback_config не нужен — Swarm копирует update_config при откате. latest tag не мешает rollback.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "parallelism=5 на 6 реплик — под пиком нагрузки мало healthy; canary: parallelism=1, длинный monitor, потом ускоряем.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "миграции — one-off migrator service, не rolling update приложения",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Катаю все 20 реплик с parallelism=20 без healthcheck — норм для prod. Схему БД меняю в том же rolling update что и код.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "docker-swarm-rolling-update",
+    "apiUrl": "https://api.itlead.org/api/questions/docker-swarm-rolling-update",
+    "pageUrl": "https://itlead.org/interview-questions/docker/docker-swarm-rolling-update",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to perform a rolling update in Docker Swarm?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

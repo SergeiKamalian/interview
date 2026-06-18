@@ -1,0 +1,399 @@
+{
+  "topic": {
+    "code": "container_vs_virtual_machine",
+    "name": "Контейнер vs виртуальная машина",
+    "skillCode": "docker",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Чем контейнер отличается от виртуальной машины (VM)?",
+    "shortAnswer": "Контейнер и VM изолируют нагрузки на разных уровнях стека. Контейнер — это процесс на ядре хоста, изолированный через Linux namespaces и cgroups (~10 МБ, старт за миллисекунды). VM — полная гостевая ОС поверх гипервизора (сотни МБ, старт за секунды). Контейнеры легче и быстрее, но делят ядро хоста; VM медленнее, зато изолируют на уровне «железа» — это важно для multi-tenant и другой ОС.",
+    "idealAnswer": "Контейнер и виртуальная машина оба изолируют рабочие нагрузки, но на совершенно разных уровнях. Контейнер — процесс хоста с ограниченной видимостью: ядро Linux изолирует через namespaces (отдельные представления процессов, сети, ФС, пользователей) и cgroups (лимиты CPU, памяти, I/O). Гостевой ОС нет — используется ядро хоста. VM — полная гостевая операционная система на гипервизоре (KVM, VMware, Hyper-V): виртуализируется CPU, память, устройства; гость загружает своё ядро, init, драйверы. Сравнение: старт контейнера — миллисекунды, оверхед ~10 МБ; VM — секунды, сотни МБ только на гостевую ОС. Плотность на сервере 128 ГБ: 100–200 контейнеров vs 10–15 VM. Изоляция: контейнеры — process-level, слабее (общее ядро, kernel CVE может затронуть все контейнеры на хосте); VM — hardware-level, сильнее (отдельное ядро на tenant). Контейнер не может запустить Windows на Linux-хосте — нужна VM. Когда контейнеры: микросервисы, CI/CD, быстрые деплои, одна Linux-база, высокая плотность. Когда VM: multi-tenant с недоверенными нагрузками, другая ОС, compliance (PCI DSS), legacy с systemd и kernel modules. На практике часто оба слоя: облако (EC2) — VM между tenant'ами, внутри — Kubernetes/Docker между приложениями. Типичные ошибки: «контейнер — это лёгкая VM» (нет guest kernel и виртуализированного железа); поднимать VM на 30-секундный CI-тест; доверять только Docker для multi-tenant без VM-границы; путать размер образа с RAM (слои Docker шарятся между контейнерами, у VM — отдельный disk и память на каждый инстанс). Docker Desktop на Mac/Windows прячет маленькую Linux VM, потому что контейнерам нужно Linux-ядро.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "container_vm_definition",
+      "title": "Определяет контейнер и VM",
+      "expected": "Кандидат объясняет: контейнер — изолированный процесс на ядре хоста (namespaces + cgroups), без гостевой ОС; VM — полная гостевая ОС на гипервизоре с собственным ядром.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — Key difference и TL;DR ITLead",
+        "mustConcepts": [
+          "контейнер",
+          "container",
+          "виртуальн",
+          "VM",
+          "процесс",
+          "ядро",
+          "kernel",
+          "хост",
+          "host",
+          "гипервизор",
+          "hypervisor",
+          "namespaces",
+          "cgroups",
+          "гостев",
+          "guest OS",
+          "изоляц",
+          "без guest kernel",
+          "полная ОС"
+        ],
+        "falseClaims": [
+          "контейнер — это маленькая виртуальная машина с собственным ядром",
+          "VM и контейнер изолируют на одном и том же уровне стека",
+          "контейнер включает полную гостевую операционную систему",
+          "VM — это просто процесс на ядре хоста без гипервизора"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "isolation_mechanism",
+      "title": "Знает механизмы изоляции",
+      "expected": "Кандидат описывает: контейнер — PID/mount/network namespaces + cgroups на одном ядре; VM — гипервизор виртуализирует CPU/RAM/устройства, гость загружает своё ядро.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "How isolation works — базовый блок ITLead для junior",
+        "mustConcepts": [
+          "namespaces",
+          "cgroups",
+          "PID namespace",
+          "mount namespace",
+          "network namespace",
+          "гипервизор",
+          "KVM",
+          "VMware",
+          "Hyper-V",
+          "виртуализ",
+          "CPU",
+          "память",
+          "RAM",
+          "init",
+          "драйвер",
+          "один kernel",
+          "hardware-level"
+        ],
+        "falseClaims": [
+          "контейнеры изолируют через гипервизор как VM",
+          "VM используют только namespaces без виртуализации железа",
+          "два контейнера на одном хосте имеют разные физические ядра CPU",
+          "cgroups создают отдельное ядро для каждого контейнера"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "resource_overhead",
+      "title": "Сравнивает ресурсы и скорость",
+      "expected": "Кандидат называет: контейнер — миллисекунды старта, ~10 МБ оверхеда, высокая плотность; VM — секунды, сотни МБ на гостевую ОС, меньше инстансов на том же железе.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR и comparison table — ключевые цифры для junior",
+        "mustConcepts": [
+          "миллисекунд",
+          "секунд",
+          "старт",
+          "boot",
+          "10 МБ",
+          "сотни МБ",
+          "оверхед",
+          "overhead",
+          "плотность",
+          "density",
+          "100",
+          "200",
+          "128 GB",
+          "docker run",
+          "быстр",
+          "медлен",
+          "image",
+          "образ"
+        ],
+        "falseClaims": [
+          "VM и контейнер стартуют одинаково быстро",
+          "контейнер всегда потребляет сотни мегабайт только на ОС",
+          "на одном сервере VM и контейнеров можно запустить одинаковое количество",
+          "docker run nginx занимает столько же времени, сколько полный boot VM"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "isolation_strength",
+      "title": "Понимает силу изоляции",
+      "expected": "Кандидат объясняет: VM сильнее — отдельное ядро на tenant; контейнеры делят ядро хоста, kernel CVE может затронуть все контейнеры; для недоверенных нагрузок нужна VM-граница.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Isolation strength из comparison table — важно для junior decision-making",
+        "mustConcepts": [
+          "изоляц",
+          "сильнее",
+          "слабее",
+          "process-level",
+          "hardware-level",
+          "общий kernel",
+          "shared kernel",
+          "CVE",
+          "уязвим",
+          "multi-tenant",
+          "tenant",
+          "blast radius",
+          "радиус",
+          "границ",
+          "доверен",
+          "недоверен"
+        ],
+        "falseClaims": [
+          "контейнеры изолируют так же надёжно, как VM, для любых multi-tenant сценариев",
+          "kernel CVE в контейнере затрагивает только один контейнер и не может повлиять на соседей",
+          "VM всегда слабее изолируют, чем Docker на одном хосте",
+          "общее ядро хоста не имеет значения для безопасности контейнеров"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Выбирает контейнер или VM",
+      "expected": "Кандидат называет правила: контейнер — микросервисы, CI/CD, одна Linux-база, быстрые деплои; VM — другая ОС, compliance, legacy, недоверенные tenant'ы; может упомянуть VM+container в облаке.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "When containers / When VMs — decision rule из ITLead",
+        "mustConcepts": [
+          "микросервис",
+          "CI/CD",
+          "деплой",
+          "Linux",
+          "Windows",
+          "другая ОС",
+          "compliance",
+          "PCI",
+          "legacy",
+          "systemd",
+          "Kubernetes",
+          "EC2",
+          "облак",
+          "доверен",
+          "недоверен",
+          "decision",
+          "когда"
+        ],
+        "falseClaims": [
+          "всегда нужно выбирать контейнеры вместо VM",
+          "VM никогда не нужны в современной инфраструктуре",
+          "Windows-контейнер на Linux-хосте работает без VM так же, как Linux-контейнер",
+          "legacy-приложение с kernel modules всегда лучше упаковать в Docker без VM"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные заблуждения",
+      "expected": "Кандидат опровергает: «контейнер = лёгкая VM»; VM для 30-секундного CI; размер образа ≠ потребление RAM; systemd с несколькими сервисами в одном контейнере — антипаттерн.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes ITLead — отдельный checkpoint с falseClaims",
+        "falseClaimCapFraction": 0,
+        "mustConcepts": [
+          "лёгк",
+          "lightweight VM",
+          "не VM",
+          "guest kernel",
+          "CI",
+          "эфемерн",
+          "docker run --rm",
+          "образ",
+          "image size",
+          "RAM",
+          "слои",
+          "layers",
+          "systemd",
+          "антипаттерн",
+          "multi-tenant"
+        ],
+        "falseClaims": [
+          "контейнер — это лёгкая виртуальная машина",
+          "образ Docker на 1 ГБ всегда занимает 1 ГБ RAM на каждый контейнер",
+          "для каждого CI-билда лучше поднимать полную VM",
+          "можно без проблем запускать systemd с десятью сервисами внутри одного контейнера как в VM"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Контейнер — процесс на ядре хоста, изоляция через namespaces и cgroups, старт за миллисекунды. VM — полная гостевая ОС на гипервизоре, boot за секунды, сотни МБ оверхеда. Контейнеры быстрее и плотнее, но делят kernel; VM сильнее изолируют — для multi-tenant и Windows на Linux.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "docker run nginx — ~2 сек, ~10 МБ. vagrant up с ubuntu — минуты и сотни мегабайт на гостевую ОС. Для микросервисов и CI — контейнер; для другой ОС или жёсткого compliance — VM. В AWS EC2 сначала VM, внутри — Kubernetes с контейнерами.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну контейнер это не маленькая vm — просто процесс с ограничениями, ядро общее. vm тащит свою ос. для тестов в ci docker run --rm, vm только если реально нужна другая система",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Контейнер — это урезанная виртуальная машина с собственным ядром Linux внутри. VM и Docker стартуют одинаково быстро и одинаково изолируют.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Контейнеры всегда безопаснее VM для публичного PaaS с кодом от разных клиентов на одном хосте — kernel CVE не страшен.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Образ на 2 ГБ значит каждый контейнер съедает 2 ГБ RAM. Для npm test в CI лучше каждый раз поднимать полную VM — так надёжнее.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "container_vm_definition",
+      "exampleType": "good",
+      "exampleText": "Контейнер — изолированный процесс на ядре хоста через namespaces и cgroups. VM — полная гостевая ОС на гипервизоре со своим ядром.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "container_vm_definition",
+      "exampleType": "good",
+      "exampleText": "контейнер без guest os, vm с полной гостевой системой и своим ядром — разные уровни стека",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "container_vm_definition",
+      "exampleType": "bad",
+      "exampleText": "Docker-контейнер — это KVM-виртуалка поменьше, только без GUI.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "isolation_mechanism",
+      "exampleType": "good",
+      "exampleText": "Контейнер: PID/mount/network namespaces + cgroups на одном ядре. VM: hypervisor (KVM/VMware) виртуализирует CPU и RAM, гость грузит init и драйверы.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "isolation_mechanism",
+      "exampleType": "good",
+      "exampleText": "namespaces дают контейнеру свою вьюху процессов и сети, cgroups лимитируют cpu/ram. у vm между железом и гостем сидит hypervisor",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "isolation_mechanism",
+      "exampleType": "bad",
+      "exampleText": "Docker изолирует через Type-1 hypervisor так же, как ESXi, только без виртуального диска.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "resource_overhead",
+      "exampleType": "good",
+      "exampleText": "docker run nginx ~2 с, ~10 МБ baseline. VM vagrant up — 30–60+ с, сотни МБ на guest OS. На 128 ГБ — 100–200 контейнеров vs ~10–15 VM.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "resource_overhead",
+      "exampleType": "good",
+      "exampleText": "контейнер переиспользует kernel хоста — поэтому ms старт. vm каждый раз bootит свою ос — секунды минимум",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "resource_overhead",
+      "exampleType": "bad",
+      "exampleText": "Redis в контейнере и Redis в VM потребляют одинаковое время на boot и одинаковый оверхед ОС.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "isolation_strength",
+      "exampleType": "good",
+      "exampleText": "VM — hardware-level isolation, отдельное ядро. Контейнеры share host kernel — CVE в ядре может затронуть все контейнеры на машине.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "isolation_strength",
+      "exampleType": "good",
+      "exampleText": "для недоверенного кода от разных клиентов — vm между tenant, внутри уже docker. plain docker на shared host — один kernel cve от breach",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "isolation_strength",
+      "exampleType": "bad",
+      "exampleText": "Process-level изоляция контейнера эквивалентна hardware isolation VM для любого SaaS.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Микросервисы на Linux, частые деплои, CI — контейнер. Windows guest на Linux host, PCI compliance, legacy с systemd — VM. Облако: EC2 VM + EKS контейнеры внутри.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "доверенные свои сервисы — docker. чужой код multi-tenant — vm или microvm. другая os — только vm",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "VM устарели — всегда Docker, даже когда нужен Windows Server на Linux-хосте.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Контейнер — не лёгкая VM: нет guest kernel и виртуализированного железа. docker run --rm node npm test для CI, не vagrant up на каждый pipeline.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "образ 1gb не значит 1gb ram — слои шарятся между контейнерами одного image. у vm каждый инстанс свой disk и память",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Правильный паттерн — systemd с nginx, postgres и redis в одном контейнере, как на маленькой VM.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "container-vs-virtual-machine",
+    "apiUrl": "https://api.itlead.org/api/questions/container-vs-virtual-machine",
+    "pageUrl": "https://itlead.org/interview-questions/docker/container-vs-virtual-machine",
+    "difficulty": "JUNIOR",
+    "titleEn": "Container vs Virtual Machine: what is the difference?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

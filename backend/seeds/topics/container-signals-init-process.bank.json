@@ -1,0 +1,688 @@
+{
+  "topic": {
+    "code": "container_signals_init_process",
+    "name": "Сигналы и init-процесс в контейнерах",
+    "skillCode": "docker",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как обрабатывать сигналы в контейнерах и что такое init-процесс?",
+    "shortAnswer": "В контейнере главный процесс — PID 1 с особыми правилами Unix: по умолчанию игнорирует большинство сигналов и отвечает за reap зомби-процессов. Приложение должно ловить SIGTERM для graceful shutdown; `docker stop` шлёт SIGTERM, ждёт grace period (10 с), затем SIGKILL. Флаг `--init` (tini) решает проблему зомби и корректно форвардит сигналы.",
+    "idealAnswer": "В контейнере процесс из CMD/ENTRYPOINT становится PID 1 и наследует особую семантику Unix init: без явного handler большинство сигналов (SIGTERM, SIGINT) игнорируются ядром; PID 1 обязан вызывать wait() для дочерних процессов — иначе накапливаются зомби (<defunct> в ps). При docker stop демон шлёт SIGTERM на PID 1, ждёт N секунд (по умолчанию 10), затем SIGKILL. Без trap SIGTERM приложение не завершается вовремя → exit code 137 (принудительное убийство), без flush БД/логов и drain in-flight запросов. Решение: зарегистрировать handler (process.on('SIGTERM') в Node, signal.signal в Python, signal.Notify в Go), завершить работу, закрыть соединения и выйти с кодом 0. Зомби возникают когда родитель fork-ит детей, но не вызывает wait() — типично для Python multiprocessing и некоторых Node child_process паттернов; сироты reparent-ятся на PID 1. tini через docker run --init становится PID 1, приложение — PID 2; tini форвардит SIGTERM/SIGINT и reap-ит зомби. Shell form CMD (nginx -g \"daemon off;\") оборачивает команду в /bin/sh -c — sh становится PID 1, не форвардит сигналы детям; всегда используй exec form [\"nginx\", \"-g\", \"daemon off;\"]. В entrypoint-скриптах критичен exec \"$@\" — заменяет shell реальным бинарником, иначе sh остаётся PID 1. --init нужен для fork-heavy приложений и shell-heavy entrypoint; для single-process Go/Rust в exec form — опционален. Типичные ошибки: shell form CMD, отсутствие exec в entrypoint, handler только логирует SIGTERM без exit, игнорирование exit 137. Ctrl+C шлёт SIGINT (у Node есть default handler), docker stop — SIGTERM (нужен явный handler). STOPSIGNAL в Dockerfile или --stop-signal переопределяет сигнал остановки. Отладка: docker stop --time 30 + time — чистый exit за 1–2 с с кодом 0; strace -p PID -e trace=signal с --cap-add SYS_PTRACE.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "pid1_special_role",
+      "title": "Понимает роль PID 1 в контейнере",
+      "expected": "Кандидат объясняет: приложение из CMD/ENTRYPOINT — PID 1; игнорирует сигналы без handler; отвечает за reap зомби через wait(); на хосте это systemd, в контейнере — ваше приложение.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — особая семантика PID 1 из Unix",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "pid1_special_role",
+            "oftenConfusedWith": [
+              "tini_init_flag",
+              "sigterm_graceful_shutdown"
+            ],
+            "anchorTermsExpected": [
+              "PID 1",
+              "init",
+              "игнорир",
+              "сигнал",
+              "zombie",
+              "зомби",
+              "wait",
+              "reap",
+              "CMD",
+              "ENTRYPOINT"
+            ],
+            "anchorTermsWrongTopic": [
+              "tini всегда нужен",
+              "docker stop шлёт SIGKILL сразу",
+              "PID 1 это только systemd"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "PID 1",
+              "init",
+              "главн"
+            ],
+            "ask": "чем PID 1 в контейнере отличается от обычного процесса на хосте"
+          }
+        ],
+        "mustConcepts": [
+          "PID 1",
+          "init",
+          "init-процесс",
+          "CMD",
+          "ENTRYPOINT",
+          "игнорир",
+          "сигнал",
+          "handler",
+          "zombie",
+          "зомби",
+          "wait",
+          "reap",
+          "defunct",
+          "systemd",
+          "контейнер",
+          "особ",
+          "семантик",
+          "Unix"
+        ],
+        "falseClaims": [
+          "PID 1 в контейнере ведёт себя как обычный процесс",
+          "сигналы всегда доходят до приложения без handler",
+          "reap зомби делает только tini, не PID 1",
+          "в контейнере PID 1 всегда systemd"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "sigterm_graceful_shutdown",
+      "title": "Знает flow docker stop и SIGTERM",
+      "expected": "Кандидат описывает: SIGTERM → grace period (10 с) → SIGKILL; без trap — dirty shutdown и exit 137; handler должен завершить работу, flush state, закрыть соединения и выйти.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "graceful shutdown — главная production-проблема из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "pid1_special_role",
+            "floorFraction": 0.45
+          }
+        ],
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "SIGTERM",
+              "docker stop",
+              "grace"
+            ],
+            "ask": "что происходит при docker stop пошагово и зачем trap SIGTERM"
+          },
+          {
+            "match": [
+              "137",
+              "SIGKILL",
+              "exit"
+            ],
+            "ask": "что означает exit code 137 и когда он появляется"
+          }
+        ],
+        "mustConcepts": [
+          "SIGTERM",
+          "SIGKILL",
+          "docker stop",
+          "grace",
+          "grace period",
+          "10",
+          "trap",
+          "handler",
+          "graceful",
+          "shutdown",
+          "flush",
+          "закрыт",
+          "соединен",
+          "exit 137",
+          "137",
+          "dirty",
+          "process.exit",
+          "server.close",
+          "drain"
+        ],
+        "falseClaims": [
+          "docker stop сразу шлёт SIGKILL",
+          "SIGTERM можно игнорировать без последствий",
+          "exit 137 — нормальное завершение",
+          "grace period нельзя изменить",
+          "handler достаточно только залогировать SIGTERM"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "zombies_init_process",
+      "title": "Понимает зомби и init-процесс",
+      "expected": "Кандидат объясняет: зомби — завершённые дети без wait(); родитель не reap → <defunct>; сироты reparent на PID 1; fork без wait накапливает зомби; лимит PID ~32768.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "fork/multiprocessing — реальная проблема long-running контейнеров",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "zombie",
+              "зомби",
+              "defunct",
+              "wait"
+            ],
+            "ask": "как возникают зомби в контейнере и кто их должен reap-ить"
+          },
+          {
+            "match": [
+              "fork",
+              "multiprocessing",
+              "child_process"
+            ],
+            "ask": "какие типы приложений чаще всего накапливают зомби"
+          }
+        ],
+        "mustConcepts": [
+          "zombie",
+          "зомби",
+          "defunct",
+          "wait",
+          "reap",
+          "fork",
+          "дочерн",
+          "родител",
+          "reparent",
+          "сирот",
+          "PID",
+          "32768",
+          "multiprocessing",
+          "child_process",
+          "os.fork",
+          "os.wait",
+          "накоплен"
+        ],
+        "falseClaims": [
+          "зомби потребляют много RAM и убивают контейнер мгновенно",
+          "зомби исчезают сами без wait",
+          "только kernel создаёт зомби, приложение не при чём",
+          "fork в контейнере не создаёт зомби"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "tini_init_flag",
+      "title": "Знает tini и флаг --init",
+      "expected": "Кандидат описывает: --init оборачивает app в tini; tini — PID 1, app — PID 2; форвардит SIGTERM/SIGINT; reap-ит зомби; выходит с кодом приложения.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "tini — стандартное решение zombie + signal forward",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "zombies_init_process",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "tini_init_flag",
+            "oftenConfusedWith": [
+              "pid1_special_role",
+              "shell_vs_exec_form"
+            ],
+            "anchorTermsExpected": [
+              "tini",
+              "--init",
+              "docker-init",
+              "forward",
+              "форвард",
+              "reap",
+              "PID 2"
+            ],
+            "anchorTermsWrongTopic": [
+              "tini заменяет trap SIGTERM",
+              "--init делает sh PID 1"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "tini",
+              "--init",
+              "docker-init"
+            ],
+            "ask": "что делает tini как PID 1 и когда нужен --init"
+          }
+        ],
+        "mustConcepts": [
+          "tini",
+          "--init",
+          "docker-init",
+          "docker run --init",
+          "PID 1",
+          "PID 2",
+          "forward",
+          "форвард",
+          "SIGTERM",
+          "SIGINT",
+          "reap",
+          "зомби",
+          "обёртк",
+          "wrapper",
+          "dumb-init",
+          "s6"
+        ],
+        "falseClaims": [
+          "tini заменяет необходимость trap SIGTERM в коде",
+          "--init всегда обязателен для любого контейнера",
+          "tini не форвардит сигналы приложению",
+          "tini и dumb-init — полноценные process supervisor как s6"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "shell_vs_exec_form",
+      "title": "Отличает shell form от exec form CMD",
+      "expected": "Кандидат объясняет: shell form оборачивает в /bin/sh -c, sh — PID 1, не форвардит SIGTERM детям; exec form [\"prog\", \"arg\"] — приложение само PID 1; всегда exec form в production.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "самая частая причина сломанного docker stop по ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "sigterm_graceful_shutdown",
+            "floorFraction": 0.4
+          },
+          {
+            "checkpointKey": "entrypoint_exec",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "shell form",
+              "exec form",
+              "CMD",
+              "sh -c"
+            ],
+            "ask": "почему CMD nginx -g \"daemon off;\" ломает docker stop"
+          }
+        ],
+        "mustConcepts": [
+          "shell form",
+          "exec form",
+          "CMD",
+          "ENTRYPOINT",
+          "/bin/sh",
+          "sh -c",
+          "PID 1",
+          "PID 2",
+          "nginx",
+          "daemon off",
+          "не форвард",
+          "игнорир",
+          "production",
+          "массив",
+          "[\"prog\""
+        ],
+        "falseClaims": [
+          "shell form и exec form эквивалентны для сигналов",
+          "sh всегда форвардит SIGTERM дочернему процессу",
+          "exec form запускает shell внутри",
+          "shell form безопасна для production CMD"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "entrypoint_exec",
+      "title": "Знает exec в entrypoint-скриптах",
+      "expected": "Кандидат объясняет: exec \"$@\" заменяет shell реальным бинарником; без exec sh остаётся PID 1 и блокирует сигналы; типичный паттерн docker-entrypoint.sh.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "exec в entrypoint — практический паттерн из ITLead examples",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "exec",
+              "entrypoint",
+              "$@"
+            ],
+            "ask": "зачем exec \"$@\" в конце docker-entrypoint.sh"
+          }
+        ],
+        "mustConcepts": [
+          "exec",
+          "exec \"$@\"",
+          "entrypoint",
+          "docker-entrypoint.sh",
+          "shell",
+          "замен",
+          "бинарник",
+          "PID 1",
+          "setup",
+          "migrate",
+          "spawn",
+          "дочерн"
+        ],
+        "falseClaims": [
+          "\"$@\" без exec достаточно для корректных сигналов",
+          "exec запускает второй процесс параллельно shell",
+          "entrypoint-скрипт всегда должен оставаться PID 1"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки signal handling",
+      "expected": "Кандидат называет: shell form CMD, нет exec в entrypoint, handler без exit, забыли --init для fork-heavy app, exit 137 как симптом; реальный impact на БД/workers/web.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes + real-world impact из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "137",
+              "Postgres",
+              "WAL",
+              "worker"
+            ],
+            "ask": "какие последствия dirty shutdown для БД и worker-контейнеров"
+          },
+          {
+            "match": [
+              "SIGINT",
+              "Ctrl+C",
+              "Node"
+            ],
+            "ask": "почему Node выходит на Ctrl+C, но не на docker stop без handler"
+          }
+        ],
+        "mustConcepts": [
+          "shell form",
+          "exec",
+          "handler",
+          "exit",
+          "137",
+          "SIGKILL",
+          "--init",
+          "defunct",
+          "Postgres",
+          "MySQL",
+          "WAL",
+          "worker",
+          "502",
+          "SIGINT",
+          "Ctrl+C",
+          "Node",
+          "idempotency",
+          "in-flight"
+        ],
+        "falseClaims": [
+          "exit 137 означает успешный graceful shutdown",
+          "handler может только print без exit",
+          "Ctrl+C и docker stop шлют один и тот же сигнал",
+          "зомби не влияют на long-running контейнеры"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "signals_debug",
+      "title": "Умеет отлаживать обработку сигналов",
+      "expected": "Кандидат упоминает: STOPSIGNAL/--stop-signal, SIGINT vs SIGTERM, docker stop --time + time, логи handler, strace -e trace=signal с SYS_PTRACE; tini vs dumb-init vs s6.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "senior follow-up: отладка и переопределение stop signal",
+        "mustConcepts": [
+          "STOPSIGNAL",
+          "stop-signal",
+          "SIGUSR1",
+          "SIGINT",
+          "SIGTERM",
+          "strace",
+          "SYS_PTRACE",
+          "docker stop --time",
+          "dumb-init",
+          "s6",
+          "runit",
+          "лог",
+          "handler"
+        ],
+        "falseClaims": [
+          "нельзя изменить сигнал docker stop",
+          "strace нельзя использовать в контейнере",
+          "s6 нужен для любого single-process приложения"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "В контейнере приложение — PID 1: без handler SIGTERM игнорируется, docker stop ждёт 10 с и шлёт SIGKILL (exit 137). Ловлю SIGTERM, делаю server.close и process.exit(0). Для fork-heavy Python — docker run --init, tini reap-ит зомби. CMD только exec form [\"nginx\", \"-g\", \"daemon off;\"], в entrypoint — exec \"$@\".",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На деплое видел exit 137 — shell form CMD, sh был PID 1 и не передавал SIGTERM nginx. Починили exec form + trap в Node. Для multiprocessing добавили --init — defunct исчезли. Проверяю: docker stop --time 30, чистый exit за пару секунд с кодом 0.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "PID 1 reap-ит зомби через wait(). tini как --init форвардит SIGTERM на app (PID 2). Graceful shutdown: drain запросов, flush WAL у Postgres, иначе recovery при рестарте. Ctrl+C — SIGINT, docker stop — SIGTERM; в Node нужен явный process.on('SIGTERM').",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "docker stop сразу убивает контейнер SIGKILL, сигналы в Docker не важны. PID 1 — это всегда systemd внутри контейнера.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "CMD nginx -g \"daemon off;\" — нормально, shell form удобнее. Exit 137 — штатное завершение. --init обязателен даже для single-process Go без fork.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Достаточно signal.signal(SIGTERM, lambda: print('bye')) — логируем и контейнер сам выйдет. Entrypoint: run-init && /usr/bin/myapp без exec — сигналы дойдут до приложения.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "pid1_special_role",
+      "exampleType": "good",
+      "exampleText": "CMD/ENTRYPOINT делает приложение PID 1 — наследует правила init: игнор сигналов без trap и обязанность reap зомби через wait().",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "pid1_special_role",
+      "exampleType": "good",
+      "exampleText": "ну в контейнере твой процесс внезапно init — если не wait-ишь детей, зомби копятся, сигналы без handler не ловятся",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "pid1_special_role",
+      "exampleType": "bad",
+      "exampleText": "PID 1 в Docker — это dockerd, приложение просто дочерний процесс хоста.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "sigterm_graceful_shutdown",
+      "exampleType": "good",
+      "exampleText": "docker stop: SIGTERM → 10 с grace → SIGKILL. Handler закрывает server, flush БД, process.exit(0). Без trap — exit 137.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "sigterm_graceful_shutdown",
+      "exampleType": "good",
+      "exampleText": "process.on('SIGTERM', () => server.close(() => process.exit(0))) — иначе через 10 секунд SIGKILL",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "sigterm_graceful_shutdown",
+      "exampleType": "bad",
+      "exampleText": "SIGTERM можно не обрабатывать — Docker сам подождёт сколько нужно и не убьёт процесс.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "zombies_init_process",
+      "exampleType": "good",
+      "exampleText": "fork без os.wait() — 100 зомби <defunct>; каждый жрёт PID-слот, на длинных контейнерах упираемся в лимит.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "zombies_init_process",
+      "exampleType": "good",
+      "exampleText": "сироты reparent на PID 1 — он должен reap. Python multiprocessing без join — классика накопления зомби",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "zombies_init_process",
+      "exampleType": "bad",
+      "exampleText": "Зомби — это утечка памяти в гигабайтах, контейнер падает от OOM за минуту.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "tini_init_flag",
+      "exampleType": "good",
+      "exampleText": "docker run --init: tini PID 1, app PID 2; tini форвардит SIGTERM и reap-ит зомби, выходит с кодом приложения.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "tini_init_flag",
+      "exampleType": "good",
+      "exampleText": "для fork-heavy app или shell entrypoint — --init; для Go single-process в exec CMD — опционально, не вредит",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "tini_init_flag",
+      "exampleType": "bad",
+      "exampleText": "tini заменяет trap SIGTERM — handler в коде не нужен.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "shell_vs_exec_form",
+      "exampleType": "good",
+      "exampleText": "CMD nginx -g \"daemon off;\" — sh PID 1, nginx PID 2, SIGTERM на sh игнорируется. Правильно: CMD [\"nginx\", \"-g\", \"daemon off;\"].",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "shell_vs_exec_form",
+      "exampleType": "good",
+      "exampleText": "shell form = /bin/sh -c, exec form = приложение сразу PID 1, сигналы доходят",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "shell_vs_exec_form",
+      "exampleType": "bad",
+      "exampleText": "Shell form и exec form одинаково передают SIGTERM nginx — разницы нет.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "entrypoint_exec",
+      "exampleType": "good",
+      "exampleText": "docker-entrypoint.sh: migrate, потом exec \"$@\" — shell заменяется myapp, бинарник получает PID 1 и сигналы.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "entrypoint_exec",
+      "exampleType": "good",
+      "exampleText": "без exec \"$@\" sh остаётся pid 1 и глотает sigterm",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "entrypoint_exec",
+      "exampleType": "bad",
+      "exampleText": "run-init && myapp server — нормальный паттерн, exec не нужен.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Exit 137 на docker stop — сигналы сломаны. Postgres SIGKILL → WAL replay минутами. Handler должен реально exit, не только print.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Node: Ctrl+C SIGINT есть default, docker stop SIGTERM — нужен process.on явно",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "137 — успешный код, значит контейнер корректно остановился.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "signals_debug",
+      "exampleType": "good",
+      "exampleText": "STOPSIGNAL SIGUSR1 в Dockerfile; отладка: time docker stop --time 30; strace -p PID -e trace=signal.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "signals_debug",
+      "exampleType": "good",
+      "exampleText": "чистый shutdown — exit 0 за 1-2с; грязный — ждёт весь grace и 137",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "signals_debug",
+      "exampleType": "bad",
+      "exampleText": "Сигнал docker stop изменить нельзя, только SIGTERM навсегда.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "container-signals-init-process",
+    "apiUrl": "https://api.itlead.org/api/questions/container-signals-init-process",
+    "pageUrl": "https://itlead.org/interview-questions/docker/container-signals-init-process",
+    "difficulty": "SENIOR",
+    "titleEn": "How to handle signals in containers and what is the init process?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

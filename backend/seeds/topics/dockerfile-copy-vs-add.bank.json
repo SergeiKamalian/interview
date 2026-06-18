@@ -1,0 +1,471 @@
+{
+  "topic": {
+    "code": "dockerfile_copy_vs_add",
+    "name": "COPY vs ADD в Dockerfile",
+    "skillCode": "docker",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "В чём разница между COPY и ADD в Dockerfile?",
+    "shortAnswer": "COPY и ADD оба копируют файлы из build context в образ, но ADD делает дополнительно: автоматически распаковывает локальные tar-архивы и может скачивать файлы по URL. Для обычного копирования используйте COPY — это рекомендация официального Dockerfile best-practices guide.",
+    "idealAnswer": "COPY и ADD на первый взгляд одинаковы — оба копируют файлы и директории из build context в образ. Разница в том, что ADD делает «магию» поверх копирования: автоматически распаковывает локальные tar-архивы (.tar, .tar.gz/.tgz, .tar.bz2, .tar.xz) и может загружать файлы по удалённым URL. Оба поддерживают одинаковые флаги: --chown, --chmod, --from=stage для multi-stage build. Официальный Dockerfile best-practices guide прямо говорит: «Although ADD and COPY are functionally similar, generally speaking, COPY is preferred». COPY предсказуем: что видишь в Dockerfile — то получишь в образе. ADD менее предсказуем: читая ADD foo /bar, нужно знать тип foo — обычный файл, tar или URL. Дефолтный выбор — COPY для package.json, src/, конфигов и всего обычного копирования. ADD уместен когда: (1) локальный tarball нужно распаковать одним шагом вместо RUN tar xf; (2) сборка base image FROM scratch с ADD rootfs.tar.gz / — так строятся Alpine и distroless. Для URL лучше RUN curl -fsSL ... && sha256sum -c && rm в одном слое: явная верификация checksum, контроль retry, cleanup без лишних слоёв. ADD https://... без checksum — плохая практика: нет проверки целостности, слабое кеширование, мусор в образе. Классическая ошибка: ADD vendor.tar.gz /opt/ — tarball не кладётся как файл, а распаковывается в /opt/. ADD package.json вместо COPY — функционально то же, но читатель Dockerfile вынужден гадать «это tar?». С BuildKit (# syntax=docker/dockerfile:1.7+) допустим ADD --checksum=sha256:... https://... — верифицируемое cache-friendly скачивание в одну строку; plain COPY с URL напрямую не работает. .zip ADD не распаковывает — нужен COPY + RUN unzip. В production Dockerfiles почти всегда только COPY; ADD встречается в FROM scratch rootfs и подобных minimal base images.",
+    "maxScore": 10,
+    "skills": [
+      "docker"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "copy_vs_add_core",
+      "title": "Понимает ключевое различие COPY и ADD",
+      "expected": "Кандидат формулирует: оба копируют из build context в образ; ADD дополнительно распаковывает tar и может загружать URL; COPY — предсказуемое копирование без «магии».",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR темы — без этого остальное бессмысленно",
+        "confusionPairs": [
+          {
+            "checkpointKey": "copy_vs_add_core",
+            "oftenConfusedWith": [
+              "copy_default_preferred",
+              "add_extra_features"
+            ],
+            "anchorTermsExpected": [
+              "COPY",
+              "ADD",
+              "build context",
+              "tar",
+              "URL",
+              "распаков",
+              "копир"
+            ],
+            "anchorTermsWrongTopic": [
+              "COPY скачивает URL",
+              "ADD только для tar",
+              "COPY и ADD полностью идентичны"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "COPY",
+              "ADD",
+              "разниц"
+            ],
+            "ask": "чем ADD отличается от COPY помимо простого копирования"
+          }
+        ],
+        "mustConcepts": [
+          "COPY",
+          "ADD",
+          "build context",
+          "образ",
+          "image",
+          "копир",
+          "файл",
+          "директор",
+          "tar",
+          "архив",
+          "распаков",
+          "URL",
+          "скач",
+          "fetch",
+          "предсказу",
+          "магия",
+          "дополнительн"
+        ],
+        "falseClaims": [
+          "COPY и ADD делают абсолютно одно и то же",
+          "ADD не копирует обычные файлы",
+          "COPY может скачивать файлы по URL",
+          "ADD распаковывает zip-архивы",
+          "разница только в названии команды"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "copy_default_preferred",
+      "title": "Знает что COPY — дефолтный выбор",
+      "expected": "Кандидат называет: COPY предпочтителен для обычного копирования; официальный best-practices guide; предсказуемость и читаемость Dockerfile.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "best practices — ключевая рекомендация ITLead TL;DR",
+        "mustConcepts": [
+          "COPY",
+          "дефолт",
+          "по умолчанию",
+          "preferred",
+          "best practices",
+          "best-practices",
+          "рекоменд",
+          "предсказу",
+          "читаем",
+          "package.json",
+          "src",
+          "production",
+          "обычн",
+          "plain copy"
+        ],
+        "falseClaims": [
+          "ADD предпочтительнее COPY для всех случаев",
+          "COPY устарел и заменён ADD",
+          "ADD безопаснее для production копирования",
+          "best practices рекомендуют ADD вместо COPY"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "add_extra_features",
+      "title": "Знает дополнительные возможности ADD",
+      "expected": "Кандидат объясняет: ADD auto-extract локальных tar (.tar, .tar.gz, .tar.bz2, .tar.xz); ADD может fetch по URL; .zip не распаковывает.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "tar extraction и URL — суть «магии» ADD",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "copy_vs_add_core",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "tar",
+              "tar.gz",
+              "распаков"
+            ],
+            "ask": "что произойдёт с ADD app.tar.gz /app/ — файл или распаковка"
+          },
+          {
+            "match": [
+              "zip",
+              ".zip"
+            ],
+            "ask": "распаковывает ли ADD zip-архивы"
+          }
+        ],
+        "mustConcepts": [
+          "ADD",
+          "tar",
+          "tar.gz",
+          "tgz",
+          "tar.bz2",
+          "tar.xz",
+          "распаков",
+          "extract",
+          "auto-extract",
+          "URL",
+          "https",
+          "скач",
+          "fetch",
+          "zip",
+          "не распаков",
+          "unzip",
+          "локальн"
+        ],
+        "falseClaims": [
+          "ADD vendor.tar.gz кладёт файл как есть без распаковки",
+          "ADD распаковывает .zip автоматически",
+          "ADD https:// работает так же надёжно как RUN curl с checksum",
+          "COPY распаковывает tar-архивы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "url_run_alternative",
+      "title": "Знает альтернативу ADD URL",
+      "expected": "Кандидат называет: для URL лучше RUN curl -fsSL + sha256sum/checksum + cleanup в одном слое; ADD URL без верификации — плохая практика; BuildKit ADD --checksum как современный вариант.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "production-паттерн из Common mistakes ITLead",
+        "mustConcepts": [
+          "RUN",
+          "curl",
+          "checksum",
+          "sha256",
+          "sha256sum",
+          "верифика",
+          "verify",
+          "cleanup",
+          "rm",
+          "один слой",
+          "layer",
+          "ADD URL",
+          "https",
+          "без checksum",
+          "BuildKit",
+          "--checksum",
+          "dpkg",
+          "binary"
+        ],
+        "falseClaims": [
+          "ADD https:// без checksum безопасен для production",
+          "RUN curl хуже ADD URL для production",
+          "ADD URL автоматически проверяет checksum",
+          "после ADD URL файл всегда удаляется из образа"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "legitimate_add_usage",
+      "title": "Знает когда ADD уместен",
+      "expected": "Кандидат называет: FROM scratch + ADD rootfs.tar.gz /; распаковка локального tarball одним шагом; Alpine/distroless base images.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "легитимные кейсы из ITLead When ADD is right",
+        "mustConcepts": [
+          "FROM scratch",
+          "scratch",
+          "rootfs",
+          "tar.gz",
+          "Alpine",
+          "distroless",
+          "base image",
+          "распаков",
+          "один шаг",
+          "RUN tar",
+          "minirootfs",
+          "официальн"
+        ],
+        "falseClaims": [
+          "ADD никогда не нужен в реальных Dockerfiles",
+          "FROM scratch использует COPY для rootfs",
+          "ADD уместен для копирования package.json",
+          "только senior-образы используют ADD"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки COPY/ADD",
+      "expected": "Кандидат называет: ADD вместо COPY для plain files; ADD URL без верификации; забывают что ADD tar.gz распаковывает, а не кладёт файл; линтеры флагают ADD URL.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — tar surprise, ADD package.json, URL trust",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ADD package.json",
+              "plain copy"
+            ],
+            "ask": "почему ADD package.json хуже COPY package.json"
+          },
+          {
+            "match": [
+              "vendor.tar.gz",
+              "распаков",
+              "сюрприз"
+            ],
+            "ask": "что не так с ADD vendor.tar.gz /opt/ если ожидали файл"
+          }
+        ],
+        "mustConcepts": [
+          "ADD package.json",
+          "COPY package.json",
+          "когнитив",
+          "читаем",
+          "tar surprise",
+          "распаков",
+          "не файл",
+          "vendor.tar.gz",
+          "URL без",
+          "checksum",
+          "линтер",
+          "linter",
+          "GitHub Actions",
+          "Cloud Build",
+          "миграц",
+          "gotcha",
+          "ошибк"
+        ],
+        "falseClaims": [
+          "ADD package.json лучше COPY потому что мощнее",
+          "ADD vendor.tar.gz положит tarball в /opt/ как файл",
+          "линтеры рекомендуют ADD для URL",
+          "разница COPY/ADD только косметическая для plain files"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "COPY и ADD оба копируют из build context, но ADD ещё распаковывает tar и может тянуть URL. Для package.json и src всегда COPY — предсказуемо. ADD оставляю для FROM scratch + rootfs.tar.gz или когда tarball нужно распаковать одной строкой.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну copy — просто копирует как есть, add — ещё tar сам распакует и url скачает. в проде почти всё через copy, add только rootfs в scratch образах. url лучше curl + sha256 в run, не add https",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Best practices Docker: COPY preferred. ADD app.tar.gz /app/ распакует содержимое, не положит файл. Для бинарника с интернета — RUN curl -fsSL -o /tmp/x.deb && echo hash | sha256sum -c - && dpkg -i && rm.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "COPY и ADD полностью одинаковые, ADD просто новее. Для всего использую ADD — он мощнее.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "ADD https://example.com/app.deb /tmp/ — норм для production, Docker сам проверит checksum и удалит файл после установки.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "ADD vendor.tar.gz /opt/ положит архив в /opt/vendor.tar.gz как файл. COPY с URL скачает файл напрямую.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "copy_vs_add_core",
+      "exampleType": "good",
+      "exampleText": "Оба копируют из context; ADD = COPY + tar extract + URL fetch.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "copy_vs_add_core",
+      "exampleType": "good",
+      "exampleText": "copy просто кладёт файлы, add ещё tar распакует и url потянет — вот вся разница",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "copy_vs_add_core",
+      "exampleType": "bad",
+      "exampleText": "COPY умеет скачивать URL, ADD только копирует локальные файлы.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "copy_default_preferred",
+      "exampleType": "good",
+      "exampleText": "COPY — дефолт по best practices: package.json, src/, конфиги — всё через COPY, без сюрпризов.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "copy_default_preferred",
+      "exampleType": "good",
+      "exampleText": "в прод dockerfile только copy, add не трогаю кроме rootfs — так читается и предсказуемо",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "copy_default_preferred",
+      "exampleType": "bad",
+      "exampleText": "ADD предпочтительнее COPY, потому что Dockerfile guide рекомендует ADD для plain copies.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "add_extra_features",
+      "exampleType": "good",
+      "exampleText": "ADD app.tar.gz /app/ — tarball распакуется в /app/, не ляжет как файл. Поддерживает .tar, .tar.gz, .tar.bz2, .tar.xz. .zip — нет, нужен COPY + RUN unzip.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "add_extra_features",
+      "exampleType": "good",
+      "exampleText": "add ещё url качает, но это discouraged. tar.gz сам разархивирует — классический gotcha",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "add_extra_features",
+      "exampleType": "bad",
+      "exampleText": "ADD распаковывает и zip, и rar. COPY тоже умеет auto-extract tar.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "url_run_alternative",
+      "exampleType": "good",
+      "exampleText": "Вместо ADD https://... — RUN curl -fsSL -o /tmp/x.deb && echo sha256 /tmp/x.deb | sha256sum -c - && dpkg -i /tmp/x.deb && rm /tmp/x.deb. Верификация и cleanup в одном слое.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "url_run_alternative",
+      "exampleType": "good",
+      "exampleText": "add url без checksum — плохо. с buildkit можно add --checksum=sha256:abc... https://... — единственный ок паттерн для url в проде",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "url_run_alternative",
+      "exampleType": "bad",
+      "exampleText": "ADD https://example.com/binary.deb безопасен — Docker кеширует и проверяет hash автоматически.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "legitimate_add_usage",
+      "exampleType": "good",
+      "exampleText": "FROM scratch + ADD alpine-minirootfs.tar.gz / — легитимный кейс, так строят Alpine. Экономит RUN tar xf.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "legitimate_add_usage",
+      "exampleType": "good",
+      "exampleText": "add норм когда локальный tarball одним шагом распаковать или scratch rootfs залить",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "legitimate_add_usage",
+      "exampleType": "bad",
+      "exampleText": "ADD никогда не используют в реальных проектах, только COPY существует.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "ADD package.json вместо COPY — функционально то же, но коллега будет думать «это tar?». ADD vendor.tar.gz /opt/ распакует, не положит файл — сюрприз при миграции.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "линтеры в gcb и github actions ругают add url — лучше run curl с checksum",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "ADD package.json лучше COPY — звучит мощнее и быстрее собирает образ.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "dockerfile-copy-vs-add",
+    "apiUrl": "https://api.itlead.org/api/questions/dockerfile-copy-vs-add",
+    "pageUrl": "https://itlead.org/interview-questions/docker/dockerfile-copy-vs-add",
+    "difficulty": "JUNIOR",
+    "titleEn": "COPY vs ADD in Dockerfile: what is the difference?",
+    "categorySlug": "docker",
+    "syncedAt": "2026-06-18T15:00:00.000Z"
+  }
+}

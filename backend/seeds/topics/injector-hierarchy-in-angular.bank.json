@@ -1,0 +1,738 @@
+{
+  "topic": {
+    "code": "injector_hierarchy_angular",
+    "name": "Иерархия инжекторов в Angular",
+    "skillCode": "angular",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как устроена иерархия инжекторов в Angular и как Angular резолвит зависимости?",
+    "shortAnswer": "Иерархия инжекторов — дерево экземпляров Injector, зеркалирующее дерево компонентов. При запросе токена Angular начинает с ближайшего инжектора и идёт вверх, пока не найдёт провайдер или не выбросит NullInjectorError. Дочерние инжекторы наследуют родительские, но затеняют их при локальной регистрации того же токена.",
+    "idealAnswer": "Иерархия инжекторов в Angular — дерево экземпляров Injector, повторяющее дерево компонентов. При резолюции токена Angular начинает с ближайшего инжектора (element injector компонента или директивы) и поднимается вверх: родительский компонент → предки → module injector → root (application) injector. Если провайдер не найден — NullInjectorError. Каждый Injector хранит resolved-сервисы в records map: один токен не инстанцируется дважды в рамках одного инжектора — singleton на уровне инжектора. Четыре уровня: root (@Injectable({ providedIn: 'root' }) — один singleton на приложение, lazy, tree-shakable); module (NgModule.providers — для eager сливается с root, для lazy-loaded создаётся child injector с изолированным scope); component (@Component.providers — новый экземпляр на каждый экземпляр компонента, уничтожается с компонентом, дети наследуют); element/directive (@Directive.providers — scope элемента, директива делит element injector с host-комponent). Ключевое правило shadowing: локальный provider перекрывает родительский для всего поддерева; siblings не делят component-level instance. Lazy-loaded module получает свой injector — сервис в NgModule.providers lazy-модуля НЕ shared с root; если тот же сервис providedIn: 'root', внутри lazy-модуля shadow root, снаружи — root singleton; два экземпляра одновременно. Правило выбора уровня: app-wide state → providedIn: 'root'; feature isolation в lazy route → NgModule.providers lazy module; per-instance data → Component.providers; mock поддерева → useClass на component/module level. @Self() — только текущий element injector, без подъёма; @SkipSelf() — пропустить текущий, искать с родителя (рекурсивные деревья, parent LoggerService); @Optional() — null вместо ошибки. viewProviders vs providers: viewProviders только для view компонента, не для projected content через ng-content; projected компонент с inject сервиса из viewProviders → NullInjectorError. Standalone (Angular 14+): EnvironmentInjector вместо NgModule injectors, bootstrapApplication создаёт root EnvironmentInjector; component providers работают так же; inject() в signals/computed использует то же дерево. Типичные ошибки: ожидание shared root instance из lazy module providers; двойная регистрация module + component → два экземпляра; child наследует parent component provider «неожиданно»; providedIn: 'root' в published library; путаница viewProviders/providers. Real-world: Material Overlay providedIn root; NgRx forRoot/forFeature; Nx lazy libraries module providers; Universal platform providers.",
+    "maxScore": 10,
+    "skills": [
+      "angular",
+      "typescript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "injector_tree_definition",
+      "title": "Понимает дерево инжекторов и walk-up резолюцию",
+      "expected": "Кандидат объясняет: дерево Injector зеркалирует component tree; поиск от ближайшего инжектора вверх; NullInjectorError если не найден; дочерние наследуют, но shadow при локальном provider.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — org chart аналогия и walk-up из ITLead TL;DR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "injector_tree_definition",
+            "oftenConfusedWith": [
+              "resolution_and_caching",
+              "four_injector_levels"
+            ],
+            "anchorTermsExpected": [
+              "Injector",
+              "дерев",
+              "component tree",
+              "вверх",
+              "walk up",
+              "NullInjectorError",
+              "shadow",
+              "затен",
+              "наслед"
+            ],
+            "anchorTermsWrongTopic": [
+              "Angular ищет только в root",
+              "injector не связан с компонентами",
+              "multi-providers собирают массив"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Injector",
+              "дерев",
+              "component tree"
+            ],
+            "ask": "как Angular ищет токен от ближайшего инжектора вверх и что такое shadowing"
+          }
+        ],
+        "mustConcepts": [
+          "Injector",
+          "инжектор",
+          "дерев",
+          "component tree",
+          "зеркал",
+          "walk up",
+          "вверх",
+          "ближайш",
+          "NullInjectorError",
+          "наслед",
+          "inherit",
+          "shadow",
+          "затен",
+          "перекры",
+          "override",
+          "локальн",
+          "provider",
+          "резолв",
+          "resolution"
+        ],
+        "falseClaims": [
+          "Angular резолвит зависимости только из root injector",
+          "дерево инжекторов не связано с деревом компонентов",
+          "дочерний инжектор всегда возвращает root singleton",
+          "NullInjectorError возникает только при опечатке в имени сервиса"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "four_injector_levels",
+      "title": "Знает четыре уровня инжекторов",
+      "expected": "Кандидат перечисляет: root (providedIn: 'root'), module (NgModule.providers), component (Component.providers), element/directive; когда какой уровень выбирать.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "four levels + decision rule из ITLead Theory",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "injector_tree_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "four_injector_levels",
+            "oftenConfusedWith": [
+              "lazy_module_injectors"
+            ],
+            "anchorTermsExpected": [
+              "providedIn: 'root'",
+              "NgModule.providers",
+              "Component.providers",
+              "Directive.providers",
+              "root",
+              "module",
+              "component",
+              "element"
+            ],
+            "anchorTermsWrongTopic": [
+              "eager module всегда изолирован от root",
+              "providedIn root создаёт экземпляр на каждый компонент"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "providedIn",
+              "root",
+              "NgModule",
+              "Component.providers"
+            ],
+            "ask": "когда использовать providedIn root vs NgModule.providers vs Component.providers"
+          }
+        ],
+        "mustConcepts": [
+          "root injector",
+          "providedIn: 'root'",
+          "singleton",
+          "tree-shak",
+          "module injector",
+          "NgModule.providers",
+          "component injector",
+          "Component.providers",
+          "element injector",
+          "Directive.providers",
+          "app-wide",
+          "feature isolation",
+          "per-instance",
+          "lazy",
+          "EnvironmentInjector",
+          "standalone",
+          "bootstrapApplication"
+        ],
+        "falseClaims": [
+          "providedIn: 'root' создаёт новый экземпляр на каждый inject",
+          "NgModule.providers всегда глобальны для всего приложения",
+          "Component.providers видны sibling-компонентам",
+          "Directive создаёт отдельную ветку injector tree"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "resolution_and_caching",
+      "title": "Знает механизм резолюции и records map",
+      "expected": "Кандидат описывает порядок: component injector → ancestors → module → root; records map кеширует экземпляр; getAt() обход вверх; singleton guarantee на уровне инжектора.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "getAt(), records map — runtime detail из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "records",
+              "getAt",
+              "кеш",
+              "singleton"
+            ],
+            "ask": "что хранит records map и почему второй inject того же токена не создаёт новый экземпляр"
+          }
+        ],
+        "mustConcepts": [
+          "records",
+          "records map",
+          "getAt",
+          "кеш",
+          "cache",
+          "singleton",
+          "один экземпляр",
+          "per injector",
+          "parent",
+          "связ",
+          "bootstrap",
+          "инстанц",
+          "instantiat",
+          "повторн",
+          "не создаёт заново"
+        ],
+        "falseClaims": [
+          "каждый inject() создаёт новый экземпляр сервиса",
+          "records map общий для всего приложения",
+          "getAt() ищет только в module injector"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "shadowing_and_inheritance",
+      "title": "Понимает shadowing и наследование провайдеров",
+      "expected": "Кандидат объясняет: локальный provider shadow root для поддерева; siblings снаружи получают root; child наследует parent component providers; MockUserService пример.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ChildComponent MockUserService + parent inheritance — ключевые ITLead examples",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "shadowing_and_inheritance",
+            "oftenConfusedWith": [
+              "lazy_module_injectors"
+            ],
+            "anchorTermsExpected": [
+              "shadow",
+              "затен",
+              "useClass",
+              "MockUserService",
+              "sibling",
+              "поддерев",
+              "наслед",
+              "ParentComponent"
+            ],
+            "anchorTermsWrongTopic": [
+              "component provider глобален",
+              "siblings делят component instance"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "MockUserService",
+              "useClass",
+              "ChildComponent"
+            ],
+            "ask": "ChildComponent с providers MockUserService — что получат siblings и дети"
+          },
+          {
+            "match": [
+              "ParentComponent",
+              "SharedService",
+              "наслед"
+            ],
+            "ask": "почему ChildComponent получает SharedService от ParentComponent, а не root"
+          }
+        ],
+        "mustConcepts": [
+          "shadow",
+          "затен",
+          "override",
+          "перекры",
+          "локальн",
+          "useClass",
+          "MockUserService",
+          "ChildComponent",
+          "sibling",
+          "сосед",
+          "поддерев",
+          "subtree",
+          "наслед",
+          "inherit",
+          "ParentComponent",
+          "SharedService",
+          "root instance",
+          "отдельн экземпляр"
+        ],
+        "falseClaims": [
+          "component providers видны всем компонентам приложения",
+          "sibling components делят один component-level экземпляр",
+          "локальный provider не влияет на дочерние компоненты",
+          "child всегда получает root singleton даже если parent объявил provider"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "lazy_module_injectors",
+      "title": "Понимает lazy-loaded module injectors",
+      "expected": "Кандидат объясняет: lazy module — child injector; NgModule.providers в lazy module изолированы; shadow providedIn root внутри модуля; MockAuthService в lazy e2e пример; два экземпляра одновременно.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "самая частая senior-ошибка — ожидание shared root из lazy module",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "lazy_module_injectors",
+            "oftenConfusedWith": [
+              "four_injector_levels",
+              "shadowing_and_inheritance"
+            ],
+            "anchorTermsExpected": [
+              "lazy",
+              "lazy-loaded",
+              "child injector",
+              "AuthTestModule",
+              "MockAuthService",
+              "shadow root",
+              "два экземпляра"
+            ],
+            "anchorTermsWrongTopic": [
+              "lazy module providers глобальны",
+              "eager module создаёт отдельный injector как lazy"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "lazy",
+              "NgModule.providers",
+              "DataService"
+            ],
+            "ask": "DataService в NgModule.providers lazy module и providedIn root — сколько экземпляров и кто что видит"
+          },
+          {
+            "match": [
+              "MockAuthService",
+              "AuthTestModule",
+              "e2e"
+            ],
+            "ask": "как замокать AuthService только внутри lazy feature module"
+          }
+        ],
+        "mustConcepts": [
+          "lazy-loaded",
+          "lazy module",
+          "child injector",
+          "NgModule.providers",
+          "изоляц",
+          "isolation",
+          "shadow",
+          "providedIn: 'root'",
+          "два экземпляра",
+          "одновременно",
+          "MockAuthService",
+          "AuthTestModule",
+          "eager",
+          "merged with root",
+          "feature isolation",
+          "Nx",
+          "lazy feature"
+        ],
+        "falseClaims": [
+          "lazy module providers автоматически shared с root singleton",
+          "eager module всегда создаёт отдельный injector как lazy",
+          "компоненты вне lazy module видят lazy module provider",
+          "providedIn root отменяет NgModule.providers в lazy module"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "self_skipself_optional",
+      "title": "Знает @Self(), @SkipSelf(), @Optional()",
+      "expected": "Кандидат объясняет: @Self() — только текущий injector; @SkipSelf() — с родителя (LoggerService recursive); @Optional() — null без ошибки; комбинация @Optional @SkipSelf.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "follow-up questions и SkipSelf Logger пример из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "@Self()",
+              "Self"
+            ],
+            "ask": "когда нужен @Self() и что произойдёт если токен не в текущем injector"
+          },
+          {
+            "match": [
+              "@SkipSelf()",
+              "SkipSelf",
+              "LoggerService",
+              "parent"
+            ],
+            "ask": "как @SkipSelf() помогает в рекурсивном LoggerService без circular dependency"
+          },
+          {
+            "match": [
+              "@Optional()",
+              "Optional"
+            ],
+            "ask": "чем @Optional() отличается от отсутствия декоратора при missing token"
+          }
+        ],
+        "mustConcepts": [
+          "@Self()",
+          "Self",
+          "только текущ",
+          "current injector",
+          "@SkipSelf()",
+          "SkipSelf",
+          "пропуст",
+          "родител",
+          "parent",
+          "@Optional()",
+          "Optional",
+          "null",
+          "без ошибк",
+          "LoggerService",
+          "рекурсив",
+          "TreeService",
+          "TreeNode",
+          "NullInjectorError",
+          "enforce"
+        ],
+        "falseClaims": [
+          "@Self() ищет начиная с root injector",
+          "@SkipSelf() всегда возвращает null",
+          "@Optional() создаёт stub-объект автоматически",
+          "декораторы меняют порядок module vs component injectors"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки и viewProviders",
+      "expected": "Кандидат называет: lazy module vs root; module+component double instance; child inherits parent provider; providedIn root в library; viewProviders vs providers для ng-content projected components.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "5 Common mistakes + viewProviders из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "lazy_module_injectors",
+            "floorFraction": 0.4
+          },
+          {
+            "checkpointKey": "shadowing_and_inheritance",
+            "floorFraction": 0.35
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "common_mistakes",
+            "oftenConfusedWith": [
+              "shadowing_and_inheritance"
+            ],
+            "anchorTermsExpected": [
+              "viewProviders",
+              "providers",
+              "ng-content",
+              "projected",
+              "NullInjectorError",
+              "CartService",
+              "DevTools"
+            ],
+            "anchorTermsWrongTopic": [
+              "viewProviders и providers всегда equivalent",
+              "projected content наследует viewProviders"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "viewProviders",
+              "ng-content",
+              "projected"
+            ],
+            "ask": "почему projected component не видит сервис из viewProviders"
+          },
+          {
+            "match": [
+              "CartService",
+              "module",
+              "component",
+              "два экземпляра"
+            ],
+            "ask": "CartService в NgModule и Component providers — сколько экземпляров"
+          },
+          {
+            "match": [
+              "providedIn: 'root'",
+              "library",
+              "platform"
+            ],
+            "ask": "почему providedIn root в published library может быть проблемой"
+          }
+        ],
+        "mustConcepts": [
+          "viewProviders",
+          "providers",
+          "ng-content",
+          "projected",
+          "content projection",
+          "NullInjectorError",
+          "CartService",
+          "два экземпляра",
+          "module и component",
+          "Angular DevTools",
+          "providedIn: 'root'",
+          "library",
+          "providedIn: 'platform'",
+          "microfrontend",
+          "CounterService",
+          "per card",
+          "ParentComponent",
+          "SharedService"
+        ],
+        "falseClaims": [
+          "viewProviders и providers работают одинаково для projected content",
+          "можно безопасно дублировать provider в module и component без лишних экземпляров",
+          "providedIn root в library всегда безопасен для любого consumer",
+          "projected компонент всегда видит viewProviders host-компонента"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Injector tree зеркалирует component tree. inject(AuthService) — сначала element injector компонента, потом вверх до root. Component.providers с MockUserService shadow root только для поддерева; siblings снаружи — root singleton. Lazy module — свой child injector: AuthService в NgModule.providers lazy feature shadow providedIn root внутри модуля.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "App-wide auth — providedIn: 'root'. Per-card counter — CounterService в Component.providers каждой CardComponent. E2e lazy AuthTestModule — { provide: AuthService, useClass: MockAuthService }. LoggerService с @Optional() @SkipSelf() parent — рекурсивное дерево без circular error. Projected widget inject сервис — только providers, не viewProviders.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "records map кеширует экземпляр per injector — второй inject UserService в том же компоненте тот же объект. Standalone: bootstrapApplication → EnvironmentInjector root; component providers element injectors без изменений.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Angular всегда берёт сервис из root injector, component providers декоративные. Lazy module NgModule.providers — тот же singleton что providedIn root.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "@Self() ищет с root вниз. viewProviders доступны projected content через ng-content. Два CartService в module и component — Angular merge в один экземпляр.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "ChildComponent не наследует providers ParentComponent — каждый всегда fresh root instance. Lazy-loaded module providers видны shell app автоматически.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "injector_tree_definition",
+      "exampleType": "good",
+      "exampleText": "Дерево Injector = дерево компонентов; walk up от ближайшего; NullInjectorError если провайдер не найден; локальный provider shadow родителя для subtree.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "injector_tree_definition",
+      "exampleType": "good",
+      "exampleText": "ну как org chart — спросил у своего component injector, потом у родителя, потом root; child shadow если сам объявил токен",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "injector_tree_definition",
+      "exampleType": "bad",
+      "exampleText": "Injector hierarchy — flat map всех сервисов приложения в root, component tree не участвует.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "four_injector_levels",
+      "exampleType": "good",
+      "exampleText": "root providedIn singleton app-wide; module NgModule.providers feature scope; component per-instance; directive element scope на host element.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "four_injector_levels",
+      "exampleType": "good",
+      "exampleText": "auth logging flags — root; lazy feature state — module providers lazy lib; form state — component providers; overlay — root Material",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "four_injector_levels",
+      "exampleType": "bad",
+      "exampleText": "providedIn root создаёт новый AuthService на каждый компонент. Directive.providers создаёт отдельную ветку дерева без host component.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "resolution_and_caching",
+      "exampleType": "good",
+      "exampleText": "getAt() от element injector вверх; records map — второй inject того же токена возвращает cached instance без new.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "resolution_and_caching",
+      "exampleType": "good",
+      "exampleText": "singleton guarantee per injector level — один UserService на component injector, не на всё приложение",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "resolution_and_caching",
+      "exampleType": "bad",
+      "exampleText": "Каждый constructor inject создаёт новый экземпляр даже для providedIn root в одном компоненте.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "shadowing_and_inheritance",
+      "exampleType": "good",
+      "exampleText": "ChildComponent providers MockUserService — child true, siblings root UserService; ParentComponent SharedService — child наследует parent instance.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "shadowing_and_inheritance",
+      "exampleType": "good",
+      "exampleText": "локальный useClass shadow root только в subtree — снаружи siblings не видят mock",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "shadowing_and_inheritance",
+      "exampleType": "bad",
+      "exampleText": "Component.providers глобально заменяют root для всего приложения включая unrelated routes.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "lazy_module_injectors",
+      "exampleType": "good",
+      "exampleText": "AuthTestModule lazy + MockAuthService — dashboard внутри видит mock; shell app — real providedIn root; два AuthService одновременно.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "lazy_module_injectors",
+      "exampleType": "good",
+      "exampleText": "DataService в lazy NgModule.providers — отдельный child injector, не shared root; убрать из providers если нужен root singleton",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "lazy_module_injectors",
+      "exampleType": "bad",
+      "exampleText": "Lazy module providers автоматически регистрируются в root при loadChildren — один singleton на всё app.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "self_skipself_optional",
+      "exampleType": "good",
+      "exampleText": "@Self() FormService — только providers этого компонента, иначе throw. @SkipSelf() LoggerService — parent logger в ChildComponent providers.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "self_skipself_optional",
+      "exampleType": "good",
+      "exampleText": "@Optional() Analytics — null если не зарегистрирован; @Optional @SkipSelf parent TreeService в recursive node",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "self_skipself_optional",
+      "exampleType": "bad",
+      "exampleText": "@SkipSelf() inject из текущего component injector. @Self() walk up до root если не найден.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "viewProviders — только view template; projected через ng-content inject → NullInjectorError. CartService module + component — два instance, DevTools покажет.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "library providedIn root — consumer app root pollution; microfrontend — providedIn platform или let app decide",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "viewProviders и providers equivalent для ng-content children. Parent SharedService provider не наследуется child автоматически.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "injector-hierarchy-in-angular",
+    "apiUrl": "https://api.itlead.org/api/questions/injector-hierarchy-in-angular",
+    "pageUrl": "https://itlead.org/interview-questions/angular/injector-hierarchy-in-angular",
+    "difficulty": "SENIOR",
+    "titleEn": "Injector hierarchy in Angular",
+    "categorySlug": "angular",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}
