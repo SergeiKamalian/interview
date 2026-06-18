@@ -27,7 +27,7 @@ function loadGoldenCases(): GoldenCalibrationCase[] {
     .filter((file) => !file.includes('transitive-'))
     .filter((file) => !file.includes('hooks-useeffect'))
     .filter((file) => !file.includes('hooks-useeffect-after'))
-    .filter((file) => !file.includes('hooks-double-mismatch'))
+    .filter((file) => !file.includes('candidate-turn-classifier'))
     .sort();
 
   return files.map((file) => {

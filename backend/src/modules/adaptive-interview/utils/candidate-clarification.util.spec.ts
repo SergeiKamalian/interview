@@ -2,6 +2,7 @@ import {
   buildClarificationFollowUpQuestion,
   countScopeClarificationTurns,
   isCandidateAskingForScope,
+  isScopeClarificationTurn,
   isVagueFollowUpQuestion,
   MAX_SCOPE_CLARIFICATION_TURNS_PER_QUESTION,
   resolveScopeClarificationDisposition,
@@ -43,65 +44,41 @@ describe('candidate-clarification.util', () => {
   });
 
   describe('resolveScopeClarificationDisposition', () => {
-    it('overrides misunderstood_question on targeted meta question', () => {
+    it('maps classifier turn_kind to disposition', () => {
       expect(
         resolveScopeClarificationDisposition({
-          answer: 'Вы говорите про render и commit phase, да?',
-          aiDisposition: 'misunderstood_question',
-          isTargetedFollowUp: true,
+          candidateTurnKind: 'scope_clarification',
+          aiDisposition: 'engaged',
         }),
       ).toBe('asked_for_scope');
     });
 
-    it('trusts AI asked_for_scope even without regex match', () => {
+    it('falls back to AI disposition when turn_kind is absent', () => {
       expect(
         resolveScopeClarificationDisposition({
-          answer: 'То есть речь про планировщик внутри Fiber?',
           aiDisposition: 'asked_for_scope',
-          isTargetedFollowUp: true,
         }),
       ).toBe('asked_for_scope');
     });
 
-    it('uses regex fallback when AI missed on targeted follow-up', () => {
+    it('prefers classifier over evaluator disposition', () => {
       expect(
         resolveScopeClarificationDisposition({
-          answer: 'Что именно?',
-          aiDisposition: 'engaged',
-          isTargetedFollowUp: true,
-        }),
-      ).toBe('asked_for_scope');
-    });
-
-    it('does not override AI engaged when answer is substantive', () => {
-      expect(
-        resolveScopeClarificationDisposition({
-          answer:
-            'Scheduler через MessageChannel проверяет shouldYield каждые 5ms.',
-          aiDisposition: 'engaged',
-          isTargetedFollowUp: true,
+          candidateTurnKind: 'substantive_answer',
+          aiDisposition: 'misunderstood_question',
         }),
       ).toBe('engaged');
     });
+  });
 
-    it('overrides to asked_for_scope on targeted follow-up', () => {
+  describe('isScopeClarificationTurn', () => {
+    it('uses classifier turn_kind when provided', () => {
       expect(
-        resolveScopeClarificationDisposition({
-          answer: 'Что именно?',
+        isScopeClarificationTurn({
+          candidateTurnKind: 'scope_clarification',
           aiDisposition: 'engaged',
-          isTargetedFollowUp: true,
         }),
-      ).toBe('asked_for_scope');
-    });
-
-    it('keeps AI disposition on main answer', () => {
-      expect(
-        resolveScopeClarificationDisposition({
-          answer: 'Что именно?',
-          aiDisposition: 'engaged',
-          isTargetedFollowUp: false,
-        }),
-      ).toBe('engaged');
+      ).toBe(true);
     });
   });
 
@@ -114,6 +91,8 @@ describe('candidate-clarification.util', () => {
             { role: 'candidate', content: 'Что именно?' },
           ],
           latestCandidateAnswer: 'Что вы имеете в виду?',
+          candidateTurnKind: 'scope_clarification',
+          candidateDispositionFromAi: 'asked_for_scope',
           isTargetedFollowUp: true,
         }),
       ).toBe(2);
@@ -176,6 +155,7 @@ describe('candidate-clarification.util', () => {
           answer:
             'А вам нужно чтобы я ответил коротко и по делу или по деталям?',
           aiDisposition: 'engaged',
+          candidateTurnKind: 'format_clarification',
           isTargetedFollowUp: false,
           isFollowUpContext: true,
         }),

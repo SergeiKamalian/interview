@@ -1,6 +1,11 @@
 import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview-context.types';
 import type { CheckpointEvaluationHints } from '../types/checkpoint-evaluation-hints.type';
 import type { CandidateAnswerDisposition } from '../types/candidate-answer-disposition.type';
+import type { CandidateTurnKind } from '../types/candidate-turn-classifier.types';
+import {
+  isScopeClarificationTurnKind,
+  mapTurnKindToDisposition,
+} from './map-turn-kind-to-disposition.util';
 import { isCandidateDecliningKnowledge, isTargetedTopicRefusal } from './candidate-decline.util';
 import { resolveProbePhrasesForCandidate } from './probe-policy.util';
 
@@ -46,7 +51,7 @@ const VAGUE_FOLLOW_UP_PATTERNS: RegExp[] = [
   /что\s+сможете\s+добавить/i,
 ];
 
-/** Regex safety net when evaluator misses obvious scope/meta phrasing on a targeted follow-up. */
+/** Legacy phrase matching — shadow mode and clarification reply templates only. */
 export function isCandidateAskingForScope(answer: string): boolean {
   const normalized = answer.trim();
   if (!normalized) {
@@ -88,64 +93,35 @@ export function isAnswerFormatClarification(answer: string): boolean {
 }
 
 export function resolveScopeClarificationDisposition(input: {
-  answer: string;
+  candidateTurnKind?: CandidateTurnKind | null;
   aiDisposition?: CandidateAnswerDisposition | null;
-  isTargetedFollowUp: boolean;
-  isFollowUpContext?: boolean;
 }): CandidateAnswerDisposition | null {
-  const inFollowUpDialogue =
-    input.isTargetedFollowUp || input.isFollowUpContext === true;
-
-  if (input.aiDisposition === 'asked_for_scope') {
-    return 'asked_for_scope';
-  }
-
-  if (
-    inFollowUpDialogue &&
-    looksLikeClarificationQuestion(input.answer) &&
-    (input.aiDisposition === 'misunderstood_question' ||
-      input.aiDisposition === 'confused' ||
-      input.aiDisposition === 'off_topic')
-  ) {
-    return 'asked_for_scope';
-  }
-
-  if (!inFollowUpDialogue) {
-    return input.aiDisposition ?? null;
-  }
-
-  if (
-    isCandidateAskingForScope(input.answer) ||
-    isAnswerFormatClarification(input.answer) ||
-    looksLikeClarificationQuestion(input.answer)
-  ) {
-    return 'asked_for_scope';
+  if (input.candidateTurnKind) {
+    return mapTurnKindToDisposition(input.candidateTurnKind);
   }
 
   return input.aiDisposition ?? null;
 }
 
 export function isScopeClarificationTurn(input: {
-  answer: string;
+  candidateTurnKind?: CandidateTurnKind | null;
   aiDisposition?: CandidateAnswerDisposition | null;
-  isTargetedFollowUp: boolean;
-  isFollowUpContext?: boolean;
 }): boolean {
-  return (
-    resolveScopeClarificationDisposition(input) === 'asked_for_scope'
-  );
+  if (input.candidateTurnKind) {
+    return isScopeClarificationTurnKind(input.candidateTurnKind);
+  }
+
+  return input.aiDisposition === 'asked_for_scope';
 }
 
 export function countScopeClarificationTurns(input: {
   localTurns: AdaptiveInterviewContextPacket['localTurns'];
   latestCandidateAnswer?: string | null;
   candidateDispositionFromAi?: CandidateAnswerDisposition | null;
+  candidateTurnKind?: CandidateTurnKind | null;
   isTargetedFollowUp?: boolean;
   isFollowUpContext?: boolean;
 }): number {
-  const followUpContext =
-    input.isFollowUpContext === true || input.isTargetedFollowUp === true;
-
   let count = 0;
 
   for (const turn of input.localTurns) {
@@ -153,13 +129,7 @@ export function countScopeClarificationTurns(input: {
       continue;
     }
 
-    if (
-      isScopeClarificationTurn({
-        answer: turn.content,
-        isTargetedFollowUp: true,
-        isFollowUpContext: true,
-      })
-    ) {
+    if (looksLikeClarificationQuestion(turn.content)) {
       count += 1;
     }
   }
@@ -171,10 +141,8 @@ export function countScopeClarificationTurns(input: {
       (turn) => turn.role === 'candidate' && turn.content.trim() === latest,
     ) &&
     isScopeClarificationTurn({
-      answer: latest,
+      candidateTurnKind: input.candidateTurnKind,
       aiDisposition: input.candidateDispositionFromAi,
-      isTargetedFollowUp: input.isTargetedFollowUp ?? false,
-      isFollowUpContext: followUpContext,
     })
   ) {
     count += 1;
@@ -188,6 +156,7 @@ export function buildClarificationFollowUpQuestion(input: {
   missingMustConcepts: string[];
   hints?: CheckpointEvaluationHints | null;
   candidateScopeQuestion: string;
+  candidateTurnKind?: CandidateTurnKind | null;
   previousFollowUpQuestion?: string | null;
   seed?: number;
 }): string {
@@ -201,7 +170,10 @@ export function buildClarificationFollowUpQuestion(input: {
   const scopeQuestion = input.candidateScopeQuestion.trim();
   const previousFollowUp = input.previousFollowUpQuestion?.trim() ?? '';
 
-  if (isAnswerFormatClarification(scopeQuestion)) {
+  if (
+    input.candidateTurnKind === 'format_clarification' ||
+    isAnswerFormatClarification(scopeQuestion)
+  ) {
     return buildFormatClarificationReply(previousFollowUp, conceptList);
   }
 

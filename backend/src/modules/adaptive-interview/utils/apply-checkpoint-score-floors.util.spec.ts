@@ -696,7 +696,11 @@ describe('applyCheckpointScoreFloors', () => {
         ],
       },
       context,
-      { evidenceSource: 'follow_up_answer' },
+      {
+        evidenceSource: 'follow_up_answer',
+        candidateTurnKind: 'scope_clarification',
+        candidateDispositionFromClassifier: 'asked_for_scope',
+      },
     );
 
     const scheduling = evaluation.checkpointResults.find(

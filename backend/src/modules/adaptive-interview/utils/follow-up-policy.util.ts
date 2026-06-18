@@ -1,4 +1,5 @@
-import type {
+import type { CandidateTurnKind } from '../types/candidate-turn-classifier.types';
+import {
   FollowUpPolicyDecision,
   FollowUpPolicyInput,
 } from '../types/follow-up-planner.types';
@@ -81,6 +82,7 @@ export function evaluateFollowUpPolicy(
     shouldSkipFollowUps({
       answer: input.latestCandidateAnswer ?? '',
       aiDisposition: input.candidateDispositionFromAi,
+      candidateTurnKind: input.candidateTurnKind,
       followUpsUsedForQuestion: input.followUpsUsedForQuestion,
     })
   ) {
@@ -89,6 +91,7 @@ export function evaluateFollowUpPolicy(
       reason: resolveSkipFollowUpReason({
         answer: input.latestCandidateAnswer ?? '',
         aiDisposition: input.candidateDispositionFromAi,
+        candidateTurnKind: input.candidateTurnKind,
       }),
     };
   }
@@ -282,9 +285,8 @@ function resolveClarificationFollowUpDecision(
   const latestAnswer = input.latestCandidateAnswer ?? '';
   const scopeContext = resolveScopeTurnContext(input);
   const isScopeAsk = isScopeClarificationTurn({
-    answer: latestAnswer,
+    candidateTurnKind: input.candidateTurnKind,
     aiDisposition: input.candidateDispositionFromAi,
-    ...scopeContext,
   });
 
   if (!isScopeAsk) {
@@ -307,6 +309,7 @@ function resolveClarificationFollowUpDecision(
     localTurns: input.localTurns ?? [],
     latestCandidateAnswer: latestAnswer,
     candidateDispositionFromAi: input.candidateDispositionFromAi,
+    candidateTurnKind: input.candidateTurnKind,
     isTargetedFollowUp:
       scopeContext.isTargetedFollowUp || Boolean(targetKey),
     isFollowUpContext: scopeContext.isFollowUpContext,
@@ -352,9 +355,8 @@ function hasPendingScopeClarification(input: FollowUpPolicyInput): boolean {
   const latestAnswer = input.latestCandidateAnswer ?? '';
   const scopeContext = resolveScopeTurnContext(input);
   const isScopeAsk = isScopeClarificationTurn({
-    answer: latestAnswer,
+    candidateTurnKind: input.candidateTurnKind,
     aiDisposition: input.candidateDispositionFromAi,
-    ...scopeContext,
   });
 
   if (!isScopeAsk) {
@@ -365,6 +367,7 @@ function hasPendingScopeClarification(input: FollowUpPolicyInput): boolean {
     localTurns: input.localTurns ?? [],
     latestCandidateAnswer: latestAnswer,
     candidateDispositionFromAi: input.candidateDispositionFromAi,
+    candidateTurnKind: input.candidateTurnKind,
     isTargetedFollowUp: scopeContext.isTargetedFollowUp,
     isFollowUpContext: scopeContext.isFollowUpContext,
   });
@@ -405,15 +408,15 @@ function resolveTopicRedirectDecision(
     checkpointResults: input.latestCheckpointResults,
     checkpointStates: input.checkpointStates,
     candidateDispositionFromAi: input.candidateDispositionFromAi,
+    candidateTurnKind: input.candidateTurnKind,
     isTargetedFollowUp: scopeContext.isTargetedFollowUp,
     isFollowUpContext: scopeContext.isFollowUpContext,
   });
 
   if (
     isScopeClarificationTurn({
-      answer: input.latestCandidateAnswer ?? '',
+      candidateTurnKind: input.candidateTurnKind,
       aiDisposition: input.candidateDispositionFromAi,
-      ...scopeContext,
     })
   ) {
     return null;
@@ -451,9 +454,8 @@ function hasPendingTopicRedirect(input: FollowUpPolicyInput): boolean {
   const scopeContext = resolveScopeTurnContext(input);
   if (
     isScopeClarificationTurn({
-      answer: input.latestCandidateAnswer ?? '',
+      candidateTurnKind: input.candidateTurnKind,
       aiDisposition: input.candidateDispositionFromAi,
-      ...scopeContext,
     })
   ) {
     return false;
@@ -579,6 +581,7 @@ export function buildNaturalTemplateFollowUp(input: {
   checkpointTitle?: string;
   checkpointExpected?: string;
   latestCandidateAnswer: string;
+  candidateTurnKind?: CandidateTurnKind | null;
   previousFollowUpQuestions?: string[];
   seed?: number;
   missingMustConcepts?: string[];
@@ -619,6 +622,7 @@ export function buildNaturalTemplateFollowUp(input: {
         missingMustConcepts: input.missingMustConcepts ?? [],
         hints: input.evaluationHints,
         candidateScopeQuestion: input.latestCandidateAnswer,
+        candidateTurnKind: input.candidateTurnKind,
         previousFollowUpQuestion:
           previousFollowUpQuestions[previousFollowUpQuestions.length - 1] ??
           null,

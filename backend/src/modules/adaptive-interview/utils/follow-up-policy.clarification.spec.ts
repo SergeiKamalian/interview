@@ -30,6 +30,7 @@ function schedulingPolicyInput(
     lowWeightCheckpointRatio: 0.2,
     latestCandidateAnswer: 'Что именно вам интересно?',
     candidateDispositionFromAi: 'asked_for_scope',
+    candidateTurnKind: 'scope_clarification',
     stickyTargetCheckpointKey: 'scheduling',
     localTurns: [
       { role: 'ai', content: 'Можете уточнить технические детали?' },
@@ -87,6 +88,7 @@ describe('evaluateFollowUpPolicy — scope clarification', () => {
           { role: 'candidate', content: 'Можете конкретнее?' },
         ],
         latestCandidateAnswer: 'Можете конкретнее?',
+        candidateTurnKind: 'scope_clarification',
       }),
     );
 
@@ -101,6 +103,7 @@ describe('evaluateFollowUpPolicy — scope clarification', () => {
       schedulingPolicyInput({
         latestCandidateAnswer: 'То есть речь про планировщик внутри Fiber?',
         candidateDispositionFromAi: 'asked_for_scope',
+        candidateTurnKind: 'scope_clarification',
         localTurns: [
           {
             role: 'ai',
@@ -192,7 +195,8 @@ describe('evaluateFollowUpPolicy — scope clarification', () => {
       lowWeightCheckpointRatio: 0.2,
       latestCandidateAnswer:
         'А вам нужно чтобы я ответил коротко и по делу или по деталям?',
-      candidateDispositionFromAi: 'engaged',
+      candidateDispositionFromAi: 'asked_for_scope',
+      candidateTurnKind: 'format_clarification',
       stickyTargetCheckpointKey: 'fiber_definition',
       isFollowUpAnswer: true,
       localTurns: [
@@ -254,7 +258,8 @@ describe('evaluateFollowUpPolicy — scope clarification', () => {
       questionScoreSufficientRatio: 0.6,
       lowWeightCheckpointRatio: 0.2,
       latestCandidateAnswer: 'Вы говорите про render и commit phase, да?',
-      candidateDispositionFromAi: 'misunderstood_question',
+      candidateDispositionFromAi: 'asked_for_scope',
+      candidateTurnKind: 'scope_clarification',
       stickyTargetCheckpointKey: 'fiber_definition',
       isFollowUpAnswer: true,
       localTurns: [

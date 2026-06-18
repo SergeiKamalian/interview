@@ -21,6 +21,7 @@ export class FollowUpPolicyService {
     candidateDispositionFromAi?: CandidateAnswerDisposition | null,
     recentScoreDeltas?: number[],
     latestCheckpointResults?: FollowUpPolicyInput['latestCheckpointResults'],
+    candidateTurnKind?: FollowUpPolicyInput['candidateTurnKind'],
   ): FollowUpPolicyDecision {
     const limits = getAdaptiveInterviewContextLimits();
 
@@ -58,6 +59,7 @@ export class FollowUpPolicyService {
       latestCandidateAnswer: context.latestCandidateAnswer,
       checkpointEvidenceTextByKey,
       candidateDispositionFromAi: candidateDispositionFromAi ?? undefined,
+      candidateTurnKind: candidateTurnKind ?? undefined,
       stickyTargetCheckpointKey: context.targetCheckpointKey,
       questionText: context.questionText,
       latestCheckpointResults,

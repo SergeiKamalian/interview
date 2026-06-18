@@ -24,10 +24,13 @@ import {
   summarizeAdaptiveContextPacket,
 } from '../utils/adaptive-ai-debug.util';
 import {
-  isFullQuestionDecline,
   shouldSkipFollowUps,
 } from '../utils/candidate-decline.util';
-import { resolveScopeClarificationDisposition } from '../utils/candidate-clarification.util';
+import { buildCandidateTurnClassifierInput } from '../utils/build-candidate-turn-classifier-input.util';
+import { isWholeDeclineTurnKind } from '../utils/map-turn-kind-to-disposition.util';
+import type { CandidateTurnKind } from '../types/candidate-turn-classifier.types';
+import type { CandidateAnswerDisposition } from '../types/candidate-answer-disposition.type';
+import { CandidateTurnClassifierService } from './candidate-turn-classifier.service';
 import { MediaAssetService } from '../../media/media-asset.service';
 import { MainQuestionOpenerService } from './main-question-opener.service';
 
@@ -50,6 +53,7 @@ export class AdaptiveInterviewSubmitService {
     private readonly adaptiveOpenAiResponseStateService: AdaptiveOpenAiResponseStateService,
     private readonly mediaAssetService: MediaAssetService,
     private readonly mainQuestionOpenerService: MainQuestionOpenerService,
+    private readonly candidateTurnClassifierService: CandidateTurnClassifierService,
   ) {}
 
   async assertCanSubmit(
@@ -319,10 +323,61 @@ export class AdaptiveInterviewSubmitService {
       messageKind: saveResult.candidateMessage.messageKind ?? undefined,
     });
 
-    if (isFullQuestionDecline(trimmedAnswer)) {
+    this.interviewRealtimeService.emit({
+      attemptId,
+      eventType: 'ai.evaluation_started',
+      interviewQuestionId: currentQuestion.id,
+      messageId: saveResult.candidateMessage.id,
+    });
+
+    const buildContextTimer = startAdaptiveAiPhaseTimer(
+      this.logger,
+      'submit_answer.build_context',
+      { attemptId, interviewQuestionId: currentQuestion.id },
+    );
+    const contextPacket =
+      await this.adaptiveInterviewContextService.buildContextPacket(
+        attemptId,
+        currentQuestion.id,
+      );
+    buildContextTimer.finish({
+      context: summarizeAdaptiveContextPacket(contextPacket),
+    });
+
+    const classifyTimer = startAdaptiveAiPhaseTimer(
+      this.logger,
+      'submit_answer.classify_turn',
+      { attemptId, interviewQuestionId: currentQuestion.id },
+    );
+    const classificationResult =
+      await this.candidateTurnClassifierService.classifyTurn(
+        buildCandidateTurnClassifierInput({
+          context: contextPacket,
+          attemptId,
+          interviewQuestionId: currentQuestion.id,
+        }),
+      );
+    classifyTimer.finish({
+      status: classificationResult.status,
+      turnKind:
+        classificationResult.status === 'valid'
+          ? classificationResult.classification.turnKind
+          : undefined,
+    });
+
+    let candidateTurnKind: CandidateTurnKind | null = null;
+    let candidateDisposition: CandidateAnswerDisposition | null = null;
+
+    if (classificationResult.status === 'valid') {
+      candidateTurnKind = classificationResult.classification.turnKind;
+      candidateDisposition = classificationResult.classification.disposition;
+    }
+
+    if (isWholeDeclineTurnKind(candidateTurnKind)) {
       logAdaptiveAiDebug(this.logger, 'submit_answer.candidate_declined', {
         attemptId,
         interviewQuestionId: currentQuestion.id,
+        candidateTurnKind,
         answerPreview: trimmedAnswer,
       });
 
@@ -346,27 +401,6 @@ export class AdaptiveInterviewSubmitService {
       return result;
     }
 
-    this.interviewRealtimeService.emit({
-      attemptId,
-      eventType: 'ai.evaluation_started',
-      interviewQuestionId: currentQuestion.id,
-      messageId: saveResult.candidateMessage.id,
-    });
-
-    const buildContextTimer = startAdaptiveAiPhaseTimer(
-      this.logger,
-      'submit_answer.build_context',
-      { attemptId, interviewQuestionId: currentQuestion.id },
-    );
-    const contextPacket =
-      await this.adaptiveInterviewContextService.buildContextPacket(
-        attemptId,
-        currentQuestion.id,
-      );
-    buildContextTimer.finish({
-      context: summarizeAdaptiveContextPacket(contextPacket),
-    });
-
     const scoreBefore = contextPacket.checkpointStates.reduce(
       (total, state) => total + state.scoreAwarded,
       0,
@@ -385,6 +419,8 @@ export class AdaptiveInterviewSubmitService {
         context: contextPacket,
         skipEnsureStates: true,
         evidenceSource: isFollowUpAnswer ? 'follow_up_answer' : 'main_answer',
+        candidateTurnKind,
+        candidateDispositionFromClassifier: candidateDisposition,
       });
     evaluateTimer.finish({ status: evaluation.status });
 
@@ -408,26 +444,18 @@ export class AdaptiveInterviewSubmitService {
       });
     }
 
-    let candidateDisposition =
-      evaluation.status === 'valid' ? evaluation.candidateDisposition : null;
     if (evaluation.status === 'valid') {
-      candidateDisposition = resolveScopeClarificationDisposition({
-        answer: trimmedAnswer,
-        aiDisposition: evaluation.candidateDisposition,
-        isTargetedFollowUp:
-          isFollowUpAnswer && Boolean(contextPacket.targetCheckpointKey),
-        isFollowUpContext: isFollowUpAnswer,
-      });
+      candidateDisposition =
+        candidateDisposition ?? evaluation.candidateDisposition;
     }
 
     if (
       evaluation.status === 'valid' &&
       shouldSkipFollowUps({
-        answer: trimmedAnswer,
         aiDisposition: candidateDisposition,
+        candidateTurnKind,
         followUpsUsedForQuestion: contextPacket.followUpLimits.usedForQuestion,
-      }) &&
-      !isFullQuestionDecline(trimmedAnswer)
+      })
     ) {
       logAdaptiveAiDebug(this.logger, 'submit_answer.candidate_declined_ai', {
         attemptId,
@@ -471,6 +499,8 @@ export class AdaptiveInterviewSubmitService {
             : undefined,
         candidateDispositionFromAi:
           evaluation.status === 'valid' ? candidateDisposition : undefined,
+        candidateTurnKind:
+          evaluation.status === 'valid' ? candidateTurnKind : undefined,
         followUpsUsedForQuestion: contextPacket.followUpLimits.usedForQuestion,
         avoidLlmFallback: evaluation.status === 'valid',
         recentScoreDeltas: isFollowUpAnswer ? [scoreDelta] : undefined,

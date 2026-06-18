@@ -35,8 +35,8 @@
 | TASK-14.25 | [x] done | Floors guard coverage=none | `025-✅-floors-guard-coverage-none.md` |
 | TASK-14.26 | [x] done | Min probes before topic switch | `026-✅-min-probes-before-topic-switch.md` |
 | TASK-14.27 | [x] done | Candidate clarification on vague follow-up | `027-✅-candidate-clarification-follow-up.md` |
-| TASK-14.28 | [ ] todo | Candidate turn AI classifier (intent вместо regex) | `028-⬜-candidate-turn-ai-classifier.md` |
-| TASK-14.29 | [ ] todo | Wire classifier into submit + policy | `029-⬜-wire-classifier-submit-policy.md` |
+| TASK-14.28 | [x] done | Candidate turn AI classifier (intent вместо regex) | `028-✅-candidate-turn-ai-classifier.md` |
+| TASK-14.29 | [x] done | Wire classifier into submit + policy | `029-✅-wire-classifier-submit-policy.md` |
 | TASK-14.30 | [ ] todo | Deprecate legacy intent regex | `030-⬜-deprecate-legacy-intent-regex.md` |
 | TASK-14.31 | [ ] todo | Bank-driven false claims (legacy-contradiction-cap) | `031-⬜-bank-driven-false-claims.md` |
 
@@ -57,8 +57,9 @@
 Design: [`docs/evaluation-accuracy/candidate-turn-classifier.md`](../../../evaluation-accuracy/candidate-turn-classifier.md)
 
 ```txt
-14.28 Candidate turn AI classifier     ⬜  ← START HERE
-14.29 Wire classifier into submit      ⬜
+14.28 Candidate turn AI classifier     ✅
+14.29 Wire classifier into submit      ✅
+14.30 Deprecate legacy intent regex    ⬜  ← START HERE
 14.30 Deprecate legacy intent regex    ⬜
 14.31 Bank-driven false claims         ⬜
 ```

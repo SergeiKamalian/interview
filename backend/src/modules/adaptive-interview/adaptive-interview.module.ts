@@ -19,6 +19,8 @@ import { FollowUpPlannerValidatorService } from './services/follow-up-planner-va
 import { FollowUpPolicyService } from './services/follow-up-policy.service';
 import { PerTurnCheckpointEvaluatorService } from './services/per-turn-checkpoint-evaluator.service';
 import { PerTurnEvaluationValidatorService } from './services/per-turn-evaluation-validator.service';
+import { CandidateTurnClassifierValidatorService } from './services/candidate-turn-classifier-validator.service';
+import { CandidateTurnClassifierService } from './services/candidate-turn-classifier.service';
 import { QuestionSummaryService } from './services/question-summary.service';
 
 @Module({
@@ -39,6 +41,8 @@ import { QuestionSummaryService } from './services/question-summary.service';
     AdaptiveAiConversationService,
     AdaptiveOpenAiResponseStateService,
     PerTurnEvaluationValidatorService,
+    CandidateTurnClassifierValidatorService,
+    CandidateTurnClassifierService,
     PerTurnCheckpointEvaluatorService,
     FollowUpPolicyService,
     FollowUpPlannerValidatorService,
@@ -57,6 +61,8 @@ import { QuestionSummaryService } from './services/question-summary.service';
     AdaptiveOpenAiResponseStateService,
     PerTurnCheckpointEvaluatorService,
     PerTurnEvaluationValidatorService,
+    CandidateTurnClassifierValidatorService,
+    CandidateTurnClassifierService,
     FollowUpPolicyService,
     FollowUpPlannerService,
     FollowUpPlannerValidatorService,

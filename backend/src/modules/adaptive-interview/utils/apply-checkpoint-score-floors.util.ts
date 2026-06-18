@@ -16,9 +16,11 @@ import {
   rationaleIndicatesSoundEvidence,
 } from './bad-answer-signature.util';
 import { isTargetedTopicRefusal } from './candidate-decline.util';
+import type { CandidateTurnKind } from '../types/candidate-turn-classifier.types';
+import { isScopeClarificationTurn } from './candidate-clarification.util';
 import {
-  resolveScopeClarificationDisposition,
-} from './candidate-clarification.util';
+  isTargetedRefusalTurnKind,
+} from './map-turn-kind-to-disposition.util';
 import {
   collectCheckpointEvidenceText,
   collectFullCandidateText,
@@ -61,7 +63,11 @@ export type ApplyCheckpointScoreFloorsResult = {
 export function applyCheckpointScoreFloors(
   evaluation: PerTurnCheckpointEvaluationAiResponse,
   context: AdaptiveInterviewContextPacket,
-  options: { evidenceSource?: EvaluationEvidenceSource } = {},
+  options: {
+    evidenceSource?: EvaluationEvidenceSource;
+    candidateTurnKind?: CandidateTurnKind | null;
+    candidateDispositionFromClassifier?: PerTurnCheckpointEvaluationAiResponse['candidateDisposition'] | null;
+  } = {},
 ): ApplyCheckpointScoreFloorsResult {
   const fullCandidateText = collectFullCandidateText(context);
   const latestCandidateText = collectLatestCandidateText(context);
@@ -179,11 +185,9 @@ export function applyCheckpointScoreFloors(
       priorScoreAwarded: priorState?.scoreAwarded ?? 0,
     });
 
-    const effectiveDisposition = resolveScopeClarificationDisposition({
-      answer: latestTurnText,
-      aiDisposition: evaluation.candidateDisposition,
-      isTargetedFollowUp,
-    });
+    const effectiveDisposition =
+      options.candidateDispositionFromClassifier ??
+      evaluation.candidateDisposition;
     guardedResult = applyScopeClarificationScoreFreeze({
       result: guardedResult,
       checkpointKey: result.checkpointKey,
@@ -315,12 +319,13 @@ export function applyCheckpointScoreFloors(
 
     const scopeClarificationTurn =
       item.isTargetedFollowUp &&
-      resolveScopeClarificationDisposition({
-        answer: item.latestTurnText,
-        aiDisposition: evaluation.candidateDisposition,
-        isTargetedFollowUp: true,
-      }) === 'asked_for_scope' &&
-      context.targetCheckpointKey === item.guardedWithQuote.checkpointKey;
+      context.targetCheckpointKey === item.guardedWithQuote.checkpointKey &&
+      isScopeClarificationTurn({
+        candidateTurnKind: options.candidateTurnKind,
+        aiDisposition:
+          options.candidateDispositionFromClassifier ??
+          evaluation.candidateDisposition,
+      });
 
     if (scopeClarificationTurn) {
       const frozenScore = item.priorState?.scoreAwarded ?? 0;
@@ -347,7 +352,9 @@ export function applyCheckpointScoreFloors(
     const realigned =
       item.isTargetedFollowUp &&
       (evaluation.candidateDisposition === 'declined' ||
-        isTargetedTopicRefusal(item.latestTurnText))
+        isTargetedRefusalTurnKind(options.candidateTurnKind) ||
+        (!options.candidateTurnKind &&
+          isTargetedTopicRefusal(item.latestTurnText)))
         ? {
             ...item.original,
             scoreAwarded: merged.scoreAwarded,

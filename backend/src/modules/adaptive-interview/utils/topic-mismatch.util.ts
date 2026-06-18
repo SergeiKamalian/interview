@@ -1,5 +1,6 @@
 import type { AdaptiveCheckpointDefinition } from '../types/adaptive-interview-context.types';
 import type { CandidateAnswerDisposition } from '../types/candidate-answer-disposition.type';
+import type { CandidateTurnKind } from '../types/candidate-turn-classifier.types';
 import { isScopeClarificationTurn } from './candidate-clarification.util';
 import type { ConfusionPair } from '../types/checkpoint-evaluation-hints.type';
 import { countMatchedConcepts } from './text-evidence-overlap.util';
@@ -47,6 +48,7 @@ export function detectTopicMismatch(input: {
     followUpCount?: number;
   }>;
   candidateDispositionFromAi?: CandidateAnswerDisposition | null;
+  candidateTurnKind?: CandidateTurnKind | null;
   isTargetedFollowUp?: boolean;
   isFollowUpContext?: boolean;
 }): TopicMismatchDetection {
@@ -56,10 +58,8 @@ export function detectTopicMismatch(input: {
 
   if (
     isScopeClarificationTurn({
-      answer,
+      candidateTurnKind: input.candidateTurnKind,
       aiDisposition: input.candidateDispositionFromAi,
-      isTargetedFollowUp: input.isTargetedFollowUp ?? false,
-      isFollowUpContext: inFollowUpDialogue,
     })
   ) {
     return {

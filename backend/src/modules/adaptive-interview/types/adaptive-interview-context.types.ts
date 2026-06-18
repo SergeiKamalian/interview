@@ -4,7 +4,7 @@ export type AdaptiveLocalTurn = {
   sequenceOrder: number;
   role: 'ai' | 'candidate';
   content: string;
-  messageKind?: 'main_answer' | 'follow_up_answer' | null;
+  messageKind?: 'main_answer' | 'follow_up_answer' | 'topic_opener_answer' | null;
   targetCheckpointKey?: string | null;
 };
 
@@ -53,7 +53,7 @@ export type AdaptiveInterviewContextPacket = {
   badAnswerExamples: string[];
   latestCandidateAnswer: string;
   latestCandidateMessageId: number | null;
-  latestAnswerMessageKind?: 'main_answer' | 'follow_up_answer' | null;
+  latestAnswerMessageKind?: 'main_answer' | 'follow_up_answer' | 'topic_opener_answer' | null;
   targetCheckpointKey?: string | null;
   checkpointStates: AdaptiveCheckpointStateSnapshot[];
   evidenceSnippets: AdaptiveEvidenceSnippet[];

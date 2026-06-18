@@ -188,6 +188,7 @@ describe('topic mismatch vs scope clarification', () => {
     const detection = detectTopicMismatch({
       expectedCheckpointKey: 'fiber_definition',
       latestCandidateAnswer: 'Вы говорите про render и commit phase, да?',
+      candidateTurnKind: 'scope_clarification',
       checkpoints: [
         {
           checkpointKey: 'fiber_definition',

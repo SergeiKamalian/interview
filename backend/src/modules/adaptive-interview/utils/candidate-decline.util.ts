@@ -1,4 +1,9 @@
 import type { CandidateAnswerDisposition } from '../types/candidate-answer-disposition.type';
+import type { CandidateTurnKind } from '../types/candidate-turn-classifier.types';
+import {
+  isTargetedRefusalTurnKind,
+  isWholeDeclineTurnKind,
+} from './map-turn-kind-to-disposition.util';
 
 const DECLINE_PATTERNS: RegExp[] = [
   /ничего\s+не\s+знаю/i,
@@ -81,22 +86,34 @@ export function isFullQuestionDecline(answer: string): boolean {
   return isCandidateDecliningKnowledge(answer);
 }
 
-/** Regex and/or AI disposition from evaluate_turn. */
+/** Classifier disposition drives follow-up skip; regex only for legacy fallbacks. */
 export function shouldSkipFollowUps(input: {
-  answer: string;
+  answer?: string;
   aiDisposition?: CandidateAnswerDisposition | null;
+  candidateTurnKind?: CandidateTurnKind | null;
   /** Follow-ups already used on this main question (planned/asked/answered). */
   followUpsUsedForQuestion?: number;
 }): boolean {
-  if (isFullQuestionDecline(input.answer)) {
+  if (isWholeDeclineTurnKind(input.candidateTurnKind)) {
+    return true;
+  }
+
+  if (isTargetedRefusalTurnKind(input.candidateTurnKind)) {
+    return false;
+  }
+
+  if (!input.candidateTurnKind && input.answer && isFullQuestionDecline(input.answer)) {
     return true;
   }
 
   if (input.aiDisposition === 'declined') {
-    return !isScopedTopicDecline(input.answer);
+    if (input.candidateTurnKind) {
+      return isWholeDeclineTurnKind(input.candidateTurnKind);
+    }
+
+    return !isScopedTopicDecline(input.answer ?? '');
   }
 
-  // Give at least one redirect/clarification before stopping on AI "confused".
   if (input.aiDisposition === 'confused') {
     return (input.followUpsUsedForQuestion ?? 0) >= 1;
   }
@@ -113,10 +130,14 @@ export function shouldSkipFollowUps(input: {
 }
 
 export function resolveSkipFollowUpReason(input: {
-  answer: string;
+  answer?: string;
   aiDisposition?: CandidateAnswerDisposition | null;
+  candidateTurnKind?: CandidateTurnKind | null;
 }): string {
-  if (isFullQuestionDecline(input.answer)) {
+  if (
+    isWholeDeclineTurnKind(input.candidateTurnKind) ||
+    (!input.candidateTurnKind && input.answer && isFullQuestionDecline(input.answer))
+  ) {
     return 'candidate_declined_knowledge';
   }
 

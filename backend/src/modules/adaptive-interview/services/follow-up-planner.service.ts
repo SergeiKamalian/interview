@@ -19,6 +19,7 @@ import {
 } from '../prompts/follow-up-planner.prompt';
 import { CheckpointStateRepository } from '../repositories/checkpoint-state.repository';
 import { FollowUpRepository } from '../repositories/follow-up.repository';
+import type { CandidateTurnKind } from '../types/candidate-turn-classifier.types';
 import type {
   FollowUpPlannerRunResult,
   FollowUpPlannerOptions,
@@ -119,6 +120,7 @@ export class FollowUpPlannerService {
       options.candidateDispositionFromAi,
       options.recentScoreDeltas,
       options.latestCheckpointResults,
+      options.candidateTurnKind,
     );
     policyTimer.finish({
       shouldAskFollowUp: policy.shouldAskFollowUp,
@@ -156,6 +158,7 @@ export class FollowUpPlannerService {
       questionText: context.questionText,
       checkpointTitle: policy.checkpointTitle,
       latestCandidateAnswer: context.latestCandidateAnswer,
+      candidateTurnKind: options.candidateTurnKind,
       previousFollowUpQuestions,
       seed: followUpSeed,
       followUpKind: policy.followUpKind,

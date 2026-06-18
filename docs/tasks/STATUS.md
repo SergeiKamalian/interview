@@ -42,25 +42,25 @@ Evaluation accuracy & HR analytics
 Active subtask ID:
 
 ```txt
-TASK-14.28 — Candidate turn AI classifier
+TASK-14.30 — Deprecate legacy intent regex
 ```
 
 Last completed subtask:
 
 ```txt
-TASK-14.27 — Candidate clarification on vague follow-up
+TASK-14.29 — Wire classifier into submit + policy
 ```
 
 Next recommended subtask:
 
 ```txt
-TASK-14.28 — Candidate turn AI classifier (design: docs/evaluation-accuracy/candidate-turn-classifier.md)
+TASK-14.30 — Deprecate legacy intent regex
 ```
 
 Last updated:
 
 ```txt
-2026-06-18 (14.28 planned — wave 3 intent classifier)
+2026-06-18 (14.29 done)
 ```
 
 ---
@@ -97,8 +97,8 @@ Last updated:
 
 ## Wave 3 (in progress)
 
-- [ ] TASK-14.28 — Candidate turn AI classifier
-- [ ] TASK-14.29 — Wire classifier into submit + policy
+- [x] TASK-14.28 — Candidate turn AI classifier
+- [x] TASK-14.29 — Wire classifier into submit + policy
 - [ ] TASK-14.30 — Deprecate legacy intent regex
 - [ ] TASK-14.31 — Bank-driven false claims
 

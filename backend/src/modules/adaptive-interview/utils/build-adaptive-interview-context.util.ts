@@ -84,9 +84,11 @@ export function buildAdaptiveInterviewContextPacket(
     latestAnswerMessageKind:
       latestCandidateMessage?.messageKind === 'follow_up_answer'
         ? 'follow_up_answer'
-        : latestCandidateMessage?.messageKind === 'main_answer'
-          ? 'main_answer'
-          : null,
+        : latestCandidateMessage?.messageKind === 'topic_opener_answer'
+          ? 'topic_opener_answer'
+          : latestCandidateMessage?.messageKind === 'main_answer'
+            ? 'main_answer'
+            : null,
     targetCheckpointKey: latestCandidateMessage?.targetCheckpointKey ?? null,
     checkpointStates,
     evidenceSnippets,
