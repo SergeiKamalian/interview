@@ -1,0 +1,628 @@
+{
+  "topic": {
+    "code": "nextjs_how_incremental_static_regeneration_isr_works_nextjs",
+    "name": "ISR (Incremental Static Regeneration) в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как работает Incremental Static Regeneration (ISR) в Next.js?",
+    "shortAnswer": "ISR — стратегия Next.js: страницы предрендерятся статически на build, а после истечения таймера `revalidate` отдельные страницы регенерируются в фоне без полного rebuild. Первый запрос после истечения таймера получает stale-версию; следующий — уже свежую. При ошибке фоновой регенерации продолжает отдаваться последняя успешная stale-версия.",
+    "idealAnswer": "ISR (Incremental Static Regeneration) сочетает преимущества SSG и SSR: HTML генерируется статически на build (или при первом запросе с `fallback: 'blocking'`), но может обновляться в фоне по таймеру без полного `next build`. В Pages Router `getStaticProps` возвращает `{ props, revalidate: N }` — значение сериализуется в `/_next/static/[page].json` вместе с props. Когда запрос приходит после истечения таймера, Next.js: (1) сразу отдаёт stale HTML текущему пользователю; (2) ставит `getStaticProps` в очередь на worker; (3) атомарно пишет новый HTML и JSON на диск/CDN; (4) все параллельные запросы во время регенерации тоже получают stale. Следующий запрос после завершения записи — свежая версия. Если `getStaticProps` падает в фоне — ошибка логируется, stale остаётся, SSR-fallback не происходит. Отличие от SSG: для обновления не нужен полный rebuild. Отличие от SSR: нет render на каждый запрос, отдача с CDN мгновенная, но возможны stale reads. Правило выбора: данные меняются раз в минуты/часы и большинство запросов бьёт в одни страницы — ISR; user-specific данные — SSR; никогда не меняется — чистый SSG. В App Router `revalidate` задаётся в `fetch(..., { next: { revalidate: 300 } })` или `export const revalidate = 300` на сегменте. On-demand точнее таймера: `revalidatePath('/path')` инвалидирует Full Route Cache и Router Cache; `revalidateTag('tag')` — Data Cache для fetch с `tags`. Senior nuance: только `revalidatePath` не очищает старые fetch из Data Cache — для полной свежести часто нужны оба. Self-hosted vs Vercel: механизм тот же, но multi-instance требует persistent FS или custom cache handler (Redis). Типичные ошибки: `revalidate: 0` — не SSR; module-level state в `getStaticProps` не переживает Lambda; `fallback: 'blocking'` даёт blocking SSR на первый unknown slug (p99 TTFB); preview mode без `revalidate: false` может закешировать черновики в CDN; `getStaticProps` >10s убивается на Vercel.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "react"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "isr_definition",
+      "title": "Понимает суть ISR",
+      "expected": "Кандидат объясняет: ISR — статический pre-render на build + фоновая регенерация отдельных страниц по таймеру `revalidate` без полного rebuild приложения.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — SSG с expiry hook и фоновым обновлением",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "isr_definition",
+            "oftenConfusedWith": [
+              "isr_vs_ssg_ssr",
+              "revalidate_stale_flow"
+            ],
+            "anchorTermsExpected": [
+              "ISR",
+              "incremental",
+              "статич",
+              "revalidate",
+              "фон",
+              "build",
+              "без rebuild"
+            ],
+            "anchorTermsWrongTopic": [
+              "ISR это SSR",
+              "ISR рендерит на каждый запрос",
+              "ISR требует полный next build для каждого обновления"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ISR",
+              "incremental",
+              "revalidate"
+            ],
+            "ask": "чем ISR отличается от обычного SSG и от SSR одной фразой"
+          }
+        ],
+        "mustConcepts": [
+          "ISR",
+          "incremental",
+          "статич",
+          "регенерац",
+          "revalidate",
+          "build",
+          "фон",
+          "background",
+          "без rebuild",
+          "отдельн",
+          "страниц",
+          "pre-render",
+          "SSG",
+          "expiry",
+          "таймер",
+          "CDN"
+        ],
+        "falseClaims": [
+          "ISR рендерит страницу на каждый запрос как SSR",
+          "ISR требует полный next build для любого обновления контента",
+          "ISR не использует статический HTML",
+          "ISR и SSG полностью идентичны",
+          "ISR всегда отдаёт только свежие данные без stale"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "isr_vs_ssg_ssr",
+      "title": "Отличает ISR от SSG и SSR",
+      "expected": "Кандидат сравнивает: SSG — только на build, без stale; SSR — render на каждый запрос; ISR — CDN-скорость + фоновые обновления по таймеру; называет когда что выбирать.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "таблица сравнения и decision rule из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "isr_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "isr_vs_ssg_ssr",
+            "oftenConfusedWith": [
+              "when_to_use_isr"
+            ],
+            "anchorTermsExpected": [
+              "SSG",
+              "SSR",
+              "CDN",
+              "stale",
+              "каждый запрос",
+              "build"
+            ],
+            "anchorTermsWrongTopic": [
+              "ISR заменяет SSR для профилей",
+              "SSG всегда лучше ISR для новостей"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "SSG",
+          "SSR",
+          "build",
+          "каждый запрос",
+          "CDN",
+          "мгновен",
+          "stale",
+          "застарел",
+          "обновлен",
+          "каталог",
+          "блог",
+          "профил",
+          "корзин",
+          "user-specific",
+          "документ",
+          "marketing"
+        ],
+        "falseClaims": [
+          "ISR и SSR дают одинаковую стоимость на запрос",
+          "SSG подходит для персональных корзин без client fetch",
+          "ISR никогда не отдаёт устаревший контент",
+          "SSR быстрее ISR по first load для high-traffic каталогов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "revalidate_stale_flow",
+      "title": "Знает stale-first flow revalidate",
+      "expected": "Кандидат описывает: после истечения таймера первый запрос получает stale HTML и триггерит фоновую регенерацию; следующий запрос — свежую версию; параллельные запросы во время regen тоже stale.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевой механизм ISR — stale-first, fresh-second",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "regeneration_internals",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "stale",
+              "первый запрос",
+              "следующ"
+            ],
+            "ask": "что получает первый и второй запрос после истечения revalidate: 60"
+          },
+          {
+            "match": [
+              "concurrent",
+              "параллел",
+              "одновремен"
+            ],
+            "ask": "что видят параллельные запросы пока идёт фоновая регенерация"
+          }
+        ],
+        "mustConcepts": [
+          "revalidate",
+          "таймер",
+          "stale",
+          "застарел",
+          "первый запрос",
+          "следующ",
+          "свеж",
+          "фон",
+          "background",
+          "регенерац",
+          "параллел",
+          "concurrent",
+          "истеч",
+          "expir",
+          "post-expiry",
+          "кеш"
+        ],
+        "falseClaims": [
+          "первый запрос после таймера всегда ждёт завершения regen",
+          "пользователь никогда не видит stale контент при ISR",
+          "все запросы во время regen блокируются до готовности новой версии",
+          "revalidate означает немедленный rebuild на каждый запрос"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "pages_router_gsp",
+      "title": "Знает ISR в Pages Router",
+      "expected": "Кандидат показывает `getStaticProps` с `revalidate: N`, объясняет сериализацию в `/_next/static/[page].json` и что это контракт ISR в Pages Router.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый quick example ITLead — getStaticProps + revalidate",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "getStaticProps",
+              "revalidate"
+            ],
+            "ask": "как включить ISR в Pages Router через getStaticProps"
+          }
+        ],
+        "mustConcepts": [
+          "getStaticProps",
+          "revalidate",
+          "props",
+          "return",
+          "Pages Router",
+          "static JSON",
+          "json payload",
+          "build time",
+          "serialize",
+          "сериализ",
+          "контракт"
+        ],
+        "falseClaims": [
+          "ISR в Pages Router настраивается только через getServerSideProps",
+          "revalidate в getStaticProps не сохраняется в static JSON",
+          "getStaticProps выполняется на клиенте при каждом клике"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "app_router_on_demand",
+      "title": "Знает App Router ISR и on-demand revalidation",
+      "expected": "Кандидат называет `fetch` с `next: { revalidate }`, `export const revalidate`, `revalidatePath`, `revalidateTag`; понимает разницу time-based vs on-demand и cache layers (Data Cache vs Full Route Cache).",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "App Router + senior follow-up про cache layers",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "app_router_on_demand",
+            "oftenConfusedWith": [
+              "revalidate_stale_flow"
+            ],
+            "anchorTermsExpected": [
+              "revalidatePath",
+              "revalidateTag",
+              "fetch",
+              "Data Cache",
+              "Full Route Cache"
+            ],
+            "anchorTermsWrongTopic": [
+              "revalidatePath очищает все fetch автоматически",
+              "fetch revalidate и revalidatePath одно и то же"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "revalidatePath",
+              "revalidateTag"
+            ],
+            "ask": "чем on-demand revalidatePath отличается от time-based revalidate: 60"
+          },
+          {
+            "match": [
+              "Data Cache",
+              "Full Route Cache",
+              "Router Cache"
+            ],
+            "ask": "какие cache layers затрагивает fetch revalidate vs revalidatePath"
+          }
+        ],
+        "mustConcepts": [
+          "App Router",
+          "fetch",
+          "next revalidate",
+          "export const revalidate",
+          "revalidatePath",
+          "revalidateTag",
+          "tags",
+          "on-demand",
+          "webhook",
+          "Route Handler",
+          "Server Action",
+          "Data Cache",
+          "Full Route Cache",
+          "Router Cache",
+          "time-based",
+          "таймер",
+          "CMS"
+        ],
+        "falseClaims": [
+          "revalidatePath автоматически инвалидирует все fetch независимо от tags",
+          "fetch с revalidate и revalidatePath работают на одном cache layer",
+          "export const revalidate в layout не влияет на дочерние сегменты",
+          "on-demand revalidation требует полный next build"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "regeneration_internals",
+      "title": "Понимает внутренний процесс регенерации",
+      "expected": "Кандидат описывает: stale serve → queue getStaticProps → atomic write HTML/JSON → ошибка regen не ломает страницу; упоминает self-hosted vs Vercel нюансы.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "internal flow и error handling из ITLead Theory",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "atomic",
+              "worker",
+              "ошибк",
+              "throw"
+            ],
+            "ask": "что происходит если getStaticProps падает во время фоновой регенерации"
+          }
+        ],
+        "mustConcepts": [
+          "worker",
+          "очеред",
+          "queue",
+          "atomic",
+          "атомар",
+          "writeFile",
+          "HTML",
+          "JSON",
+          "ETag",
+          "ошибк",
+          "throw",
+          "stale оста",
+          "last successful",
+          "self-hosted",
+          "Vercel",
+          "cache handler",
+          "filesystem",
+          "Edge Network"
+        ],
+        "falseClaims": [
+          "при ошибке regen Next.js переключается на SSR",
+          "ошибка фоновой regen удаляет страницу из CDN",
+          "self-hosted multi-instance ISR работает из коробки без shared cache",
+          "регенерация блокирует все запросы до завершения записи"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки ISR",
+      "expected": "Кандидат называет: `revalidate: 0` ≠ SSR; module-level state в getStaticProps; `fallback: 'blocking'` и p99 TTFB; preview без `revalidate: false`; timeout 10s на Vercel.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes блок ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "revalidate: 0",
+              "revalidate 0"
+            ],
+            "ask": "почему revalidate: 0 не заменяет getServerSideProps"
+          },
+          {
+            "match": [
+              "fallback blocking",
+              "fallback: 'blocking'"
+            ],
+            "ask": "как fallback: blocking влияет на TTFB для новых slug"
+          },
+          {
+            "match": [
+              "preview",
+              "revalidate: false"
+            ],
+            "ask": "зачем в preview mode возвращать revalidate: false"
+          }
+        ],
+        "mustConcepts": [
+          "revalidate: 0",
+          "getServerSideProps",
+          "module-level",
+          "Lambda",
+          "unstable_cache",
+          "Redis",
+          "fallback blocking",
+          "TTFB",
+          "p99",
+          "preview mode",
+          "revalidate: false",
+          "черновик",
+          "CDN",
+          "10 секунд",
+          "timeout",
+          "paginate"
+        ],
+        "falseClaims": [
+          "revalidate: 0 даёт поведение SSR на каждый запрос",
+          "module-level переменные в getStaticProps шарятся между invocations",
+          "preview mode автоматически исключает черновики из CDN",
+          "fallback: blocking не блокирует первый запрос для unknown slug"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "ISR — статика на build, потом фоновое обновление по revalidate без полного rebuild. Первый запрос после истечения 60 секунд получает stale HTML и триггерит regen; следующий — свежий. В App Router — fetch с next: { revalidate: 300 } или webhook с revalidateTag для CMS.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Каталог товаров: ISR с revalidate 300 — CDN быстрый, цены обновляются в фоне. Профиль пользователя — SSR. Документация без изменений — чистый SSG. При публикации статьи CMS шлёт POST на /api/revalidate с revalidateTag('article-slug') — точнее таймера.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "getStaticProps + revalidate: 60 в Pages Router. t=0 CDN отдаёт HTML. t=61 первый клиент — stale + background getStaticProps. t=61 второй — уже новая версия. Если regen упал — stale остаётся, SSR не включается.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "ISR — это SSR на каждый запрос, только медленнее. revalidate: 0 делает то же что getServerSideProps.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "После истечения таймера пользователь всегда ждёт пока getStaticProps закончится — stale никогда не отдаётся. При ошибке regen страница падает в 500.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для ISR храню кеш в module-level массиве в getStaticProps — он шарится между всеми Lambda. revalidatePath достаточно чтобы сбросить и fetch Data Cache и Route Cache.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "isr_definition",
+      "exampleType": "good",
+      "exampleText": "ISR — SSG с таймером: страницы статические, но отдельные обновляются в фоне по revalidate без next build всего приложения.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "isr_definition",
+      "exampleType": "good",
+      "exampleText": "ну isr — как готовый кофе на стойке, машина варит новую порцию в фоне, ты пьёшь то что уже налито",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "isr_definition",
+      "exampleType": "bad",
+      "exampleText": "ISR рендерит каждую страницу на сервере при каждом HTTP-запросе как классический SSR.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "isr_vs_ssg_ssr",
+      "exampleType": "good",
+      "exampleText": "SSG — только build, ISR — build + фоновые апдейты со stale, SSR — render каждый раз. Новости и каталоги — ISR; корзина — SSR.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "isr_vs_ssg_ssr",
+      "exampleType": "good",
+      "exampleText": "для docs landing — ssg хватит; для product feed что меняется раз в час — isr; для /me/profile — ssr",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "isr_vs_ssg_ssr",
+      "exampleType": "bad",
+      "exampleText": "ISR лучше SSR для персональных корзин потому что CDN быстрее и данные всегда актуальные.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "revalidate_stale_flow",
+      "exampleType": "good",
+      "exampleText": "revalidate: 60 — после минуты первый hit stale + queue regen, второй hit fresh. Пока пишется новый HTML — все concurrent тоже stale.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "revalidate_stale_flow",
+      "exampleType": "good",
+      "exampleText": "ключ isr — stale-first: никто не ждёт regen, следующий запрос уже видит обновление",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "revalidate_stale_flow",
+      "exampleType": "bad",
+      "exampleText": "Как только таймер истёк, Next.js блокирует всех пользователей до завершения getStaticProps.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "pages_router_gsp",
+      "exampleType": "good",
+      "exampleText": "return { props: { posts }, revalidate: 60 } из getStaticProps — revalidate попадает в static JSON, Next читает его на каждой cache check.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "pages_router_gsp",
+      "exampleType": "good",
+      "exampleText": "pages/posts.js — gsp с revalidate, это весь контракт isr в pages router",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "pages_router_gsp",
+      "exampleType": "bad",
+      "exampleText": "ISR в Pages Router включается через getServerSideProps с cache: true.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "app_router_on_demand",
+      "exampleType": "good",
+      "exampleText": "App Router: fetch(url, { next: { revalidate: 300, tags: ['problems'] } }). CMS webhook вызывает revalidateTag('problems') — точнее таймера. revalidatePath('/blog') сбрасывает Full Route Cache.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "app_router_on_demand",
+      "exampleType": "good",
+      "exampleText": "senior: fetch revalidate бьёт в Data Cache, revalidatePath — Route + Router cache; для полной свежести часто нужны оба + tag",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "app_router_on_demand",
+      "exampleType": "bad",
+      "exampleText": "revalidatePath('/articles') автоматически инвалидирует все fetch с любыми tags на всём сайте.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "regeneration_internals",
+      "exampleType": "good",
+      "exampleText": "Post-expiry: stale сразу, getStaticProps в worker, atomic write HTML+JSON, ETag без race. Throw в regen — лог и last good stale, не SSR.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "regeneration_internals",
+      "exampleType": "good",
+      "exampleText": "на self-hosted три node — нужен redis cache handler, иначе fs cache не шарится",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "regeneration_internals",
+      "exampleType": "bad",
+      "exampleText": "Если background getStaticProps упал — Next.js автоматически переключает маршрут на getServerSideProps.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "revalidate: 0 — не SSR, страница всё ещё static с агрессивным regen. Preview: return { props, revalidate: false } чтобы черновик не попал в CDN.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "fallback blocking на viral slug — p99 ttfb прыгает, лучше prebuild топ paths или fallback true со skeleton",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "let cache = [] на module level в getStaticProps — нормальный shared store между regen на Vercel Lambda.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nextjs-how-incremental-static-regeneration-isr-works-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/nextjs-how-incremental-static-regeneration-isr-works-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/nextjs-how-incremental-static-regeneration-isr-works-in-nextjs",
+    "difficulty": "SENIOR",
+    "titleEn": "How incremental static regeneration (ISR) works in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

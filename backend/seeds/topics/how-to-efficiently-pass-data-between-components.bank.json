@@ -1,0 +1,503 @@
+{
+  "topic": {
+    "code": "how_to_efficiently_pass_data_between_components",
+    "name": "Эффективная передача данных между компонентами Vue",
+    "skillCode": "vue",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как эффективно передавать данные между компонентами во Vue.js?",
+    "shortAnswer": "Props и emit — базовый механизм Vue для связи родитель–потомок: props передают данные вниз (read-only в дочернем), emit отправляет события вверх. Данные текут вниз через props, события — вверх через emit; для соседних компонентов и глубоких деревьев — Pinia.",
+    "idealAnswer": "Props и emit — встроенная система Vue для коммуникации родитель–потомок: props несут данные вниз от родителя к дочернему, emit отправляет события вверх от дочернего к родителю. Props создают однонаправленный реактивный канал: при изменении значения у родителя дочерний обновляется автоматически, но дочерний не может писать назад — props read-only внутри компонента. Emit идёт в обратном направлении: дочерний вызывает именованное событие с payload, родитель слушает и решает, что делать со своим состоянием. Практическое правило: конфиг и данные для отображения вниз → props; действие дочернего должно изменить родителя (submit, delete, close modal) → emit; двусторонняя синхронизация кастомного input → v-model (`:modelValue` + `update:modelValue`); данные через несколько уровней дерева → provide/inject; соседние компоненты или глобальный state → Pinia. Prop drilling — передача props через промежуточные компоненты, которые их не используют; при 2+ уровнях глубины лучше Pinia. v-model — сокращение для props + emit: `:modelValue` вниз, `update:modelValue` вверх; именованные аргументы `v-model:title`. Компилятор превращает `<Child :count=\"count\" @update=\"handleUpdate\" />` в `createVNode(Child, { count, onUpdate: handleUpdate })`; props — реактивные геттеры на proxy дочернего, emit диспатчится в patch-цикле, обработчик родителя — свойство `onUpdate` на vnode, не DOM-событие. Типичные ошибки: прямая мутация props (`props.count++`) — warning, родитель не обновится; опечатка в имени emit без объявления в `defineEmits` — событие молча теряется; передача функции как prop вместо `@submit` — ломает однонаправленную модель; мутация вложенного объекта в props меняет данные родителя по ссылке — нужен `readonly()` или копия. При async emit payload — обычный JS-объект, не reactive; родитель должен присвоить в `ref`. Реальные примеры: TodoMVC (props задачи вниз, emit toggle/delete вверх), Element Plus v-model на inputs, Nuxt UI modals `emit('close', result)`, Pinia вместо 3+ уровней prop drilling. Частые emit (100/сек) сами дешёвые O(1); bottleneck — тяжёлый handler родителя; батчить через `nextTick`, профилировать Vue DevTools.",
+    "maxScore": 10,
+    "skills": [
+      "vue",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "props_emit_pattern",
+      "title": "Понимает паттерн props и emit",
+      "expected": "Кандидат объясняет: props — данные вниз от родителя, read-only в дочернем; emit — события вверх к родителю; `defineProps` и `defineEmits` в script setup; родитель владеет состоянием, дочерний уведомляет.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — TL;DR и базовый цикл parent-child",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "props",
+              "emit",
+              "defineProps",
+              "defineEmits"
+            ],
+            "ask": "опиши цикл: родитель передаёт count, дочерний кликом emit('update', newValue), родитель обновляет ref"
+          }
+        ],
+        "mustConcepts": [
+          "props",
+          "emit",
+          "defineProps",
+          "defineEmits",
+          "родитель",
+          "дочерн",
+          "вниз",
+          "вверх",
+          "read-only",
+          "событ",
+          "payload",
+          "script setup",
+          "состоян",
+          "ref",
+          "однонаправлен",
+          "уведомл"
+        ],
+        "falseClaims": [
+          "props можно мутировать в дочернем и родитель обновится автоматически",
+          "emit — это нативное DOM-событие браузера",
+          "дочерний компонент владеет общим состоянием с родителем через props",
+          "defineEmits необязателен в Vue 3 script setup"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "props_vs_emit_difference",
+      "title": "Отличает props от emit",
+      "expected": "Кандидат сравнивает направление, мутабельность, реактивность: props — parent→child, read-only, автообновление при изменении родителя; emit — child→parent, ручной payload, родитель решает что делать.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Key Difference и таблица сравнения из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "props_emit_pattern",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "направлен",
+              "read-only",
+              "реактивн"
+            ],
+            "ask": "чем props отличается от emit по направлению, мутабельности и реактивности"
+          }
+        ],
+        "mustConcepts": [
+          "направлен",
+          "parent to child",
+          "child to parent",
+          "read-only",
+          "мутабельн",
+          "реактивн",
+          "автоматич",
+          "payload",
+          "обработчик",
+          "handler",
+          "конфиг",
+          "display data",
+          "действ",
+          "callback",
+          "предсказуем"
+        ],
+        "falseClaims": [
+          "props и emit работают в обе стороны одинаково",
+          "emit автоматически делает payload реактивным",
+          "props можно писать в дочернем без warning",
+          "родитель не контролирует своё состояние при emit"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "v_model_shorthand",
+      "title": "Понимает v-model как props + emit",
+      "expected": "Кандидат объясняет: v-model компилируется в `:modelValue` prop и `@update:modelValue` emit; именованные `v-model:title`; двусторонняя синхронизация кастомного input.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "v-model — центральный паттерн двусторонней связи из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "v-model",
+              "modelValue",
+              "update:modelValue"
+            ],
+            "ask": "во что компилируется v-model на кастомном компоненте и как сделать v-model:title"
+          }
+        ],
+        "mustConcepts": [
+          "v-model",
+          "modelValue",
+          "update:modelValue",
+          "двусторонн",
+          "синхронизац",
+          "кастомн",
+          "input",
+          "именован",
+          "v-model:title",
+          "аргумент",
+          "сокращен",
+          "shorthand",
+          "Element Plus",
+          "компил"
+        ],
+        "falseClaims": [
+          "v-model — отдельный механизм, не связанный с props и emit",
+          "v-model работает только на нативных input, не на компонентах",
+          "update:modelValue — DOM-событие input",
+          "на одном компоненте нельзя несколько v-model"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "alternatives_prop_drilling",
+      "title": "Знает альтернативы и prop drilling",
+      "expected": "Кандидат называет: prop drilling — props через промежуточные компоненты; provide/inject для статических зависимостей через несколько уровней; Pinia для соседних и глобального reactive state; правило 2+ уровней → Pinia.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "When to use и follow-up prop drilling из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "props_emit_pattern",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "prop drilling",
+              "Pinia",
+              "provide"
+            ],
+            "ask": "что такое prop drilling и когда выбрать provide/inject vs Pinia"
+          },
+          {
+            "match": [
+              "соседн",
+              "Header",
+              "Cart"
+            ],
+            "ask": "как Header и Cart делят user data без цепочки props"
+          }
+        ],
+        "mustConcepts": [
+          "prop drilling",
+          "проброс",
+          "промежуточн",
+          "provide",
+          "inject",
+          "Pinia",
+          "store",
+          "соседн",
+          "глобальн",
+          "2 уровн",
+          "глубин",
+          "дерев",
+          "реактивн",
+          "shared state",
+          "TodoMVC",
+          "Header",
+          "Cart"
+        ],
+        "falseClaims": [
+          "prop drilling — нормальный паттерн для любой глубины дерева",
+          "provide/inject заменяет Pinia для всего глобального state",
+          "соседние компоненты всегда связывают через props родителя",
+          "Pinia нужен только для server state"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки props/emit",
+      "expected": "Кандидат называет: мутация props напрямую; опечатки в emit без defineEmits; функция как prop вместо @event; мутация вложенного объекта по ссылке — readonly или копия.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — критичные production-паттерны ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "props_emit_pattern",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "props.count++",
+              "мутац",
+              "readonly"
+            ],
+            "ask": "почему props.count++ в дочернем ломает модель и что делать вместо"
+          },
+          {
+            "match": [
+              "defineEmits",
+              "typo",
+              "опечатк"
+            ],
+            "ask": "что случится с emit('typo-event') без объявления в defineEmits"
+          },
+          {
+            "match": [
+              "вложен",
+              "объект",
+              "ссылк"
+            ],
+            "ask": "почему props.task.title = 'new' меняет объект родителя"
+          }
+        ],
+        "mustConcepts": [
+          "мутац",
+          "props.count",
+          "readonly proxy",
+          "warning",
+          "defineEmits",
+          "опечатк",
+          "типо",
+          "молча",
+          "функц",
+          "on-submit",
+          "@submit",
+          "вложен",
+          "объект",
+          "ссылк",
+          "readonly()",
+          "spread",
+          "копи",
+          "v-bind"
+        ],
+        "falseClaims": [
+          "можно безопасно делать props.count++ в script setup",
+          "Vue автоматически ловит опечатки в именах emit",
+          "передача :on-submit как prop — рекомендуемый Vue-паттерн",
+          "вложенные объекты в props передаются по значению, не по ссылке"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "vue_internal_async",
+      "title": "Понимает внутреннюю механику и async emit",
+      "expected": "Кандидат объясняет: компилятор → createVNode с onUpdate; emit в patch-цикле, не DOM; payload async emit — plain JS, родитель кладёт в ref для реактивности; частые emit дешёвые, bottleneck — handler родителя.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "How Vue handles + async reactivity gap — бонус middle",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "createVNode",
+              "vnode",
+              "async"
+            ],
+            "ask": "почему после async emit список не обновляется без tasks.value = data"
+          }
+        ],
+        "mustConcepts": [
+          "createVNode",
+          "vnode",
+          "onUpdate",
+          "patch",
+          "proxy",
+          "геттер",
+          "не DOM",
+          "async",
+          "plain JS",
+          "ref",
+          "реактивн",
+          "payload",
+          "nextTick",
+          "батч",
+          "DevTools",
+          "O(1)",
+          "handler"
+        ],
+        "falseClaims": [
+          "emit создаёт настоящее DOM CustomEvent в дереве браузера",
+          "payload emit автоматически оборачивается в reactive",
+          "100 emit в секунду всегда тормозят Vue независимо от handler",
+          "Vue ставит emit в очередь если родитель ещё не смонтирован"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Props и emit — базовая связь родитель–потомок: count вниз через :count, клик в дочернем emit('update', newValue), родитель обновляет ref. Данные вниз, события вверх. Для Header и Cart — Pinia, не цепочка props через layout.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Кастомный input делаю с v-model: внутри :modelValue и emit('update:modelValue'). Форма эмитит add-task с объектом, список в родителе push в ref. Вложенный task не мутирую — readonly или копия при передаче.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну props вниз read-only, emit вверх когда надо родителю обновить стейт. если пробрасываю через 3 уровня — pinia. async fetch эмитит plain array, родитель tasks.value = data",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В дочернем делаю props.count++ — так проще синхронизировать с родителем. Emit — это DOM click event. Для любой глубины дерева всегда цепочка props.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "v-model — магия Vue, не связана с props и emit. Передаю :on-submit как prop — это каноничный однонаправленный паттерн. После async emit данные сами становятся reactive.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "defineEmits не нужен — Vue сам найдёт опечатку в имени события. props.task.title = 'x' безопасно, объекты копируются по значению.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "props_emit_pattern",
+      "exampleType": "good",
+      "exampleText": "defineProps(['count']), defineEmits(['update']); emit('update', props.count + 1) — родитель слушает @update и меняет ref.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "props_emit_pattern",
+      "exampleType": "good",
+      "exampleText": "стейт у родителя, дочерний только показывает и эмитит — как counter button в todo",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "props_emit_pattern",
+      "exampleType": "bad",
+      "exampleText": "Дочерний хранит истину в props и мутирует их при клике — родитель подхватит сам.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "props_vs_emit_difference",
+      "exampleType": "good",
+      "exampleText": "Props — parent→child, read-only, авто-реактивность при смене родителя; emit — child→parent с payload, родитель решает обновлять ref или нет.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "props_vs_emit_difference",
+      "exampleType": "good",
+      "exampleText": "конфиг темы вниз props, кнопка удалить вверх emit — разные роли",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "props_vs_emit_difference",
+      "exampleType": "bad",
+      "exampleText": "Emit и props оба двусторонние — можно писать в props как в v-model без emit.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "v_model_shorthand",
+      "exampleType": "good",
+      "exampleText": "v-model на MyInput → :modelValue + @update:modelValue; v-model:title → update:title emit.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "v_model_shorthand",
+      "exampleType": "good",
+      "exampleText": "element plus input — тот же паттерн modelValue/update:modelValue под капотом",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "v_model_shorthand",
+      "exampleType": "bad",
+      "exampleText": "v-model на компоненте — отдельный API, не props+emit.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "alternatives_prop_drilling",
+      "exampleType": "good",
+      "exampleText": "Prop drilling — theme через Layout→Page→Card без использования в Layout; provide/inject для DI, Pinia когда Header и Cart нужен один user.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "alternatives_prop_drilling",
+      "exampleType": "good",
+      "exampleText": "больше двух уровней без смысла для промежуточного — store вместо проброса",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "alternatives_prop_drilling",
+      "exampleType": "bad",
+      "exampleText": "Соседним компонентам всегда передаю данные через props общего родителя на 5 уровней — это эффективно.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Не props.count++, а emit('update', props.count + 1). Все события в defineEmits. Вложенный task — readonly(props.task) или {...task}.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "@submit вместо :on-submit prop — читаемее и однонаправленная модель событий",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "emit('typo-event') без defineEmits — Vue выбросит ошибку и остановит рендер.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "vue_internal_async",
+      "exampleType": "good",
+      "exampleText": "Компилятор делает createVNode с onUpdate; async emit data-loaded — родитель onDataLoaded кладёт в tasks.value = data.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "vue_internal_async",
+      "exampleType": "good",
+      "exampleText": "100 emit/сек ок если handler лёгкий; тяжёлый re-render родителя — батч nextTick",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "vue_internal_async",
+      "exampleType": "bad",
+      "exampleText": "Emit из async fetch сам оборачивает JSON в reactive proxy — ref не нужен.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "how-to-efficiently-pass-data-between-components",
+    "apiUrl": "https://api.itlead.org/api/questions/how-to-efficiently-pass-data-between-components",
+    "pageUrl": "https://itlead.org/interview-questions/vue/how-to-efficiently-pass-data-between-components",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to efficiently pass data between components?",
+    "categorySlug": "vue",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

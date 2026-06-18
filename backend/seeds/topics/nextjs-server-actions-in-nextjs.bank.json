@@ -1,0 +1,587 @@
+{
+  "topic": {
+    "code": "nextjs_server_actions_in_nextjs",
+    "name": "Server Actions в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое Server Actions в Next.js и как их использовать для мутаций данных из компонентов?",
+    "shortAnswer": "Server Actions — асинхронные серверные функции с директивой `'use server'`, которые изменяют данные (create/update/delete) прямо из React-компонентов без отдельного API-маршрута. Next.js автоматически создаёт HTTP POST-эндпоинт; форма с `action={...}` работает даже без JavaScript. После записи нужны `revalidatePath`/`revalidateTag`; для публичных API и webhooks — Route Handlers.",
+    "idealAnswer": "Server Actions — async-функции на сервере с директивой `'use server'`: мутации данных из UI без отдельного Route Handler. Next.js генерирует POST-эндпоинт; при submit формы браузер бьёт в него — client fetch не обязателен. Директива на уровне файла (все export — actions) или внутри функции в Server Component. Формы: `<form action={updateUser}>` — progressive enhancement, работает без JS. Из Client Component — import action + `useTransition` (`startTransition`, `isPending`) или React 19 `useActionState` для возвращаемого состояния и ошибок полей. Валидация обязательна: action публично вызываем как API — zod/safeParse, возвращать `{ error }`/`{ success }`, не throw (иначе Error Boundary). После write — `revalidatePath('/path')` (Full Route Cache) или `revalidateTag('tag')` (точечно для fetch с `{ next: { tags } }`); `redirect` автоматически revalidate destination. Отличие от Route Handlers: actions привязаны к React-дереву, FormData, UI-мутации; Handlers — стандартный HTTP для mobile/webhooks/cron. URL action нестабилен между deploy — не публичный API. CSRF: Next.js проверяет action ID на POST; авторизацию — внутри функции. Нельзя `'use server'` в файле с `'use client'`. Server Action из Server Action — обычный async import без HTTP. Типичные кейсы: профиль, todos, auth+redirect, optimistic UI с `useOptimistic`. Ошибки: забыли revalidate — UI stale; сырой FormData без schema; action в client file; throw вместо return error.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "server_action_definition",
+      "title": "Понимает что такое Server Action",
+      "expected": "Кандидат объясняет: async-функция на сервере с `'use server'`, мутации из компонентов без отдельного API; Next.js создаёт POST автоматически.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — ядро: use server и мутации без Route Handler",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "server_action_definition",
+            "oftenConfusedWith": [
+              "vs_route_handlers",
+              "forms_action"
+            ],
+            "anchorTermsExpected": [
+              "use server",
+              "сервер",
+              "мутац",
+              "POST",
+              "FormData",
+              "без API"
+            ],
+            "anchorTermsWrongTopic": [
+              "Route Handler для формы",
+              "выполняется в браузере",
+              "только GET"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "use server",
+              "Server Action"
+            ],
+            "ask": "чем Server Action отличается от обычного fetch к /api и от Route Handler"
+          }
+        ],
+        "mustConcepts": [
+          "Server Action",
+          "use server",
+          "сервер",
+          "async",
+          "мутац",
+          "create",
+          "update",
+          "delete",
+          "POST",
+          "FormData",
+          "компонент",
+          "без API",
+          "Route Handler",
+          "Next.js",
+          "автоматич",
+          "эндпоинт"
+        ],
+        "falseClaims": [
+          "Server Actions выполняются в браузере",
+          "Server Actions заменяют все Route Handlers",
+          "Server Actions — это client-side fetch wrapper",
+          "Server Actions работают только с GET",
+          "нужно вручную создавать route.ts для каждой формы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "use_server_directive",
+      "title": "Знает директиву use server",
+      "expected": "Кандидат описывает: file-level `'use server'` на все export vs function-level внутри Server Component; нельзя в `'use client'` файле.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый синтаксис из ITLead directive section",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "file-level",
+              "function-level",
+              "use client"
+            ],
+            "ask": "где ставить use server — файл actions vs inline в Page"
+          }
+        ],
+        "mustConcepts": [
+          "use server",
+          "директив",
+          "file-level",
+          "function-level",
+          "export",
+          "actions/user",
+          "Server Component",
+          "use client",
+          "отдельный файл",
+          "импорт",
+          "inline"
+        ],
+        "falseClaims": [
+          "use server можно в файле с use client",
+          "use server работает только внутри одной функции Page",
+          "file-level use server не помечает export как actions",
+          "use server выполняет код на клиенте при import"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "forms_action",
+      "title": "Использует формы и progressive enhancement",
+      "expected": "Кандидат описывает: `<form action={action}>`; React перехватывает submit; без JS — обычный POST, action всё равно выполняется.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "progressive enhancement — ключевое преимущество Server Actions",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "server_action_definition",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "form",
+              "action=",
+              "progressive"
+            ],
+            "ask": "что происходит при submit формы с action={serverAction} без загруженного JS"
+          }
+        ],
+        "mustConcepts": [
+          "form",
+          "action=",
+          "submit",
+          "progressive enhancement",
+          "без JavaScript",
+          "без JS",
+          "POST",
+          "input",
+          "name",
+          "перехват",
+          "Server Component",
+          "settings"
+        ],
+        "falseClaims": [
+          "форма с Server Action не работает без JavaScript",
+          "нужен onSubmit и preventDefault для Server Action",
+          "action в form принимает только строку URL",
+          "Server Action в form требует use client обязательно"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "client_invocation",
+      "title": "Вызывает action из Client Component",
+      "expected": "Кандидат называет: import action; `useTransition` + `startTransition` + `isPending`; React 19 `useActionState` для возврата и ошибок; `useOptimistic` для optimistic UI.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "useTransition/useActionState — второй основной паттерн после форм",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useTransition",
+              "startTransition",
+              "isPending"
+            ],
+            "ask": "как вызвать Server Action по клику кнопки с loading state"
+          },
+          {
+            "match": [
+              "useActionState",
+              "prevState"
+            ],
+            "ask": "как показать field errors из action через useActionState"
+          }
+        ],
+        "mustConcepts": [
+          "useTransition",
+          "startTransition",
+          "isPending",
+          "use client",
+          "onClick",
+          "button",
+          "useActionState",
+          "prevState",
+          "loading",
+          "disabled",
+          "useOptimistic",
+          "optimistic",
+          "import action"
+        ],
+        "falseClaims": [
+          "Server Action нельзя вызвать из Client Component",
+          "useTransition заменяет Server Action",
+          "isPending true пока action на сервере — не нужен для UX",
+          "useActionState работает только с REST fetch"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "validation_errors",
+      "title": "Валидирует вход и возвращает ошибки",
+      "expected": "Кандидат объясняет: action как публичный API — zod/safeParse; return `{ error }`/`{ success }`, не throw; CSRF action ID от Next.js; auth внутри функции.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "validation + security — частая production-ошибка",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "mistakes_and_boundary",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "zod",
+              "safeParse",
+              "validation"
+            ],
+            "ask": "почему нельзя доверять FormData.get без schema"
+          },
+          {
+            "match": [
+              "throw",
+              "Error Boundary",
+              "return error"
+            ],
+            "ask": "throw vs return { error } при вызове из Client Component"
+          },
+          {
+            "match": [
+              "CSRF",
+              "action ID"
+            ],
+            "ask": "как Next.js защищает Server Actions от CSRF и кто проверяет authorization"
+          }
+        ],
+        "mustConcepts": [
+          "валидац",
+          "zod",
+          "safeParse",
+          "schema",
+          "FormData",
+          "return",
+          "error",
+          "success",
+          "throw",
+          "Error Boundary",
+          "fieldErrors",
+          "публичн",
+          "API endpoint",
+          "CSRF",
+          "action ID",
+          "authorization",
+          "auth"
+        ],
+        "falseClaims": [
+          "FormData от своей формы безопасен без валидации",
+          "throw в action — лучший способ показать ошибку поля",
+          "Next.js проверяет права пользователя автоматически",
+          "CSRF защита не нужна для Server Actions",
+          "Server Action нельзя вызвать извне приложения"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "revalidation_cache",
+      "title": "Инвалидирует кеш после мутации",
+      "expected": "Кандидат называет: `revalidatePath`, `revalidateTag`; tag точечнее для shared data; `redirect` revalidate destination; без revalidate — stale UI.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "revalidate — самый частый баг при первом внедрении",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "revalidatePath",
+              "revalidateTag"
+            ],
+            "ask": "когда revalidateTag лучше revalidatePath"
+          },
+          {
+            "match": [
+              "redirect",
+              "stale"
+            ],
+            "ask": "почему UI показывает старые данные после успешной мутации"
+          }
+        ],
+        "mustConcepts": [
+          "revalidatePath",
+          "revalidateTag",
+          "next/cache",
+          "кеш",
+          "stale",
+          "Full Route Cache",
+          "Data Cache",
+          "tags",
+          "redirect",
+          "next/navigation",
+          "после write",
+          "мутац",
+          "инвалидац"
+        ],
+        "falseClaims": [
+          "Next.js автоматически сбрасывает весь кеш после любой мутации",
+          "revalidatePath и revalidateTag делают одно и то же всегда",
+          "redirect не обновляет кеш destination",
+          "revalidate нужен только для SSG не для Server Actions"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "mistakes_and_boundary",
+      "title": "Знает границы и типичные ошибки",
+      "expected": "Кандидат называет: не public API (нестабильный URL); Route Handlers для webhooks/mobile; action не в client file; server-to-server action без HTTP; return errors не throw.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes + vs Route Handlers из ITLead",
+        "confusionPairs": [
+          {
+            "checkpointKey": "mistakes_and_boundary",
+            "oftenConfusedWith": [
+              "server_action_definition",
+              "validation_errors"
+            ],
+            "anchorTermsExpected": [
+              "Route Handler",
+              "webhook",
+              "public API",
+              "use client",
+              "revalidate"
+            ],
+            "anchorTermsWrongTopic": [
+              "Server Action для Stripe webhook",
+              "mobile вызывает action URL напрямую"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "Route Handler",
+          "public API",
+          "webhook",
+          "mobile",
+          "нестабильн",
+          "URL",
+          "deploy",
+          "use client",
+          "отдельный файл",
+          "revalidate",
+          "забыл",
+          "stale UI",
+          "Server Action",
+          "cron",
+          "third-party"
+        ],
+        "falseClaims": [
+          "Server Action URL стабилен для внешних интеграций",
+          "Stripe webhook лучше через Server Action",
+          "можно объявить use server внутри use client файла",
+          "забыть revalidate — UI всё равно обновится из БД автоматически"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Server Action — `'use server'` async на сервере, форма `<form action={updateUser}>` без отдельного route.ts. После db.update — revalidatePath('/settings'). Валидация zod, ошибки return объектом, не throw.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Профиль — actions/profile.ts с file-level use server. Client settings: useActionState(updateProfile) показывает field errors. Кнопка «Решено» — startTransition + toggleSolved, isPending disabled. Webhook Stripe — Route Handler, не action.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "createProblem: db.create → revalidateTag('problems') если несколько страниц шарят fetch → redirect('/problems'). CSRF закрывает Next.js action ID, но currentUserId проверяю сам в action.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Server Actions — это fetch на /api из useEffect. Форма без JS не работает. После update кеш сам обновится.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Пишу `'use server'` в том же файле что `'use client'` — удобнее. FormData.get('email') сразу в БД без schema. Mobile app бьёт в action URL из прошлого deploy.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "При ошибке валидации throw — Error Boundary покажет поля. revalidateTag не нужен если есть redirect. Server Action из другого action идёт через HTTP POST.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "server_action_definition",
+      "exampleType": "good",
+      "exampleText": "Async функция с use server на сервере мутирует БД; Next.js сам делает POST endpoint для вызова из UI.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "server_action_definition",
+      "exampleType": "good",
+      "exampleText": "ну server action — мутация с компонента без api route, next сам post генерит",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "server_action_definition",
+      "exampleType": "bad",
+      "exampleText": "Server Action выполняется в браузере после hydration, как обычный onClick handler.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "use_server_directive",
+      "exampleType": "good",
+      "exampleText": "actions/user.ts — use server наверху, все export — actions. One-off в Page — use server внутри handleSubmit.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "use_server_directive",
+      "exampleType": "good",
+      "exampleText": "client component импортирует из actions/*.ts, не объявляет use server локально",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "use_server_directive",
+      "exampleType": "bad",
+      "exampleText": "Добавил use server в ClientButton.tsx с use client — так проще держать логику рядом.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "forms_action",
+      "exampleType": "good",
+      "exampleText": "<form action={updateUserName}><input name=\"name\" /><button type=\"submit\">Save</button></form> — работает без JS как обычный POST.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "forms_action",
+      "exampleType": "good",
+      "exampleText": "progressive enhancement: js не загрузился — форма всё равно submit и action на сервере отработает",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "forms_action",
+      "exampleType": "bad",
+      "exampleText": "Для Server Action обязателен onSubmit с preventDefault и fetch вручную.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "client_invocation",
+      "exampleType": "good",
+      "exampleText": "startTransition(() => solveProblem(id)); isPending — spinner на кнопке. useActionState — state.error.name для поля.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "client_invocation",
+      "exampleType": "good",
+      "exampleText": "useOptimistic + startTransition: UI сразу solved, потом await toggleSolved, откат если fail",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "client_invocation",
+      "exampleType": "bad",
+      "exampleText": "Server Action можно вызвать только через form action, onClick не поддерживается.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "validation_errors",
+      "exampleType": "good",
+      "exampleText": "schema.safeParse FormData; if (!success) return { error: flatten fieldErrors }; auth check currentUserId внутри.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "validation_errors",
+      "exampleType": "good",
+      "exampleText": "return { error: 'Неверный пароль' } вместо throw — компонент setErrors, не Error Boundary",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "validation_errors",
+      "exampleType": "bad",
+      "exampleText": "FormData от нашей формы доверенный — zod лишний. Next.js сам проверит что user admin.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "revalidation_cache",
+      "exampleType": "good",
+      "exampleText": "После create: revalidateTag('problems') — только tagged fetch; revalidatePath('/problems') — весь route cache URL.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "revalidation_cache",
+      "exampleType": "good",
+      "exampleText": "забыл revalidatePath — список stale хотя insert в БД прошёл; redirect('/problems') destination revalidate",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "revalidation_cache",
+      "exampleType": "bad",
+      "exampleText": "revalidate не нужен — Next.js читает БД на каждый render после Server Action автоматически.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "mistakes_and_boundary",
+      "exampleType": "good",
+      "exampleText": "UI форма — Server Action. GitHub webhook и mobile REST — Route Handler app/api. Action URL меняется между build.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "mistakes_and_boundary",
+      "exampleType": "good",
+      "exampleText": "import deletePost из actions в другом action — просто await, без http. cron и stripe — handlers",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "mistakes_and_boundary",
+      "exampleType": "bad",
+      "exampleText": "Публичный REST для партнёров делаю через экспорт Server Action — URL стабильный навсегда.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nextjs-server-actions-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/nextjs-server-actions-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/nextjs-server-actions-in-nextjs",
+    "difficulty": "MIDDLE",
+    "titleEn": "Server actions in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

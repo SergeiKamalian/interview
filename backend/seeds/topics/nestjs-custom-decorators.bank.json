@@ -1,0 +1,599 @@
+{
+  "topic": {
+    "code": "nestjs_custom_decorators",
+    "name": "Кастомные декораторы в NestJS",
+    "skillCode": "nestjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как создавать и использовать кастомные декораторы в NestJS?",
+    "shortAnswer": "Кастомные декораторы в NestJS — TypeScript-функции, которые либо извлекают данные из контекста запроса через createParamDecorator и ExecutionContext, либо сохраняют метаданные через SetMetadata для guards и pipes. Для повторяющихся комбинаций используют applyDecorators.",
+    "idealAnswer": "NestJS активно использует декораторы TypeScript для metadata-driven разработки. Кастомный декоратор — функция, которая либо извлекает значение из ExecutionContext на каждый запрос (param decorator), либо один раз при определении класса записывает метаданные через SetMetadata/Reflect.defineMetadata для чтения guards и pipes. Два основных типа: param decorators (createParamDecorator) — pull data из request; metadata decorators (SetMetadata) — store data для guards. Правило выбора: если копируешь request.user или SetMetadata('roles', ...) в 2+ местах — выноси в декоратор; для разовой логики используй guard или pipe напрямую. createParamDecorator принимает factory (data, ctx) => value: data — аргумент внутри @CurrentUser('email'), ctx.switchToHttp().getRequest() для HTTP; возвращай null вместо undefined для честных типов. Metadata: export const ROLES_KEY = 'roles'; Roles = (...roles) => SetMetadata(ROLES_KEY, roles); guard читает через Reflector.getAllAndOverride([getHandler(), getClass()]) — method-level побеждает class-level. Composed: applyDecorators(SetMetadata, UseGuards, ApiBearerAuth) → @Auth('admin') вместо четырёх декораторов. Property decorator для валидации: registerDecorator из class-validator (IsStrongPassword). Внутренности: декораторы компилируются как статические вызовы при определении класса, не при запросе; NestJS сканирует метаданные при bootstrap и подключает к DI; guards вызывают Reflect.getMetadata. Типичные ошибки: switchToHttp() без проверки ctx.getType() (падает в WebSocket/RPC); undefined вместо null для отсутствующего user; отсутствие reflect-metadata в shared library; конфликт имён с @Body(); inline SetMetadata('roles') без константы ключа. Реальные кейсы: @nestjs/passport @User(), GraphQL @CurrentUser() с GqlExecutionContext, RBAC @Roles() + RolesGuard, @Auth() для Swagger sync. createParamDecorator может быть async (после guards). Unit-тест: mock ExecutionContext, вызов factory напрямую без полного приложения.",
+    "maxScore": 10,
+    "skills": [
+      "nestjs",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "custom_decorators_definition",
+      "title": "Понимает суть кастомных декораторов",
+      "expected": "Кандидат объясняет: кастомные декораторы — TypeScript-функции для извлечения данных из запроса или записи метаданных; NestJS читает их в runtime через reflect-metadata; уменьшают boilerplate.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — зачем и что такое custom decorator",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "custom_decorators_definition",
+            "oftenConfusedWith": [
+              "param_vs_metadata",
+              "create_param_decorator"
+            ],
+            "anchorTermsExpected": [
+              "кастомн",
+              "декоратор",
+              "метадан",
+              "ExecutionContext",
+              "reflect-metadata"
+            ],
+            "anchorTermsWrongTopic": [
+              "декоратор заменяет guard",
+              "декоратор выполняется только при запросе всегда"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "кастомн",
+              "декоратор",
+              "метадан"
+            ],
+            "ask": "зачем создавать свой декоратор вместо прямого request.user в контроллере"
+          }
+        ],
+        "mustConcepts": [
+          "кастомн",
+          "декоратор",
+          "TypeScript",
+          "метадан",
+          "metadata-driven",
+          "ExecutionContext",
+          "reflect-metadata",
+          "Reflect",
+          "runtime",
+          "boilerplate",
+          "повтор",
+          "извлеч",
+          "запрос",
+          "guard",
+          "pipe",
+          "NestJS"
+        ],
+        "falseClaims": [
+          "кастомный декоратор заменяет guard полностью",
+          "декораторы NestJS работают только на методах контроллера",
+          "метаданные декораторов читаются только при компиляции TypeScript",
+          "кастомный декоратор не связан с reflect-metadata"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "param_vs_metadata",
+      "title": "Различает param и metadata декораторы",
+      "expected": "Кандидат объясняет: param decorator (createParamDecorator) выполняется на каждый запрос и извлекает значение; metadata decorator (SetMetadata) записывает статические данные при определении класса, guard читает через Reflector.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевое различие из ITLead — смешение ломает guards",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "custom_decorators_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "param_vs_metadata",
+            "oftenConfusedWith": [
+              "metadata_roles_reflector",
+              "create_param_decorator"
+            ],
+            "anchorTermsExpected": [
+              "param",
+              "metadata",
+              "createParamDecorator",
+              "SetMetadata",
+              "Reflector"
+            ],
+            "anchorTermsWrongTopic": [
+              "SetMetadata извлекает user из request",
+              "createParamDecorator хранит roles"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "param",
+              "metadata",
+              "SetMetadata",
+              "createParamDecorator"
+            ],
+            "ask": "чем param decorator отличается от metadata decorator и когда какой использовать"
+          }
+        ],
+        "mustConcepts": [
+          "param",
+          "metadata",
+          "createParamDecorator",
+          "SetMetadata",
+          "Reflector",
+          "на каждый запрос",
+          "при определении класса",
+          "статическ",
+          "извлеч",
+          "хран",
+          "guard",
+          "undefined",
+          "runtime",
+          "method decorator",
+          "parameter decorator"
+        ],
+        "falseClaims": [
+          "SetMetadata извлекает данные из request на каждый запрос",
+          "createParamDecorator сохраняет roles для guard",
+          "param и metadata декораторы взаимозаменяемы",
+          "metadata decorator выполняется при каждом HTTP-запросе"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "create_param_decorator",
+      "title": "Знает createParamDecorator и ExecutionContext",
+      "expected": "Кандидат описывает factory (data, ctx): switchToHttp().getRequest(), data — аргумент @CurrentUser('email'), возврат null вместо undefined; декоратор после guards, req.user уже заполнен.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый паттерн CurrentUser из ITLead quick example",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "createParamDecorator",
+              "CurrentUser",
+              "data"
+            ],
+            "ask": "что такое data в createParamDecorator и как получить email через @CurrentUser('email')"
+          }
+        ],
+        "mustConcepts": [
+          "createParamDecorator",
+          "ExecutionContext",
+          "switchToHttp",
+          "getRequest",
+          "request.user",
+          "data",
+          "CurrentUser",
+          "factory",
+          "null",
+          "undefined",
+          "аргумент",
+          "поле",
+          "JwtAuthGuard",
+          "после guard",
+          "async"
+        ],
+        "falseClaims": [
+          "data в createParamDecorator — это весь request object",
+          "createParamDecorator не может быть async",
+          "param decorator выполняется до auth guard",
+          "switchToHttp работает во всех транспортах без проверки типа"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "metadata_roles_reflector",
+      "title": "Знает SetMetadata, ROLES_KEY и Reflector",
+      "expected": "Кандидат описывает Roles = SetMetadata(ROLES_KEY, roles), RolesGuard с Reflector.getAllAndOverride([getHandler(), getClass()]); method-level побеждает class-level; без requiredRoles guard пропускает.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "RBAC паттерн — основной use case metadata decorators",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "param_vs_metadata",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Reflector",
+              "getAllAndOverride",
+              "ROLES_KEY"
+            ],
+            "ask": "как RolesGuard читает @Roles и что вернёт getAllAndOverride если roles на классе и методе разные"
+          },
+          {
+            "match": [
+              "getHandler",
+              "getClass",
+              "override"
+            ],
+            "ask": "почему @Roles на методе переопределяет @Roles на контроллере"
+          }
+        ],
+        "mustConcepts": [
+          "SetMetadata",
+          "ROLES_KEY",
+          "Roles",
+          "Reflector",
+          "getAllAndOverride",
+          "getHandler",
+          "getClass",
+          "RolesGuard",
+          "CanActivate",
+          "requiredRoles",
+          "user.roles",
+          "403",
+          "method-level",
+          "class-level",
+          "override",
+          "констант",
+          "ключ"
+        ],
+        "falseClaims": [
+          "getAllAndOverride проверяет только class-level metadata",
+          "class-level roles всегда побеждают method-level",
+          "без @Roles guard всегда возвращает 403",
+          "ROLES_KEY можно захардкодить строкой 'roles' только в guard без экспорта"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "apply_decorators_compose",
+      "title": "Знает applyDecorators и composed декораторы",
+      "expected": "Кандидат объясняет applyDecorators объединяет SetMetadata, UseGuards, ApiBearerAuth в один @Auth(); уменьшает дублирование и держит Swagger в sync.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "composed @Auth паттерн из ITLead advanced example",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "applyDecorators",
+              "Auth",
+              "composed"
+            ],
+            "ask": "зачем @Auth() вместо четырёх отдельных декораторов на каждом маршруте"
+          }
+        ],
+        "mustConcepts": [
+          "applyDecorators",
+          "composed",
+          "Auth",
+          "UseGuards",
+          "SetMetadata",
+          "ApiBearerAuth",
+          "Swagger",
+          "OpenAPI",
+          "bundle",
+          "объедин",
+          "один декоратор",
+          "читабель",
+          "JwtAuthGuard",
+          "RolesGuard"
+        ],
+        "falseClaims": [
+          "applyDecorators работает только с param decorators",
+          "composed decorator нельзя параметризовать ролями",
+          "applyDecorators заменяет необходимость guards",
+          "Swagger декораторы нельзя включать в applyDecorators"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки custom decorators",
+      "expected": "Кандидат называет: switchToHttp без ctx.getType() (WebSocket/RPC); undefined вместо null; отсутствие reflect-metadata в library; конфликт имён с @Body(); inline SetMetadata без константы ключа.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — silent guard failures",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "metadata_roles_reflector",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "switchToHttp",
+              "WebSocket",
+              "getType"
+            ],
+            "ask": "почему param decorator с switchToHttp падает в WebSocket и как исправить"
+          },
+          {
+            "match": [
+              "reflect-metadata",
+              "undefined",
+              "guard"
+            ],
+            "ask": "что будет если в shared library нет import reflect-metadata"
+          }
+        ],
+        "mustConcepts": [
+          "switchToHttp",
+          "getType",
+          "WebSocket",
+          "RPC",
+          "microservice",
+          "null",
+          "undefined",
+          "reflect-metadata",
+          "Reflector.getMetadata",
+          "конфликт",
+          "Body",
+          "ParsedBody",
+          "ROLES_KEY",
+          "констант",
+          "опечатк",
+          "inline SetMetadata",
+          "shared library",
+          "main.ts"
+        ],
+        "falseClaims": [
+          "switchToHttp безопасен во всех транспортах NestJS",
+          "undefined и null одинаково безопасны для типа User в контроллере",
+          "reflect-metadata не нужен — NestJS всегда подтягивает его из shared lib",
+          "можно назвать свой param decorator Body — это не конфликтует с @nestjs/common"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда создавать декоратор",
+      "expected": "Кандидат называет правило: 2+ повторений request.user или SetMetadata → декоратор; roles на нескольких маршрутах → metadata + guard; 4 декоратора на endpoint → applyDecorators; разовая логика → guard/pipe напрямую.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "decision rule из TL;DR ITLead",
+        "mustConcepts": [
+          "2+",
+          "повтор",
+          "дублир",
+          "request.user",
+          "roles",
+          "guard",
+          "pipe",
+          "разов",
+          "one-off",
+          "validation",
+          "registerDecorator",
+          "property decorator",
+          "IsStrongPassword",
+          "class-validator",
+          "e-commerce",
+          "RBAC",
+          "GraphQL",
+          "GqlExecutionContext"
+        ],
+        "falseClaims": [
+          "каждый endpoint обязан иметь свой composed decorator",
+          "для одного использования всё равно нужен custom decorator",
+          "guard всегда лучше param decorator для user extraction",
+          "property decorator заменяет ValidationPipe"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Кастомные декораторы — TypeScript-функции: createParamDecorator для @CurrentUser() из request.user, SetMetadata для @Roles() который guard читает через Reflector. Если на каждом protected route четыре декоратора — собираю @Auth() через applyDecorators.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Param decorator крутится на каждый запрос, metadata — один раз при загрузке класса. RolesGuard: getAllAndOverride с handler первым — @Roles на методе бьёт @Roles на контроллере. В shared lib обязательно reflect-metadata, иначе metadata undefined и guard молча пускает всех.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "CurrentUser через createParamDecorator: data='email' достаёт поле, без аргумента — весь user, ?? null чтобы не ловить undefined. В WebSocket проверяю ctx.getType() перед switchToHttp. Unit-тест — mock ExecutionContext, factory напрямую.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "SetMetadata и createParamDecorator — одно и то же, оба достают user из request на каждый HTTP-запрос.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Делаю param decorator Body — удобнее чем @Body() из common. reflect-metadata не нужен если декоратор в npm-пакете. getAllAndOverride смотрит только class, method игнорирует.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "RolesGuard без @Roles на маршруте всегда 403. createParamDecorator выполняется до JwtAuthGuard, поэтому request.user ещё пустой — это нормально.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "custom_decorators_definition",
+      "exampleType": "good",
+      "exampleText": "Custom decorator — переиспользуемая метка: NestJS читает metadata или значение из ExecutionContext в runtime, меньше копипасты request.user.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "custom_decorators_definition",
+      "exampleType": "good",
+      "exampleText": "ну свой декоратор — как ярлык на метод, nest при bootstrap подхватывает метаданные через reflect",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "custom_decorators_definition",
+      "exampleType": "bad",
+      "exampleText": "Кастомный декоратор — это просто синтаксический сахар без reflect-metadata, guards его не видят.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "param_vs_metadata",
+      "exampleType": "good",
+      "exampleText": "Param — createParamDecorator, значение на запрос из ctx. Metadata — SetMetadata, guard читает Reflector позже. Перепутал — roles undefined, guard ведёт себя непредсказуемо.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "param_vs_metadata",
+      "exampleType": "good",
+      "exampleText": "current user — param, roles на route — metadata, не наоборот",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "param_vs_metadata",
+      "exampleType": "bad",
+      "exampleText": "SetMetadata('roles') автоматически кладёт user.roles в параметр контроллера как @Roles().",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "create_param_decorator",
+      "exampleType": "good",
+      "exampleText": "createParamDecorator((data, ctx) => { const req = ctx.switchToHttp().getRequest(); return data ? req.user?.[data] ?? null : req.user ?? null; }) — data из @CurrentUser('email').",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "create_param_decorator",
+      "exampleType": "good",
+      "exampleText": "factory async ок — await db после guard, user уже в request",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "create_param_decorator",
+      "exampleType": "bad",
+      "exampleText": "createParamDecorator всегда возвращает undefined если user нет — TypeScript сам разберётся с типом User.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "metadata_roles_reflector",
+      "exampleType": "good",
+      "exampleText": "export ROLES_KEY; Roles = (...r) => SetMetadata(ROLES_KEY, r); guard: reflector.getAllAndOverride(ROLES_KEY, [handler, class]) — @Roles('user') на методе при @Roles('admin') на классе вернёт ['user'].",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "metadata_roles_reflector",
+      "exampleType": "good",
+      "exampleText": "нет requiredRoles — canActivate true, публичный endpoint внутри контроллера с guard",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "metadata_roles_reflector",
+      "exampleType": "bad",
+      "exampleText": "Reflector.getMetadata только на классе — method-level @Roles игнорируется всегда.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "apply_decorators_compose",
+      "exampleType": "good",
+      "exampleText": "Auth(...roles) = applyDecorators(SetMetadata, UseGuards(Jwt, Roles), ApiBearerAuth, ApiUnauthorizedResponse) — один @Auth('admin') вместо стека.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "apply_decorators_compose",
+      "exampleType": "good",
+      "exampleText": "composed декоратор — не забываешь swagger bearer на новых route",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "apply_decorators_compose",
+      "exampleType": "bad",
+      "exampleText": "applyDecorators заменяет guards — достаточно одного @Auth без JwtAuthGuard внутри.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "UserId: if (ctx.getType()==='http') switchToHttp else switchToRpc — иначе websocket падает. CurrentUser: ?? null. ROLES_KEY — одна константа в decorator и guard.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "не называю декоратор Body — ломает validation pipe. в lib первой строкой import reflect-metadata",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "В microservice param decorator всегда ctx.switchToHttp().getRequest().user.id — работает везде.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "request.user в трёх контроллерах — CurrentUser param decorator. Roles на десяти route — @Roles + guard. Один раз проверка — inline guard без декоратора.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "сложный пароль — registerDecorator property, не param. graphql — GqlExecutionContext вместо http",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Любой endpoint должен иметь минимум три custom decorator, иначе код не NestJS-way.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-custom-decorators",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-custom-decorators",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-custom-decorators",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to create and use custom decorators in NestJS?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

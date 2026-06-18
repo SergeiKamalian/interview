@@ -1,0 +1,571 @@
+{
+  "topic": {
+    "code": "internationalization_in_nextjs",
+    "name": "Интернационализация (i18n) в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как реализовать интернационализацию (i18n) в Next.js App Router?",
+    "shortAnswer": "i18n в Next.js App Router — это паттерн маршрутизации, где код локали живёт в URL (`/en/about`, `/de/about`), а middleware читает `Accept-Language` или cookie и редиректит на нужную версию до рендера страницы. Для App Router нужны папка `app/[locale]/` и middleware; ключ `i18n` в `next.config.js` работает только в Pages Router.",
+    "idealAnswer": "Интернационализация (i18n) в Next.js — проектирование приложения под несколько языков и регионов. В App Router локаль — динамический сегмент `[locale]` в URL: `/en/about` и `/de/about` — одна страница, разный язык. Middleware перехватывает запрос до резолва маршрута: проверяет cookie, затем заголовок `Accept-Language`, затем fallback на дефолтную локаль; редиректит или переписывает URL с префиксом локали. Обязателен `config.matcher`, исключающий `/_next`, `/api` и статику — без него rewrite ломает `/_next/static` (404). App Router и Pages Router не смешивают: Pages Router использует блок `i18n` в `next.config.js`, App Router его полностью игнорирует — нужны `[locale]` и middleware. Для реальных проектов — `next-intl`: pluralization (ICU `{count, plural, ...}`), форматирование дат/чисел, RSC. Layout: `NextIntlClientProvider` + `getMessages()` из `next-intl/server`, `html lang={locale}`. В страницах — `useTranslations('Namespace')`, интерполяция `t('stats', { users: 42 })`. Валидация локали: `if (!supportedLocales.includes(locale)) notFound()` — иначе `/xx/dashboard` рендерит страницу с пустой локалью. Language switcher: заменить первый сегмент pathname через `usePathname` + `router.push`. Навигация: locale-aware `Link` из `@/i18n/routing` (next-intl), не голый `<Link href=\"/products\">` — теряется префикс. Типичные ошибки: нет matcher в middleware; хардкод `locale === 'de' ? 'Hallo' : 'Hello'` вместо ICU; `i18n` в next.config при App Router; забытый `notFound()`; потеря локали в Link. Когда нужен i18n routing: мультиязычный SaaS/e-commerce — subpath `/en/shop` (общие cookie и сессии, SEO). Одномовное приложение — без `[locale]`. Static export (`next export`): middleware не работает без Node runtime — `generateStaticParams()` per locale или деплой с runtime. RTL (арабский, иврит): `dir=\"rtl\"` на `<html>`, CSS logical properties (`margin-inline-start`), `direction()` из next-intl. Subpath vs domain: subpath проще (общий link equity); domain (`en.example.com`) — отдельный DNS и analytics. Без middleware `[locale]` — просто URL-сегмент, автоопределение языка не происходит.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "i18n_routing_definition",
+      "title": "Понимает i18n-маршрутизацию в Next.js",
+      "expected": "Кандидат объясняет: локаль в URL (`/en/about`), динамический сегмент `[locale]`, middleware определяет язык до рендера; одна страница — разные языковые версии.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — locale в URL и роль middleware",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "i18n_routing_definition",
+            "oftenConfusedWith": [
+              "middleware_locale_detection",
+              "app_vs_pages_router"
+            ],
+            "anchorTermsExpected": [
+              "[locale]",
+              "middleware",
+              "Accept-Language",
+              "URL",
+              "префикс",
+              "redirect"
+            ],
+            "anchorTermsWrongTopic": [
+              "next.config i18n для App Router",
+              "локаль без middleware автоматически"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "[locale]",
+              "middleware",
+              "URL"
+            ],
+            "ask": "как локаль попадает в URL и что делает middleware до рендера страницы"
+          }
+        ],
+        "mustConcepts": [
+          "i18n",
+          "интернационализа",
+          "локал",
+          "locale",
+          "[locale]",
+          "URL",
+          "префикс",
+          "/en/",
+          "/de/",
+          "middleware",
+          "redirect",
+          "Accept-Language",
+          "cookie",
+          "динамический сегмент",
+          "App Router",
+          "до рендера"
+        ],
+        "falseClaims": [
+          "Next.js автоматически определяет локаль без middleware",
+          "[locale] сам читает Accept-Language",
+          "i18n в Next.js не требует изменения URL",
+          "один URL для всех языков без сегмента локали в App Router"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "app_vs_pages_router",
+      "title": "Отличает App Router от Pages Router в i18n",
+      "expected": "Кандидат сравнивает: App Router — папка `app/[locale]/` + middleware; Pages Router — блок `i18n` в `next.config.js`; смешивание ломает определение локали без явных ошибок.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "частая путаница next.config i18n vs [locale]",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "i18n_routing_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "app_vs_pages_router",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "App Router",
+              "Pages Router",
+              "next.config",
+              "[locale]",
+              "i18n.locales"
+            ],
+            "anchorTermsWrongTopic": [
+              "i18n в next.config работает в App Router",
+              "можно смешать оба подхода"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "App Router",
+          "Pages Router",
+          "next.config.js",
+          "i18n",
+          "i18n.locales",
+          "[locale]",
+          "middleware",
+          "игнорир",
+          "не смешив",
+          "locale detection",
+          "redirect",
+          "разные подходы"
+        ],
+        "falseClaims": [
+          "ключ i18n в next.config.js работает в App Router",
+          "App Router и Pages Router i18n можно смешивать без проблем",
+          "Pages Router не нужен next.config для i18n",
+          "App Router использует i18n block из next.config"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "middleware_locale_detection",
+      "title": "Знает middleware и определение локали",
+      "expected": "Кандидат описывает: middleware читает cookie → Accept-Language → default; redirect/rewrite с префиксом; обязательный `config.matcher` исключает `_next`, `api`, статику.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "matcher и порядок cookie/header — production-критично",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "matcher",
+              "config.matcher",
+              "_next"
+            ],
+            "ask": "зачем matcher в middleware и что ломается без него"
+          },
+          {
+            "match": [
+              "Accept-Language",
+              "cookie",
+              "redirect"
+            ],
+            "ask": "в каком порядке middleware выбирает локаль: cookie, header, default"
+          }
+        ],
+        "mustConcepts": [
+          "middleware",
+          "NextResponse",
+          "redirect",
+          "rewrite",
+          "Accept-Language",
+          "cookie",
+          "locale cookie",
+          "matcher",
+          "config.matcher",
+          "_next",
+          "api",
+          "favicon",
+          "static",
+          "404",
+          "default locale",
+          "fallback"
+        ],
+        "falseClaims": [
+          "middleware можно без matcher — статика не пострадает",
+          "rewrite /_next/static на /en/_next/static безопасен",
+          "Accept-Language читается в page component, не в middleware",
+          "middleware не нужен если есть [locale] папка"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "next_intl_library",
+      "title": "Знает next-intl и переводы",
+      "expected": "Кандидат упоминает: `next-intl`, `NextIntlClientProvider`, `getMessages`, `useTranslations`, ICU pluralization, `notFound()` для невалидных локалей, `html lang`.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "стандартная библиотека App Router — pluralization и RSC",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useTranslations",
+              "next-intl",
+              "messages"
+            ],
+            "ask": "как подключить next-intl в layout и использовать переводы в page"
+          },
+          {
+            "match": [
+              "notFound",
+              "plural",
+              "ICU"
+            ],
+            "ask": "зачем notFound() для неизвестной локали и как работает plural в ICU"
+          }
+        ],
+        "mustConcepts": [
+          "next-intl",
+          "NextIntlClientProvider",
+          "getMessages",
+          "useTranslations",
+          "messages",
+          "en.json",
+          "plural",
+          "pluralization",
+          "ICU",
+          "интерполя",
+          "notFound",
+          "валид",
+          "supportedLocales",
+          "html lang",
+          "RSC",
+          "layout"
+        ],
+        "falseClaims": [
+          "next-intl не нужен — достаточно if/else по locale в JSX",
+          "notFound() для невалидной локали не обязателен",
+          "useTranslations работает без NextIntlClientProvider",
+          "pluralization в next-intl только через ручной if/else"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки i18n в Next.js",
+      "expected": "Кандидат называет: нет matcher; хардкод переводов в компонентах; `i18n` в next.config при App Router; забытый `notFound()`; `<Link>` без locale-префикса.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "пять ошибок из ITLead Common mistakes",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Link",
+              "locale-aware",
+              "routing"
+            ],
+            "ask": "почему `<Link href=\"/products\">` теряет локаль и как исправить"
+          },
+          {
+            "match": [
+              "хардкод",
+              "Hallo",
+              "Hello"
+            ],
+            "ask": "чем плох locale === 'de' ? 'Hallo' : 'Hello' в компоненте"
+          }
+        ],
+        "mustConcepts": [
+          "matcher",
+          "хардкод",
+          "next.config i18n",
+          "notFound",
+          "Link",
+          "locale-aware",
+          "i18n/routing",
+          "потеря локали",
+          "префикс",
+          "RTL",
+          "/_next/static",
+          "404",
+          "пустая локаль",
+          "невалид"
+        ],
+        "falseClaims": [
+          "можно хардкодить переводы через тернарник для production",
+          "Link из next/navigation автоматически сохраняет locale",
+          "i18n key в next.config достаточен для App Router",
+          "matcher в middleware опционален для production"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда нужен i18n routing",
+      "expected": "Кандидат сравнивает: multi-language SaaS/e-commerce — subpath i18n; одномовное приложение — без `[locale]`; static export — `generateStaticParams` или runtime; subpath vs domain для SEO.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use из ITLead — trade-offs",
+        "mustConcepts": [
+          "SaaS",
+          "e-commerce",
+          "subpath",
+          "domain",
+          "SEO",
+          "cookie",
+          "сесс",
+          "одномовн",
+          "single language",
+          "static export",
+          "next export",
+          "generateStaticParams",
+          "Node runtime",
+          "Vercel",
+          "link equity"
+        ],
+        "falseClaims": [
+          "i18n routing нужен всегда даже для одного языка",
+          "static export с middleware i18n работает без generateStaticParams",
+          "отдельный домен en.example.com всегда лучше subpath",
+          "next export сохраняет locale detection через middleware"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "language_switcher_rtl",
+      "title": "Знает language switcher и RTL",
+      "expected": "Кандидат описывает: switcher меняет первый сегмент pathname; для RTL — `dir=\"rtl\"` на html, CSS logical properties, `direction()` из next-intl.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "language switcher + RTL — бонус middle",
+        "mustConcepts": [
+          "language switcher",
+          "usePathname",
+          "router.push",
+          "сегмент",
+          "RTL",
+          "dir",
+          "rtl",
+          "ltr",
+          "logical properties",
+          "margin-inline",
+          "padding-inline",
+          "direction()",
+          "арабск",
+          "иврит"
+        ],
+        "falseClaims": [
+          "RTL достаточно только перевести текст без dir на html",
+          "language switcher должен менять только cookie без URL",
+          "margin-left достаточен для RTL без logical properties",
+          "direction() не нужен при next-intl"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "i18n в App Router: все страницы под `app/[locale]/`, middleware читает cookie и Accept-Language, редиректит `/about` → `/en/about`. Matcher исключает `/_next` и `/api`. Переводы через next-intl: `useTranslations`, ICU plural. Невалидная локаль — `notFound()`. Link из `@/i18n/routing`, не голый href без префикса.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для мультиязычного магазина делаю subpath `/de/shop` — cookie общие. Одномовный admin — без `[locale]`. Static export — `generateStaticParams` per locale, middleware на export не работает. Pages Router — только `i18n` в next.config, в App Router это не работает.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Layout: NextIntlClientProvider + getMessages. Dashboard: t('activeUsers', { count: 42 }) с ICU plural. Switcher: pathname.split('/'), segments[1] = newLocale, router.push. Arabic: html dir=rtl, margin-inline-start вместо margin-left.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для i18n в App Router достаточно добавить i18n block в next.config.js — middleware не нужен, [locale] сам определит язык из браузера.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Middleware без matcher — норм, Next.js сам не тронет static. Переводы через `{locale === 'de' ? 'Hallo' : 'Hello'}`. Link href=\"/products\" сохранит текущую локаль автоматически.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "next export с middleware i18n работает как на Vercel — locale detection на static hosting без generateStaticParams.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "i18n_routing_definition",
+      "exampleType": "good",
+      "exampleText": "Локаль — сегмент URL `/en/about`; middleware ставит префикс до рендера по Accept-Language или cookie.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "i18n_routing_definition",
+      "exampleType": "good",
+      "exampleText": "ну i18n тут — [locale] в path, middleware редиректит с / на /en или /de",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "i18n_routing_definition",
+      "exampleType": "bad",
+      "exampleText": "Next.js сам подставляет локаль в params без middleware — Accept-Language читается в page.tsx.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "app_vs_pages_router",
+      "exampleType": "good",
+      "exampleText": "App Router: `app/[locale]/` + middleware. Pages Router: `i18n: { locales: ['en','de'] }` в next.config. Смешивать нельзя — detection молча ломается.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "app_vs_pages_router",
+      "exampleType": "good",
+      "exampleText": "в app router next.config i18n игнорится полностью — только [locale] папка",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "app_vs_pages_router",
+      "exampleType": "bad",
+      "exampleText": "i18n в next.config работает и для App Router — достаточно locales array.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "middleware_locale_detection",
+      "exampleType": "good",
+      "exampleText": "middleware: cookie locale → Accept-Language → 'en'; matcher `['/((?!api|_next|favicon.ico).*)']` — иначе /_next/static 404.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "middleware_locale_detection",
+      "exampleType": "good",
+      "exampleText": "без matcher rewrite ломает статику — всегда исключаю _next и api",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "middleware_locale_detection",
+      "exampleType": "bad",
+      "exampleText": "Rewrite всего pathname на /en + path без matcher — static assets всё равно найдутся.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "next_intl_library",
+      "exampleType": "good",
+      "exampleText": "next-intl: layout с NextIntlClientProvider, page — useTranslations('Dashboard'), plural через ICU `{count, plural, one {...} other {...}}`.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "next_intl_library",
+      "exampleType": "good",
+      "exampleText": "если locale не в supportedLocales — notFound(), иначе /xx/dashboard с пустой локалью",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "next_intl_library",
+      "exampleType": "bad",
+      "exampleText": "useTranslations работает без provider — достаточно import json в каждый компонент.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Ошибки: нет matcher; i18n в next.config при App Router; Link без locale; хардкод Hallo/Hello; забытый notFound для /xx/.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Link из @/i18n/routing держит префикс — обычный href='/products' сбросит локаль",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Тернарник locale === 'de' ? ... норм для 100+ строк и RTL plural.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Multi-lang SaaS — subpath i18n, общие сессии. Single language — без [locale]. next export — generateStaticParams, middleware не работает без Node.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "subpath /en/about проще domain en.site.com для SEO и cookies; domain — если отдельная аналитика по региону",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Всегда добавляю [locale] даже для одного языка — без вреда для URL.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "language_switcher_rtl",
+      "exampleType": "good",
+      "exampleText": "Switcher: segments[1] = newLocale, router.push(join). RTL: html dir=rtl, padding-inline, next-intl direction().",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "language_switcher_rtl",
+      "exampleType": "good",
+      "exampleText": "для арабского dir rtl на html + logical css, не margin-left",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "language_switcher_rtl",
+      "exampleType": "bad",
+      "exampleText": "RTL — только перевод текста, dir на html не нужен.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "internationalization-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/internationalization-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/internationalization-in-nextjs",
+    "difficulty": "MIDDLE",
+    "titleEn": "Internationalization (i18n) in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

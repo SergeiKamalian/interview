@@ -1,0 +1,489 @@
+{
+  "topic": {
+    "code": "nestjs_providers_dependency_injection",
+    "name": "Провайдеры и dependency injection в NestJS",
+    "skillCode": "nestjs",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Что такое провайдеры в NestJS и как работает dependency injection?",
+    "shortAnswer": "Провайдер в NestJS — любой класс или значение, которое IoC-контейнер создаёт и внедряет вместо ручного `new`. Контейнер читает типы параметров конструктора через `reflect-metadata`, находит их в массиве `providers` модуля и передаёт закешированный экземпляр. Сервисы — самая частая форма, но через `useValue`, `useClass`, `useFactory` и `useExisting` можно зарегистрировать что угодно.",
+    "idealAnswer": "Провайдер — любой класс или значение, которое IoC-контейнер Nest создаёт и внедряет автоматически: сервисы, репозитории, фабрики, конфиг. Контроллер объявляет зависимость в конструкторе (`constructor(private readonly users: UsersService)`), контейнер читает тип через `reflect-metadata`, ищет токен в `providers` модуля и передаёт закешированный экземпляр — нигде нет `new UsersService()`. DI решает проблему ручного `new`: при смене реализации, моках в тестах или шаринге одного экземпляра не нужно править каждый вызов. Три обязательных условия: `@Injectable()` на классе, класс в `providers` модуля, который видит приложение, и в `tsconfig.json` — `emitDecoratorMetadata: true` и `experimentalDecorators: true`. Иначе — «Nest can't resolve dependencies of X» при старте. При `NestFactory.create()`: Nest сканирует `@Module()`, собирает providers/controllers/imports, читает типы конструкторов, строит DAG зависимостей, создаёт экземпляры снизу вверх и кеширует по токену. Циклические зависимости ломают bootstrap — фикс `forwardRef(() => OtherService)` с обеих сторон. Кастомные провайдеры: `useValue` — готовое значение; `useClass` — подмена класса; `useFactory` — async/sync фабрика с `inject: [...]`; `useExisting` — алиас токена. Для string/symbol токенов — `@Inject('DB_POOL')`. Scope по умолчанию — singleton на приложение; `Scope.REQUEST` — новый экземпляр на HTTP-запрос; `Scope.TRANSIENT` — на каждую точку внедрения. Опасность: request-scoped провайдер внутри singleton захватывает контекст первого запроса навсегда — весь chain должен быть request-scoped. Типичные ошибки: забытый `@Injectable()`; провайдер в другом модуле без `exports`/`imports`; circular dependency без forwardRef; scope mismatch. Тесты: `Test.createTestingModule({ providers }).overrideProvider(UsersService).useValue(mock).compile()`. Сервис — провайдер, но провайдер не всегда сервис (репозитории, пулы, value bindings). PrismaService, ConfigService, `@InjectRepository` — провайдеры под капотом.",
+    "maxScore": 10,
+    "skills": [
+      "nestjs",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "provider_definition",
+      "title": "Понимает что такое провайдер и IoC-контейнер",
+      "expected": "Кандидат объясняет: провайдер — класс или значение под управлением IoC-контейнера; контейнер создаёт и внедряет экземпляры; контроллер объявляет что нужно в конструкторе, а не как построить; сервисы — частный случай провайдера.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — ядро: провайдер как рецепт в IoC-контейнере",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "провайдер",
+              "IoC",
+              "контейнер",
+              "DI"
+            ],
+            "ask": "что такое провайдер в NestJS и чем он отличается от обычного класса с new"
+          }
+        ],
+        "mustConcepts": [
+          "провайдер",
+          "provider",
+          "IoC",
+          "контейнер",
+          "container",
+          "DI",
+          "внедрен",
+          "inject",
+          "сервис",
+          "service",
+          "@Injectable",
+          "конструктор",
+          "constructor",
+          "рецепт",
+          "токен",
+          "token",
+          "кеш",
+          "cached",
+          "создаёт",
+          "не new"
+        ],
+        "falseClaims": [
+          "провайдер — это только класс с @Injectable без участия контейнера",
+          "контроллер сам создаёт сервис через new",
+          "провайдер и сервис — строго одно и то же",
+          "IoC-контейнер работает только на каждый HTTP-запрос по умолчанию"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "registration_injection",
+      "title": "Знает регистрацию и условия injection",
+      "expected": "Кандидат перечисляет три условия: @Injectable(), класс в providers модуля, emitDecoratorMetadata и experimentalDecorators в tsconfig; понимает регистрацию в @Module({ providers: [...] }) и внедрение через constructor.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "три обязательных условия из ITLead — базовый junior setup",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "@Injectable",
+              "providers",
+              "emitDecoratorMetadata"
+            ],
+            "ask": "что нужно для работы injection кроме объявления UsersService в конструкторе"
+          }
+        ],
+        "mustConcepts": [
+          "@Injectable",
+          "providers",
+          "модуль",
+          "module",
+          "@Module",
+          "emitDecoratorMetadata",
+          "experimentalDecorators",
+          "tsconfig",
+          "reflect-metadata",
+          "can't resolve dependencies",
+          "регистрац",
+          "массив providers",
+          "конструктор",
+          "private readonly",
+          "UsersService",
+          "UsersModule"
+        ],
+        "falseClaims": [
+          "достаточно @Controller без @Injectable на сервисе",
+          "providers можно опустить если класс импортирован в файле",
+          "emitDecoratorMetadata не нужен для class-based injection",
+          "Nest резолвит зависимости без reflect-metadata"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "bootstrap_resolution",
+      "title": "Понимает bootstrap и резолвинг зависимостей",
+      "expected": "Кандидат описывает: NestFactory.create() сканирует модули, читает типы конструктора через reflect-metadata, строит граф зависимостей, создаёт экземпляры снизу вверх и кеширует; при запросе контроллер уже держит готовый сервис.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "последовательность bootstrap из ITLead — ключ к пониманию DI",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "NestFactory",
+              "bootstrap",
+              "граф",
+              "reflect-metadata"
+            ],
+            "ask": "что происходит при NestFactory.create() с UsersService и UsersController"
+          },
+          {
+            "match": [
+              "forwardRef",
+              "circular",
+              "цикл"
+            ],
+            "ask": "почему циклическая зависимость ломает bootstrap и как forwardRef помогает"
+          }
+        ],
+        "mustConcepts": [
+          "NestFactory.create",
+          "bootstrap",
+          "reflect-metadata",
+          "тип параметр",
+          "constructor",
+          "граф",
+          "DAG",
+          "зависимост",
+          "dependency graph",
+          "снизу вверх",
+          "leaf",
+          "кеш",
+          "cache",
+          "token",
+          "forwardRef",
+          "circular",
+          "циклич",
+          "сканирует",
+          "imports",
+          "controllers"
+        ],
+        "falseClaims": [
+          "Nest создаёт новый UsersService на каждый HTTP-запрос по умолчанию",
+          "reflect-metadata читается на каждый запрос заново",
+          "циклические зависимости Nest разрешает автоматически без forwardRef",
+          "bootstrap не строит граф — только lazy init при первом запросе"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "custom_providers",
+      "title": "Знает кастомные провайдеры и токены",
+      "expected": "Кандидат различает useValue, useClass, useFactory (с inject), useExisting; понимает токен provide и @Inject для string/symbol; useFactory для async init (DB pool, Redis).",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "custom providers — типичный junior+ follow-up из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useFactory",
+              "useClass",
+              "useValue"
+            ],
+            "ask": "когда useFactory вместо useClass и зачем inject в factory provider"
+          },
+          {
+            "match": [
+              "@Inject",
+              "токен",
+              "USER_REPO"
+            ],
+            "ask": "зачем string token и @Inject если для класса достаточно типа в конструкторе"
+          }
+        ],
+        "mustConcepts": [
+          "useValue",
+          "useClass",
+          "useFactory",
+          "useExisting",
+          "provide",
+          "токен",
+          "token",
+          "@Inject",
+          "inject",
+          "async",
+          "фабрик",
+          "factory",
+          "алиас",
+          "alias",
+          "MockMailerService",
+          "ConfigService",
+          "DB_POOL",
+          "interface",
+          "интерфейс",
+          "подмен"
+        ],
+        "falseClaims": [
+          "useClass подходит для async инициализации connection pool",
+          "useExisting создаёт новый экземпляр класса",
+          "string token работает без @Inject в конструкторе",
+          "useValue нельзя использовать для конфиг-объектов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки DI",
+      "expected": "Кандидат называет: забытый @Injectable(); провайдер в другом модуле без exports/imports; circular dependency без forwardRef; request-scoped внутри singleton; правильно — exports в AuthModule, imports в UsersModule, весь chain request-scoped.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes ITLead — частые ошибки на fresh setup",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "exports",
+              "imports",
+              "wrong module"
+            ],
+            "ask": "UsersService в AuthModule, UsersController в UsersModule без imports — что сломается"
+          },
+          {
+            "match": [
+              "Scope.REQUEST",
+              "singleton",
+              "TenantContext"
+            ],
+            "ask": "почему request-scoped TenantContext в singleton BillingService опасен"
+          }
+        ],
+        "mustConcepts": [
+          "@Injectable",
+          "забыл",
+          "exports",
+          "imports",
+          "AuthModule",
+          "UsersModule",
+          "can't resolve",
+          "forwardRef",
+          "circular",
+          "циклич",
+          "Scope.REQUEST",
+          "singleton",
+          "TenantContext",
+          "BillingService",
+          "scope mismatch",
+          "первый запрос",
+          "overrideProvider",
+          "TestingModule",
+          "mock"
+        ],
+        "falseClaims": [
+          "достаточно объявить провайдер в любом модуле — Nest найдёт глобально",
+          "exports не нужен если класс exported из файла TypeScript",
+          "request-scoped провайдер безопасно внедрять в singleton",
+          "forwardRef нужен только на одной стороне цикла"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "provider_scopes",
+      "title": "Понимает scope провайдеров",
+      "expected": "Кандидат сравнивает: singleton (default) — один экземпляр на приложение; Scope.REQUEST — на HTTP-запрос; Scope.TRANSIENT — на каждую точку injection; два контроллера делят один UsersService только при singleton.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Scope singleton/request/transient — базовый junior follow-up",
+        "mustConcepts": [
+          "singleton",
+          "default",
+          "Scope.REQUEST",
+          "Scope.TRANSIENT",
+          "transient",
+          "request",
+          "один экземпляр",
+          "на приложение",
+          "на запрос",
+          "на injection",
+          "shared",
+          "общий",
+          "память",
+          "Injectable scope",
+          "opt out"
+        ],
+        "falseClaims": [
+          "по умолчанию Nest создаёт новый экземпляр сервиса на каждый запрос",
+          "Scope.TRANSIENT и Scope.REQUEST дают один и тот же lifecycle",
+          "singleton scope можно задать только глобально в main.ts",
+          "смена scope не влияет на видимость данных между контроллерами"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Провайдер — рецепт в IoC-контейнере: @Injectable на UsersService, регистрация в providers модуля, контейнер один раз строит экземпляр при bootstrap и внедряет в UsersController через constructor — без new. Три условия: декоратор, providers, emitDecoratorMetadata в tsconfig.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "DI вместо new — меняю PrismaUsersRepository на mock через useClass в тестовом модуле, AuthService не трогаю. Для пула БД useFactory async с inject ConfigService — если URL битый, приложение падает при старте, а не на первом запросе. Scope по умолчанию singleton — два контроллера видят одного UsersService.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "NestFactory.create сканирует @Module, reflect-metadata читает тип UsersService в конструкторе контроллера, строит граф, кеширует. String token USER_REPO — @Inject в AuthService. Request-scoped TenantContext нельзя в singleton BillingService — захватит первого tenant.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Провайдер — это просто @Injectable, Nest сам найдёт класс без providers массива. reflect-metadata не нужен если TypeScript strict.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "UsersService в AuthModule достаточно — exports не нужен, Nest глобально резолвит все providers. Request-scoped в singleton — норм, Nest обновит tenant на каждый запрос.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "useFactory только для синхронных классов, async pool — через new в constructor сервиса. DI в Nest работает в plain JavaScript без emitDecoratorMetadata.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "provider_definition",
+      "exampleType": "good",
+      "exampleText": "Провайдер — класс под управлением IoC: контейнер создаёт и inject в constructor, контроллер не знает как построен UsersService.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "provider_definition",
+      "exampleType": "good",
+      "exampleText": "ну провайдер — как рецепт в контейнере, сервис один раз собрали при старте, в контроллер передали готовый",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "provider_definition",
+      "exampleType": "bad",
+      "exampleText": "Провайдер — это любой класс, контейнер не участвует, главное @Controller на соседнем файле.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "registration_injection",
+      "exampleType": "good",
+      "exampleText": "@Injectable + providers: [UsersService] в UsersModule + emitDecoratorMetadata/experimentalDecorators — иначе can't resolve dependencies.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "registration_injection",
+      "exampleType": "good",
+      "exampleText": "без @Injectable nest не видит класс, без providers в модуле — не резолвит, без metadata в tsconfig — типы Object",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "registration_injection",
+      "exampleType": "bad",
+      "exampleText": "Достаточно import UsersService в controller file — Nest подхватит автоматически без providers.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "bootstrap_resolution",
+      "exampleType": "good",
+      "exampleText": "NestFactory.create: scan modules → read constructor types → build DAG → instantiate leaf-first → cache by token. На запрос wiring уже готов.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "bootstrap_resolution",
+      "exampleType": "good",
+      "exampleText": "UsersService нужен AuthService и наоборот — без forwardRef bootstrap падает, lazy ref с обеих сторон",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "bootstrap_resolution",
+      "exampleType": "bad",
+      "exampleText": "Nest создаёт провайдеры lazy при первом HTTP-запросе, bootstrap только регистрирует routes.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "custom_providers",
+      "exampleType": "good",
+      "exampleText": "useValue для APP_CONFIG, useClass MockMailer в тестах, useFactory async для DB_POOL с inject: [ConfigService], useExisting — алиас LOGGER на PinoLogger.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "custom_providers",
+      "exampleType": "good",
+      "exampleText": "интерфейс UsersRepository — provide USER_REPO useClass PrismaUsersRepository, в сервисе @Inject('USER_REPO')",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "custom_providers",
+      "exampleType": "bad",
+      "exampleText": "useClass для async pool с await connect — Nest сам дождётся Promise в constructor.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "UsersService только в AuthModule без exports — UsersController в UsersModule не резолвится. Fix: exports + imports или дублировать providers.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "TenantContext REQUEST в BillingService singleton — все запросы видят tenant первого клиента, весь chain делаем request-scoped",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Circular UsersService↔AuthService Nest разрулит сам, forwardRef только для circular modules.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "provider_scopes",
+      "exampleType": "good",
+      "exampleText": "Default singleton — один UsersService на app, user создан в одном контроллере виден в другом. REQUEST — новый на HTTP-запрос, TRANSIENT — на каждый inject point.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "provider_scopes",
+      "exampleType": "good",
+      "exampleText": "явно @Injectable({ scope: Scope.REQUEST }) если нужен per-request state, иначе singleton",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "provider_scopes",
+      "exampleType": "bad",
+      "exampleText": "Scope.TRANSIENT — один экземпляр на всё приложение как singleton, разницы нет.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-providers-dependency-injection",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-providers-dependency-injection",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-providers-dependency-injection",
+    "difficulty": "JUNIOR",
+    "titleEn": "What are providers and how does dependency injection work in NestJS?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

@@ -1,0 +1,581 @@
+{
+  "topic": {
+    "code": "keepalive_in_vue",
+    "name": "KeepAlive в Vue.js",
+    "skillCode": "vue",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое `<KeepAlive>` в Vue.js и когда его использовать?",
+    "shortAnswer": "`<KeepAlive>` — встроенный компонент Vue, который кеширует экземпляры дочерних компонентов при переключении вместо их уничтожения, сохраняя реактивное состояние и DOM. В отличие от `v-if`, компонент деактивируется и реактивируется, а не размонтируется заново. Управление кешем — через `include`, `exclude` и `:max`.",
+    "idealAnswer": "`<KeepAlive>` — встроенный компонент Vue 3, который при переключении представлений деактивирует дочерние компоненты и хранит их в памяти, вместо полного destroy/remount. Реактивное состояние, vnode-дерево и слушатели событий сохраняются; при возврате Vue вставляет тот же vnode обратно в DOM и вызывает `onActivated`. Без `<KeepAlive>` `v-if` запускает полный цикл: `beforeUnmount`, очистка DOM, потеря state; при remount всё начинается с нуля. С `<KeepAlive>` компонент перемещается в скрытый контейнер вне активного DOM — это как «пауза» вместо «выхода из игры». Когда использовать: вкладки с вводом, многошаговые формы с «назад», навигация список → детали → назад (scroll position). Не использовать: одноразовые тяжёлые view, статические страницы с always-fresh data. Пропсы контроля: `include` и `exclude` — строка или массив имён компонентов (опция `name`, не имя файла); без `name` selective filter не сработает — `defineOptions({ name: 'UserForm' })`. `:max` — LRU-лимит: при превышении выселяется least recently activated и полностью unmount. Lifecycle: `onActivated` — каждый вход в DOM из кеша (включая первый mount вместе с `onMounted`); `onDeactivated` — уход с экрана, но компонент жив; это не `beforeUnmount`. В `onDeactivated` паузят таймеры/подписки, не очищают reactive state. Внутри Vue 3 renderer держит `Map` кешированных vnode по name/uid; LRU через `:max` отслеживает порядок активаций. С Vue Router: `<RouterView v-slot=\"{ Component }\"><KeepAlive include=\"Home,Dashboard\"><component :is=\"Component\" :key=\"$route.path\" /></KeepAlive></RouterView>` — `:key` даёт отдельные cache entry per route path/params. Типичные ошибки: `include` без `name` на компоненте; unbounded cache без `:max` (сотни MB в dashboard); случайный `:key` сбрасывает кеш; `onDeactivated` как полный cleanup; `include=\"div\"` с HTML-тегами. `<KeepAlive>` client-only — на SSR не работает, активируется после hydration. Паттерн refresh: `onActivated(() => fetchLatestData())` — DOM/scroll из кеша, данные свежие при каждом возврате.",
+    "maxScore": 10,
+    "skills": [
+      "vue",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "keepalive_definition",
+      "title": "Понимает назначение KeepAlive",
+      "expected": "Кандидат объясняет: `<KeepAlive>` кеширует экземпляры компонентов при переключении, сохраняет state и DOM, избегает повторного mount.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — TL;DR и определение из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "KeepAlive",
+              "кеш",
+              "кэш"
+            ],
+            "ask": "что происходит с компонентом внутри `<KeepAlive>` при переключении вкладки"
+          }
+        ],
+        "mustConcepts": [
+          "KeepAlive",
+          "кеш",
+          "кэш",
+          "кешир",
+          "экземпляр",
+          "instance",
+          "состоян",
+          "state",
+          "DOM",
+          "деактив",
+          "реактив",
+          "не уничтож",
+          "не destroy",
+          "переключ",
+          "toggle",
+          "встроенн",
+          "компонент Vue",
+          "сохран",
+          "remount",
+          "монтир"
+        ],
+        "falseClaims": [
+          "KeepAlive пересоздаёт компонент при каждом переключении",
+          "KeepAlive работает только с Vue Router",
+          "KeepAlive уничтожает компонент при скрытии",
+          "KeepAlive заменяет Pinia для хранения state"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "vif_vs_keepalive",
+      "title": "Отличает KeepAlive от v-if",
+      "expected": "Кандидат сравнивает: `v-if` — destroy/remount, state теряется; `<KeepAlive>` — deactivate/reactivate, state и vnode остаются; упоминает beforeUnmount vs деактивацию.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевое отличие из ITLead Key difference",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "keepalive_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "vif_vs_keepalive",
+            "oftenConfusedWith": [
+              "keepalive_definition"
+            ],
+            "anchorTermsExpected": [
+              "v-if",
+              "destroy",
+              "remount",
+              "деактив",
+              "state сохран"
+            ],
+            "anchorTermsWrongTopic": [
+              "v-show уничтожает DOM",
+              "KeepAlive это v-show"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "v-if",
+              "destroy",
+              "remount"
+            ],
+            "ask": "что происходит с формой при v-if=false vs внутри KeepAlive"
+          }
+        ],
+        "mustConcepts": [
+          "v-if",
+          "destroy",
+          "remount",
+          "уничтож",
+          "beforeUnmount",
+          "деактив",
+          "реактив",
+          "state теря",
+          "state сохран",
+          "vnode",
+          "скрыт",
+          "контейнер",
+          "DOM очищ",
+          "с нуля",
+          "watchers",
+          "слушател"
+        ],
+        "falseClaims": [
+          "v-if и KeepAlive ведут себя одинаково при toggle",
+          "KeepAlive всё равно вызывает beforeUnmount при каждом скрытии",
+          "v-if сохраняет reactive state между переключениями",
+          "KeepAlive — это синтаксический сахар для v-show"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "cache_control_props",
+      "title": "Знает include, exclude и max",
+      "expected": "Кандидат описывает: `include`/`exclude` фильтруют по опции `name` компонента; `:max` — LRU-лимит, старейший evict и unmount; без `name` selective filter не работает.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "include/exclude/max — практический контроль кеша",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "include",
+              "exclude",
+              "name"
+            ],
+            "ask": "почему include=\"UserForm\" не сработает без defineOptions name"
+          },
+          {
+            "match": [
+              "max",
+              "LRU",
+              "evict"
+            ],
+            "ask": "как работает LRU eviction при :max=\"5\""
+          }
+        ],
+        "mustConcepts": [
+          "include",
+          "exclude",
+          "max",
+          "name",
+          "defineOptions",
+          "имя компонента",
+          "не имя файла",
+          "LRU",
+          "evict",
+          "высел",
+          "лимит",
+          "неограничен",
+          "ProductList",
+          "ShoppingCart",
+          "Settings",
+          "selective",
+          "фильтр",
+          "Map",
+          "uid"
+        ],
+        "falseClaims": [
+          "include сравнивает имя файла .vue, а не name option",
+          "include=\"div\" кеширует div-элементы",
+          "без :max Vue автоматически очищает кеш через 5 минут",
+          "exclude и include нельзя комбинировать"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "lifecycle_hooks",
+      "title": "Понимает onActivated и onDeactivated",
+      "expected": "Кандидат объясняет: `onActivated` при каждом входе в DOM из кеша (и при первом mount вместе с onMounted); `onDeactivated` — уход с экрана, компонент жив; не путать с beforeUnmount/onMounted.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "lifecycle hooks — ключевой API KeepAlive",
+        "confusionPairs": [
+          {
+            "checkpointKey": "lifecycle_hooks",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "onActivated",
+              "onDeactivated",
+              "beforeUnmount",
+              "onMounted"
+            ],
+            "anchorTermsWrongTopic": [
+              "onDeactivated уничтожает компонент",
+              "onActivated только первый раз"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "onDeactivated",
+              "beforeUnmount"
+            ],
+            "ask": "чем onDeactivated отличается от beforeUnmount при KeepAlive"
+          },
+          {
+            "match": [
+              "onActivated",
+              "onMounted"
+            ],
+            "ask": "почему onActivated срабатывает и при первом mount"
+          }
+        ],
+        "mustConcepts": [
+          "onActivated",
+          "onDeactivated",
+          "onMounted",
+          "beforeUnmount",
+          "lifecycle",
+          "хук",
+          "первый mount",
+          "каждый возврат",
+          "из кеша",
+          "компонент жив",
+          "таймер",
+          "clearInterval",
+          "fetchLatestData",
+          "refresh",
+          "пауз",
+          "не уничтож"
+        ],
+        "falseClaims": [
+          "onDeactivated означает полное уничтожение компонента",
+          "onActivated срабатывает только при повторном входе, не при первом mount",
+          "beforeUnmount вызывается при каждом toggle внутри KeepAlive",
+          "onActivated заменяет onMounted полностью"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки KeepAlive",
+      "expected": "Кандидат называет: нет `name` при include; unbounded cache без `:max`; случайный `:key` сбрасывает кеш; cleanup state в onDeactivated; include с HTML-тегами.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — частые production-проблемы",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "cache_control_props",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "name",
+              "include",
+              "defineOptions"
+            ],
+            "ask": "почему include=\"UserForm\" не кеширует UserForm.vue без name"
+          },
+          {
+            "match": [
+              "key",
+              "route",
+              "кеш сброс"
+            ],
+            "ask": "когда :key на component помогает, а когда ломает кеш"
+          }
+        ],
+        "mustConcepts": [
+          "name",
+          "defineOptions",
+          "include без name",
+          "max",
+          "неограничен",
+          "память",
+          "мегабайт",
+          "key",
+          "route.path",
+          "fullPath",
+          "params.id",
+          "onDeactivated",
+          "очист state",
+          "include div",
+          "HTML-тег",
+          "dashboard",
+          "mobile",
+          "20+ view"
+        ],
+        "falseClaims": [
+          "include работает с именем файла UserForm.vue",
+          "без :max Vue сам ограничивает кеш до 10 компонентов",
+          ":key никак не влияет на KeepAlive cache",
+          "можно безопасно обнулять reactive state в onDeactivated"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда использовать KeepAlive",
+      "expected": "Кандидат называет: вкладки с input, многошаговые формы, list→detail→back; пропускает одноразовые тяжёлые view и always-fresh static pages.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "When to use / skip из ITLead",
+        "mustConcepts": [
+          "вкладк",
+          "tab",
+          "форма",
+          "input",
+          "scroll",
+          "многошаг",
+          "список",
+          "детал",
+          "назад",
+          "navigation",
+          "memory-intensive",
+          "тяжёл",
+          "одноразов",
+          "fresh data",
+          "статич",
+          "overhead",
+          "e-commerce",
+          "admin dashboard"
+        ],
+        "falseClaims": [
+          "KeepAlive нужен для всех компонентов в SPA",
+          "KeepAlive улучшает SEO",
+          "для static pages с fresh API data KeepAlive всегда полезен",
+          "KeepAlive заменяет lazy loading компонентов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "vue_router_integration",
+      "title": "Знает паттерн с Vue Router",
+      "expected": "Кандидат описывает RouterView + KeepAlive + dynamic component; `:key=\"$route.path\"` или params для отдельных cache entry; упоминает client-only (не SSR).",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "RouterView pattern и per-route key — бонус middle",
+        "mustConcepts": [
+          "RouterView",
+          "v-slot",
+          "Component",
+          "component :is",
+          "route.path",
+          "fullPath",
+          "params",
+          "cache entry",
+          "SSR",
+          "client-only",
+          "hydration",
+          "Nuxt keepalive"
+        ],
+        "falseClaims": [
+          "KeepAlive кеширует на сервере при SSR",
+          "RouterView не совместим с KeepAlive",
+          ":key всегда ломает KeepAlive без исключений"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "`<KeepAlive>` кеширует экземпляр компонента: переключил вкладку — форма и scroll на месте. `v-if` бы уничтожил state. Контролирую через include по name и :max для LRU. onActivated — подтягиваю свежие данные, onDeactivated — паузю таймер.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В админке RouterView оборачиваю в KeepAlive include=\"Home,Dashboard\" :max=\"10\" — фильтры таблицы живут между переходами. Для /users/1 и /users/2 ставлю :key=\"$route.params.id\", чтобы профили не делили один кеш.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну keepalive как пауза в игре — ушёл с вкладки, вернулся, всё на месте. без него v-if всё сносит. главное — name на компоненте и max, иначе память утекает",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "KeepAlive — это v-show для компонентов. При каждом переключении вызывается beforeUnmount и компонент создаётся заново, но DOM остаётся.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "include=\"UserForm.vue\" автоматически кеширует файл UserForm.vue. KeepAlive работает на SSR и кеширует HTML на сервере.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "onDeactivated — то же что beforeUnmount, там можно обнулить все ref и reactive state. :max не нужен, Vue сам чистит кеш.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "keepalive_definition",
+      "exampleType": "good",
+      "exampleText": "KeepAlive деактивирует компонент в скрытый кеш — state, vnode и listeners сохраняются до реактивации.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "keepalive_definition",
+      "exampleType": "good",
+      "exampleText": "вкладки с keepalive — ввёл текст, ушёл, вернулся, input не сбросился",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "keepalive_definition",
+      "exampleType": "bad",
+      "exampleText": "KeepAlive при скрытии компонента полностью уничтожает его и создаёт новый при показе.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "vif_vs_keepalive",
+      "exampleType": "good",
+      "exampleText": "v-if=false → beforeUnmount, DOM cleared, state gone. KeepAlive → deactivate, тот же vnode вернётся с onActivated.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "vif_vs_keepalive",
+      "exampleType": "good",
+      "exampleText": "без keepalive v-if каждый раз remount с нуля, с keepalive просто спрятали и показали обратно",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "vif_vs_keepalive",
+      "exampleType": "bad",
+      "exampleText": "v-if и KeepAlive одинаково сохраняют reactive state между переключениями.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "cache_control_props",
+      "exampleType": "good",
+      "exampleText": "include=\"ProductList,ShoppingCart\" — кеш только по name option. :max=\"5\" — LRU, шестой вытесняет least recently used.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "cache_control_props",
+      "exampleType": "good",
+      "exampleText": "defineOptions({ name: 'UserForm' }) иначе include не матчится — компонент ведёт себя как обычный v-if",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "cache_control_props",
+      "exampleType": "bad",
+      "exampleText": "include=\"div,span\" кеширует HTML-элементы. exclude работает по имени файла, не по name.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "lifecycle_hooks",
+      "exampleType": "good",
+      "exampleText": "onActivated — fetchLatestData при каждом возврате на вкладку; onDeactivated — clearInterval, компонент ещё жив в кеше.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "lifecycle_hooks",
+      "exampleType": "good",
+      "exampleText": "первый рендер — и onMounted и onActivated. логику только первого mount — в onMounted",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "lifecycle_hooks",
+      "exampleType": "bad",
+      "exampleText": "beforeUnmount срабатывает при каждом скрытии внутри KeepAlive. onActivated только при втором и далее показе.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Dashboard без :max — 20+ cached views, сотни MB на mobile. Fix: :max=\"10\" и include только нужных name.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": ":key=\"$route.fullPath\" осознанно — /dashboard/sales и /dashboard/analytics не делят один state. случайный key на tab toggle — кеш бесполезен",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "В onDeactivated обнуляю orders.value = [] — при возврате форма пустая, но это нормально для KeepAlive.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Многошаговая форма и tab navigation с input — KeepAlive. Одноразовый тяжёлый chart или страница с always-fresh API — без кеша.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "list → detail → back — список остаётся прокрученным. static landing с fresh data каждый раз — keepalive лишний overhead",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "KeepAlive обязателен для каждого route component в любом Vue SPA.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "vue_router_integration",
+      "exampleType": "good",
+      "exampleText": "RouterView v-slot + KeepAlive + component :is + :key=\"$route.path\" — route-level cache, client-only после hydration.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "vue_router_integration",
+      "exampleType": "good",
+      "exampleText": "nuxt keepalive meta — тот же принцип кеша страниц каталога",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "vue_router_integration",
+      "exampleType": "bad",
+      "exampleText": "KeepAlive на SSR рендерит кешированный HTML для каждого пользователя на сервере.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "keepalive-in-vue",
+    "apiUrl": "https://api.itlead.org/api/questions/keepalive-in-vue",
+    "pageUrl": "https://itlead.org/interview-questions/vue/keepalive-in-vue",
+    "difficulty": "MIDDLE",
+    "titleEn": "Keepalive in Vue.js",
+    "categorySlug": "vue",
+    "syncedAt": "2026-06-18T15:00:00.000Z"
+  }
+}

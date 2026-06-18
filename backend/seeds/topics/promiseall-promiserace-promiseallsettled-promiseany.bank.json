@@ -1,0 +1,603 @@
+{
+  "topic": {
+    "code": "promiseall_promiserace_promiseallsettled_promiseany",
+    "name": "Promise.all, Promise.race, Promise.allSettled, Promise.any",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "В чём разница между Promise.all, Promise.race, Promise.allSettled и Promise.any?",
+    "shortAnswer": "Promise.all, Promise.race, Promise.allSettled и Promise.any — четыре статических метода конструктора Promise для координации нескольких промисов с разной стратегией успеха и ошибок. all ждёт выполнения всех и падает на первой rejection; race возвращает первый settled (fulfilled или rejected); allSettled всегда resolve с массивом {status, value/reason} по каждому промису; any — первый fulfilled или AggregateError, если все отклонились.",
+    "idealAnswer": "Четыре статических метода Promise координируют группу промисов, но по-разному определяют «готово». Promise.all ждёт, пока все промисы выполнятся успешно, и возвращает массив значений в порядке входа; при первой rejection весь all сразу reject с её причиной — остальные ошибки теряются. Promise.race возвращает результат первого settled промиса — неважно fulfilled или rejected; типичный паттерн — race с таймером для timeout. Promise.allSettled (ES2020) всегда resolve: ждёт завершения каждого промиса и отдаёт массив объектов {status: 'fulfilled'|'rejected', value/reason} — сам метод никогда не reject, удобен для batch-операций с частичными сбоями. Promise.any (ES2021) resolve при первом fulfilled; если все reject — AggregateError с массивом причин в e.errors; паттерн CDN failover и «первый доступный сервер». Ключевое различие: all и race короткозамыкают (short-circuit) на первом релевантном событии; allSettled и any обрабатывают все входы до конца (any — до первого успеха или пока не провалятся все). Не-промис значения автоматически оборачиваются в Promise.resolve(), поэтому Promise.race([1, slowPromise]) сразу resolve с 1. Когда что брать: все результаты обязательны — all (параллельные API, getStaticProps); timeout — race + reject-таймер; частичные ошибки допустимы — allSettled (дашборд, batch save); первый успех — any (несколько CDN/endpoint). Типичные ошибки: ждать от all списка всех ошибок (нужен allSettled + filter); race без timeout — вечное зависание; игнорировать AggregateError.errors у any; мутация объектов allSettled in-place. Edge cases: all([]) и allSettled([]) — сразу resolve([]); race([]) — никогда не settle; any([]) — сразу AggregateError. При race, если p1 reject первым, p2 продолжает в фоне, но результат игнорируется.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "promise_all",
+      "title": "Понимает Promise.all",
+      "expected": "Кандидат объясняет: ждёт fulfillment всех промисов; возвращает массив значений в порядке входа; при первой rejection весь all reject — short-circuit; типично для параллельных fetch, когда все данные обязательны.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — all или ничего",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Promise.all",
+              "все",
+              "reject"
+            ],
+            "ask": "что произойдёт если один из трёх параллельных fetch упадёт при Promise.all"
+          }
+        ],
+        "mustConcepts": [
+          "Promise.all",
+          "все",
+          "массив",
+          "порядок",
+          "fulfill",
+          "reject",
+          "первая",
+          "ошибк",
+          "short-circuit",
+          "коротк",
+          "параллел",
+          "fetch",
+          "all or nothing",
+          "все обязательн"
+        ],
+        "falseClaims": [
+          "Promise.all собирает все ошибки в массив",
+          "Promise.all resolve если хотя бы один промис успешен",
+          "Promise.all ждёт только первый fulfilled",
+          "Promise.all никогда не reject"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "promise_race",
+      "title": "Понимает Promise.race",
+      "expected": "Кандидат объясняет: побеждает первый settled промис (fulfilled или rejected); паттерн timeout через race с reject-таймером; без timeout race может зависнуть навсегда.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "race + timeout — ключевой production-паттерн",
+        "confusionPairs": [
+          {
+            "checkpointKey": "promise_race",
+            "oftenConfusedWith": [
+              "promise_any"
+            ],
+            "anchorTermsExpected": [
+              "race",
+              "первый settled",
+              "fulfilled",
+              "rejected",
+              "timeout",
+              "таймер"
+            ],
+            "anchorTermsWrongTopic": [
+              "race только fulfilled",
+              "race ждёт всех"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "race",
+              "timeout",
+              "setTimeout"
+            ],
+            "ask": "как сделать timeout для медленного запроса через Promise.race"
+          }
+        ],
+        "mustConcepts": [
+          "Promise.race",
+          "race",
+          "первый",
+          "settled",
+          "fulfilled",
+          "rejected",
+          "быстр",
+          "timeout",
+          "таймер",
+          "withTimeout",
+          "setTimeout",
+          "reject",
+          "завис",
+          "без таймаута"
+        ],
+        "falseClaims": [
+          "Promise.race возвращает только первый fulfilled",
+          "Promise.race ждёт завершения всех промисов",
+          "race без timeout безопасен для production",
+          "если p1 reject в race, p2 останавливается"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "promise_allsettled",
+      "title": "Понимает Promise.allSettled",
+      "expected": "Кандидат объясняет: всегда resolve; массив {status, value/reason} по каждому промису; не short-circuit; для batch с частичными сбоями; filter rejected для списка ошибок.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "allSettled vs all — частая путаница в batch-коде",
+        "confusionPairs": [
+          {
+            "checkpointKey": "promise_allsettled",
+            "oftenConfusedWith": [
+              "promise_all"
+            ],
+            "anchorTermsExpected": [
+              "allSettled",
+              "status",
+              "fulfilled",
+              "rejected",
+              "всегда resolve",
+              "частичн"
+            ],
+            "anchorTermsWrongTopic": [
+              "allSettled reject при ошибке",
+              "allSettled как all"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "allSettled",
+              "filter",
+              "rejected"
+            ],
+            "ask": "как получить все ошибки из batch-операций вместо Promise.all"
+          }
+        ],
+        "mustConcepts": [
+          "Promise.allSettled",
+          "allSettled",
+          "status",
+          "fulfilled",
+          "rejected",
+          "value",
+          "reason",
+          "всегда resolve",
+          "не reject",
+          "все промис",
+          "частичн",
+          "filter",
+          "batch",
+          "дашборд"
+        ],
+        "falseClaims": [
+          "Promise.allSettled reject при первой ошибке",
+          "Promise.allSettled возвращает только fulfilled значения",
+          "allSettled и all ведут себя одинаково при ошибках",
+          "allSettled short-circuit на первой rejection"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "promise_any",
+      "title": "Понимает Promise.any",
+      "expected": "Кандидат объясняет: первый fulfilled wins; если все reject — AggregateError с e.errors; паттерн failover/CDN; отличает от race (any игнорирует reject до последнего).",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "any + AggregateError — ES2021, часто путают с race",
+        "confusionPairs": [
+          {
+            "checkpointKey": "promise_any",
+            "oftenConfusedWith": [
+              "promise_race"
+            ],
+            "anchorTermsExpected": [
+              "any",
+              "первый fulfilled",
+              "AggregateError",
+              "errors",
+              "failover",
+              "CDN"
+            ],
+            "anchorTermsWrongTopic": [
+              "any возвращает первый reject",
+              "any как race"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "AggregateError",
+              "any",
+              "errors"
+            ],
+            "ask": "что вернёт Promise.any если все три CDN-запроса упали"
+          }
+        ],
+        "mustConcepts": [
+          "Promise.any",
+          "any",
+          "первый успех",
+          "fulfilled",
+          "AggregateError",
+          "errors",
+          "все reject",
+          "failover",
+          "CDN",
+          "сервер",
+          "пропуск reject",
+          "e.errors"
+        ],
+        "falseClaims": [
+          "Promise.any resolve при первом reject",
+          "Promise.any и Promise.race работают одинаково",
+          "AggregateError содержит только message без списка причин",
+          "any ждёт все fulfilled перед resolve"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "short_circuit_comparison",
+      "title": "Сравнивает стратегии short-circuit",
+      "expected": "Кандидат объясняет: all и race короткозамыкают на первом релевантном событии; allSettled ждёт всех; any — до первого успеха или пока все не reject; таблица when-to-use.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Key difference блок ITLead — граница где ломается prod-код",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "promise_all",
+            "floorFraction": 0.4
+          },
+          {
+            "checkpointKey": "promise_race",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "short-circuit",
+              "коротк",
+              "all",
+              "race"
+            ],
+            "ask": "чем отличается short-circuit у all от поведения allSettled"
+          },
+          {
+            "match": [
+              "нужны все",
+              "первый успех",
+              "полная картина"
+            ],
+            "ask": "какой метод выбрать: все результаты, fastest, полная картина, первый success"
+          }
+        ],
+        "mustConcepts": [
+          "short-circuit",
+          "короткозамык",
+          "all",
+          "race",
+          "allSettled",
+          "any",
+          "сравнен",
+          "таблиц",
+          "стратег",
+          "все результ",
+          "быстр",
+          "полная картин",
+          "первый успех",
+          "ES2015",
+          "ES2020",
+          "ES2021"
+        ],
+        "falseClaims": [
+          "все четыре метода short-circuit одинаково",
+          "allSettled короткозамыкает на первой ошибке",
+          "any и race всегда дают один результат",
+          "разница только в синтаксисе, семантика одна"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Выбирает метод под задачу",
+      "expected": "Кандидат называет сценарии: all — параллельные API, все данные обязательны; race+timeout — внешние сервисы; allSettled — дашборд с optional блоками; any — CDN failover; может упомянуть React Query, Next.js getStaticProps, SWR mutate.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "When to use + real-world из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "дашборд",
+              "optional",
+              "user"
+            ],
+            "ask": "user обязателен, stats и feed optional — какой метод и как обработать результат"
+          },
+          {
+            "match": [
+              "CDN",
+              "failover",
+              "any"
+            ],
+            "ask": "три CDN URL — какой метод и как обработать полный провал"
+          }
+        ],
+        "mustConcepts": [
+          "параллел",
+          "API",
+          "timeout",
+          "дашборд",
+          "batch",
+          "failover",
+          "CDN",
+          "optional",
+          "обязательн",
+          "getStaticProps",
+          "useQueries",
+          "Express",
+          "withTimeout",
+          "graceful",
+          "деградац"
+        ],
+        "falseClaims": [
+          "Promise.all для дашборда где часть блоков может упасть",
+          "Promise.race без таймера для production timeout",
+          "Promise.any когда нужны все результаты массива",
+          "allSettled когда достаточно первого успешного CDN"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки и edge cases",
+      "expected": "Кандидат называет: all не собирает все ошибки; race без timeout зависает; AggregateError.errors; non-promise values в race; мутация allSettled results; empty array: all/allSettled→[], race([]) never, any([])→AggregateError.",
+      "score": 1.0,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes + follow-up empty array ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "пустой",
+              "[]",
+              "empty"
+            ],
+            "ask": "что вернут Promise.all([]), race([]) и any([])"
+          },
+          {
+            "match": [
+              "race",
+              "p1",
+              "p2",
+              "reject"
+            ],
+            "ask": "p1 reject первым в race — что с p2"
+          }
+        ],
+        "mustConcepts": [
+          "все ошибки",
+          "allSettled",
+          "filter",
+          "timeout",
+          "AggregateError",
+          "errors",
+          "Promise.resolve",
+          "не-промис",
+          "мутац",
+          "пустой массив",
+          "race([])",
+          "never settle",
+          "p2",
+          "фон",
+          "игнорир"
+        ],
+        "falseClaims": [
+          "Promise.all([]) never settle",
+          "Promise.race([]) resolve сразу с []",
+          "Promise.any([]) resolve с undefined",
+          "p1 reject в race останавливает выполнение p2"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Promise.all — все или ничего, массив значений, первая ошибка роняет всё. race — первый settled, для timeout пара с reject-таймером. allSettled — всегда resolve, status по каждому, для batch с частичными сбоями. any — первый fulfilled, иначе AggregateError.errors. all/race short-circuit; allSettled ждёт всех; any до первого успеха.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "три fetch профиля — all, один упал — весь catch. медленный api — race с setTimeout reject. дашборд: user must, stats optional — allSettled и руками проверяю status. три cdn — any, все упали — смотрю err.errors.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Next.js getStaticProps — Promise.all параллельных fetch. Express route — withTimeout через race. SWR mutate нескольких ключей — allSettled. all([]) сразу []. race([]) висит. any([]) — AggregateError.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Promise.all собирает все rejection reasons в один массив. Promise.race возвращает только fulfilled. allSettled reject если хоть один промис упал. any и race — одно и то же.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "race([slowA, slowB]) без timeout — норм для production. AggregateError — только e.message, errors не нужен. Promise.race([1, slow]) — баг, числа нельзя передавать.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для CDN failover беру Promise.all — достаточно одного успешного. race([]) resolve []. p1 reject в race — p2 отменяется движком.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "promise_all",
+      "exampleType": "good",
+      "exampleText": "const [user, posts, comments] = await Promise.all([fetchUser(), fetchPosts(), fetchComments()]) — три запроса параллельно, один fail — throw.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "promise_all",
+      "exampleType": "good",
+      "exampleText": "all ждёт все fulfilled, порядок значений как порядок промисов в массиве",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "promise_all",
+      "exampleType": "bad",
+      "exampleText": "Promise.all([failA(), failB()]).catch(e => e) — получу обе ошибки в массиве.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "promise_race",
+      "exampleType": "good",
+      "exampleText": "withTimeout = (p, ms) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), ms))])",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "promise_race",
+      "exampleType": "good",
+      "exampleText": "race — кто первый settled, reject p1 значит весь race reject, p2 в фоне дорабатывает",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "promise_race",
+      "exampleType": "bad",
+      "exampleText": "Promise.race игнорирует rejected промисы и ждёт только fulfilled.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "promise_allsettled",
+      "exampleType": "good",
+      "exampleText": "const r = await Promise.allSettled([p1,p2,p3]); const errors = r.filter(x => x.status==='rejected').map(x => x.reason)",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "promise_allsettled",
+      "exampleType": "good",
+      "exampleText": "loadDashboard: user rejected — throw; stats/feed rejected — null или []",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "promise_allsettled",
+      "exampleType": "bad",
+      "exampleText": "allSettled упал на первой ошибке как all — нужен try/catch вокруг allSettled.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "promise_any",
+      "exampleType": "good",
+      "exampleText": "await Promise.any(cdnUrls.map(url => fetch(url))) — первый ok CDN; catch AggregateError → err.errors",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "promise_any",
+      "exampleType": "good",
+      "exampleText": "any пропускает reject пока не найдёт fulfilled или не кончатся все",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "promise_any",
+      "exampleType": "bad",
+      "exampleText": "Promise.any([fail1, fail2]).catch(e => console.log(e.message)) — там все причины в message.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "short_circuit_comparison",
+      "exampleType": "good",
+      "exampleText": "all short-circuit на первой rejection; allSettled считает и fulfilled и rejected до конца; any short-circuit на первом fulfilled.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "short_circuit_comparison",
+      "exampleType": "good",
+      "exampleText": "нужны все — all; fastest — race; полная картина — allSettled; первый success — any",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "short_circuit_comparison",
+      "exampleType": "bad",
+      "exampleText": "allSettled и all оба short-circuit — разница только в ES версии.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Профиль без posts хуже ошибки — Promise.all на три endpoint. Stats optional — allSettled + fallback null.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Express внешний API — withTimeout 3s через race, иначе запрос висит часами",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Batch save где часть записей может упасть — всё равно Promise.all, partial ok.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "all([]) и allSettled([]) → []. race([]) never settles. any([]) → AggregateError сразу.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "race([1, slow]) → 1 сразу — Promise.resolve обёртка, но лучше явные промисы",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "results.forEach(r => r.value = upper(r.value)) на allSettled — норм, объекты immutable не нужны.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "promiseall-promiserace-promiseallsettled-promiseany",
+    "apiUrl": "https://api.itlead.org/api/questions/promiseall-promiserace-promiseallsettled-promiseany",
+    "pageUrl": "https://itlead.org/interview-questions/javascript/promiseall-promiserace-promiseallsettled-promiseany",
+    "difficulty": "MIDDLE",
+    "titleEn": "Promise.all, promise.race, promise.allsettled, promise.any",
+    "categorySlug": "javascript",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

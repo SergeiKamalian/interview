@@ -1,0 +1,612 @@
+{
+  "topic": {
+    "code": "utility_type_readonly_typescript",
+    "name": "Утилитарный тип Readonly в TypeScript",
+    "skillCode": "typescript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что делает утилитарный тип Readonly<T> в TypeScript и когда его использовать?",
+    "shortAnswer": "Readonly<T> делает все свойства типа T непереназначаемыми на этапе компиляции: чтение работает, записи — ошибка компиляции. Ключевое: shallow immutability — защищён только верхний уровень, вложенные объекты и массивы остаются мутабельными. Runtime cost ноль — TypeScript стирает типы при emit.",
+    "idealAnswer": "Readonly<T> — встроенный utility type TypeScript: делает каждое свойство T readonly на compile time. Чтение свойств разрешено; переприсвоение (`user.name = 'Bob'`) — ошибка компиляции. Компилятор раскрывает Readonly как mapped type: `{ readonly [K in keyof T]: T[K] }` — проходит по ключам T и добавляет модификатор readonly. В emitted JavaScript ничего не остаётся: V8 и Node не видят Readonly, runtime guards нет. Главная особенность — shallow immutability: блокируются только прямые свойства T. Если свойство — объект, его внутренние поля мутабельны (`settings.db.host = 'prod'` компилируется). Массивы внутри Readonly<{ items: number[] }> всё ещё принимают push — заблокирована ссылка на массив, не сам массив; fix: `readonly items: readonly number[]`. Index signatures: `Readonly<{ [k: string]: number }>` не запрещает добавление новых ключей — только переприсвоение существующих; для блокировки динамических ключей писать `{ readonly [k: string]: number }` inline. Когда использовать: объект передаётся между функциями и нужна защита от случайных мутаций; конфиг при старте приложения; API response, который не должен меняться downstream; React props (`Readonly<TodoProps>`) для явного контракта no-mutation. Отличие от модификатора `readonly` на одном поле: `readonly id: number` — одно свойство; Readonly<T> — все свойства T одновременно; JS output идентичен. С классами Readonly<T> работает для public instance properties; private/protected mapped type не затрагивает — в классе лучше readonly inline. Deep immutability: рекурсивный mapped type `type DeepReadonly<T> = { readonly [K in keyof T]: DeepReadonly<T[K]> }` или Immer/runtime Object.freeze. Типичные ошибки: ожидать deep protection; push в readonly-массив; думать что Readonly запечатывает index signature от новых ключей. Практика: Redux `type State = Readonly<{ todos: Todo[] }>`, server config `Readonly<{ port: number }>`, Zod `z.object({...}).readonly()`.",
+    "maxScore": 10,
+    "skills": [
+      "typescript",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "readonly_definition",
+      "title": "Понимает суть Readonly<T>",
+      "expected": "Кандидат объясняет: Readonly<T> блокирует переприсвоение всех свойств T на compile time; чтение работает; ошибка при записи; zero runtime cost — типы стираются при компиляции.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — ядро utility type middle",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Readonly",
+              "readonly",
+              "compile"
+            ],
+            "ask": "что Readonly<T> делает с каждым свойством T и есть ли это в runtime"
+          }
+        ],
+        "mustConcepts": [
+          "Readonly",
+          "readonly",
+          "utility type",
+          "утилитарн",
+          "compile time",
+          "компил",
+          "переприсво",
+          "reassignment",
+          "чтение",
+          "запись",
+          "ошибка компиляц",
+          "свойств",
+          "непереназнач",
+          "immutable",
+          "незмен",
+          "runtime cost",
+          "накладн",
+          "стира",
+          "erase",
+          "emit"
+        ],
+        "falseClaims": [
+          "Readonly добавляет runtime guards в JavaScript",
+          "Readonly запрещает чтение свойств",
+          "Readonly работает только с interface, не с type",
+          "Readonly делает объект глубоко immutable"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "shallow_immutability",
+      "title": "Понимает shallow, не deep immutability",
+      "expected": "Кандидат объясняет: Readonly<T> защищает только верхний уровень; вложенные объекты мутабельны; settings.db.host можно менять; для deep — DeepReadonly или вложенный Readonly.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Key difference ITLead — самая частая production-ошибка",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "readonly_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "shallow_immutability",
+            "oftenConfusedWith": [
+              "readonly_definition"
+            ],
+            "anchorTermsExpected": [
+              "shallow",
+              "вложен",
+              "nested",
+              "верхний уровень",
+              "deep"
+            ],
+            "anchorTermsWrongTopic": [
+              "Readonly защищает всё рекурсивно",
+              "nested объект блокируется автоматически"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "shallow",
+              "вложен",
+              "nested",
+              "db.host"
+            ],
+            "ask": "почему settings.theme = 'light' ошибка, а settings.db.host = 'prod' компилируется"
+          },
+          {
+            "match": [
+              "DeepReadonly",
+              "глубок",
+              "рекурсив"
+            ],
+            "ask": "как получить deep immutability если Readonly shallow"
+          }
+        ],
+        "mustConcepts": [
+          "shallow",
+          "поверхност",
+          "верхний уровень",
+          "top-level",
+          "вложен",
+          "nested",
+          "глубок",
+          "deep",
+          "мутабель",
+          "mutable",
+          "объект внутри",
+          "db.host",
+          "theme",
+          "DeepReadonly",
+          "рекурсив",
+          "mapped type",
+          "защищ",
+          "не защищ",
+          "Redux",
+          "конфиг"
+        ],
+        "falseClaims": [
+          "Readonly<T> рекурсивно блокирует все вложенные свойства",
+          "nested object автоматически readonly внутри Readonly<T>",
+          "shallow и deep для Readonly — одно и то же",
+          "вложенная мутация всегда ошибка компиляции с Readonly"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "compiler_mapped_type",
+      "title": "Понимает механизм компилятора",
+      "expected": "Кандидат описывает: Readonly раскрывается как `{ readonly [K in keyof T]: T[K] }`; mapped type по ключам T; в JS ничего не попадает; V8 не видит модификатор.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "How compiler handles — mapped type expansion из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "mapped type",
+              "keyof",
+              "readonly [K"
+            ],
+            "ask": "как вручную развернуть Readonly<User> через mapped type"
+          },
+          {
+            "match": [
+              "JavaScript",
+              "emit",
+              "V8"
+            ],
+            "ask": "что остаётся в emitted JS после Readonly<T>"
+          }
+        ],
+        "mustConcepts": [
+          "mapped type",
+          "отображаем",
+          "keyof",
+          "readonly [K in keyof T]",
+          "модификатор",
+          "modifier",
+          "раскрыва",
+          "разворач",
+          "компилятор",
+          "compiler",
+          "emit",
+          "JavaScript",
+          "V8",
+          "Node",
+          "runtime",
+          "стира",
+          "erase",
+          "идентичн",
+          "plain object"
+        ],
+        "falseClaims": [
+          "TypeScript генерирует Object.freeze для Readonly",
+          "mapped type Readonly остаётся в runtime",
+          "Readonly добавляет readonly в emitted JS",
+          "компилятор не может развернуть Readonly в mapped type"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Знает когда применять Readonly",
+      "expected": "Кандидат называет: объект между функциями без side effects; config при старте; API response downstream; React props; Redux State; Zod readonly().",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "When to use из ITLead — практический контекст",
+        "mustConcepts": [
+          "config",
+          "конфиг",
+          "startup",
+          "старт",
+          "API response",
+          "ответ",
+          "downstream",
+          "React props",
+          "пропс",
+          "TodoProps",
+          "Redux",
+          "State",
+          "side effect",
+          "побочн",
+          "мутац",
+          "контракт",
+          "Zod",
+          "readonly()",
+          "Next.js",
+          "ServerConfig"
+        ],
+        "falseClaims": [
+          "Readonly нужен только для enum",
+          "Readonly заменяет Object.freeze в runtime",
+          "для React props Readonly бессмысленен — React уже readonly",
+          "Readonly нужен на каждом объекте в приложении"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes_arrays_nested",
+      "title": "Знает ошибки с массивами и вложенностью",
+      "expected": "Кандидат называет: nested object мутабельен; push в Readonly<{ items: number[] }> разрешён; fix — readonly items: readonly number[]; DeepReadonly для глубокой защиты.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "mistakes 1 и 2 из ITLead — silent runtime bugs",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "shallow_immutability",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "push",
+              "items",
+              "массив"
+            ],
+            "ask": "почему state.items.push(3) компилируется в Readonly<{ items: number[] }>"
+          },
+          {
+            "match": [
+              "cfg.db.host",
+              "nested",
+              "production"
+            ],
+            "ask": "почему cfg.db.host = 'production' не ошибка при Readonly<Config>"
+          }
+        ],
+        "mustConcepts": [
+          "push",
+          "массив",
+          "array",
+          "items",
+          "ссылка",
+          "reference",
+          "readonly number[]",
+          "readonly items",
+          "вложен",
+          "nested",
+          "db.host",
+          "production",
+          "компилиру",
+          "без ошибки",
+          "silent",
+          "тихий",
+          "runtime bug",
+          "DeepReadonly",
+          "Immer",
+          "Object.freeze"
+        ],
+        "falseClaims": [
+          "Readonly<{ items: number[] }> блокирует push",
+          "nested cfg.db.host всегда ошибка с Readonly",
+          "readonly на массиве и Readonly на объекте — одно и то же для push",
+          "DeepReadonly встроен в TypeScript как Readonly"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "index_signatures_mistake",
+      "title": "Понимает index signatures и Readonly",
+      "expected": "Кандидат объясняет: Readonly<{ [k: string]: number }> не блокирует obj['newKey'] = 1; readonly на index signature inline блокирует добавление ключей; senior follow-up из ITLead.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "mistake 3 ITLead — senior-level nuance для middle+",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "index signature",
+              "newKey",
+              "динамич"
+            ],
+            "ask": "почему Readonly<{ [k: string]: number }> не запрещает obj['newKey'] = 1"
+          },
+          {
+            "match": [
+              "readonly [k: string]",
+              "inline"
+            ],
+            "ask": "как заблокировать и переприсвоение и добавление новых ключей"
+          }
+        ],
+        "mustConcepts": [
+          "index signature",
+          "индексн",
+          "динамич",
+          "dynamic",
+          "newKey",
+          "новый ключ",
+          "добавлен",
+          "addition",
+          "переприсво",
+          "inline",
+          "readonly [k: string]",
+          "обёртка",
+          "wrapper",
+          "mapped type",
+          "паттерн",
+          "запечат",
+          "seal"
+        ],
+        "falseClaims": [
+          "Readonly на объекте с index signature запрещает новые ключи",
+          "index signature и Readonly<T> эквивалентны для динамических ключей",
+          "obj['newKey'] = 1 всегда ошибка с Readonly",
+          "mapped type wrapper меняет поведение index signature"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "vs_readonly_modifier",
+      "title": "Отличает Readonly<T> от readonly на поле",
+      "expected": "Кандидат сравнивает: readonly id — одно свойство; Readonly<T> — все свойства; с классами — public ok, private/protected mapped type не трогает; JS output идентичен.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up questions ITLead — modifier vs utility",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "readonly id",
+              "одно свойство",
+              "все свойства"
+            ],
+            "ask": "разница между readonly на поле и Readonly<T>"
+          },
+          {
+            "match": [
+              "class",
+              "private",
+              "protected"
+            ],
+            "ask": "работает ли Readonly<T> с private полями класса"
+          }
+        ],
+        "mustConcepts": [
+          "readonly id",
+          "модификатор",
+          "modifier",
+          "одно свойство",
+          "все свойства",
+          "every property",
+          "class",
+          "класс",
+          "public",
+          "private",
+          "protected",
+          "instance",
+          "экземпляр",
+          "JavaScript output",
+          "идентичн",
+          "ничего",
+          "inline",
+          "тело класса"
+        ],
+        "falseClaims": [
+          "readonly на поле и Readonly<T> дают разный JavaScript",
+          "Readonly<T> блокирует private поля класса",
+          "для классов Readonly<T> всегда лучше чем readonly inline",
+          "Readonly<T> работает только с interface"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Readonly<T> блокирует переприсвоение всех свойств T на compile time — чтение ok, записи ошибка. Shallow: nested db.host мутабельен. Компилятор: { readonly [K in keyof T]: T[K] }. Runtime cost ноль.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Конфиг при старте: const config: Readonly<AppConfig> — apiUrl не переприсвоить. В React явно Readonly<TodoProps> для контракта. Для deep — DeepReadonly или readonly items: readonly number[] чтобы push не проходил.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "settings: Readonly<Settings> — theme ошибка, db.host ок. state.items.push компилируется — ссылка locked, массив нет. Index: Readonly<{ [k: string]: number }> не блокирует newKey — пишу readonly inline.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Readonly<T> делает объект глубоко immutable — nested объекты и push в массивы блокируются автоматически. TypeScript добавляет runtime freeze.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Readonly<{ [k: string]: number }> запрещает obj['newKey'] = 1. readonly id и Readonly<T> дают разный JavaScript output.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для React props Readonly бессмыслен — React не проверяет мутации. Readonly<T> работает с private полями класса через mapped type.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "readonly_definition",
+      "exampleType": "good",
+      "exampleText": "Readonly<User> — user.name = 'Bob' ошибка компиляции; console.log(user.name) работает; в JS plain object без guards.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "readonly_definition",
+      "exampleType": "good",
+      "exampleText": "ну readonly utility — все ключи T только для чтения на compile time, в рантайме типы стираются",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "readonly_definition",
+      "exampleType": "bad",
+      "exampleText": "Readonly добавляет Object.freeze при компиляции и блокирует чтение свойств.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "shallow_immutability",
+      "exampleType": "good",
+      "exampleText": "Readonly<Settings> shallow — settings.theme ошибка, settings.db.host = 'prod' компилируется; nested не защищён.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "shallow_immutability",
+      "exampleType": "good",
+      "exampleText": "для deep immutability — DeepReadonly<T> рекурсивный mapped type или Immer, Readonly сам по себе только первый уровень",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "shallow_immutability",
+      "exampleType": "bad",
+      "exampleText": "Readonly<T> рекурсивно блокирует cfg.db.host — nested mutation всегда compile error.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "compiler_mapped_type",
+      "exampleType": "good",
+      "exampleText": "Readonly<T> = { readonly [K in keyof T]: T[K] }; mapped type по ключам; emit JS идентичен без readonly.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "compiler_mapped_type",
+      "exampleType": "good",
+      "exampleText": "v8 никогда не видит readonly — чисто compile-time mapped type, zero runtime overhead",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "compiler_mapped_type",
+      "exampleType": "bad",
+      "exampleText": "TypeScript оставляет readonly модификаторы в emitted JavaScript для Readonly<T>.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "ServerConfig Readonly после startup; Redux State Readonly; Zod z.object().readonly(); props Readonly<TodoProps> в Next.js.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "когда объект идёт через несколько функций — compile-time защита от случайной мутации, не runtime freeze",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Readonly нужен на каждый объект и заменяет Immer в Redux.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes_arrays_nested",
+      "exampleType": "good",
+      "exampleText": "state.items.push(3) ok в Readonly<{ items: number[] }> — fix: readonly items: readonly number[]. cfg.db.host production компилируется.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes_arrays_nested",
+      "exampleType": "good",
+      "exampleText": "redux slice с nested config — мутация вложенного поля тихий баг до прода, Readonly не спасает без DeepReadonly",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes_arrays_nested",
+      "exampleType": "bad",
+      "exampleText": "Readonly<{ items: number[] }> блокирует push — массив полностью immutable.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "index_signatures_mistake",
+      "exampleType": "good",
+      "exampleText": "Readonly<{ [k: string]: number }> — obj['newKey'] = 1 ok; для блокировки — { readonly [k: string]: number } inline без wrapper.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "index_signatures_mistake",
+      "exampleType": "good",
+      "exampleText": "readonly wrapper не seal dynamic keys — только values at existing keys locked, senior nuance index signature",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "index_signatures_mistake",
+      "exampleType": "bad",
+      "exampleText": "Readonly на объекте с index signature автоматически запрещает добавление новых ключей.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "vs_readonly_modifier",
+      "exampleType": "good",
+      "exampleText": "readonly id — одно поле; Readonly<T> — все свойства T; JS output одинаковый — ничего. Класс: public ok, private mapped type не трогает.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "vs_readonly_modifier",
+      "exampleType": "good",
+      "exampleText": "для класса точнее readonly прямо в теле, Readonly<T> на instance type — только public properties",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "vs_readonly_modifier",
+      "exampleType": "bad",
+      "exampleText": "Readonly<T> на классе блокирует private и protected поля через mapped type.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "utility-type-readonly-in-typescript",
+    "apiUrl": "https://api.itlead.org/api/questions/utility-type-readonly-in-typescript",
+    "pageUrl": "https://itlead.org/interview-questions/typescript/utility-type-readonly-in-typescript",
+    "difficulty": "MIDDLE",
+    "titleEn": "Utility type readonly in TypeScript",
+    "categorySlug": "typescript",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

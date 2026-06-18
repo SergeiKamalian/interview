@@ -1,0 +1,584 @@
+{
+  "topic": {
+    "code": "what_is_promise_chaining_javascript",
+    "name": "Promise chaining (цепочка промисов) в JavaScript",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое promise chaining (цепочка промисов) в JavaScript и как она работает?",
+    "shortAnswer": "Promise chaining — паттерн, где каждый `.then()` возвращает новый Promise и передаёт своё значение следующему обработчику в цепочке. Ошибки «спускаются» к ближайшему `.catch()`. Без `return` внутри `.then()` с фигурными скобками следующий обработчик получит `undefined`.",
+    "idealAnswer": "Promise chaining — паттерн последовательных async-шагов: каждый `.then(handler)` создаёт новый Promise; когда предыдущий settle, handler получает его значение, а возвращённое из handler значение (или Promise) становится входом для следующего `.then()`. Как домино: первый шаг запускает цепочку, каждый следующий срабатывает автоматически. Типичный flow: `fetch('/user').then(res => res.json()).then(user => user.name).then(name => console.log(name)).catch(err => console.error(err))`. Внутри: при вызове `.then()` handler ставится в microtask queue; после settle предыдущего Promise движок выполняет handler. Простое значение автоматически оборачивается в resolved Promise; если handler возвращает другой Promise — цепочка ждёт его settle (Promise resolution procedure); если throw — новый Promise reject, оставшиеся `.then()` пропускаются, выполнение переходит к `.catch()`. Всё в microtask queue — event loop обрабатывает microtasks до macrotasks (`setTimeout`), поэтому 5 шагов с sync return завершатся до любого таймера. Главное преимущество перед вложенными callback-ами: плоская цепочка вместо callback hell и один `.catch()` на весь flow. Когда использовать: 2–4 линейных шага (fetch, parse, transform); один error handler в конце; mix sync/async return. Параллель — `Promise.all()`, не chain. Условия, циклы, try/catch-стиль — `async/await` (синтаксический сахар над chaining, не замена). Типичные ошибки: забыть `return` в `.then()` с `{}` — следующий handler получает `undefined`; mid-chain `.catch()` без rethrow «глотает» ошибку и chain resolve с undefined; вложенные `.then()` вместо flat chain; не понимать что sync return всё равно асинхронен для кода вне chain. Реальное применение: Express route `fetchUser().then(validate).then(respond).catch(errorHandler)`; React useEffect — последовательный fetch user → posts; axios interceptors; Node `fs.promises.readFile().then(parse).then(writeFile)`. Если handler в `.then()` кидает ошибку — Promise этого `.then()` reject, skip до `.catch()`. Несколько `.catch()`: первый поглощает rejection и resolve chain своим return value, если не `throw err`. V8 при return Promise из `.then()` не передаёт объект Promise как value — ждёт inner settle и пробрасывает его resolved value.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "chaining_definition",
+      "title": "Понимает promise chaining",
+      "expected": "Кандидат объясняет: паттерн последовательных `.then()`, каждый возвращает новый Promise; результат предыдущего шага — вход следующего handler.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — определение chaining",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "chain",
+              "цепоч",
+              "then"
+            ],
+            "ask": "что передаётся между соседними `.then()` в цепочке"
+          }
+        ],
+        "mustConcepts": [
+          "promise chaining",
+          "цепоч",
+          "chain",
+          "then",
+          "новый Promise",
+          "возвращ",
+          "результат",
+          "следующ",
+          "handler",
+          "обработчик",
+          "последовательн",
+          "переда",
+          "значен",
+          "input",
+          "вход",
+          "паттерн"
+        ],
+        "falseClaims": [
+          "then модифицирует исходный Promise",
+          "цепочка — это один Promise на весь flow",
+          "chaining работает только с fetch",
+          "then не возвращает новый Promise"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "chain_mechanism",
+      "title": "Знает механизм цепочки",
+      "expected": "Кандидат описывает: `.then()` создаёт новый Promise; handler в microtask queue; plain value оборачивается; return Promise — цепочка ждёт inner settle; throw — reject.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "внутренний механизм из ITLead How the chain works",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "chaining_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "chain_mechanism",
+            "oftenConfusedWith": [
+              "internal_resolution"
+            ],
+            "anchorTermsExpected": [
+              "microtask",
+              "новый Promise",
+              "оборач",
+              "return Promise",
+              "settle"
+            ],
+            "anchorTermsWrongTopic": [
+              "then синхронно возвращает число",
+              "return Promise передаёт объект Promise как value"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "microtask",
+              "event loop",
+              "очеред"
+            ],
+            "ask": "когда выполняется handler после `.then()` относительно sync кода и setTimeout"
+          },
+          {
+            "match": [
+              "return Promise",
+              "внутренн",
+              "inner"
+            ],
+            "ask": "что происходит когда handler возвращает другой Promise"
+          }
+        ],
+        "mustConcepts": [
+          "новый Promise",
+          "microtask",
+          "microtask queue",
+          "очеред",
+          "handler",
+          "settle",
+          "заверш",
+          "plain value",
+          "простое значение",
+          "оборач",
+          "wrap",
+          "return Promise",
+          "внутренн",
+          "inner",
+          "ждёт",
+          "throw",
+          "reject",
+          "resolution procedure"
+        ],
+        "falseClaims": [
+          "handler в then выполняется синхронно сразу при вызове then",
+          "return Promise передаёт объект Promise следующему then как value",
+          "throw в then не прерывает цепочку",
+          "microtasks и setTimeout в одной очереди без порядка"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "flat_vs_nested",
+      "title": "Отличает chain от callback hell",
+      "expected": "Кандидат сравнивает: flat `.then()` chain vs вложенные callback-и; один `.catch()` покрывает весь flow; читаемость и единая обработка ошибок.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевое преимущество chaining — flat vs nested",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "callback hell",
+              "вложен",
+              "flat",
+              "плоск"
+            ],
+            "ask": "как flat chain решает проблему вложенных fetch().then().then()"
+          },
+          {
+            "match": [
+              "catch",
+              "один",
+              "error"
+            ],
+            "ask": "сколько `.catch()` нужно для цепочки из трёх async шагов"
+          }
+        ],
+        "mustConcepts": [
+          "callback hell",
+          "вложен",
+          "пирамид",
+          "flat",
+          "плоск",
+          "цепоч",
+          "читаем",
+          "один catch",
+          "един",
+          "ошибк",
+          "fetch",
+          "json",
+          "отступ",
+          "уровень",
+          "nested",
+          "вместо влож"
+        ],
+        "falseClaims": [
+          "вложенные then и flat chain одинаково читаемы",
+          "для каждого then нужен свой catch",
+          "chaining не улучшает обработку ошибок",
+          "callback hell решается только prettier"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "error_propagation",
+      "title": "Понимает propagation ошибок",
+      "expected": "Кандидат объясняет: throw/reject в chain пропускает оставшиеся `.then()` и идёт к `.catch()`; несколько catch — первый поглощает без rethrow.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "error bubble и follow-up questions из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "throw",
+              "catch",
+              "skip",
+              "пропуск"
+            ],
+            "ask": "что происходит с оставшимися `.then()` если handler бросает ошибку"
+          },
+          {
+            "match": [
+              "rethrow",
+              "throw err",
+              "несколько catch"
+            ],
+            "ask": "почему второй `.catch()` не срабатывает после первого без rethrow"
+          }
+        ],
+        "mustConcepts": [
+          "throw",
+          "reject",
+          "catch",
+          "пропуск",
+          "skip",
+          "remaining",
+          "оставш",
+          "bubble",
+          "спуск",
+          "ошибк",
+          "rethrow",
+          "перекиды",
+          "поглощ",
+          "resolve",
+          "undefined",
+          "несколько catch"
+        ],
+        "falseClaims": [
+          "throw в then не влияет на следующие then",
+          "catch в середине chain всегда останавливает flow",
+          "несколько catch срабатывают все подряд без rethrow",
+          "ошибка в then теряется если нет catch в конце"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки chaining",
+      "expected": "Кандидат называет: забытый `return` в `.then()` с `{}`; mid-chain `.catch()` без rethrow; вложенные `.then()` вместо flat; sync return всё равно async для внешнего кода.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "4 Common mistakes из ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "error_propagation",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "return",
+              "undefined",
+              "фигурн"
+            ],
+            "ask": "почему `.then(user => { user.name; })` даёт undefined в следующем then"
+          },
+          {
+            "match": [
+              "catch",
+              "rethrow",
+              "глот",
+              "swallow"
+            ],
+            "ask": "почему `.catch(err => console.log(err))` без throw ломает следующий then"
+          },
+          {
+            "match": [
+              "вложен",
+              "nested",
+              "flat"
+            ],
+            "ask": "как переписать вложенный `res.json().then(...)` в flat chain"
+          }
+        ],
+        "mustConcepts": [
+          "return",
+          "undefined",
+          "фигурн",
+          "скобк",
+          "implicit return",
+          "catch",
+          "rethrow",
+          "throw err",
+          "глот",
+          "swallow",
+          "mid-chain",
+          "посеред",
+          "вложен",
+          "nested",
+          "flat",
+          "sync",
+          "асинхрон",
+          "вне цепоч",
+          "Promise.resolve",
+          "оборач"
+        ],
+        "falseClaims": [
+          "стрелка с {} возвращает последнее выражение автоматически",
+          "catch без rethrow останавливает chain с ошибкой",
+          "вложенный then — правильный способ chaining",
+          "код после chain видит результат then синхронно"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда chain vs async/await",
+      "expected": "Кандидат называет: 2–4 линейных шага — chain; условия/циклы — async/await; параллель — Promise.all; async/await — сахар над chaining.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use таблица ITLead",
+        "mustConcepts": [
+          "линейн",
+          "2-4",
+          "fetch",
+          "parse",
+          "transform",
+          "async/await",
+          "await",
+          "услов",
+          "if",
+          "цикл",
+          "loop",
+          "Promise.all",
+          "параллел",
+          "синтаксическ",
+          "сахар",
+          "sugar",
+          "не замен",
+          "try/catch",
+          "Express",
+          "useEffect"
+        ],
+        "falseClaims": [
+          "async/await полностью заменяет promise chaining",
+          "для параллельных запросов нужен chain then",
+          "chain лучше async/await для if внутри flow",
+          "Promise.all — это chaining"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "real_world_usage",
+      "title": "Приводит практические примеры",
+      "expected": "Кандидат упоминает Express route chain, React useEffect fetch, axios interceptors, fs.promises; один catch на несколько шагов.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "real-world usage — бонус middle",
+        "mustConcepts": [
+          "Express",
+          "route",
+          "useEffect",
+          "fetch",
+          "axios",
+          "interceptor",
+          "fs.promises",
+          "readFile",
+          "Node",
+          "production",
+          "validate",
+          "respond",
+          "errorHandler"
+        ],
+        "falseClaims": [
+          "chaining используется только в учебных примерах",
+          "Express не поддерживает promise chain",
+          "axios не использует цепочки"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Promise chaining — последовательные `.then()`: каждый возвращает новый Promise, значение передаётся дальше. Ошибки идут к одному `.catch()` в конце. Без `return` в `{}` — undefined. async/await — сахар над тем же механизмом; для if/циклов await читабельнее.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну цепочка then — как домино: fetch → json → имя → log. один catch на всё. если забыл return в блоке — следующий then undefined. mid catch без throw — ошибку проглотил, then всё равно бежит.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В Express: fetchUser(id).then(user => fetchPosts(user.id)).then(posts => res.json(posts)).catch(err => res.status(500).json({ error: err.message })). Параллель user+posts — Promise.all, не chain.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Chaining — это когда все then выполняются синхронно сразу. then не возвращает Promise. Ошибки не попадают в catch автоматически.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": ".then(user => { user.name; }) нормально передаёт имя дальше. catch в середине без rethrow останавливает chain. async/await и chaining — разные механизмы без связи.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для трёх параллельных fetch нужна цепочка then. Вложенные then читабельнее flat chain. microtasks выполняются после setTimeout 0.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "chaining_definition",
+      "exampleType": "good",
+      "exampleText": "fetch('/api/user').then(res => res.json()).then(user => user.name).then(console.log) — каждый then получает результат предыдущего.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "chaining_definition",
+      "exampleType": "good",
+      "exampleText": "каждый then возвращает новый промис — результат одного шага едет в следующий handler",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "chaining_definition",
+      "exampleType": "bad",
+      "exampleText": "Chaining модифицирует один Promise, все then пишут в одно состояние.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "chain_mechanism",
+      "exampleType": "good",
+      "exampleText": "`.then()` ставит handler в microtask queue; plain value wrap; return inner Promise — chain ждёт inner settle, не объект Promise.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "chain_mechanism",
+      "exampleType": "good",
+      "exampleText": "throw в then — reject нового Promise, остальные then skip до catch",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "chain_mechanism",
+      "exampleType": "bad",
+      "exampleText": "return fetch('/x') из then передаёт Promise object как value в следующий then.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "flat_vs_nested",
+      "exampleType": "good",
+      "exampleText": "fetch('/user').then(r=>r.json()).then(u=>fetch(`/posts/${u.id}`)).then(r=>r.json()) — flat, один catch в конце вместо трёх уровней вложенности.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "flat_vs_nested",
+      "exampleType": "good",
+      "exampleText": "вместо callback hell — одна колонка then, ошибки не размазаны по if(err)",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "flat_vs_nested",
+      "exampleType": "bad",
+      "exampleText": "Для каждого async шага нужен отдельный catch — flat chain не помогает с ошибками.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "error_propagation",
+      "exampleType": "good",
+      "exampleText": "if (!response.ok) throw new Error('Not found') в then — skip оставшихся then, landing в `.catch()`.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "error_propagation",
+      "exampleType": "good",
+      "exampleText": "первый catch без throw err — chain resolve undefined, второй catch молчит",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "error_propagation",
+      "exampleType": "bad",
+      "exampleText": "throw в then выполняет все следующие then перед catch.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": ".then(res => res.json()) ok; .then(res => { res.json(); }) без return — следующий then undefined.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "catch(err => console.log(err)) без rethrow — data в следующем then undefined даже после ошибки fetch",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "return res.json().then(...) внутри одного then — правильный flat chain.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "2–4 линейных шага — chain; if/цикл по async — async/await; user+posts параллельно — Promise.all.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "async/await — сахар над then, не замена; для простого fetch→json→render chain короче",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Любой async код лучше писать только через chain, async/await устарел.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "real_world_usage",
+      "exampleType": "good",
+      "exampleText": "Express: fetchUser().then(validate).then(respond).catch(errorHandler) — один catch на DB+validation.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "real_world_usage",
+      "exampleType": "good",
+      "exampleText": "useEffect: fetch user then fetch posts по id — последовательная загрузка в chain",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "real_world_usage",
+      "exampleType": "bad",
+      "exampleText": "В production promise chaining не используют — только async/await или callbacks.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "what-is-promise-chaining-in-javascript",
+    "apiUrl": "https://api.itlead.org/api/questions/what-is-promise-chaining-in-javascript",
+    "pageUrl": "https://itlead.org/interview-questions/javascript/what-is-promise-chaining-in-javascript",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is promise chaining in JavaScript",
+    "categorySlug": "javascript",
+    "syncedAt": "2026-06-18T20:00:00.000Z"
+  }
+}

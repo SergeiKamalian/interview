@@ -1,0 +1,630 @@
+{
+  "topic": {
+    "code": "shcho_take_code_splitting",
+    "name": "Code splitting",
+    "skillCode": "javascript",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое code splitting и как его реализовать в JavaScript-приложении?",
+    "shortAnswer": "Code splitting — это разбиение одного большого JavaScript-бандла на меньшие чанки, которые браузер загружает по требованию, а не целиком при первом заходе. Механизм — динамический `import()`: бандлер создаёт отдельный файл в точке вызова, браузер запрашивает его только когда выполнение доходит до этого кода. Самый частый паттерн — route-based splitting через `React.lazy` и Suspense; Next.js делает это автоматически для каждой страницы.",
+    "idealAnswer": "Code splitting — практика разбиения монолитного JS-бандла на несколько меньших чанков, которые браузер скачивает только когда они реально нужны. Без splitting браузер загружает всё приложение до первого рендера. Статический `import` попадает в main bundle; динамический `import()` заставляет Webpack/Vite/Rollup вынести модуль в отдельный файл (например `chunk-abc123.js` или `312.abc1d2.js` с хешем). Браузер делает новый HTTP-запрос при первом выполнении этого пути. Route-based splitting — стандарт в React: `React.lazy(() => import('./pages/Dashboard'))` + Suspense fallback + React Router; пользователь на `/dashboard` не скачивает Settings. Component-level splitting — для тяжёлых виджетов (редактор, карта, PDF): lazy + условный рендер, чанк грузится только когда `showEditor === true`. Внутри бандлера: chunk file + runtime-snippet для fetch; magic comment `webpackChunkName` задаёт имя; Vite использует Rollup chunking; Next.js автоматически делит каждый файл в `app/` или `pages/`. Prefetch/Preload: `webpackPrefetch: true` — фоновая загрузка в idle до перехода; `webpackPreload: true` — параллельно с родительским чанком; prefetch on hover/focus сокращает perceived navigation time. Типичные ошибки: over-splitting (50 чанков по 5kb хуже одного medium bundle — правило ~30-40kb минимум); Suspense без ErrorBoundary — падение всего приложения при сбое загрузки чанка (deploy mid-navigation); дубли shared deps в разных чанках — проверять SplitChunksPlugin и bundle analyzer; splitting без анализа bundle — решать по данным webpack-bundle-analyzer / rollup-plugin-visualizer. React.lazy vs plain `import()`: lazy оборачивает dynamic import и интегрируется с Suspense (loading state из коробки), работает только с default export; plain import возвращает Promise — loading вручную. При смене route во время загрузки React отменяет pending Suspense и грузит новый чанк; старый fetch продолжается в фоне, но модуль игнорируется. Role-based gating: `import()` для admin-роутов не выполняется для обычных пользователей — чанк не запрашивается. Метрики: TTI и LCP улучшаются когда убран blocking JS; Lighthouse «Remove unused JavaScript»; заметный эффект когда main bundle < ~150-200kb gzip. Экосистема: Next.js auto page split, Vite + manualChunks, Vue defineAsyncComponent, Angular loadChildren.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "code_splitting_definition",
+      "title": "Понимает определение code splitting",
+      "expected": "Кандидат объясняет: разбиение большого бандла на чанки; загрузка по требованию, а не всё сразу; цель — уменьшить initial bundle и ускорить first paint/TTI.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — on-demand chunks вместо monolith bundle",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "code splitting",
+              "чанк",
+              "bundle"
+            ],
+            "ask": "зачем делить бандл и что происходит без splitting при первой загрузке"
+          }
+        ],
+        "mustConcepts": [
+          "code splitting",
+          "разбиен",
+          "бандл",
+          "bundle",
+          "чанк",
+          "chunk",
+          "по требован",
+          "on demand",
+          "lazy load",
+          "initial bundle",
+          "начальн",
+          "не всё сразу",
+          "меньш",
+          "first paint",
+          "TTI",
+          "монолит"
+        ],
+        "falseClaims": [
+          "code splitting загружает все чанки сразу при первом заходе",
+          "code splitting это только для React",
+          "code splitting заменяет минификацию и tree-shaking",
+          "без splitting браузер всё равно качает только нужные модули"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "dynamic_import_mechanism",
+      "title": "Знает механизм dynamic import()",
+      "expected": "Кандидат сравнивает static import (main bundle) и dynamic import() (отдельный chunk); описывает HTTP-запрос при первом выполнении; может упомянуть hashed filename и webpackChunkName.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевой механизм из ITLead — import() как точка split",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "code_splitting_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "dynamic_import_mechanism",
+            "oftenConfusedWith": [
+              "lazy_vs_dynamic_import"
+            ],
+            "anchorTermsExpected": [
+              "dynamic import",
+              "import()",
+              "static import",
+              "main bundle",
+              "отдельный файл",
+              "HTTP"
+            ],
+            "anchorTermsWrongTopic": [
+              "React.lazy это единственный способ",
+              "import() синхронный"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "import()",
+              "dynamic",
+              "static"
+            ],
+            "ask": "чем static import отличается от dynamic import() с точки зрения бандлера"
+          }
+        ],
+        "mustConcepts": [
+          "dynamic import",
+          "import()",
+          "статическ",
+          "static import",
+          "main bundle",
+          "отдельн",
+          "chunk file",
+          "HTTP",
+          "запрос",
+          "await import",
+          "runtime",
+          "webpackChunkName",
+          "хеш",
+          "hashed",
+          "бандлер",
+          "Webpack",
+          "Vite",
+          "Rollup"
+        ],
+        "falseClaims": [
+          "dynamic import() попадает в main bundle как static import",
+          "import() выполняется на этапе build, а не runtime",
+          "браузер кэширует чанк и никогда не делает повторный запрос",
+          "import() работает только внутри React.lazy"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "route_based_splitting",
+      "title": "Знает route-based splitting с React.lazy",
+      "expected": "Кандидат описывает паттерн: lazy(() => import('./Page')) + Suspense fallback + Routes; каждая страница — отдельный чанк; пользователь не скачивает непосещённые роуты.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "самый частый паттерн из ITLead TL;DR",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "React.lazy",
+              "Suspense",
+              "Route"
+            ],
+            "ask": "как React.lazy + Suspense + Router делят код по страницам"
+          },
+          {
+            "match": [
+              "Next.js",
+              "pages",
+              "app/"
+            ],
+            "ask": "как Next.js делает splitting без ручного lazy"
+          }
+        ],
+        "mustConcepts": [
+          "React.lazy",
+          "Suspense",
+          "fallback",
+          "route",
+          "роут",
+          "страниц",
+          "React Router",
+          "Routes",
+          "Route",
+          "lazy(() => import",
+          "отдельный чанк",
+          "не скачива",
+          "Next.js",
+          "pages",
+          "app/",
+          "автоматич"
+        ],
+        "falseClaims": [
+          "React.lazy работает без Suspense",
+          "все роуты всегда попадают в initial bundle",
+          "route splitting требует ручной настройки Webpack в Next.js",
+          "lazy принимает любой named export без обёртки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "component_level_splitting",
+      "title": "Понимает component-level splitting",
+      "expected": "Кандидат объясняет: split не только по роутам, но и для тяжёлых компонентов (редактор, карта, PDF); условный рендер + lazy; чанк грузится только при showEditor/true.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "RichEditor/PostForm паттерн из ITLead",
+        "mustConcepts": [
+          "component-level",
+          "компонент",
+          "тяжёл",
+          "редактор",
+          "карт",
+          "PDF",
+          "RichEditor",
+          "условн",
+          "showEditor",
+          "lazy",
+          "Suspense",
+          "не все пользователи",
+          "200kb",
+          "виджет"
+        ],
+        "falseClaims": [
+          "splitting имеет смысл только на границах роутов",
+          "тяжёлый компонент всегда нужно грузить в main bundle",
+          "component split не требует Suspense"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "prefetch_preload",
+      "title": "Знает prefetch и preload",
+      "expected": "Кандидат различает webpackPrefetch (idle, до перехода) и webpackPreload (параллельно с parent); prefetch on hover/focus; prefetch — default для route transitions.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Prefetch/Preload секция ITLead — UX оптимизация",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "prefetch",
+              "preload",
+              "hover"
+            ],
+            "ask": "чем webpackPrefetch отличается от webpackPreload и когда prefetch on hover"
+          }
+        ],
+        "mustConcepts": [
+          "prefetch",
+          "preload",
+          "webpackPrefetch",
+          "webpackPreload",
+          "idle",
+          "фон",
+          "до перехода",
+          "параллельн",
+          "parent chunk",
+          "hover",
+          "onMouseEnter",
+          "onFocus",
+          "кэш",
+          "navigation",
+          "round trip"
+        ],
+        "falseClaims": [
+          "prefetch и preload делают одно и то же",
+          "preload всегда лучше prefetch для любого чанка",
+          "prefetch блокирует main thread",
+          "без prefetch chunk невозможно загрузить"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки code splitting",
+      "expected": "Кандидат называет: over-splitting (<30-40kb не стоит); Suspense без ErrorBoundary; дубли shared deps; splitting без bundle analyzer; ErrorBoundary для chunk load failure.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — production pitfalls senior",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "route_based_splitting",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ErrorBoundary",
+              "Suspense",
+              "crash"
+            ],
+            "ask": "что случится при сбое загрузки чанка без ErrorBoundary"
+          },
+          {
+            "match": [
+              "over-split",
+              "30",
+              "40kb",
+              "HTTP"
+            ],
+            "ask": "почему 50 мелких чанков могут быть медленнее одного bundle"
+          },
+          {
+            "match": [
+              "lodash",
+              "SplitChunks",
+              "дубли"
+            ],
+            "ask": "как избежать дублирования lodash в нескольких чанках"
+          }
+        ],
+        "mustConcepts": [
+          "over-split",
+          "слишком мелк",
+          "30",
+          "40kb",
+          "HTTP/2",
+          "ErrorBoundary",
+          "Suspense",
+          "chunk load",
+          "network error",
+          "deploy",
+          "crash",
+          "lodash",
+          "SplitChunksPlugin",
+          "дубли",
+          "shared",
+          "bundle analyzer",
+          "webpack-bundle-analyzer",
+          "visualizer",
+          "данн",
+          "инстинкт"
+        ],
+        "falseClaims": [
+          "Suspense сам ловит ошибки загрузки чанка",
+          "чем больше чанков, тем всегда быстрее",
+          "SplitChunksPlugin никогда не выносит общие deps",
+          "ErrorBoundary не нужен если есть fallback в Suspense"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "lazy_vs_dynamic_import",
+      "title": "Отличает React.lazy от plain dynamic import",
+      "expected": "Кандидат объясняет: React.lazy оборачивает import() и интегрируется с Suspense; plain import() — Promise и loading вручную; lazy только default export; route switch отменяет pending Suspense.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up Q&A из ITLead interview questions",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "React.lazy",
+              "default export"
+            ],
+            "ask": "почему React.lazy работает только с default export"
+          },
+          {
+            "match": [
+              "route",
+              "pending",
+              "отмен"
+            ],
+            "ask": "что происходит если пользователь ушёл на другой route пока чанк грузится"
+          }
+        ],
+        "mustConcepts": [
+          "React.lazy",
+          "plain import",
+          "Promise",
+          "Suspense",
+          "loading state",
+          "вручную",
+          "default export",
+          "named export",
+          "pending",
+          "отмен",
+          "новый чанк",
+          "in-flight",
+          "игнорир",
+          "role-based",
+          "admin"
+        ],
+        "falseClaims": [
+          "React.lazy и import() — полностью одно и то же",
+          "React.lazy поддерживает named export без обёртки",
+          "браузер отменяет in-flight fetch при смене route",
+          "plain import() автоматически показывает fallback"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "performance_metrics",
+      "title": "Связывает splitting с метриками производительности",
+      "expected": "Кандидат называет TTI, LCP; Lighthouse «Remove unused JavaScript»; main bundle ~150-200kb gzip как ориентир; улучшение когда убран blocking JS.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "бонус — метрики из follow-up ITLead",
+        "mustConcepts": [
+          "TTI",
+          "LCP",
+          "Lighthouse",
+          "unused JavaScript",
+          "150",
+          "200kb",
+          "gzip",
+          "blocking",
+          "first paint",
+          "main bundle"
+        ],
+        "falseClaims": [
+          "code splitting улучшает только SEO, не runtime",
+          "splitting всегда улучшает LCP без исключений",
+          "метрики не меняются если initial bundle тот же"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Code splitting делит monolith bundle на чанки по dynamic import(). Статический import — в main; await import('./Chart') — отдельный файл, браузер качает при первом вызове. Route split: React.lazy + Suspense — Dashboard и Settings разные чанки. Prefetch on hover убирает wait при клике.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Без splitting юзер качает 800kb сразу. Делаю lazy на роуты и тяжёлый RichEditor — initial ~120kb gzip. ErrorBoundary вокруг Suspense — deploy mid-navigation не роняет всё приложение. Смотрю webpack-bundle-analyzer перед split, не режу на 5kb чанки.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Next.js сам делит pages/app. В CRA — React.lazy per route. webpackPrefetch для Analytics. React.lazy ≠ plain import: lazy даёт Suspense integration, только default export.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Code splitting — это когда Webpack минифицирует код. Достаточно static import везде, браузер сам загрузит только нужное.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Дроблю каждый компонент на отдельный 3kb чанк — чем больше файлов, тем быстрее. Suspense без ErrorBoundary норм, React сам перезагрузит страницу.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "React.lazy работает с named export из коробки. Prefetch и preload — одно и то же, preload всегда лучше для route transitions.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "code_splitting_definition",
+      "exampleType": "good",
+      "exampleText": "Code splitting — on-demand chunks вместо одного fat bundle при первой загрузке; цель — меньше blocking JS и быстрее TTI.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "code_splitting_definition",
+      "exampleType": "good",
+      "exampleText": "ну это когда не всё приложение сразу качаешь, а кусками по мере надобности",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "code_splitting_definition",
+      "exampleType": "bad",
+      "exampleText": "Code splitting загружает все чанки параллельно при первом заходе чтобы потом не ждать.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "dynamic_import_mechanism",
+      "exampleType": "good",
+      "exampleText": "import { format } from 'date-fns' — main bundle; const { Chart } = await import('./Chart.js') — отдельный chunk-abc123.js по HTTP при первом выполнении.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "dynamic_import_mechanism",
+      "exampleType": "good",
+      "exampleText": "dynamic import() — бандлер режет файл, runtime fetch когда дошли до await",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "dynamic_import_mechanism",
+      "exampleType": "bad",
+      "exampleText": "import() резолвится на build time и попадает в main.js как обычный require.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "route_based_splitting",
+      "exampleType": "good",
+      "exampleText": "const Dashboard = lazy(() => import('./pages/Dashboard')); Suspense fallback + Routes — юзер на /dashboard не качает Settings chunk.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "route_based_splitting",
+      "exampleType": "good",
+      "exampleText": "в next каждая page — свой чанк автоматом, в react router lazy руками",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "route_based_splitting",
+      "exampleType": "bad",
+      "exampleText": "React.lazy можно использовать без Suspense — fallback не обязателен.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "component_level_splitting",
+      "exampleType": "good",
+      "exampleText": "RichEditor lazy + showEditor && Suspense — 200kb редактор грузится только когда юзер нажал «написать пост».",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "component_level_splitting",
+      "exampleType": "good",
+      "exampleText": "карты и pdf viewer — классика для component split, не только роуты",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "component_level_splitting",
+      "exampleType": "bad",
+      "exampleText": "Splitting имеет смысл только между страницами, внутри страницы всё должно быть в main bundle.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "prefetch_preload",
+      "exampleType": "good",
+      "exampleText": "webpackPrefetch: true — idle download до перехода; webpackPreload — параллельно с parent. NavLink onMouseEnter={() => import('./HeavyDashboard')} — prefetch on hover.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "prefetch_preload",
+      "exampleType": "good",
+      "exampleText": "prefetch на hover — к моменту клика чанк уже в кэше, 800ms → 100ms",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "prefetch_preload",
+      "exampleType": "bad",
+      "exampleText": "Preload всегда ставлю на все route chunks — prefetch устарел и не нужен.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "ErrorBoundary > Suspense > LazyRoute — chunk load failure не крашит всё приложение. Не режу на 50×5kb — overhead HTTP. SplitChunksPlugin + analyzer перед решением.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "deploy пока юзер переходит — без error boundary весь app падает, с boundary — refresh message",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Suspense fallback достаточно для network error при загрузке чанка, ErrorBoundary лишний.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "lazy_vs_dynamic_import",
+      "exampleType": "good",
+      "exampleText": "React.lazy оборачивает import() + Suspense loading; plain import() — Promise, state сам. lazy только default export.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "lazy_vs_dynamic_import",
+      "exampleType": "good",
+      "exampleText": "сменил route пока грузится — react отменяет pending suspense, старый fetch в фоне но модуль игнорится",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "lazy_vs_dynamic_import",
+      "exampleType": "bad",
+      "exampleText": "React.lazy и await import() — идентичны, разницы нет.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "performance_metrics",
+      "exampleType": "good",
+      "exampleText": "Splitting бьёт по TTI и LCP когда убрали blocking JS; Lighthouse unused JavaScript; ориентир main bundle <150-200kb gzip.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "performance_metrics",
+      "exampleType": "good",
+      "exampleText": "main bundle был 400kb — после route split 140kb gzip, first paint заметно быстрее",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "performance_metrics",
+      "exampleType": "bad",
+      "exampleText": "Code splitting влияет только на bundle size в отчёте, TTI и LCP не меняются.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "shcho-take-code-splitting",
+    "apiUrl": "https://api.itlead.org/api/questions/shcho-take-code-splitting",
+    "pageUrl": "https://itlead.org/interview-questions/javascript/shcho-take-code-splitting",
+    "difficulty": "SENIOR",
+    "titleEn": "What is code splitting?",
+    "categorySlug": "javascript",
+    "syncedAt": "2026-06-18T15:00:00.000Z"
+  }
+}

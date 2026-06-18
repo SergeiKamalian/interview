@@ -1,0 +1,620 @@
+{
+  "topic": {
+    "code": "nodejs_file_system_module",
+    "name": "Модуль File System (fs) в Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работает модуль File System (fs) в Node.js?",
+    "shortAnswer": "Модуль `fs` (File System) — встроенный API Node.js для чтения, записи и управления файлами на диске. Асинхронные операции выполняются в пуле потоков libuv, не блокируя event loop. Для серверного кода используй `fs/promises` с `async/await`; всегда передавай `'utf8'` в `readFile`, иначе вернётся `Buffer`, а не строка.",
+    "idealAnswer": "Модуль `fs` — встроенный API Node.js для чтения, записи, изменения и мониторинга файлов и каталогов на диске. Три стиля API: callback-based (legacy), синхронный (блокирует event loop) и Promise-based через `fs/promises` (современный стандарт). Асинхронный `fs` неблокирующий: Node делегирует дисковый I/O пулу потоков libuv (по умолчанию 4 потока, настраивается через `UV_THREADPOOL_SIZE`, max 1024), сразу возвращает управление event loop; по завершении libuv кладёт событие в очередь, V8 выполняет callback или резолвит Promise. Синхронные методы (`readFileSync`) вызывают ОС напрямую с главного потока и замораживают всё остальное. Когда что использовать: CLI-скрипты и загрузка конфига при старте — `readFileSync` допустим; Express/Fastify серверы — `fs/promises` с `async/await`; файлы >~50MB — `createReadStream`, `readFile` на 10GB убьёт процесс по памяти; отслеживание файлов — `fs.watch` (события ОС, быстро) vs `fs.watchFile` (polling, надёжнее на сетевых ФС); legacy — callbacks без рефакторинга, если нет «пирамиды». Основные операции: `readFile`/`writeFile`/`appendFile`, `mkdir({ recursive: true })` атомарно с Node 10.12+, `readdir({ withFileTypes: true })`, `stat`/`unlink`/`rm`/`rename`/`copyFile`. Типичные ошибки: `readFileSync` в веб-сервере (RPS падает с 1000 до 10); забытый `'utf8'` → Buffer вместо строки; `forEach` с async без await; callback pyramid; `mkdir` без `{ recursive: true }` → race EEXIST. Follow-up: `fs.stat` следует за symlink, `fs.lstat` — метаданные самого symlink; `appendFile` атомарен для малых записей; для больших критичных — `proper-lockfile`; pipe `createReadStream` в `res` для стриминга; в продакшене часто `chokidar` вместо `fs.watch`. Реальность: Express логирование через `appendFile`, Next.js `readdirSync` при build, Webpack `readFileSync` для манифестов, PM2 PID-файлы, NestJS загрузка `.env`.",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "fs_module_definition",
+      "title": "Понимает назначение модуля fs",
+      "expected": "Кандидат объясняет: `fs` — встроенный модуль Node.js для работы с файловой системой; чтение, запись, удаление, мониторинг файлов и каталогов; асинхронные операции не блокируют event loop.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — что такое fs и зачем нужен",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "fs",
+              "file system",
+              "файлов"
+            ],
+            "ask": "что делает модуль fs и чем он отличается от ручных syscalls"
+          }
+        ],
+        "mustConcepts": [
+          "fs",
+          "file system",
+          "файлов",
+          "встроен",
+          "core module",
+          "чтени",
+          "запис",
+          "удален",
+          "каталог",
+          "директор",
+          "монитор",
+          "watch",
+          "неблокир",
+          "event loop",
+          "диск",
+          "API"
+        ],
+        "falseClaims": [
+          "fs выполняет дисковый I/O на главном JS-потоке синхронно по умолчанию",
+          "fs — внешний npm-пакет, не входит в Node.js",
+          "fs работает только с callback API без Promise",
+          "fs блокирует event loop при каждом async readFile",
+          "fs доступен только в браузере через polyfill"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "libuv_internal",
+      "title": "Понимает внутреннюю модель libuv и event loop",
+      "expected": "Кандидат описывает: async fs делегирует I/O пулу потоков libuv (4 по умолчанию); event loop свободен; sync методы блокируют главный поток; `UV_THREADPOOL_SIZE` масштабирует пул.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевое отличие Node fs — libuv thread pool vs sync block",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "fs_module_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "libuv_internal",
+            "oftenConfusedWith": [
+              "api_styles"
+            ],
+            "anchorTermsExpected": [
+              "libuv",
+              "thread pool",
+              "event loop",
+              "4 поток",
+              "не блокир",
+              "readFileSync блок"
+            ],
+            "anchorTermsWrongTopic": [
+              "libuv выполняет JavaScript",
+              "async fs читает файл на главном потоке"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "libuv",
+              "thread pool",
+              "пул поток"
+            ],
+            "ask": "что происходит внутри при вызове fs.readFile и почему event loop не блокируется"
+          },
+          {
+            "match": [
+              "UV_THREADPOOL_SIZE",
+              "4 поток"
+            ],
+            "ask": "какой размер пула libuv по умолчанию и как его увеличить"
+          }
+        ],
+        "mustConcepts": [
+          "libuv",
+          "thread pool",
+          "пул поток",
+          "event loop",
+          "4",
+          "UV_THREADPOOL_SIZE",
+          "неблокир",
+          "deleg",
+          "делегир",
+          "completion",
+          "callback",
+          "Promise",
+          "readFileSync",
+          "блокир",
+          "главн",
+          "main thread",
+          "syscall",
+          "очеред"
+        ],
+        "falseClaims": [
+          "async readFile блокирует event loop до завершения чтения",
+          "libuv thread pool по умолчанию равен числу CPU ядер",
+          "readFileSync использует thread pool libuv",
+          "UV_THREADPOOL_SIZE можно менять в runtime после старта",
+          "libuv выполняет JavaScript-код в worker threads"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "api_styles",
+      "title": "Знает три стиля API fs",
+      "expected": "Кандидат перечисляет callback-based, sync и `fs/promises`; объясняет что sync блокирует event loop; `fs/promises` + async/await — современный стандарт для серверов; разница callback vs Promise в error handling.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "три API styles — центральный блок ITLead для middle",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "fs/promises",
+              "callback",
+              "readFileSync"
+            ],
+            "ask": "сравни callback, sync и fs/promises — когда какой и почему sync опасен на сервере"
+          },
+          {
+            "match": [
+              "async/await",
+              "pyramid",
+              "вложен"
+            ],
+            "ask": "как fs/promises решает проблему callback pyramid"
+          }
+        ],
+        "mustConcepts": [
+          "callback",
+          "sync",
+          "синхрон",
+          "readFileSync",
+          "fs/promises",
+          "Promise",
+          "async/await",
+          "require('fs')",
+          "legacy",
+          "error first",
+          "err",
+          "блокир event loop",
+          "стандарт",
+          "await readFile",
+          "pyramid",
+          "вложен"
+        ],
+        "falseClaims": [
+          "fs/promises значительно быстрее callback по I/O",
+          "sync методы безопасны в Express handler",
+          "callback API удалён из Node.js",
+          "Promise-based fs автоматически параллелит все операции",
+          "readFileSync неблокирующий если файл маленький"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use_styles",
+      "title": "Выбирает правильный стиль и инструмент",
+      "expected": "Кандидат называет: CLI/startup config — sync ok; веб-сервер — fs/promises; большие файлы — streams; watch — fs.watch vs fs.watchFile; legacy callbacks без рефакторинга если нет проблем.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use which style из ITLead",
+        "mustConcepts": [
+          "CLI",
+          "скрипт",
+          "startup",
+          "конфиг",
+          "readFileSync",
+          "Express",
+          "Fastify",
+          "сервер",
+          "fs/promises",
+          "50MB",
+          "createReadStream",
+          "stream",
+          "fs.watch",
+          "fs.watchFile",
+          "polling",
+          "chokidar",
+          "legacy",
+          "throughput"
+        ],
+        "falseClaims": [
+          "в Express всегда нужен readFileSync для скорости",
+          "readFile подходит для файлов любого размера",
+          "fs.watch надёжен на всех платформах без обёрток",
+          "callbacks нужно срочно рефакторить во всех legacy проектах",
+          "streams нужны только для бинарных файлов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "core_operations",
+      "title": "Знает основные операции fs",
+      "expected": "Кандидат называет readFile/writeFile/appendFile, mkdir с `{ recursive: true }`, readdir с withFileTypes, stat/unlink/rm/rename/copyFile; понимает атомарность recursive mkdir.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "core operations at a glance из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "mkdir",
+              "recursive",
+              "readdir"
+            ],
+            "ask": "зачем `{ recursive: true }` в mkdir и что даёт withFileTypes в readdir"
+          }
+        ],
+        "mustConcepts": [
+          "readFile",
+          "writeFile",
+          "appendFile",
+          "mkdir",
+          "recursive",
+          "readdir",
+          "withFileTypes",
+          "stat",
+          "unlink",
+          "rm",
+          "rename",
+          "copyFile",
+          "mtime",
+          "size",
+          "атомар",
+          "EEXIST",
+          "Node 10.12"
+        ],
+        "falseClaims": [
+          "mkdir без recursive создаёт вложенные каталоги автоматически",
+          "writeFile всегда дописывает в конец файла",
+          "readdir без withFileTypes возвращает объекты Dirent",
+          "unlink удаляет непустые каталоги",
+          "copyFile перемещает файл вместо копирования"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки fs",
+      "expected": "Кандидат называет: sync в веб-сервере; забытый utf8 → Buffer; forEach с async без await; callback pyramid; race при mkdir без recursive; может упомянуть RPS drop и EEXIST.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — ключевой блок ITLead для middle",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "api_styles",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "utf8",
+              "Buffer",
+              "encoding"
+            ],
+            "ask": "что вернёт readFile без encoding и как исправить"
+          },
+          {
+            "match": [
+              "forEach",
+              "await",
+              "цикл"
+            ],
+            "ask": "почему forEach с async/await не ждёт записи файлов"
+          },
+          {
+            "match": [
+              "readFileSync",
+              "Express",
+              "RPS"
+            ],
+            "ask": "почему readFileSync в route handler убивает throughput"
+          }
+        ],
+        "mustConcepts": [
+          "readFileSync",
+          "блокир",
+          "RPS",
+          "utf8",
+          "encoding",
+          "Buffer",
+          "forEach",
+          "await",
+          "for of",
+          "pyramid",
+          "callback",
+          "mkdir",
+          "recursive",
+          "race",
+          "EEXIST",
+          "конкурент",
+          "Stack Overflow"
+        ],
+        "falseClaims": [
+          "readFile без encoding возвращает строку по умолчанию",
+          "forEach корректно await-ит async callback",
+          "readFileSync в Express не влияет на другие запросы",
+          "mkdir без recursive безопасен при конкурентном создании",
+          "Buffer и string взаимозаменяемы без явного toString"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "streams_and_followups",
+      "title": "Понимает streams и follow-up темы",
+      "expected": "Кандидат объясняет: createReadStream для больших файлов и pipe в response; fs.watch (OS events) vs fs.watchFile (polling); fs.stat следует symlink, fs.lstat — сам symlink; appendFile атомарен для малых записей.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "streams + follow-up questions — бонус middle",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "createReadStream",
+              "pipe",
+              "10GB"
+            ],
+            "ask": "как отдать 10GB файл через Express без OOM"
+          },
+          {
+            "match": [
+              "fs.watch",
+              "fs.watchFile",
+              "inotify"
+            ],
+            "ask": "чем fs.watch отличается от fs.watchFile"
+          },
+          {
+            "match": [
+              "stat",
+              "lstat",
+              "symlink"
+            ],
+            "ask": "разница fs.stat и fs.lstat для симлинка"
+          }
+        ],
+        "mustConcepts": [
+          "createReadStream",
+          "createWriteStream",
+          "pipe",
+          "stream",
+          "chunk",
+          "памят",
+          "OOM",
+          "10GB",
+          "fs.watch",
+          "fs.watchFile",
+          "inotify",
+          "FSEvents",
+          "polling",
+          "fs.stat",
+          "fs.lstat",
+          "symlink",
+          "симлинк",
+          "appendFile",
+          "атомар",
+          "proper-lockfile",
+          "chokidar"
+        ],
+        "falseClaims": [
+          "readFile безопасен для 10GB файла",
+          "fs.stat возвращает метаданные symlink, не target",
+          "fs.watch и fs.watchFile работают одинаково через polling",
+          "concurrent writeFile в один лог безопасен",
+          "createReadStream загружает весь файл в память сразу"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "fs — встроенный модуль для работы с диском. Async readFile отдаёт задачу libuv thread pool (4 потока), event loop свободен. На сервере — fs/promises + await; в CLI можно readFileSync. readFile без utf8 вернёт Buffer. Файлы >50MB — createReadStream, иначе OOM.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В Express логирую через await fs.appendFile — запись в libuv, остальные запросы не ждут. Конфиг при старте читаю sync — там нет конкурентности. mkdir всегда с { recursive: true }, иначе два PM2-воркера могут словить EEXIST. Большой CSV стримлю pipe в response.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Три API: callback legacy, sync блокирует loop, fs/promises — стандарт. UV_THREADPOOL_SIZE=16 для I/O-heavy. fs.watch быстрее на локальном диске, на NFS — watchFile или chokidar. stat следует symlink, lstat — про сам линк.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "fs.readFile всегда блокирует event loop, потому что Node однопоточный. readFile без параметров возвращает строку. В Express для скорости лучше readFileSync на каждый запрос.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Callback API удалён, остался только sync fs. createReadStream читает весь файл в память как readFile. fs.stat показывает размер symlink, а не целевого файла.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "forEach с async await нормально ждёт все writeFile. mkdir без recursive атомарен при конкурентном создании. libuv pool по умолчанию 16 потоков.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "fs_module_definition",
+      "exampleType": "good",
+      "exampleText": "fs — core module Node.js для read/write/delete/watch файлов и каталогов; async операции не блокируют event loop.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "fs_module_definition",
+      "exampleType": "good",
+      "exampleText": "ну fs это стандартный модуль ноды для файлов на диске — читаешь, пишешь, следишь за изменениями",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "fs_module_definition",
+      "exampleType": "bad",
+      "exampleText": "fs — npm-пакет для браузера, в Node его нет из коробки.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "libuv_internal",
+      "exampleType": "good",
+      "exampleText": "readFile отдаёт I/O в libuv pool из 4 потоков, callback/Promise срабатывает когда libuv закончил; readFileSync блокирует main thread напрямую.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "libuv_internal",
+      "exampleType": "good",
+      "exampleText": "асинхронный fs не крутится на event loop — libuv читает в фоне, loop обрабатывает другие запросы; пул можно поднять UV_THREADPOOL_SIZE",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "libuv_internal",
+      "exampleType": "bad",
+      "exampleText": "async readFile блокирует event loop до конца чтения, потому что диск медленный.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "api_styles",
+      "exampleType": "good",
+      "exampleText": "Callback — err first, legacy; sync — readFileSync блокирует; fs/promises + async/await — чистая обработка ошибок без pyramid.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "api_styles",
+      "exampleType": "good",
+      "exampleText": "на проде только fs/promises, в однострочном cli-скрипте sync ок, callbacks оставляю если код старый и работает",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "api_styles",
+      "exampleType": "bad",
+      "exampleText": "fs/promises в 10 раз быстрее callback по скорости диска, поэтому callbacks deprecated.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use_styles",
+      "exampleType": "good",
+      "exampleText": "Express route — fs/promises; build script загрузки env — readFileSync; 2GB лог — createReadStream pipe в gzip.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use_styles",
+      "exampleType": "good",
+      "exampleText": "watch на mac иногда глючит — chokidar; на сетевой шаре watchFile polling надёжнее",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use_styles",
+      "exampleType": "bad",
+      "exampleText": "Для 10GB файла readFile быстрее stream, потому что один syscall.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "core_operations",
+      "exampleType": "good",
+      "exampleText": "appendFile дописывает лог; mkdir('logs/prod', { recursive: true }) создаёт вложенные; readdir withFileTypes — isDirectory без отдельного stat.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "core_operations",
+      "exampleType": "good",
+      "exampleText": "stat.size и mtime для проверки файла, rm recursive для папки, rename для move",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "core_operations",
+      "exampleType": "bad",
+      "exampleText": "writeFile дописывает в конец, appendFile перезаписывает файл целиком.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "readFile('file.txt') → Buffer; fix: 'utf8'. forEach(async) не ждёт — for...of с await. readFileSync в GET — сериализует все запросы.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "два воркера без recursive mkdir — второй падает EEXIST; callback pyramid лечится переходом на promises",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Buffer из readFile — это нормально для JSON.parse, encoding не нужен.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "streams_and_followups",
+      "exampleType": "good",
+      "exampleText": "createReadStream('big.csv').pipe(res) — память flat; fs.watch inotify быстрый; stat на symlink даёт target, lstat — сам линк.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "streams_and_followups",
+      "exampleType": "good",
+      "exampleText": "в pm2 cluster appendFile для коротких строк ок, для тяжёлых логов — lockfile или отдельный logger process",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "streams_and_followups",
+      "exampleType": "bad",
+      "exampleText": "readFile на 10GB норм если у сервера 32GB RAM — Node сам стримит.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-file-system-module",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-file-system-module",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-file-system-module",
+    "difficulty": "MIDDLE",
+    "titleEn": "How does the File System (fs) module work in Node.js?",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

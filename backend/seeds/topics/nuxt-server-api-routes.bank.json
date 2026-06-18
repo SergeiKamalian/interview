@@ -1,0 +1,532 @@
+{
+  "topic": {
+    "code": "nuxt_server_api_routes",
+    "name": "API-маршруты Nuxt (server/api)",
+    "skillCode": "nuxt",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как создавать API-маршруты в Nuxt?",
+    "shortAnswer": "Nuxt API-маршруты — серверные эндпоинты в папке `server/api/`, которые автоматически мапятся на URL `/api/*`. Обработчик оборачивается в `defineEventHandler`, отдельный роутер не нужен — путь файла и есть маршрут.",
+    "idealAnswer": "Nuxt API-маршруты — серверные эндпоинты в `server/api/`, которые автоматически регистрируются как `/api/*` без отдельного сервера и конфигурации роутера. Путь файла определяет URL: `server/api/users.ts` → `/api/users`, `server/api/users/[id].get.ts` → `GET /api/users/:id`. Каждый обработчик оборачивается в `defineEventHandler` (требование H3 — серверного движка Nuxt). Суффиксы `.get.ts`, `.post.ts`, `.delete.ts` ограничивают файл одним HTTP-методом; другие методы получают 405 автоматически. Данные запроса читают через `getQuery(event)` (query string), `await readBody(event)` (тело POST/PUT) и `getRouterParam(event, 'name')` (динамические сегменты `[id]`). Ошибки бросают через `createError({ statusCode, message })`, а не голый `Error` — иначе 500 и утечка stack trace. Серверные роуты выполняются в Nitro (Node.js): доступны `process.env`, `useRuntimeConfig()`, Nitro storage; недоступны `window`, `document` и Vue-реактивность. Типичные ошибки: забытый `await` у `readBody` (получается Promise вместо данных), ручная проверка `event.method` вместо отдельных файлов на метод, `event.context.params` вместо рекомендуемого `getRouterParam`. Со страниц вызывают `useFetch` или `$fetch`: `useFetch` SSR-aware — на сервере вызывает handler in-process без HTTP, на клиенте делает реальный запрос. Отличие `server/api/` от `server/routes/`: первые получают префикс `/api`, вторые — любой URL (webhooks, sitemap). Общую логику выносят в `server/utils/` (auto-import Nitro). Аутентификация — middleware в `server/middleware/`, результат в `event.context.user`. Кастомный статус: `setResponseStatus(event, 201)` или `createError({ statusCode: 422 })`.",
+    "maxScore": 10,
+    "skills": [
+      "nuxt",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "nuxt_api_basics",
+      "title": "Понимает основы server/api и defineEventHandler",
+      "expected": "Кандидат объясняет: файлы в `server/api/` автоматически становятся `/api/*`; обработчик оборачивается в `defineEventHandler`; отдельный роутер не нужен — путь файла = URL.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "TL;DR ITLead — ядро темы: auto-routing и defineEventHandler",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "defineEventHandler",
+              "server/api",
+              "автомат"
+            ],
+            "ask": "как Nuxt регистрирует эндпоинт без конфигурации роутера"
+          }
+        ],
+        "mustConcepts": [
+          "server/api",
+          "defineEventHandler",
+          "/api/",
+          "автомат",
+          "эндпоинт",
+          "путь файла",
+          "URL",
+          "H3",
+          "обработчик",
+          "без роутера",
+          "без конфиг",
+          "серверн",
+          "Nitro",
+          "регистр"
+        ],
+        "falseClaims": [
+          "нужно вручную регистрировать API-маршруты в nuxt.config",
+          "defineEventHandler опционален для server/api",
+          "server/api работает только на клиенте",
+          "API-маршруты требуют отдельного Express-сервера"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "file_path_url_mapping",
+      "title": "Знает маппинг файлов на URL и HTTP-методы",
+      "expected": "Кандидат описывает: `users.ts` → `/api/users`; `[id]` — динамический сегмент; `.get.ts`/`.post.ts` ограничивают метод; POST на `.get.ts` → 405.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "file naming и bracket syntax — ключевой практический навык",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "nuxt_api_basics",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "[id]",
+              ".get.ts",
+              "405"
+            ],
+            "ask": "как ограничить маршрут только GET и что будет при POST"
+          },
+          {
+            "match": [
+              "index.ts",
+              "users.ts",
+              "динамич"
+            ],
+            "ask": "как `[userId]/posts/[postId].ts` мапится на URL"
+          }
+        ],
+        "mustConcepts": [
+          "server/api/users",
+          "[id]",
+          "динамич",
+          "сегмент",
+          ".get.ts",
+          ".post.ts",
+          ".delete.ts",
+          "405",
+          "Method Not Allowed",
+          "index.ts",
+          "HTTP-метод",
+          "суффикс",
+          "getRouterParam",
+          "параметр маршрута",
+          "вложен"
+        ],
+        "falseClaims": [
+          "все файлы в server/api принимают любой HTTP-метод без суффикса",
+          ".get.ts не блокирует POST автоматически",
+          "динамические сегменты задаются через :id в nuxt.config",
+          "server/api/hello.ts мапится на /hello без префикса /api"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "request_data_helpers",
+      "title": "Читает данные запроса через H3-хелперы",
+      "expected": "Кандидат называет: `getQuery` для query string, `await readBody` для тела, `getRouterParam` для `[id]`; понимает что readBody async.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "три хелпера — ежедневная практика API-роутов",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "readBody",
+              "await",
+              "getQuery"
+            ],
+            "ask": "чем отличаются getQuery, readBody и getRouterParam — когда какой использовать"
+          },
+          {
+            "match": [
+              "readBody<T>",
+              "generic",
+              "TypeScript"
+            ],
+            "ask": "зачем generic у readBody и что будет без await"
+          }
+        ],
+        "mustConcepts": [
+          "getQuery",
+          "readBody",
+          "getRouterParam",
+          "await",
+          "query string",
+          "тело запроса",
+          "body",
+          "route param",
+          "параметр",
+          "async",
+          "Promise",
+          "event",
+          "POST",
+          "GET",
+          "readBody<T>"
+        ],
+        "falseClaims": [
+          "readBody синхронный и await не нужен",
+          "getQuery читает тело POST-запроса",
+          "getRouterParam работает только с query string",
+          "event.body напрямую — рекомендуемый способ в Nuxt 3"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "nitro_h3_environment",
+      "title": "Понимает среду выполнения Nitro/H3",
+      "expected": "Кандидат объясняет: роуты выполняются в Node.js (Nitro/H3), не в браузере; доступны process.env, useRuntimeConfig; недоступны window, document, Vue reactivity.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Where server routes run — частая путаница server vs client",
+        "mustConcepts": [
+          "Nitro",
+          "H3",
+          "Node.js",
+          "сервер",
+          "не браузер",
+          "process.env",
+          "useRuntimeConfig",
+          "window",
+          "document",
+          "реактивност",
+          "Vue",
+          "storage",
+          "серверное окружение",
+          "runtime config"
+        ],
+        "falseClaims": [
+          "server/api выполняется в браузере при SSR",
+          "в API-роуте можно использовать ref() и onMounted",
+          "window доступен в defineEventHandler",
+          "Nitro — это клиентский bundler Nuxt"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_api_mistakes",
+      "title": "Знает типичные ошибки API-роутов",
+      "expected": "Кандидат называет: забытый await у readBody; голый Error вместо createError; ручная проверка method вместо .get.ts/.post.ts; event.context.params vs getRouterParam.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes ITLead — частые production-баги",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "request_data_helpers",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "createError",
+              "404",
+              "500"
+            ],
+            "ask": "почему throw new Error('Not found') хуже createError({ statusCode: 404 })"
+          },
+          {
+            "match": [
+              "users.get.ts",
+              "users.post.ts",
+              "event.method"
+            ],
+            "ask": "зачем отдельные файлы на метод вместо if (event.method === 'GET')"
+          }
+        ],
+        "mustConcepts": [
+          "await readBody",
+          "createError",
+          "statusCode",
+          "500",
+          "stack trace",
+          "new Error",
+          "405",
+          ".get.ts",
+          ".post.ts",
+          "event.method",
+          "getRouterParam",
+          "event.context.params",
+          "валидац",
+          "422",
+          "без await",
+          "Promise"
+        ],
+        "falseClaims": [
+          "throw new Error даёт корректный HTTP 404",
+          "readBody без await возвращает распарсенный JSON",
+          "ручная проверка event.method — рекомендуемый паттерн Nuxt",
+          "createError нужен только в production"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "usefetch_ssr_aware",
+      "title": "Вызывает API из страниц через useFetch/$fetch",
+      "expected": "Кандидат объясняет: useFetch/$fetch из компонентов; useFetch SSR-aware — на сервере in-process без HTTP, на клиенте реальный запрос.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Calling routes from pages — связка frontend и server/api",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useFetch",
+              "SSR",
+              "in-process"
+            ],
+            "ask": "почему useFetch на сервере может не делать сетевой запрос к /api"
+          }
+        ],
+        "mustConcepts": [
+          "useFetch",
+          "$fetch",
+          "SSR",
+          "in-process",
+          "без HTTP",
+          "клиент",
+          "сервер",
+          "компонент",
+          "страниц",
+          "сетевой запрос",
+          "ofetch",
+          "/api/"
+        ],
+        "falseClaims": [
+          "useFetch всегда делает HTTP-запрос и на сервере, и на клиенте",
+          "из server/api нельзя вызывать другие API-роуты",
+          "$fetch работает только на клиенте",
+          "useFetch не поддерживает server/api маршруты"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "api_vs_routes_advanced",
+      "title": "Знает server/routes, utils, middleware и статусы",
+      "expected": "Кандидат различает server/api (префикс /api) и server/routes (любой URL); server/utils auto-import; auth через server/middleware → event.context.user; setResponseStatus для 201.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "follow-up questions ITLead — бонус middle",
+        "mustConcepts": [
+          "server/routes",
+          "server/utils",
+          "server/middleware",
+          "auto-import",
+          "webhook",
+          "sitemap",
+          "event.context.user",
+          "аутентиф",
+          "setResponseStatus",
+          "201",
+          "без /api",
+          "префикс",
+          "общая логика"
+        ],
+        "falseClaims": [
+          "server/routes тоже автоматически получают префикс /api",
+          "server/utils требует явного import в каждом handler",
+          "аутентификацию нельзя вынести в server/middleware",
+          "HTTP-статус нельзя изменить — всегда 200 при return объекта"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Кладу `.ts` в `server/api/` — Nuxt сам регистрирует `/api/*`. Обработчик в `defineEventHandler`, query через `getQuery`, body через `await readBody`, параметр `[id]` через `getRouterParam`. Ошибки — `createError({ statusCode: 404 })`. Со страницы `useFetch('/api/users/42')`: на SSR вызов in-process, на клиенте — HTTP.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для GET делаю `users/[id].get.ts` — POST автоматом 405. Валидацию body в `users.post.ts`, generic `readBody<{ name: string }>`. Webhook без /api — в `server/routes/`. Общий код в `server/utils/`, auth в middleware пишет user в `event.context.user`.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "API-роуты крутятся в Nitro на Node — есть env и runtimeConfig, нет window. Создал ресурс — `setResponseStatus(event, 201)` перед return. Не мешаю browser API в handler.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "API-маршруты настраиваю в nuxt.config routes. В handler читаю body через `readBody(event)` без await — работает как синхронный JSON.parse.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Not found кидаю через `throw new Error('Not found')` — клиент получит 404. В одном файле проверяю `if (event.method === 'GET')` и `if (event.method === 'POST')` — так рекомендует Nuxt.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "useFetch на сервере всегда бьётся в localhost по HTTP. server/api и server/routes — одно и то же, оба под /api. В API-роуте спокойно использую `document` и `ref()`.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "nuxt_api_basics",
+      "exampleType": "good",
+      "exampleText": "Файл `server/api/hello.get.ts` с `defineEventHandler(() => ({ message: 'hello' }))` — GET /api/hello без конфига роутера.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "nuxt_api_basics",
+      "exampleType": "good",
+      "exampleText": "ну кинул ts в server/api — nuxt сам сделает /api/..., defineEventHandler обязателен, h3 так устроен",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "nuxt_api_basics",
+      "exampleType": "bad",
+      "exampleText": "defineEventHandler нужен только для POST; GET-роуты работают как обычные export default function.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "file_path_url_mapping",
+      "exampleType": "good",
+      "exampleText": "`server/api/users/[id].delete.ts` — только DELETE /api/users/:id; GET вернёт 405 без моего кода.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "file_path_url_mapping",
+      "exampleType": "good",
+      "exampleText": "users.ts и users/index.ts оба дают /api/users; несколько [param] в одном пути — `[userId]/posts/[postId].ts`",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "file_path_url_mapping",
+      "exampleType": "bad",
+      "exampleText": "Динамический сегмент задаю через `users/:id.ts` — Nuxt понимает Express-синтаксис.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "request_data_helpers",
+      "exampleType": "good",
+      "exampleText": "GET /api/search?q=nuxt — `getQuery(event)`; POST body — `const body = await readBody(event)`; /api/users/42 — `getRouterParam(event, 'id')`.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "request_data_helpers",
+      "exampleType": "good",
+      "exampleText": "без await readBody вернёт Promise — самый частый баг; generic readBody<T> даёт типы для name/email",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "request_data_helpers",
+      "exampleType": "bad",
+      "exampleText": "readBody синхронный — `const body = readBody(event)` сразу даёт объект с полями.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "nitro_h3_environment",
+      "exampleType": "good",
+      "exampleText": "Handler в Nitro на Node: `useRuntimeConfig()`, env, storage — ок; window/document/ref — нет, это не браузер.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "nitro_h3_environment",
+      "exampleType": "good",
+      "exampleText": "server/api — серверный код h3/nitro, не vue-компонент; реактивность vue тут не работает",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "nitro_h3_environment",
+      "exampleType": "bad",
+      "exampleText": "При SSR defineEventHandler выполняется в браузере рядом с компонентом.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_api_mistakes",
+      "exampleType": "good",
+      "exampleText": "404 — `createError({ statusCode: 404, message: 'Not found' })`, не raw Error. Методы — отдельные `users.get.ts` и `users.post.ts`, не if в одном файле.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_api_mistakes",
+      "exampleType": "good",
+      "exampleText": "params через getRouterParam надёжнее context.params во вложенных роутах; body всегда await",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_api_mistakes",
+      "exampleType": "bad",
+      "exampleText": "throw new Error('Not found') — правильный способ вернуть 404 в Nuxt API.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "usefetch_ssr_aware",
+      "exampleType": "good",
+      "exampleText": "`const { data } = await useFetch('/api/users/' + id)` — на SSR handler вызывается in-process, в DevTools сети может не быть запроса.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "usefetch_ssr_aware",
+      "exampleType": "good",
+      "exampleText": "на клиенте useFetch уже ходит по http на /api/..., на сервере — прямой вызов nitro handler",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "usefetch_ssr_aware",
+      "exampleType": "bad",
+      "exampleText": "useFetch на сервере всегда делает fetch('http://localhost:3000/api/...') — двойной round-trip.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "api_vs_routes_advanced",
+      "exampleType": "good",
+      "exampleText": "Webhook `/stripe` — `server/routes/stripe.post.ts` без /api; shared validateToken в `server/utils/`; middleware кладёт user в context.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "api_vs_routes_advanced",
+      "exampleType": "good",
+      "exampleText": "создал user — setResponseStatus(event, 201); utils auto-import, import не нужен",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "api_vs_routes_advanced",
+      "exampleType": "bad",
+      "exampleText": "sitemap.xml обязательно класть в server/api/sitemap.xml.ts — иначе URL будет /sitemap.xml без /api.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nuxt-server-api-routes",
+    "apiUrl": "https://api.itlead.org/api/questions/nuxt-server-api-routes",
+    "pageUrl": "https://itlead.org/interview-questions/nuxt/nuxt-server-api-routes",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to create API routes in Nuxt?",
+    "categorySlug": "nuxt",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

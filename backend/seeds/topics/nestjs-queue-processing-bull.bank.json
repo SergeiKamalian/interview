@@ -1,0 +1,675 @@
+{
+  "topic": {
+    "code": "nestjs_queue_processing_bull",
+    "name": "Обработка очередей с Bull в NestJS",
+    "skillCode": "nestjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как реализовать обработку очередей с Bull в NestJS?",
+    "shortAnswer": "Bull в NestJS выносит медленные фоновые задачи из HTTP-цикла в Redis-очередь с персистентностью и повторными попытками. Установите `@nestjs/bull` и `bull`, вызовите `BullModule.forRoot()` с конфигом Redis, затем `BullModule.registerQueue()` в каждом feature-модуле. Сервис добавляет job через `queue.add()`, processor обрабатывает его в `@Process()` — HTTP-ответ уходит до начала обработки.",
+    "idealAnswer": "Очереди обрабатывают фоновые задачи, слишком медленные или ресурсоёмкие для цикла запрос-ответ: отправка email, ресайз изображений, генерация PDF, аналитика. Bull использует Redis как персистентное хранилище jobs: `queue.add()` кладёт задачу, worker забирает, обрабатывает, помечает completed или failed. `@nestjs/bull` оборачивает Bull в модульную систему NestJS: `BullModule.forRoot()` — глобальный Redis; `BullModule.registerQueue({ name })` — именованная очередь как provider; `@InjectQueue('name')` — инстанс очереди в сервисе; `@Processor('name')` + `@Process('jobName')` — consumer. HTTP handler добавляет job и сразу отвечает; processor выполняет работу когда worker свободен. Внутри Bull атомарные операции через Redis Lua: `queue.add()` пишет metadata (attempts, delay, backoff); workers опрашивают через `BRPOPLPUSH`; job переходит active → completed/failed. Redis сохраняет состояние при падении Node-процесса. Обязательно `registerQueue()` в feature-модуле — только `forRoot()` в AppModule без registerQueue приводит к runtime-ошибке `@InjectQueue`. В `defaultJobOptions` с первого дня: `attempts: 3`, `backoff: { type: 'exponential', delay: 2000 }`, `removeOnComplete: true` — без removeOnComplete completed jobs забивают Redis гигабайтами. Высокий `attempts` без backoff насыщает Redis при постоянных ошибках. CPU-heavy синхронная работа в processor блокирует event loop — `concurrency: 1` или child process. Дополнительные опции: `delay` для отложенных jobs, `repeat: { cron }` для recurring, `priority` (меньше число — выше приоритет), `limiter` для rate limit внешних API, `addBulk` для пакетной постановки, `jobId` для дедупликации. `@OnQueueFailed()` — алерты и dead-letter логика, не полагаться только на silent retry. Bull Board — UI для failed jobs, retry counts, queue depth; метрики через bullmq-prometheus. При падении worker mid-job Bull переводит job в stalled и re-queue при reconnect; для идемпотентности проверять флаг в БД перед обработкой. `@Process({ concurrency: 5 })` — до 5 параллельных jobs на процесс; горизонтальное масштабирование — несколько NestJS-инстансов, каждый опрашивает одну Redis-очередь. При падении Redis workers останавливают polling; active jobs ждут восстановления; данные не теряются при RDB/AOF. Bull vs альтернативы: Bull — задачи >500ms, retries, distributed workers; Agenda.js если нет Redis; setTimeout — простая задержка без persistence; Kafka — high-throughput streaming; синхронный ответ — очередь не нужна. BullMQ — новее, быстрее Lua, flows, лучше TypeScript; для новых проектов `@nestjs/bullmq` предпочтительнее. Реальные кейсы: onboarding (avatar + welcome email + analytics), e-commerce (invoice PDF + stock update), cron report exports, Kafka event → Bull для медленной записи в БД. Масштаб до миллионов jobs: шардирование очередей по типу, несколько worker-инстансов на очередь, Redis Cluster, autoscale по queue depth.",
+    "maxScore": 10,
+    "skills": [
+      "nestjs",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "bull_queue_definition",
+      "title": "Понимает назначение Bull и очередей",
+      "expected": "Кандидат объясняет: Bull выносит медленные фоновые задачи из HTTP-цикла в Redis-очередь; `queue.add()` ставит job, worker обрабатывает асинхронно; персистентность и retries встроены; подходит для email, PDF, image resize, analytics.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — зачем очереди и Bull из ITLead TL;DR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "bull_queue_definition",
+            "oftenConfusedWith": [
+              "nestjs_bull_setup",
+              "bull_vs_alternatives"
+            ],
+            "anchorTermsExpected": [
+              "Bull",
+              "Redis",
+              "фонов",
+              "очеред",
+              "queue.add",
+              "HTTP",
+              "retry",
+              "персистент"
+            ],
+            "anchorTermsWrongTopic": [
+              "Bull заменяет Redis",
+              "очередь синхронная",
+              "HTTP ждёт processor"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Bull",
+              "очеред",
+              "фонов"
+            ],
+            "ask": "зачем выносить отправку email в очередь вместо await в контроллере"
+          }
+        ],
+        "mustConcepts": [
+          "Bull",
+          "очеред",
+          "фонов",
+          "background",
+          "Redis",
+          "queue.add",
+          "worker",
+          "processor",
+          "HTTP",
+          "запрос-ответ",
+          "retry",
+          "повторн",
+          "персистент",
+          "email",
+          "PDF",
+          "500ms",
+          "медленн"
+        ],
+        "falseClaims": [
+          "Bull обрабатывает задачи синхронно в HTTP handler",
+          "очередь не нужна если есть async/await в контроллере",
+          "Bull хранит jobs только в памяти Node без Redis",
+          "HTTP-ответ ждёт завершения processor",
+          "Bull подходит для быстрых синхронных операций <50ms"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "nestjs_bull_setup",
+      "title": "Знает настройку @nestjs/bull",
+      "expected": "Кандидат описывает: `BullModule.forRoot({ redis })` глобально; `BullModule.registerQueue({ name })` в feature-модуле; `@InjectQueue('name')` в сервисе; `@Processor('name')` + `@Process('jobName')` для consumer; оба вызова обязательны.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "forRoot + registerQueue + декораторы — механизм NestJS",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "bull_queue_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "nestjs_bull_setup",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "forRoot",
+              "registerQueue",
+              "@InjectQueue",
+              "@Processor",
+              "@Process",
+              "BullModule"
+            ],
+            "anchorTermsWrongTopic": [
+              "достаточно только forRoot",
+              "registerQueue в AppModule один раз для всех"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "forRoot",
+              "registerQueue"
+            ],
+            "ask": "чем forRoot отличается от registerQueue и где каждый вызывается"
+          },
+          {
+            "match": [
+              "@Processor",
+              "@Process",
+              "@InjectQueue"
+            ],
+            "ask": "как сервис ставит job и как processor его обрабатывает в NestJS"
+          }
+        ],
+        "mustConcepts": [
+          "BullModule",
+          "forRoot",
+          "registerQueue",
+          "@InjectQueue",
+          "@Processor",
+          "@Process",
+          "Queue",
+          "Job",
+          "feature module",
+          "AppModule",
+          "redis",
+          "host",
+          "port",
+          "provider",
+          "consumer",
+          "декоратор"
+        ],
+        "falseClaims": [
+          "достаточно только BullModule.forRoot без registerQueue",
+          "registerQueue вызывают один раз в AppModule для всех очередей",
+          "@InjectQueue работает без registerQueue в том же модуле",
+          "@Processor автоматически регистрирует очередь в Redis",
+          "forRoot создаёт именованную очередь"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "add_and_process_jobs",
+      "title": "Умеет добавлять и обрабатывать jobs",
+      "expected": "Кандидат описывает: `queue.add('name', data)` и `addBulk`; `@Process('name')` handler получает `Job<data>`; HTTP отвечает до processor; `@OnQueueFailed()` для обработки ошибок; `job.data` содержит payload.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый flow add → process из ITLead quick example",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "queue.add",
+              "addBulk",
+              "@Process"
+            ],
+            "ask": "как контроллер ставит welcome email job и когда processor его отправляет"
+          }
+        ],
+        "mustConcepts": [
+          "queue.add",
+          "addBulk",
+          "job.data",
+          "Job",
+          "@Process",
+          "handle",
+          "welcome",
+          "payload",
+          "HTTP ответ",
+          "сразу",
+          "@OnQueueFailed",
+          "attemptsMade",
+          "return",
+          "sent"
+        ],
+        "falseClaims": [
+          "queue.add блокирует HTTP до завершения processor",
+          "addBulk выполняет jobs синхронно в том же потоке",
+          "@Process без имени обрабатывает все jobs очереди автоматически",
+          "job.data доступен только после completed"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "redis_job_lifecycle",
+      "title": "Понимает жизненный цикл job в Redis",
+      "expected": "Кандидат объясняет: Redis Lua для атомарности; BRPOPLPUSH polling; состояния waiting → active → completed/failed; stalled при падении worker; персистентность при crash Node/Redis RDB/AOF.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "внутренности Bull и follow-up про stalled/idempotency",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "stalled",
+              "active",
+              "re-queue"
+            ],
+            "ask": "что происходит если worker упал посередине job"
+          },
+          {
+            "match": [
+              "Redis",
+              "RDB",
+              "AOF",
+              "персистент"
+            ],
+            "ask": "что случится с active jobs если Redis упадёт и восстановится"
+          }
+        ],
+        "mustConcepts": [
+          "Redis",
+          "Lua",
+          "BRPOPLPUSH",
+          "active",
+          "completed",
+          "failed",
+          "waiting",
+          "stalled",
+          "re-queue",
+          "polling",
+          "metadata",
+          "attempt",
+          "crash",
+          "RDB",
+          "AOF",
+          "персистент",
+          "идемпотент"
+        ],
+        "falseClaims": [
+          "при падении worker job теряется навсегда",
+          "Bull не использует Redis lists/sets",
+          "active jobs исчезают при рестарте Redis без persistence",
+          "stalled jobs никогда не возвращаются в очередь",
+          "двойная обработка невозможна без ручной проверки в БД"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "job_options_retries",
+      "title": "Знает опции jobs: retries, delay, dedup",
+      "expected": "Кандидат называет: `attempts`, `backoff` exponential; `removeOnComplete`; `delay`; `repeat` cron; `priority`; `limiter`; `jobId` для дедупликации; `job.progress()` для отслеживания.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "defaultJobOptions и advanced options из ITLead",
+        "mustConcepts": [
+          "attempts",
+          "backoff",
+          "exponential",
+          "removeOnComplete",
+          "defaultJobOptions",
+          "delay",
+          "repeat",
+          "cron",
+          "priority",
+          "limiter",
+          "jobId",
+          "дедуплик",
+          "job.progress",
+          "concurrency"
+        ],
+        "falseClaims": [
+          "completed jobs удаляются из Redis автоматически по умолчанию",
+          "attempts: 50 без backoff — нормальная production-настройка",
+          "priority: больше число — выше приоритет",
+          "jobId создаёт новый job при каждом add с тем же id",
+          "repeat cron требует отдельного cron daemon вне Bull"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки Bull в NestJS",
+      "expected": "Кандидат называет: забытый `registerQueue` в feature module; отсутствие `removeOnComplete`; высокий attempts без backoff; CPU-heavy sync work в processor без concurrency limit; полагаться только на silent retry без `@OnQueueFailed`.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "nestjs_bull_setup",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "registerQueue",
+              "forRoot",
+              "runtime"
+            ],
+            "ask": "почему @InjectQueue падает если только forRoot в AppModule"
+          },
+          {
+            "match": [
+              "removeOnComplete",
+              "Redis",
+              "гигабайт"
+            ],
+            "ask": "что случится с Redis через недели без removeOnComplete"
+          },
+          {
+            "match": [
+              "concurrency",
+              "event loop",
+              "PDF"
+            ],
+            "ask": "почему тяжёлая генерация PDF в processor блокирует другие jobs"
+          }
+        ],
+        "mustConcepts": [
+          "registerQueue",
+          "forRoot",
+          "removeOnComplete",
+          "attempts",
+          "backoff",
+          "exponential",
+          "CPU-heavy",
+          "event loop",
+          "concurrency",
+          "child process",
+          "OnQueueFailed",
+          "silent retry",
+          "Redis memory",
+          "gigabyte",
+          "production",
+          "runtime error"
+        ],
+        "falseClaims": [
+          "forRoot достаточно для всех очередей приложения",
+          "removeOnComplete не влияет на память Redis",
+          "высокий attempts без delay безопасен при permanent failure",
+          "processor в отдельном thread pool Node по умолчанию",
+          "Bull Board заменяет @OnQueueFailed для алертов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "production_monitoring",
+      "title": "Знает мониторинг и масштабирование",
+      "expected": "Кандидат упоминает Bull Board UI; метрики queue depth и failure rate; alert на stalled >5min; `@Process({ concurrency: N })`; несколько NestJS-инстансов на одну очередь; шардирование очередей по типу job; Bull vs BullMQ.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "monitoring + concurrency + scaling из follow-up ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "concurrency",
+              "инстанс",
+              "worker"
+            ],
+            "ask": "как масштабировать обработку beyond concurrency: 5 на одном процессе"
+          },
+          {
+            "match": [
+              "BullMQ",
+              "Bull",
+              "nestjs/bullmq"
+            ],
+            "ask": "чем BullMQ отличается от Bull для нового NestJS проекта"
+          }
+        ],
+        "mustConcepts": [
+          "Bull Board",
+          "queue depth",
+          "failure rate",
+          "stalled",
+          "Prometheus",
+          "concurrency",
+          "инстанс",
+          "worker",
+          "горизонтальн",
+          "шард",
+          "Redis Cluster",
+          "autoscale",
+          "BullMQ",
+          "nestjs/bullmq",
+          "flows",
+          "миллион"
+        ],
+        "falseClaims": [
+          "concurrency: 5 заменяет необходимость нескольких worker-инстансов",
+          "Bull Board обязателен для работы очереди",
+          "Bull и BullMQ — один пакет с одинаковым API",
+          "одна очередь на всё приложение — лучшая практика при миллионе jobs",
+          "stalled jobs не требуют мониторинга"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "bull_vs_alternatives",
+      "title": "Понимает когда Bull, а когда альтернативы",
+      "expected": "Кандидат сравнивает: Bull — >500ms, retries, distributed workers; Agenda.js без Redis; setTimeout — простая задержка; Kafka — streaming; синхронный ответ — без очереди; реальные кейсы onboarding/e-commerce/cron.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "when to use таблица ITLead — бонусный checkpoint",
+        "mustConcepts": [
+          "500ms",
+          "retry",
+          "Agenda",
+          "MongoDB",
+          "setTimeout",
+          "Kafka",
+          "streaming",
+          "синхронн",
+          "onboarding",
+          "e-commerce",
+          "cron",
+          "microservice",
+          "распределён"
+        ],
+        "falseClaims": [
+          "Kafka заменяет Bull для welcome email",
+          "setTimeout даёт persistence и retry как Bull",
+          "Bull нужен для любого NestJS endpoint",
+          "Agenda требует Redis",
+          "синхронная генерация PDF в HTTP — всегда лучше очереди"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Bull выносит медленные задачи в Redis: контроллер вызывает emailQueue.add('welcome', { email }) и сразу отвечает 200. EmailProcessor с @Process('welcome') отправляет письмо когда worker свободен. forRoot — Redis глобально, registerQueue — в EmailModule. defaultJobOptions: attempts 3, exponential backoff, removeOnComplete true.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На signup ставлю три job в onboarding queue: resize-avatar, send-welcome, track-signup — Promise.all add, API отвечает до любого из них. @OnQueueFailed логирую и алертю. Bull Board на /admin/queues. Для PDF report processor concurrency: 1, jobId daily-{reportId} против дублей.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Redis хранит job metadata; BRPOPLPUSH забирает в active. Worker упал — stalled, re-queue. Идемпотентность: if (await repo.isProcessed(job.data.id)) return. Масштаб — 3 Nest pod на email queue, отдельная reports queue. Новым проектам советую @nestjs/bullmq.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Достаточно BullModule.forRoot в AppModule — @InjectQueue сам создаст очередь email. HTTP ждёт await mailer.send в контроллере, Bull не нужен. Completed jobs Redis чистит сам.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "attempts: 100 без backoff — надёжность. Тяжёлый PDF в @Process с concurrency: 20 на одном pod — норм. registerQueue один раз в AppModule для всех feature modules.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для welcome email беру Kafka — Bull только для cron. setTimeout(86400000) даёт те же retries что Bull. Worker crash — job потерян навсегда, Bull не восстанавливает.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "bull_queue_definition",
+      "exampleType": "good",
+      "exampleText": "Bull — Redis-очередь для фоновых задач: add в handler, processor вне HTTP-цикла, retries и persistence из коробки.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "bull_queue_definition",
+      "exampleType": "good",
+      "exampleText": "ну очередь как кухонный тикет — официант повесил, повар готовит, стол не ждёт",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "bull_queue_definition",
+      "exampleType": "bad",
+      "exampleText": "Bull — синхронная отправка email прямо в контроллере через await, Redis только для кеша.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "nestjs_bull_setup",
+      "exampleType": "good",
+      "exampleText": "AppModule: BullModule.forRoot({ redis }). EmailModule: registerQueue({ name: 'email' }). Service: @InjectQueue('email'). Processor: @Processor('email') + @Process('welcome').",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "nestjs_bull_setup",
+      "exampleType": "good",
+      "exampleText": "forRoot — коннект redis, registerQueue — конкретная очередь в модуле, без registerQueue inject падает",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "nestjs_bull_setup",
+      "exampleType": "bad",
+      "exampleText": "Только forRoot в AppModule — все @InjectQueue работают автоматически для любого имени.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "add_and_process_jobs",
+      "exampleType": "good",
+      "exampleText": "emailService.sendWelcome: await emailQueue.add('welcome', { email }). EmailProcessor @Process('welcome') async handle(job) { await mailer.send(job.data.email) }.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "add_and_process_jobs",
+      "exampleType": "good",
+      "exampleText": "addBulk для рассылки, @OnQueueFailed пишет в лог после attemptsMade — не молчаливый retry",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "add_and_process_jobs",
+      "exampleType": "bad",
+      "exampleText": "queue.add блокирует response пока processor не завершит job — так Bull гарантирует доставку.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "redis_job_lifecycle",
+      "exampleType": "good",
+      "exampleText": "add → waiting list; BRPOPLPUSH → active; success → completed, fail → failed/retry. Worker died → stalled → re-queue. Redis RDB/AOF — jobs не теряются.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "redis_job_lifecycle",
+      "exampleType": "good",
+      "exampleText": "перед обработкой if (repo.isProcessed(id)) return — защита от double-processing после stall",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "redis_job_lifecycle",
+      "exampleType": "bad",
+      "exampleText": "Active job при crash worker исчезает, Bull не отслеживает stalled.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "job_options_retries",
+      "exampleType": "good",
+      "exampleText": "defaultJobOptions: attempts 3, backoff exponential 2s, removeOnComplete true. Digest: add с delay 86400000. Urgent: priority 1.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "job_options_retries",
+      "exampleType": "good",
+      "exampleText": "jobId daily-report-42 — второй add не дублирует; limiter 10/sec для внешнего API",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "job_options_retries",
+      "exampleType": "bad",
+      "exampleText": "removeOnComplete не нужен — Redis сам чистит completed через час. attempts 50 без backoff — best practice.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "EmailModule обязан registerQueue — иначе runtime. removeOnComplete с day one. PDF processor concurrency 1 или child process, не 10 параллельных на event loop.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "забыл registerQueue — inject queue undefined; гигабайты completed без removeOnComplete; backoff обязателен при attempts >3",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "forRoot регистрирует все очереди — registerQueue опционален. Silent retry достаточно, OnQueueFailed не нужен в prod.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "production_monitoring",
+      "exampleType": "good",
+      "exampleText": "Bull Board на /admin/queues — failed, depth, retries. Alert stalled >5min, failure >1%. concurrency:5 на процесс + 4 Nest pod = горизонтальный scale.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "production_monitoring",
+      "exampleType": "good",
+      "exampleText": "шарды: email, images, reports — отдельные очереди и worker groups; новым проектам bullmq",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "production_monitoring",
+      "exampleType": "bad",
+      "exampleText": "concurrency:100 на одном pod заменяет несколько инстансов. BullMQ — deprecated, только @nestjs/bull.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "bull_vs_alternatives",
+      "exampleType": "good",
+      "exampleText": "Email >500ms с retry — Bull. Простой setTimeout без persistence — не Bull. High-throughput events — Kafka. Синхронный ответ пользователю — очередь не нужна.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "bull_vs_alternatives",
+      "exampleType": "good",
+      "exampleText": "onboarding три фоновых шага после signup — классический bull кейс",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "bull_vs_alternatives",
+      "exampleType": "bad",
+      "exampleText": "Любой NestJS CRUD endpoint должен идти через Bull и Kafka одновременно.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-queue-processing-bull",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-queue-processing-bull",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-queue-processing-bull",
+    "difficulty": "SENIOR",
+    "titleEn": "How to implement queue processing with Bull in NestJS?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

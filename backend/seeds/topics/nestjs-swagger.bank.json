@@ -1,0 +1,673 @@
+{
+  "topic": {
+    "code": "nestjs_swagger",
+    "name": "Документация API с Swagger в NestJS",
+    "skillCode": "nestjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как документировать NestJS API с помощью Swagger?",
+    "shortAnswer": "Пакет `@nestjs/swagger` генерирует OpenAPI-документацию из TypeScript-декораторов при старте приложения. Установите пакет, настройте `SwaggerModule.setup()` в `main.ts` и откройте `/api/docs` для интерактивного UI. Добавьте `@ApiProperty()` на поля DTO и `@ApiTags()`, `@ApiOperation()`, `@ApiResponse()` на контроллеры. Документация пересобирается при каждом рестарте и всегда соответствует актуальным маршрутам.",
+    "idealAnswer": "NestJS имеет первоклассную поддержку Swagger/OpenAPI через `@nestjs/swagger`. Пакет автоматически генерирует интерактивную документацию из декораторов на контроллерах, DTO и маршрутах — отдельный YAML не нужен, ручная синхронизация не требуется. Базовая настройка в `main.ts`: `DocumentBuilder` собирает метаданные (title, version, tags, Bearer auth), `SwaggerModule.createDocument(app, config)` сканирует все загруженные модули и строит OpenAPI v3 JSON в памяти, `SwaggerModule.setup('api/docs', app, document)` отдаёт UI по `/api/docs` и сырой JSON по `/api/docs-json`. На каждое поле DTO нужен `@ApiProperty()` или `@ApiPropertyOptional()` — без них Swagger показывает `{}` без типа и примера. Контроллеры декорируют `@ApiTags()` для группировки, `@ApiOperation()` для summary, `@ApiResponse()` по статус-кодам, `@ApiBearerAuth()` для JWT, `@ApiParam`/`@ApiQuery` для параметров, `@ApiConsumes('multipart/form-data')` для загрузки файлов. Ключевое отличие от Postman/README: код — единственный source of truth; при старте декораторы сканируются через `reflect-metadata`, спека всегда свежая, drift невозможен. В CI можно diff `/api/docs-json` для проверки breaking changes. Когда использовать: frontend/mobile потребители API, QA с JWT через кнопку Authorize, monorepo с несколькими сервисами, versioned API. Когда пропустить: внутренний прототип до 5 эндпоинтов без внешних потребителей. Типичные ошибки: отсутствие `import 'reflect-metadata'` в `main.ts` — метаданные `@ApiProperty()` пропадают без ошибки; циклические DTO без factory `type: () => ProfileDto` → stack overflow; `@ApiProperty()` на private полях — Swagger показывает, runtime скрывает; нет `@ApiTags()` — все 30+ маршрутов в default; file upload без `@ApiConsumes` — UI показывает JSON вместо file picker; несовместимость версий `@nestjs/swagger@7.1+` с NestJS 10. Follow-up: enum через `@ApiProperty({ enum, enumName })` — dropdown в UI; nested DTO через `type: () => AddressDto`, массивы `type: [ImageDto]`; class-validator (`@IsEmail`) не влияет на схему — нужен отдельный `@ApiProperty()`; `@nestjs/mapped-types` PartialType/OmitType переносят metadata; SDK — fetch `/api/docs-json` → openapi-generator-cli или Orval; guards не меняют схему — `@ApiBearerAuth()` + `@ApiResponse({ status: 401 })`; prod — `if (NODE_ENV !== 'production') setup()` или guard на `/api/docs`.",
+    "maxScore": 10,
+    "skills": [
+      "nestjs",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "swagger_setup",
+      "title": "Знает базовую настройку SwaggerModule",
+      "expected": "Кандидат описывает: установка `@nestjs/swagger`, `DocumentBuilder` (title, version, addBearerAuth, addTag), `SwaggerModule.createDocument(app, config)`, `SwaggerModule.setup('api/docs', app, document)` — UI на `/api/docs`, JSON на `/api/docs-json`.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — три вызова в main.ts из ITLead quick setup",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "swagger_setup",
+            "oftenConfusedWith": [
+              "startup_mechanism"
+            ],
+            "anchorTermsExpected": [
+              "DocumentBuilder",
+              "createDocument",
+              "setup",
+              "api/docs",
+              "SwaggerModule"
+            ],
+            "anchorTermsWrongTopic": [
+              "ручной YAML",
+              "Postman collection",
+              "документация только в build time"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "DocumentBuilder",
+              "createDocument",
+              "setup"
+            ],
+            "ask": "что делает каждый из трёх вызовов DocumentBuilder → createDocument → setup"
+          }
+        ],
+        "mustConcepts": [
+          "@nestjs/swagger",
+          "SwaggerModule",
+          "DocumentBuilder",
+          "createDocument",
+          "setup",
+          "main.ts",
+          "api/docs",
+          "docs-json",
+          "OpenAPI",
+          "setTitle",
+          "setVersion",
+          "addBearerAuth",
+          "addTag",
+          "build",
+          "интерактив",
+          "UI"
+        ],
+        "falseClaims": [
+          "Swagger требует отдельный YAML-файл рядом с кодом",
+          "setup() только отдаёт JSON без HTML UI",
+          "createDocument вызывают один раз при npm install",
+          "DocumentBuilder сканирует контроллеры напрямую без createDocument",
+          "документация не обновляется при изменении декораторов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "dto_decorators",
+      "title": "Декорирует DTO через @ApiProperty",
+      "expected": "Кандидат объясняет: каждое поле DTO нуждается в `@ApiProperty()` или `@ApiPropertyOptional()`; без декоратора поле `{}` без типа; example, description, enum, minLength в options.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "DTO metadata — основа читаемой схемы в UI",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "advanced_topics",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ApiProperty",
+              "ApiPropertyOptional"
+            ],
+            "ask": "что будет в Swagger UI если забыть @ApiProperty на поле DTO"
+          }
+        ],
+        "mustConcepts": [
+          "ApiProperty",
+          "ApiPropertyOptional",
+          "DTO",
+          "example",
+          "description",
+          "optional",
+          "enum",
+          "minLength",
+          "minimum",
+          "default",
+          "тип",
+          "схем",
+          "поле",
+          "без декоратор",
+          "пустой объект",
+          "metadata"
+        ],
+        "falseClaims": [
+          "TypeScript типы автоматически попадают в Swagger без @ApiProperty",
+          "class-validator @IsString заменяет @ApiProperty",
+          "ApiPropertyOptional делает поле обязательным в схеме",
+          "private поля с @ApiProperty корректно сериализуются в runtime",
+          "Swagger читает JSDoc комментарии вместо @ApiProperty"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "controller_decorators",
+      "title": "Декорирует контроллеры и маршруты",
+      "expected": "Кандидат перечисляет: `@ApiTags()` группировка, `@ApiOperation()` summary, `@ApiResponse()` по status, `@ApiBearerAuth()` JWT, `@ApiParam`/`@ApiQuery`, `@ApiConsumes('multipart/form-data')` для upload.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "полный набор декораторов контроллера — ключевой middle skill",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ApiTags",
+              "ApiOperation",
+              "ApiResponse"
+            ],
+            "ask": "как сгруппировать 30 маршрутов и описать 200/404/401 ответы"
+          },
+          {
+            "match": [
+              "ApiBearerAuth",
+              "Authorize",
+              "addBearerAuth"
+            ],
+            "ask": "как QA тестирует protected routes через Swagger UI без curl"
+          },
+          {
+            "match": [
+              "ApiConsumes",
+              "multipart",
+              "upload"
+            ],
+            "ask": "почему file upload без @ApiConsumes показывает JSON body"
+          }
+        ],
+        "mustConcepts": [
+          "ApiTags",
+          "ApiOperation",
+          "ApiResponse",
+          "ApiBearerAuth",
+          "ApiParam",
+          "ApiQuery",
+          "ApiConsumes",
+          "multipart/form-data",
+          "status",
+          "summary",
+          "группиров",
+          "Authorize",
+          "JWT",
+          "lock icon",
+          "type",
+          "description",
+          "404",
+          "401",
+          "201",
+          "400"
+        ],
+        "falseClaims": [
+          "Guards автоматически добавляют @ApiBearerAuth в схему",
+          "ApiResponse необязателен — Swagger угадает тип от return",
+          "ApiTags работает только на методах, не на контроллере",
+          "FileInterceptor заменяет @ApiConsumes для Swagger UI",
+          "addBearerAuth в DocumentBuilder не связан с @ApiBearerAuth на контроллере"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "code_as_source_of_truth",
+      "title": "Понимает код как единственный source of truth",
+      "expected": "Кандидат сравнивает со статичными Postman/README: декораторы сканируются при старте, спека всегда актуальна, нет drift; может упомянуть CI diff `/api/docs-json` для breaking-change check.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "ключевой selling point из ITLead vs Postman",
+        "mustConcepts": [
+          "source of truth",
+          "декоратор",
+          "старт",
+          "bootstrap",
+          "restart",
+          "актуальн",
+          "drift",
+          "Postman",
+          "README",
+          "устар",
+          "docs-json",
+          "CI",
+          "diff",
+          "breaking change",
+          "contract",
+          "Pact"
+        ],
+        "falseClaims": [
+          "Swagger требует ручного обновления YAML после каждого изменения route",
+          "Postman collection надёжнее потому что не зависит от кода",
+          "документация генерируется только один раз при build",
+          "изменение контроллера не влияет на Swagger до redeploy docs site"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "startup_mechanism",
+      "title": "Понимает механизм генерации при старте",
+      "expected": "Кандидат описывает: `createDocument()` через `reflect-metadata` сканирует `@Controller`, `@Get`/`@Post`, `@ApiProperty` по DI-контейнеру; в памяти OpenAPI v3; `setup()` отдаёт JSON и Swagger UI HTML; перегенерация на каждый bootstrap.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "how it works at startup — ITLead theory block",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "reflect-metadata",
+              "createDocument",
+              "scan"
+            ],
+            "ask": "как createDocument узнаёт о полях DTO и маршрутах контроллера"
+          }
+        ],
+        "mustConcepts": [
+          "reflect-metadata",
+          "createDocument",
+          "scan",
+          "сканир",
+          "DI",
+          "контейнер",
+          "Controller",
+          "Get",
+          "Post",
+          "OpenAPI v3",
+          "памят",
+          "bootstrap",
+          "setup",
+          "docs-json",
+          "Swagger UI",
+          "dist/ui",
+          "перегенер",
+          "каждый старт"
+        ],
+        "falseClaims": [
+          "Swagger читает исходники TypeScript файлов напрямую с диска",
+          "OpenAPI spec компилируется заранее в build step и не меняется",
+          "reflect-metadata не нужен если есть @ApiProperty",
+          "createDocument работает без загруженных NestJS modules"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки Swagger в NestJS",
+      "expected": "Кандидат называет: нет `reflect-metadata` → пустые docs; циклические DTO без `type: () => X`; @ApiProperty на private; нет @ApiTags при 30+ routes; upload без @ApiConsumes; version mismatch @nestjs/swagger 7.1+ для Nest 10.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — частые production ловушки",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "dto_decorators",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "reflect-metadata",
+              "пуст",
+              "empty"
+            ],
+            "ask": "docs приходят пустые — что проверить первым делом"
+          },
+          {
+            "match": [
+              "circular",
+              "цикл",
+              "factory",
+              "type: ()"
+            ],
+            "ask": "Maximum call stack exceeded между UserDto и ProfileDto — как починить"
+          },
+          {
+            "match": [
+              "ApiConsumes",
+              "multipart",
+              "upload"
+            ],
+            "ask": "Swagger показывает JSON textarea вместо file picker — причина"
+          }
+        ],
+        "mustConcepts": [
+          "reflect-metadata",
+          "пуст",
+          "empty docs",
+          "циклич",
+          "circular",
+          "type: ()",
+          "factory",
+          "stack overflow",
+          "private",
+          "ApiTags",
+          "default group",
+          "ApiConsumes",
+          "multipart",
+          "file picker",
+          "version mismatch",
+          "7.1",
+          "NestJS 10",
+          "enum generation"
+        ],
+        "falseClaims": [
+          "пустая Swagger схема всегда значит забыли npm install",
+          "circular DTO решается import type вместо factory function",
+          "@ApiProperty на private поле безопасно — runtime и docs совпадают",
+          "без @ApiTags все маршруты автоматически группируются по controller name",
+          "старая @nestjs/swagger 6.x полностью совместима с NestJS 10 без проблем"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда использовать Swagger",
+      "expected": "Кандидат называет: frontend/mobile потребители, QA auth flows, monorepo integration, versioned API; пропустить для tiny internal prototype без внешних consumers; prod lockdown через env или guard.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "when to use таблица ITLead — контекст middle",
+        "mustConcepts": [
+          "frontend",
+          "mobile",
+          "QA",
+          "Try it",
+          "monorepo",
+          "versioned",
+          "prototype",
+          "internal",
+          "production",
+          "NODE_ENV",
+          "guard",
+          "staging",
+          "dev",
+          "skip",
+          "внешн",
+          "потребител"
+        ],
+        "falseClaims": [
+          "Swagger обязателен для любого NestJS проекта",
+          "в production Swagger всегда должен быть публично доступен",
+          "внутренний серvice с 3 эндпоинтами обязан иметь Swagger с первого дня",
+          "Swagger заменяет integration tests"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "advanced_topics",
+      "title": "Знает продвинутые темы Swagger",
+      "expected": "Кандидат упоминает: enum с enumName → dropdown; nested DTO `type: () => X`; class-validator не влияет на схему; PartialType/OmitType; SDK через docs-json + Orval; guards + @ApiResponse 401; prod security.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "follow-up questions ITLead — бонус middle+",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "enum",
+              "enumName",
+              "dropdown"
+            ],
+            "ask": "как enum отображается как dropdown в Swagger UI"
+          },
+          {
+            "match": [
+              "class-validator",
+              "IsEmail",
+              "mapped-types"
+            ],
+            "ask": "читает ли Swagger @IsEmail автоматически"
+          },
+          {
+            "match": [
+              "Orval",
+              "openapi-generator",
+              "SDK"
+            ],
+            "ask": "как сгенерировать typed client из NestJS Swagger"
+          }
+        ],
+        "mustConcepts": [
+          "enumName",
+          "dropdown",
+          "nested",
+          "type: ()",
+          "массив",
+          "class-validator",
+          "IsEmail",
+          "mapped-types",
+          "PartialType",
+          "OmitType",
+          "Orval",
+          "openapi-generator",
+          "SDK",
+          "401",
+          "guard",
+          "Exclude",
+          "ClassSerializerInterceptor",
+          "production",
+          "staging"
+        ],
+        "falseClaims": [
+          "@IsString автоматически добавляет string type в OpenAPI",
+          "Guards меняют OpenAPI security schema динамически",
+          "Orval требует ручного копирования типов из контроллеров",
+          "enum без enumName всегда рендерится как dropdown",
+          "@Exclude из class-transformer не влияет на Swagger schema"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "`@nestjs/swagger`: DocumentBuilder → createDocument → setup('api/docs'). На DTO — @ApiProperty с example, на контроллер — @ApiTags, @ApiOperation, @ApiResponse. При старте reflect-metadata сканирует декораторы, спека всегда совпадает с кодом. QA жмёт Authorize с JWT и тестирует protected routes.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Ставлю swagger в main.ts, addBearerAuth для JWT. UsersController с @ApiTags('users'), каждый метод с @ApiResponse 200/404. CreateUserDto — @ApiProperty на email/name, optional age через ApiPropertyOptional. В CI diff docs-json между билдами. Prod — setup только если NODE_ENV !== production.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Upload: @ApiConsumes multipart + FileInterceptor — иначе UI показывает JSON. Циклический ProfileDto — @ApiProperty({ type: () => ProfileDto }). Enum category — enumName для dropdown. class-validator отдельно, Swagger не читает @IsEmail.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Swagger — это YAML файл в репо, который обновляем вручную после каждого PR. TypeScript типы DTO автоматически попадают в UI без декораторов.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Достаточно @IsEmail из class-validator — @ApiProperty лишний. File upload работает в Swagger без @ApiConsumes, Nest сам поймёт multipart.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Docs пустые — значит swagger не установлен, reflect-metadata не при чём. В production Swagger всегда открыт публично для удобства.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "swagger_setup",
+      "exampleType": "good",
+      "exampleText": "DocumentBuilder setTitle/setVersion/addBearerAuth.build() → createDocument(app, config) → setup('api/docs', app, document). JSON на /api/docs-json.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "swagger_setup",
+      "exampleType": "good",
+      "exampleText": "три строки в main.ts — config, document, setup — и на localhost:3000/api/docs интерактивная дока",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "swagger_setup",
+      "exampleType": "bad",
+      "exampleText": "createDocument вызывают один раз при npm run build и сохраняют JSON в static folder.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "dto_decorators",
+      "exampleType": "good",
+      "exampleText": "@ApiProperty({ example: 'alice@example.com', description: 'Unique email' }) на email; @ApiPropertyOptional для age; enum role с default 'user'.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "dto_decorators",
+      "exampleType": "good",
+      "exampleText": "без ApiProperty поле в swagger как пустой объект — всегда декорирую каждое поле dto",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "dto_decorators",
+      "exampleType": "bad",
+      "exampleText": "TypeScript interface достаточно — Swagger выведет типы из TS compiler.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "controller_decorators",
+      "exampleType": "good",
+      "exampleText": "@ApiTags('users') на контроллер, @ApiOperation summary на метод, @ApiResponse 200 type UserResponseDto и 404 Not found, @ApiBearerAuth для JWT.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "controller_decorators",
+      "exampleType": "good",
+      "exampleText": "addBearerAuth в DocumentBuilder + @ApiBearerAuth на контроллере — QA вставляет token в Authorize и бьёт protected GET",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "controller_decorators",
+      "exampleType": "bad",
+      "exampleText": "AuthGuard('jwt') автоматически документирует Bearer — @ApiBearerAuth не нужен.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "code_as_source_of_truth",
+      "exampleType": "good",
+      "exampleText": "Postman collection устаревает — route поменяли, docs соврали. Swagger пересканирует декораторы при каждом рестарте, drift невозможен.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "code_as_source_of_truth",
+      "exampleType": "good",
+      "exampleText": "в ci качаем docs-json и diff с предыдущим — ловим breaking changes в contract",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "code_as_source_of_truth",
+      "exampleType": "bad",
+      "exampleText": "Swagger docs и код живут отдельно — после изменения controller нужно вручную править openapi.yaml.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "startup_mechanism",
+      "exampleType": "good",
+      "exampleText": "createDocument через reflect-metadata обходит все @Controller и @ApiProperty в DI-контейнере, собирает OpenAPI v3 в памяти, setup отдаёт UI и JSON.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "startup_mechanism",
+      "exampleType": "good",
+      "exampleText": "каждый bootstrap — свежая спека, ничего не pre-compile",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "startup_mechanism",
+      "exampleType": "bad",
+      "exampleText": "Swagger парсит .ts файлы grep-ом при каждом HTTP запросе к /api/docs.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Пустые docs — первым делом import 'reflect-metadata' в main.ts. Circular UserDto↔ProfileDto — type: () => ProfileDto. Upload — @ApiConsumes multipart.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "30 routes без ApiTags — каша в default tab. Nest 10 — swagger 7.1+, иначе enum schema ломается молча",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "@ApiProperty на private email — норм, runtime и swagger совпадают. Цикл DTO лечится обычным import без factory.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Frontend/mobile команда — Swagger с Try it. QA JWT flows — Authorize button. Прототип на 3 internal endpoints — можно отложить.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "prod — setup только dev/staging или guard с api key на /api/docs",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Любой NestJS проект обязан иметь публичный Swagger в production без ограничений.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "advanced_topics",
+      "exampleType": "good",
+      "exampleText": "Enum: @ApiProperty({ enum: Category, enumName: 'Category' }) — dropdown. Nested: type: () => AddressDto. SDK: fetch docs-json → Orval. @IsEmail не влияет на schema.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "advanced_topics",
+      "exampleType": "good",
+      "exampleText": "PartialType(CreateUserDto) тащит ApiProperty metadata. Protected route — @ApiResponse 401, guard на схему не влияет",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "advanced_topics",
+      "exampleType": "bad",
+      "exampleText": "Guards динамически меняют OpenAPI paths — @ApiBearerAuth лишний. Orval требует писать types руками из контроллеров.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-swagger",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-swagger",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-swagger",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to document a NestJS API with Swagger?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

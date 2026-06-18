@@ -1,0 +1,621 @@
+{
+  "topic": {
+    "code": "infer_keyword_typescript_infer_typescript",
+    "name": "Ключевое слово infer в TypeScript",
+    "skillCode": "typescript",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое ключевое слово infer в TypeScript и как оно работает внутри conditional types?",
+    "shortAnswer": "infer — ключевое слово TypeScript, которое захватывает и именует тип изнутри совпадения conditional type, позволяя извлекать части структуры типа без предварительного знания их значения. infer R привязывается к типу в структурной позиции, когда extends-совпадение успешно; захваченный тип доступен только в true-ветке.",
+    "idealAnswer": "infer — ключевое слово TypeScript для захвата и именования типа изнутри conditional type: вы описываете форму (shape), компилятор подставляет совпавшую часть — аналог capture group в regex для типов. Работает только внутри клаузы extends условного типа; захваченная переменная (например R или U) существует только в true-ветке. Классический пример: type FnReturn<T> = T extends (...args: any[]) => infer R ? R : never — извлекает return type любой функции. В отличие от прямого доступа T['returnType'] или T[0], infer захватывает тип из структурной позиции (сигнатура функции, массив, Promise), когда имя свойства неизвестно заранее. Типичные паттерны: return type — T extends (...args: any[]) => infer R ? R : never; элемент массива — T extends readonly (infer U)[] ? U : never (readonly важен для readonly-массивов и кортежей); unwrap Promise — T extends Promise<infer U> ? U : never; параметры как кортеж — T extends (...args: infer A) => any ? A : never (rest ...args надёжнее позиционного infer по каждому аргументу). Не нужен infer, когда тип уже известен: T['value'], T[0]. Компилятор разрешает infer на этапе type-checking, не в runtime: унификация входа с паттерном extends, привязка infer-переменной, подстановка в true-ветку; код не генерируется, runtime overhead нет. Типичные ошибки: infer вне conditional type (ошибка компиляции); использование захваченного типа в false-ветке (U не в scope); забыть distribution по union — ElementType<string[] | number[]> даёт string | number; хрупкий захват по позициям (a: infer A, b: infer B) вместо ...args: infer A; ожидание runtime-поведения — infer стирается, для runtime нужны typeof, type guards, Zod. Distribution: conditional types распределяются по union, каждый член обрабатывается отдельно. Intersection не распределяется как union — для T extends A & B с infer внутри B нет изолированного доступа к вкладу A; нужны отдельные conditional types и ручное пересечение. Рекурсивный unwrap: type DeepAwaited<T> = T extends Promise<infer U> ? DeepAwaited<U> : T — основа Awaited<T>, требует TS 4.1+. Отличие от mapped types: mapped итерирует известные ключи; infer pattern-match по структуре для неизвестного внутреннего типа — разные задачи, часто вместе в utility types. Практика: ReturnType<T>, Parameters<T>, Awaited<T> в stdlib; ReturnType<typeof useSelector>; z.infer<typeof schema>; inferRouterOutputs<AppRouter> в tRPC; TanStack Query generics.",
+    "maxScore": 10,
+    "skills": [
+      "typescript",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "infer_definition",
+      "title": "Понимает infer и conditional types",
+      "expected": "Кандидат объясняет: infer захватывает тип из структурной позиции при успешном extends-совпадении; работает только внутри conditional type; захваченный тип доступен только в true-ветке.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — capture group для типов в conditional type",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "infer_definition",
+            "oftenConfusedWith": [
+              "infer_vs_indexed_access",
+              "common_patterns"
+            ],
+            "anchorTermsExpected": [
+              "infer",
+              "conditional type",
+              "extends",
+              "true-ветк",
+              "захват",
+              "структурн"
+            ],
+            "anchorTermsWrongTopic": [
+              "runtime type check",
+              "mapped type",
+              "generic parameter вместо infer"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "infer",
+              "conditional",
+              "extends"
+            ],
+            "ask": "где допустим infer и в какой ветке conditional type доступна захваченная переменная"
+          }
+        ],
+        "mustConcepts": [
+          "infer",
+          "conditional type",
+          "условн",
+          "extends",
+          "захват",
+          "capture",
+          "структурн",
+          "позици",
+          "true-ветк",
+          "true branch",
+          "false-ветк",
+          "never",
+          "паттерн",
+          "pattern match",
+          "именован",
+          "bind",
+          "привяз"
+        ],
+        "falseClaims": [
+          "infer работает вне conditional type",
+          "захваченный infer-тип доступен в false-ветке",
+          "infer выполняется в runtime",
+          "infer — это обычный generic-параметр функции",
+          "infer заменяет extends в conditional type"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "infer_vs_indexed_access",
+      "title": "Отличает infer от indexed access",
+      "expected": "Кандидат сравнивает: T['key'] и T[0] — когда имя/позиция известны; infer — когда известна структура, но внутренний тип неизвестен (сигнатура функции, Promise, массив).",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевое отличие из ITLead — structural vs named keys",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "infer_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "infer_vs_indexed_access",
+            "oftenConfusedWith": [
+              "common_patterns"
+            ],
+            "anchorTermsExpected": [
+              "indexed access",
+              "T['key']",
+              "структурн",
+              "именован",
+              "ключ"
+            ],
+            "anchorTermsWrongTopic": [
+              "infer для известного свойства",
+              "T['returnType'] всегда лучше infer"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "indexed access",
+          "T['key']",
+          "T[0]",
+          "именован",
+          "ключ",
+          "позици",
+          "структурн",
+          "сигнатур",
+          "function signature",
+          "неизвестн",
+          "заранее",
+          "hardcode",
+          "отдельный generic",
+          "внешн",
+          "функци"
+        ],
+        "falseClaims": [
+          "infer и T['key'] решают одну задачу",
+          "infer нужен когда свойство returnType уже объявлено в типе",
+          "indexed access работает для произвольной сигнатуры функции",
+          "infer захватывает тип по имени ключа",
+          "без infer всегда можно передать тип вторым generic-параметром без потери гибкости"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_patterns",
+      "title": "Знает типичные паттерны infer",
+      "expected": "Кандидат называет: return type функции, элемент массива (readonly), unwrap Promise, параметры как кортеж через ...args: infer A; знает когда infer не нужен.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use — четыре базовых паттерна из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "return type",
+              "infer R",
+              "функци"
+            ],
+            "ask": "напиши conditional type для извлечения return type любой функции"
+          },
+          {
+            "match": [
+              "...args",
+              "infer A",
+              "кортеж",
+              "параметр"
+            ],
+            "ask": "как захватить все параметры функции одним кортежем"
+          }
+        ],
+        "mustConcepts": [
+          "return type",
+          "тип возврат",
+          "infer R",
+          "массив",
+          "элемент",
+          "readonly",
+          "infer U",
+          "Promise",
+          "unwrap",
+          "развернут",
+          "параметр",
+          "...args",
+          "infer A",
+          "кортеж",
+          "tuple",
+          "T[0]",
+          "T['value']",
+          "не нужен"
+        ],
+        "falseClaims": [
+          "для readonly string[] не нужен readonly в паттерне массива",
+          "позиционный infer a, b надёжнее rest ...args",
+          "infer обязателен даже для T['value'] с известным ключом",
+          "Parameters<T> не использует infer под капотом"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "compiler_behavior",
+      "title": "Понимает compile-time поведение infer",
+      "expected": "Кандидат объясняет: infer разрешается при type-checking; унификация с extends-паттерном; привязка переменной в true-ветке; нет runtime-кода и overhead.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "type mapper / compile-time only из ITLead theory",
+        "mustConcepts": [
+          "compile time",
+          "compile-time",
+          "type-checking",
+          "проверк тип",
+          "унификац",
+          "unify",
+          "type mapper",
+          "инстанц",
+          "instantiat",
+          "runtime",
+          "стира",
+          "erase",
+          "overhead",
+          "код не генерир",
+          "true-ветк",
+          "подстановк"
+        ],
+        "falseClaims": [
+          "infer генерирует runtime type checks",
+          "infer оставляет след в скомпилированном JS",
+          "infer работает как typeof в runtime",
+          "привязка infer-переменной видна в false-ветке после неудачного match"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с infer",
+      "expected": "Кандидат называет: infer вне extends; U в false-ветке; rest vs позиционный infer; ожидание runtime; забыть readonly в паттерне массива.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "пять mistake-блоков ITLead — частые production/interview ловушки",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "infer_definition",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "false",
+              "false-ветк",
+              "scope"
+            ],
+            "ask": "почему U из infer недоступен в false-ветке conditional type"
+          },
+          {
+            "match": [
+              "...args",
+              "позици",
+              "a: infer",
+              "b: infer"
+            ],
+            "ask": "чем rest ...args: infer A лучше позиционного захвата параметров"
+          },
+          {
+            "match": [
+              "runtime",
+              "Zod",
+              "typeof"
+            ],
+            "ask": "чем заменить infer если нужна runtime-валидация типов"
+          }
+        ],
+        "mustConcepts": [
+          "вне conditional",
+          "вне extends",
+          "false-ветк",
+          "scope",
+          "область видим",
+          "rest",
+          "...args",
+          "позици",
+          "два параметра",
+          "runtime",
+          "typeof",
+          "type guard",
+          "Zod",
+          "readonly",
+          "never",
+          "ошибка компиляц",
+          "Error"
+        ],
+        "falseClaims": [
+          "type Bad<T> = infer R — валидный TypeScript",
+          "захваченный U можно использовать в false-ветке с fallback",
+          "infer проверяет типы в runtime как Zod",
+          "позиционный infer работает для функций с переменным числом аргументов",
+          "readonly в паттерне массива не влияет на совпадение"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "union_distribution",
+      "title": "Понимает distribution и intersection",
+      "expected": "Кандидат объясняет: conditional types распределяются по union (string[] | number[] → string | number); intersection не распределяется — нужны отдельные conditional types.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "distribution + senior intersection — частый источник сюрпризов",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "union_distribution",
+            "oftenConfusedWith": [
+              "infer_definition"
+            ],
+            "anchorTermsExpected": [
+              "union",
+              "distribution",
+              "распредел",
+              "intersection",
+              "string | number"
+            ],
+            "anchorTermsWrongTopic": [
+              "intersection распределяется как union",
+              "union member не матчится — весь результат never"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "union",
+              "распредел",
+              "distribution"
+            ],
+            "ask": "что даст ElementType<string[] | number[]> и почему"
+          },
+          {
+            "match": [
+              "intersection",
+              "A & B",
+              "пересечен"
+            ],
+            "ask": "почему infer с intersection не работает как с union"
+          }
+        ],
+        "mustConcepts": [
+          "union",
+          "объединен",
+          "distribution",
+          "распредел",
+          "каждый член",
+          "отдельно",
+          "string | number",
+          "intersection",
+          "пересечен",
+          "A & B",
+          "не распределя",
+          "отдельн conditional",
+          "ручн",
+          "member",
+          "не матч",
+          "combine",
+          "объедин результ"
+        ],
+        "falseClaims": [
+          "intersection распределяется по conditional type как union",
+          "T extends A & B с infer в B даёт изолированный доступ к вкладу A",
+          "union distribution всегда даёт never при одном несовпавшем члене",
+          "infer отключает distribution по union",
+          "ElementType<string[] | number[]> даёт never"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "real_world_usage",
+      "title": "Знает практику и встроенные утилиты",
+      "expected": "Кандидат упоминает: ReturnType, Parameters, Awaited; z.infer; tRPC inferRouterOutputs; рекурсивный DeepAwaited; отличие infer от mapped types.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "stdlib utilities + ecosystem — бонус senior",
+        "mustConcepts": [
+          "ReturnType",
+          "Parameters",
+          "Awaited",
+          "stdlib",
+          "стандартн",
+          "z.infer",
+          "Zod",
+          "schema",
+          "tRPC",
+          "inferRouterOutputs",
+          "TanStack Query",
+          "useSelector",
+          "Redux",
+          "DeepAwaited",
+          "рекурсив",
+          "recursive",
+          "mapped type",
+          "utility type",
+          "TS 4.1"
+        ],
+        "falseClaims": [
+          "ReturnType не построен на infer",
+          "z.infer работает в runtime без схемы",
+          "mapped types и infer решают одну задачу",
+          "рекурсивный conditional type работает в TypeScript 3.x",
+          "Awaited не использует infer"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "infer — capture group для типов в conditional type: T extends (...args: any[]) => infer R ? R : never вытаскивает return type. Работает только в extends, R только в true-ветке. Для известного ключа — T['value'], для неизвестной сигнатуры — infer. Compile-time only, в JS не остаётся.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Оборачиваю сторонний хук: HookParams<T> = T extends (...args: infer A) => any ? A : never — если useDebounce сменит сигнатуру, типы подтянутся. Promise<Promise<T>> разворачиваю DeepAwaited рекурсивно как Awaited. ElementType<string[] | number[]> → string | number из-за distribution.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ReturnType<typeof useSelector>, z.infer<typeof schema>, inferRouterOutputs в tRPC — всё infer под капотом. readonly (infer U)[] в паттерне — иначе readonly string[] упадёт в never. Intersection с infer не как union — отдельные conditional types.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "infer — runtime keyword, TypeScript вставляет проверки типов в скомпилированный JS. Можно писать type Bad<T> = infer R где угодно.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В false-ветке conditional type захваченный U всё равно доступен с fallback. T['returnType'] и infer R для функции — одно и то же всегда.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "ElementType<string[] | number[]> даёт never. Intersection A & B распределяется по conditional type как union. Для параметров лучше (a: infer A, b: infer B) чем ...args.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "infer_definition",
+      "exampleType": "good",
+      "exampleText": "infer захватывает тип в структурной позиции при extends-match; переменная только в true-ветке conditional type.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "infer_definition",
+      "exampleType": "good",
+      "exampleText": "ну infer как regex capture для типов — описал shape в extends, ts подставил совпавшую часть в true branch",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "infer_definition",
+      "exampleType": "bad",
+      "exampleText": "infer — отдельное ключевое слово, можно писать type X<T> = infer R без conditional type и extends.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "infer_vs_indexed_access",
+      "exampleType": "good",
+      "exampleText": "T['status'] когда ключ известен; infer R в сигнатуре функции когда return type заранее не объявлен в типе.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "infer_vs_indexed_access",
+      "exampleType": "good",
+      "exampleText": "indexed access по имени; infer — pattern match по структуре без знания внутреннего типа",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "infer_vs_indexed_access",
+      "exampleType": "bad",
+      "exampleText": "Для ApiResponse['data'] всегда нужен infer вместо T['data'] — indexed access не работает.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "common_patterns",
+      "exampleType": "good",
+      "exampleText": "FnReturn: (...args: any[]) => infer R; ElementType: readonly (infer U)[]; Params: (...args: infer A) => any.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "common_patterns",
+      "exampleType": "good",
+      "exampleText": "promise unwrap T extends Promise<infer U> ? U : never; для кортежа с известной позицией — T[0] без infer",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "common_patterns",
+      "exampleType": "bad",
+      "exampleText": "readonly в паттерне массива лишний — readonly string[] и string[] матчатся одинаково без readonly.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "compiler_behavior",
+      "exampleType": "good",
+      "exampleText": "Компилятор унифицирует T с extends-паттерном, bind infer R, подставляет в true — только type-checking, zero runtime.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "compiler_behavior",
+      "exampleType": "good",
+      "exampleText": "infer стирается при компиляции как и остальные типы — в bundle нет infer",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "compiler_behavior",
+      "exampleType": "bad",
+      "exampleText": "infer генерирует typeof-проверки в runtime для каждого conditional type.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "type Foo<T> = T extends { x: infer U } ? U : U — ошибка, U не в scope false-ветки. Rest ...args: infer A надёжнее двух позиционных infer.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "runtime validation — Zod/typeof, не infer; infer полностью erase",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "infer R в false-ветке с never fallback — U всё равно доступен как any.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "union_distribution",
+      "exampleType": "good",
+      "exampleText": "ElementType<string[] | number[]> → string | number: conditional применяется к каждому члену union отдельно.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "union_distribution",
+      "exampleType": "good",
+      "exampleText": "intersection не distribute — для A & B нужны два conditional type и ручное & результатов",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "union_distribution",
+      "exampleType": "bad",
+      "exampleText": "Union и intersection ведут себя одинаково при conditional types с infer.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "real_world_usage",
+      "exampleType": "good",
+      "exampleText": "ReturnType, Parameters, Awaited в lib.d.ts на infer; z.infer<typeof userSchema>; DeepAwaited для вложенных Promise API.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "real_world_usage",
+      "exampleType": "good",
+      "exampleText": "mapped type итерирует ключи; infer pattern-match — разные задачи, вместе в сложных utility",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "real_world_usage",
+      "exampleType": "bad",
+      "exampleText": "Awaited<T> реализован через mapped types без infer; z.infer выполняется в runtime.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "infer-keyword-in-typescript-infer-typescript",
+    "apiUrl": "https://api.itlead.org/api/questions/infer-keyword-in-typescript-infer-typescript",
+    "pageUrl": "https://itlead.org/interview-questions/typescript/infer-keyword-in-typescript-infer-typescript",
+    "difficulty": "SENIOR",
+    "titleEn": "Infer keyword in TypeScript — infer TypeScript",
+    "categorySlug": "typescript",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

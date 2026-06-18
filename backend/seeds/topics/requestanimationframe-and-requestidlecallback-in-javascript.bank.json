@@ -1,0 +1,629 @@
+{
+  "topic": {
+    "code": "requestanimationframe_requestidlecallback_javascript",
+    "name": "requestAnimationFrame и requestIdleCallback",
+    "skillCode": "javascript",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Чем отличаются requestAnimationFrame и requestIdleCallback в JavaScript и когда что использовать?",
+    "shortAnswer": "requestAnimationFrame планирует callback перед следующим repaint браузера, синхронно с частотой обновления экрана (~60fps). requestIdleCallback выполняет работу в свободное время после обработки ввода и рендеринга. RAF — для срочных визуальных обновлений и анимаций; RIC — для отложенных фоновых задач с низким приоритетом.",
+    "idealAnswer": "requestAnimationFrame (RAF) ставит callback в очередь на фазу «begin frame» перед пересчётом стилей, layout, paint и compositing — синхронно с vsync GPU, обычно ~16.7ms на 60Hz. Передаёт high-resolution timestamp (`performance.now()`), по которому считают delta для frame-rate-independent анимаций. Рекурсивный RAF — стандартный game loop; отмена через `cancelAnimationFrame(id)`. В фоновой вкладке RAF паузится или throttling до ~1fps — экономия CPU и батареи.\n\nrequestIdleCallback (RIC) выполняется после завершения кадра, в остаточном idle-слоте (обычно 4–10ms, на загруженной странице может быть 0). Callback получает объект `deadline` с `timeRemaining()` — сколько ms осталось до возврата потока браузеру, и `didTimeout` — если сработал fallback `timeout`. Работу нужно нарезать: `while (deadline.timeRemaining() > 1 && tasks.length) processOneTask()`. Safari не поддерживает RIC — обязателен `{ timeout: ms }`, иначе callback может никогда не выполниться на mobile/low-power.\n\nКлючевое отличие: RAF — высокий приоритет, привязка к repaint (~60/120fps); RIC — низкий приоритет, спорадический запуск только когда браузер простаивает. RAF: DOM/canvas анимации, scroll/resize с layout. RIC: analytics после hydration, prefetch, background sync (Workbox, Vercel Analytics).\n\nТипичные ошибки: `setInterval` внутри RAF-loop — две очереди, dropped frames; тяжёлая работа в RIC без проверки `timeRemaining()` — блокирует следующий paint; RAF без `cancelAnimationFrame` в cleanup React — phantom loop после unmount; RIC без timeout на mobile — analytics молча не отправляется.\n\nSenior: на 120Hz RAF вызывается чаще; promotion через `will-change: transform` / `transform3d` выносит анимацию на compositor layer — плавность даже при блокировке main thread JS. Three.js `setAnimationLoop`, React Reanimated, Preact Signals — production-паттерны RAF; polyfill RIC в Safari — обёртка над `setTimeout` с короткой задержкой.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "raf_definition",
+      "title": "Понимает requestAnimationFrame",
+      "expected": "Кандидат объясняет: RAF планирует callback перед следующим repaint, синхронизирован с vsync (~60fps на 60Hz), передаёт timestamp для delta-time анимаций; отмена через cancelAnimationFrame.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — RAF и repaint cycle",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "raf_definition",
+            "oftenConfusedWith": [
+              "raf_vs_ric",
+              "browser_pipeline"
+            ],
+            "anchorTermsExpected": [
+              "repaint",
+              "vsync",
+              "60fps",
+              "timestamp",
+              "cancelAnimationFrame"
+            ],
+            "anchorTermsWrongTopic": [
+              "idle time",
+              "deadline.timeRemaining",
+              "фоновая аналитика"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "requestAnimationFrame",
+              "RAF",
+              "repaint"
+            ],
+            "ask": "когда именно вызывается RAF-callback относительно layout и paint"
+          },
+          {
+            "match": [
+              "timestamp",
+              "performance.now",
+              "delta"
+            ],
+            "ask": "зачем RAF передаёт timestamp и как считать delta для анимации"
+          }
+        ],
+        "mustConcepts": [
+          "requestAnimationFrame",
+          "RAF",
+          "repaint",
+          "перерисов",
+          "vsync",
+          "60fps",
+          "120Hz",
+          "timestamp",
+          "performance.now",
+          "delta",
+          "рекурсив",
+          "game loop",
+          "cancelAnimationFrame",
+          "begin frame",
+          "следующ кадр",
+          "плавн",
+          "анимац"
+        ],
+        "falseClaims": [
+          "requestAnimationFrame выполняется в idle time после paint",
+          "RAF и setTimeout(16) дают одинаковую плавность",
+          "RAF не передаёт аргументов в callback",
+          "RAF работает с полной частотой в фоновой вкладке"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "ric_definition",
+      "title": "Понимает requestIdleCallback",
+      "expected": "Кандидат объясняет: RIC выполняется в idle-слоте после input и рендеринга; deadline.timeRemaining() — бюджет времени; didTimeout при срабатывании timeout; cancelIdleCallback.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — RIC и idle budget",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "requestIdleCallback",
+              "RIC",
+              "idle",
+              "deadline"
+            ],
+            "ask": "что такое объект deadline и зачем timeRemaining()"
+          }
+        ],
+        "mustConcepts": [
+          "requestIdleCallback",
+          "RIC",
+          "idle",
+          "простой",
+          "deadline",
+          "timeRemaining",
+          "didTimeout",
+          "timeout",
+          "фонов",
+          "низк приоритет",
+          "cancelIdleCallback",
+          "после рендер",
+          "после ввод",
+          "слот",
+          "бюджет",
+          "4-10ms",
+          "IdleTaskController"
+        ],
+        "falseClaims": [
+          "requestIdleCallback синхронизирован с vsync как RAF",
+          "RIC всегда получает достаточно времени для любой задачи",
+          "deadline.timeRemaining() возвращает timestamp кадра",
+          "RIC имеет такой же приоритет как RAF"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "raf_vs_ric",
+      "title": "Отличает RAF от RIC",
+      "expected": "Кандидат сравнивает: RAF — высокий приоритет, перед repaint, ~16ms; RIC — низкий, после кадра, переменный idle; RAF для визуала, RIC для фона.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевое сравнение — центр темы",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "raf_definition",
+            "floorFraction": 0.45
+          },
+          {
+            "checkpointKey": "ric_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "raf_vs_ric",
+            "oftenConfusedWith": [
+              "when_to_use"
+            ],
+            "anchorTermsExpected": [
+              "высокий приоритет",
+              "низкий приоритет",
+              "repaint",
+              "idle",
+              "визуал",
+              "фон"
+            ],
+            "anchorTermsWrongTopic": [
+              "microtask",
+              "Promise.then",
+              "Event Loop одно и то же"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "RAF",
+              "RIC",
+              "разниц",
+              "отлича"
+            ],
+            "ask": "чем RAF принципиально отличается от RIC по приоритету и моменту вызова"
+          }
+        ],
+        "mustConcepts": [
+          "высокий приоритет",
+          "низкий приоритет",
+          "repaint",
+          "idle",
+          "переменн",
+          "спорадич",
+          "визуал",
+          "фонов",
+          "16ms",
+          "60Hz",
+          "после кадра",
+          "перед кадр",
+          "срочн",
+          "отложен",
+          "таблица сравнен",
+          "trigger"
+        ],
+        "falseClaims": [
+          "RAF и RIC выполняются в одной фазе pipeline",
+          "RIC подходит для 60fps анимаций",
+          "RAF предназначен для analytics и logging",
+          "можно заменить RAF на RIC для canvas game loop"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Знает когда RAF, когда RIC",
+      "expected": "Кандидат называет: RAF — DOM/canvas анимации, scroll/resize с layout; RIC — analytics, prefetch, background sync; фоновая вкладка throttling обоих.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use из ITLead таблицы",
+        "mustConcepts": [
+          "анимац",
+          "canvas",
+          "scroll",
+          "resize",
+          "layout",
+          "analytics",
+          "telemetry",
+          "prefetch",
+          "background sync",
+          "Three.js",
+          "Vercel Analytics",
+          "Workbox",
+          "hydration",
+          "фонов вкладк",
+          "throttling",
+          "mobile",
+          "low-power"
+        ],
+        "falseClaims": [
+          "RIC лучше RAF для плавных DOM-анимаций",
+          "RAF подходит для отправки analytics после загрузки",
+          "в фоновой вкладке RAF работает на полной частоте",
+          "RIC гарантированно запускается каждый кадр"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "browser_pipeline",
+      "title": "Понимает место RAF/RIC в pipeline браузера",
+      "expected": "Кандидат описывает: RAF на main thread в begin frame до rasterization; RIC через IdleTaskController после style/layout/compositing; will-change/compositor layer для smooth при блокировке JS.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "senior follow-up — compositor и 120Hz",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "compositor",
+              "will-change",
+              "transform3d",
+              "120Hz"
+            ],
+            "ask": "как compositor layer помогает при тяжёлом JS на 120Hz дисплее"
+          },
+          {
+            "match": [
+              "Chromium",
+              "main thread",
+              "rasterization"
+            ],
+            "ask": "на каком потоке выполняется RAF и когда браузер вызывает callback"
+          }
+        ],
+        "mustConcepts": [
+          "main thread",
+          "begin frame",
+          "rasterization",
+          "style",
+          "layout",
+          "compositing",
+          "compositor",
+          "compositor layer",
+          "will-change",
+          "transform3d",
+          "GPU",
+          "120Hz",
+          "IdleTaskController",
+          "Chromium",
+          "off main thread",
+          "promotion"
+        ],
+        "falseClaims": [
+          "RAF выполняется на compositor thread",
+          "RIC запускается до layout и paint",
+          "will-change ускоряет анимацию width и height",
+          "compositor layer всегда создаётся без will-change"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки RAF/RIC",
+      "expected": "Кандидат называет: setInterval в RAF-loop; RIC без timeRemaining slice; RAF без cancel на unmount; RIC без timeout на Safari/mobile.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "ric_timeout_safari",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "setInterval",
+              "RAF",
+              "interval"
+            ],
+            "ask": "почему setInterval внутри RAF-loop даёт dropped frames"
+          },
+          {
+            "match": [
+              "useEffect",
+              "unmount",
+              "cancel"
+            ],
+            "ask": "как правильно остановить RAF-loop в React при unmount"
+          },
+          {
+            "match": [
+              "timeRemaining",
+              "heavy",
+              "slice"
+            ],
+            "ask": "почему тяжёлая работа в RIC без timeRemaining блокирует paint"
+          }
+        ],
+        "mustConcepts": [
+          "setInterval",
+          "dropped frames",
+          "две очеред",
+          "timeRemaining",
+          "нарез",
+          "slice",
+          "cancelAnimationFrame",
+          "unmount",
+          "cleanup",
+          "useEffect",
+          "phantom loop",
+          "timeout",
+          "Safari",
+          "mobile",
+          "analytics",
+          "heavyComputation",
+          "блокирует paint"
+        ],
+        "falseClaims": [
+          "setInterval(16) и RAF эквивалентны для анимаций",
+          "можно игнорировать timeRemaining в RIC — браузер подождёт",
+          "RAF-loop сам останавливается при unmount компонента",
+          "RIC без timeout надёжен в Safari и на mobile"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "ric_timeout_safari",
+      "title": "Знает timeout fallback, Safari и lifecycle",
+      "expected": "Кандидат объясняет: Safari не поддерживает RIC; `{ timeout: ms }` форсирует callback; didTimeout=true; polyfill через setTimeout; cancelAnimationFrame/cancelIdleCallback на unmount; production-паттерны Three.js/Vercel.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "браузерная поддержка и production fallback",
+        "mustConcepts": [
+          "Safari",
+          "timeout",
+          "didTimeout",
+          "polyfill",
+          "setTimeout",
+          "mobile",
+          "low-power",
+          "idle window",
+          "Chrome",
+          "Firefox",
+          "fallback",
+          "500ms",
+          "300ms",
+          "Three.js",
+          "setAnimationLoop",
+          "Vercel Analytics",
+          "delta-time",
+          "game loop"
+        ],
+        "falseClaims": [
+          "requestIdleCallback поддерживается во всех браузерах включая Safari",
+          "timeout в RIC только для отладки, в production не нужен",
+          "без timeout RIC всё равно выполнится на загруженной странице",
+          "polyfill RIC идентичен нативному по точности idle detection"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "RAF вызывается перед repaint, синхронно с vsync — ~60fps. Передаёт timestamp для delta. RIC — после кадра, в idle-слоте, с deadline.timeRemaining(). Анимации и scroll — RAF; analytics и prefetch — RIC с { timeout: 300 } для Safari.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для canvas game loop — рекурсивный RAF, delta = time - lastTime, движение не зависит от fps. Analytics кладу в очередь и flush через RIC, пока timeRemaining > 1. В React храню rafId и cancelAnimationFrame в cleanup useEffect.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "RAF — срочный визуал, RIC — фон. На 120Hz RAF чаще; will-change: transform выносит на compositor layer — плавно даже при тяжёлом JS. Safari без RIC — timeout обязателен, иначе analytics на mobile молча пропадает.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "RAF и RIC — одно и то же, оба для анимаций. RIC синхронизирован с vsync и вызывается 60 раз в секунду.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для плавной анимации ставлю setInterval(16) внутри requestAnimationFrame — так надёжнее. RIC можно вызывать без timeout, Safari поддерживает.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "requestIdleCallback передаёт timestamp как RAF. Тяжёлую работу в RIC можно делать целиком — браузер сам подождёт следующий paint.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "raf_definition",
+      "exampleType": "good",
+      "exampleText": "requestAnimationFrame планирует callback перед следующим repaint, синхронно с vsync GPU — на 60Hz это ~16.7ms между вызовами.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "raf_definition",
+      "exampleType": "good",
+      "exampleText": "ну RAF — перед перерисовкой кадра, timestamp это performance.now(), по delta считаю скорость анимации независимо от fps",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "raf_definition",
+      "exampleType": "bad",
+      "exampleText": "RAF выполняется когда браузер простаивает, как requestIdleCallback, только чуть раньше.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "ric_definition",
+      "exampleType": "good",
+      "exampleText": "RIC получает deadline с timeRemaining() — сколько ms осталось в idle-слоте; didTimeout true если сработал timeout fallback.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "ric_definition",
+      "exampleType": "good",
+      "exampleText": "requestIdleCallback — после input и рендера, в остатке 4-10ms; если страница занята, слот может быть нулевым",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "ric_definition",
+      "exampleType": "bad",
+      "exampleText": "RIC вызывается перед каждым repaint вместе с RAF, просто с меньшим приоритетом в той же очереди.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "raf_vs_ric",
+      "exampleType": "good",
+      "exampleText": "RAF — высокий приоритет, перед repaint, для 60fps визуала. RIC — низкий, после кадра, спорадически, для фоновых задач.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "raf_vs_ric",
+      "exampleType": "good",
+      "exampleText": "RAF ~16ms стабильно на 60Hz; RIC переменный idle 4-10ms или 0 на тяжёлой странице — нельзя строить на RIC game loop",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "raf_vs_ric",
+      "exampleType": "bad",
+      "exampleText": "Для canvas анимации лучше RIC — он не нагружает main thread так сильно как RAF.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "DOM-анимации и scroll с layout — RAF. Analytics после hydration, prefetch, Workbox sync — RIC с timeout.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Three.js render loop — RAF; Vercel pageview ping — RIC чтобы не мешать first paint",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Любую фоновую работу включая 60fps анимацию делаю через requestIdleCallback — он экономнее.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "browser_pipeline",
+      "exampleType": "good",
+      "exampleText": "RAF на main thread в begin frame до rasterization. will-change: transform promotion на compositor — анимация off main thread при блокировке JS.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "browser_pipeline",
+      "exampleType": "good",
+      "exampleText": "IdleTaskController меряет остаток после style/layout/compositing и отдаёт через deadline.timeRemaining()",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "browser_pipeline",
+      "exampleType": "bad",
+      "exampleText": "RAF callbacks выполняются на compositor thread, поэтому JS не может их заблокировать.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "setInterval в RAF-loop — две очереди, dropped frames; только рекурсивный RAF. RIC: while (deadline.timeRemaining() > 1) processTask().",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "useEffect: const id = requestAnimationFrame(animate); return () => cancelAnimationFrame(id) — иначе phantom loop после unmount",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "В RIC вызываю heavyComputation() целиком — idle callback же для тяжёлой работы. RAF в useEffect без cleanup — React сам отменит.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "ric_timeout_safari",
+      "exampleType": "good",
+      "exampleText": "Safari без RIC — всегда { timeout: 300 }; didTimeout true если idle не наступил. Polyfill — setTimeout с короткой задержкой.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "ric_timeout_safari",
+      "exampleType": "good",
+      "exampleText": "на mobile low-power idle window может не появиться — timeout 500ms гарантирует flush analytics",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "ric_timeout_safari",
+      "exampleType": "bad",
+      "exampleText": "RIC поддерживается в Safari с iOS 15, timeout опция только для devtools.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "ric_timeout_safari",
+      "exampleType": "good",
+      "exampleText": "Three.js setAnimationLoop — обёртка RAF. Analytics queue + RIC flush с timeout 300ms — паттерн Vercel.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "ric_timeout_safari",
+      "exampleType": "good",
+      "exampleText": "game loop: delta = time - last; updatePhysics(delta) — одинаковая скорость на 60 и 120fps",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "ric_timeout_safari",
+      "exampleType": "bad",
+      "exampleText": "Preact Signals обновляет DOM через setInterval каждые 16ms для batching commits.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "requestanimationframe-and-requestidlecallback-in-javascript",
+    "apiUrl": "https://api.itlead.org/api/questions/requestanimationframe-and-requestidlecallback-in-javascript",
+    "pageUrl": "https://itlead.org/interview-questions/javascript/requestanimationframe-and-requestidlecallback-in-javascript",
+    "difficulty": "SENIOR",
+    "titleEn": "requestAnimationFrame and requestIdleCallback in JavaScript",
+    "categorySlug": "javascript",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

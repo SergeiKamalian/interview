@@ -1,0 +1,672 @@
+{
+  "topic": {
+    "code": "redux_thunk_vs_saga",
+    "name": "Redux Thunk vs Redux Saga",
+    "skillCode": "redux",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "В чём разница между Redux Thunk и Redux Saga для асинхронных операций?",
+    "shortAnswer": "Redux Thunk позволяет action creator возвращать функцию, которая вызывает dispatch после async-работы; Redux Saga использует generator-функции, yield-ящие объекты-эффекты (call, put, take), которые middleware выполняет декларативно. Thunk — для простых API-запросов и CRUD; Saga — для отмены, race conditions, debounce и сложной оркестрации.",
+    "idealAnswer": "Redux Thunk и Redux Saga — два middleware для side effects в Redux. Thunk: action creator возвращает функцию `(dispatch, getState) => {...}`, middleware проверяет `typeof action === 'function'` и вызывает её синхронно — вся реализация Thunk умещается в ~10 строк. Async выполняется императивно через promises/async-await внутри thunk. Saga: generator-функции yield-ят plain-объекты-эффекты — `call(fn, args)` («выполни async»), `put(action)` («dispatch»), `take(pattern)` («жди action»). Middleware крутит генератор через `next(resolvedValue)`: promise из call резолвится → генератор продолжается; reject → throw в точке yield, ловится try/catch как в async/await. Ключевое отличие: Thunk — линейный имperative-код; Saga — декларативные инструкции, которые можно тестировать без моков (проверяют yielded effects). Когда Thunk: один API-вызов, базовый CRUD, <10 async actions, CRA/RTK по умолчанию (~1KB). Когда Saga: debounce/throttle (встроенные effects), параллельные запросы `all([...])`, race (`race({...})` — первый победил, остальные cancel), отмена при unmount (`cancel()`, `takeLatest`), polling (`while(true)` + `delay`), WebSocket-оркестрация (~20KB + runtime, кривая обучения 1–2 часа). Типичные ошибки Thunk: не использовать getState для проверки кэша; dispatch после unmount без AbortController; нет встроенной отмены — только ручной AbortController в useEffect cleanup. Ошибки Saga: вызов API без `yield call()` — в store попадает Promise, не данные; `takeEvery` вместо `takeLatest` при быстрых повторных action — гонки; handler dispatch-ит тот же тип action → бесконечный цикл. Тестирование: Thunk — мок dispatch/getState; Saga — итератор, проверка yielded effects без моков. Миграция Thunk→Saga: `await dispatch(thunk())` перестаёт работать — dispatch Saga не возвращает значений; нужны take/callback/eventChannel. fork vs spawn: fork привязан к родителю (ошибка ребёнка всплывает), spawn — detached fire-and-forget. select() неблокирующий (читает store сразу), take() блокирует до matching action.",
+    "maxScore": 10,
+    "skills": [
+      "redux",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "thunk_saga_mechanism",
+      "title": "Понимает механизм Thunk и Saga",
+      "expected": "Кандидат объясняет: Thunk — action creator возвращает функцию, middleware вызывает её с dispatch/getState; Saga — generator yield-ит effect-объекты, middleware их интерпретирует и выполняет.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — TL;DR и key difference из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "thunk_saga_mechanism",
+            "oftenConfusedWith": [
+              "middleware_internals"
+            ],
+            "anchorTermsExpected": [
+              "функция",
+              "generator",
+              "yield",
+              "effect",
+              "dispatch",
+              "call",
+              "put"
+            ],
+            "anchorTermsWrongTopic": [
+              "reducer выполняет async",
+              "Saga это отдельный store",
+              "Thunk заменяет middleware"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "thunk",
+              "функция",
+              "action creator"
+            ],
+            "ask": "что именно возвращает thunk action creator и что делает middleware"
+          },
+          {
+            "match": [
+              "saga",
+              "generator",
+              "yield"
+            ],
+            "ask": "что yield-ит saga и кто выполняет call/put/take"
+          }
+        ],
+        "mustConcepts": [
+          "thunk",
+          "saga",
+          "action creator",
+          "функция",
+          "generator",
+          "генератор",
+          "yield",
+          "effect",
+          "эффект",
+          "dispatch",
+          "call",
+          "put",
+          "take",
+          "middleware",
+          "async",
+          "side effect",
+          "side-effect",
+          "описатель",
+          "descriptor"
+        ],
+        "falseClaims": [
+          "Saga action creator возвращает функцию как Thunk",
+          "Thunk yield-ит effect-объекты",
+          "Saga выполняет API-вызовы напрямую без middleware",
+          "оба middleware работают одинаково через promises",
+          "reducer обрабатывает async в Thunk и Saga"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "middleware_internals",
+      "title": "Знает как middleware обрабатывает Thunk и Saga",
+      "expected": "Кандидат описывает: Thunk проверяет typeof action === 'function' и вызывает action(dispatch, getState); Saga крутит генератор next() в цикле — call ждёт promise, put dispatch-ит, take приостанавливает до matching action.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "How the middleware handles this — ключевой senior-блок",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "thunk_saga_mechanism",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "typeof",
+              "function",
+              "getState"
+            ],
+            "ask": "как Thunk middleware определяет что dispatch-ить функцию, а не plain object"
+          },
+          {
+            "match": [
+              "next",
+              "call",
+              "reject",
+              "throw"
+            ],
+            "ask": "что происходит когда promise из yield call() reject-ится"
+          }
+        ],
+        "mustConcepts": [
+          "typeof action",
+          "function",
+          "dispatch",
+          "getState",
+          "next",
+          "resolvedValue",
+          "promise",
+          "reject",
+          "throw",
+          "yield point",
+          "suspend",
+          "приостанов",
+          "resume",
+          "возобнов",
+          "call",
+          "put",
+          "take",
+          "pattern",
+          "store.dispatch",
+          "перехват"
+        ],
+        "falseClaims": [
+          "Thunk middleware асинхронно ждёт promise action creator",
+          "Saga middleware вызывает API синхронно без next()",
+          "put в Saga dispatch-ит синхронно в том же тике без очереди",
+          "take не блокирует генератор",
+          "Thunk реализация занимает сотни строк"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Выбирает Thunk или Saga по задаче",
+      "expected": "Кандидат называет критерии: Thunk — один API, простой CRUD, мало async actions; Saga — debounce, race, cancel, polling, параллельные запросы, сложная оркестрация; упоминает bundle (~1KB vs ~20KB) и learning curve.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Decision table и When to use — главный interview takeaway",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "when_to_use",
+            "oftenConfusedWith": [
+              "saga_control_flow"
+            ],
+            "anchorTermsExpected": [
+              "CRUD",
+              "debounce",
+              "race",
+              "cancel",
+              "polling",
+              "bundle"
+            ],
+            "anchorTermsWrongTopic": [
+              "Saga всегда лучше",
+              "Thunk не поддерживает async"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "debounce",
+              "search",
+              "поиск"
+            ],
+            "ask": "поиск с debounce — Thunk или Saga и почему"
+          },
+          {
+            "match": [
+              "race",
+              "fallback",
+              "отмен"
+            ],
+            "ask": "два параллельных API, побеждает первый — какой инструмент"
+          }
+        ],
+        "mustConcepts": [
+          "CRUD",
+          "API",
+          "debounce",
+          "throttle",
+          "race",
+          "cancel",
+          "отмен",
+          "polling",
+          "parallel",
+          "параллел",
+          "bundle",
+          "1KB",
+          "20KB",
+          "learning curve",
+          "простой",
+          "сложн",
+          "оркестрац",
+          "WebSocket",
+          "RTK",
+          "Create React App"
+        ],
+        "falseClaims": [
+          "Saga нужен для любого API-запроса",
+          "Thunk не может обрабатывать race conditions вообще",
+          "debounce в Thunk встроен как в Saga",
+          "bundle size одинаковый",
+          "команды всегда начинают с Saga"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "saga_effects",
+      "title": "Знает эффекты Saga: call, put, take, all",
+      "expected": "Кандидат объясняет call (async API), put (dispatch action), take (ждать action), all (параллель); понимает что effects — plain objects для тестирования без моков.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Quick example и key effects из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "call",
+              "put",
+              "take"
+            ],
+            "ask": "что делает yield call vs yield put vs yield take"
+          },
+          {
+            "match": [
+              "test",
+              "mock",
+              "iterator"
+            ],
+            "ask": "как тестировать saga без моков API"
+          }
+        ],
+        "mustConcepts": [
+          "call",
+          "put",
+          "take",
+          "takeEvery",
+          "takeLatest",
+          "all",
+          "effect",
+          "plain object",
+          "iterator",
+          "итератор",
+          "yielded",
+          "без мок",
+          "без mock",
+          "fetch",
+          "API",
+          "dispatch",
+          "listen",
+          "слуша",
+          "watch",
+          "root saga"
+        ],
+        "falseClaims": [
+          "call выполняет fetch синхронно и сразу возвращает данные",
+          "put заменяет reducer",
+          "takeEvery отменяет предыдущую задачу автоматически",
+          "effects — это функции которые saga вызывает напрямую",
+          "тест saga требует мокать fetch"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "saga_control_flow",
+      "title": "Знает race, debounce, cancel, fork в Saga",
+      "expected": "Кандидат описывает race (первый победил — остальные cancel), debounce/throttle effects, cancel/takeLatest при unmount или новом action, fork vs spawn для фоновых задач.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Advanced examples: debounce search, race fallback — senior differentiator",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "when_to_use",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "race",
+              "fallback",
+              "primary"
+            ],
+            "ask": "race между primary и fallback API — что происходит с проигравшим запросом"
+          },
+          {
+            "match": [
+              "fork",
+              "spawn"
+            ],
+            "ask": "разница fork и spawn при ошибке дочерней задачи"
+          },
+          {
+            "match": [
+              "select",
+              "take"
+            ],
+            "ask": "select блокирует генератор как take или нет"
+          }
+        ],
+        "mustConcepts": [
+          "race",
+          "debounce",
+          "throttle",
+          "cancel",
+          "takeLatest",
+          "fork",
+          "spawn",
+          "join",
+          "retry",
+          "delay",
+          "while",
+          "polling",
+          "select",
+          "blocking",
+          "неблокиру",
+          "detached",
+          "fire-and-forget",
+          "structured concurrency",
+          "проиграв",
+          "скасов"
+        ],
+        "falseClaims": [
+          "race в Thunk автоматически отменяет проигравший Promise.race",
+          "takeLatest то же что takeEvery",
+          "fork и spawn идентичны по обработке ошибок",
+          "select приостанавливает генератор до следующего action",
+          "debounce в Saga требует module-level timer как в Thunk"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки Thunk и Saga",
+      "expected": "Кандидат называет: Thunk без getState для кэша, dispatch после unmount без AbortController; Saga без yield call (Promise в payload), takeEvery vs takeLatest, бесконечный цикл при dispatch того же action type.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "saga_effects",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "getState",
+              "cache",
+              "кэш"
+            ],
+            "ask": "как в thunk избежать дублирующего fetch если данные уже в store"
+          },
+          {
+            "match": [
+              "yield call",
+              "Promise",
+              "не yield"
+            ],
+            "ask": "что попадёт в payload если api.getUser вызвать без yield call"
+          },
+          {
+            "match": [
+              "AbortController",
+              "unmount",
+              "cleanup"
+            ],
+            "ask": "как отменить thunk при unmount компонента"
+          }
+        ],
+        "mustConcepts": [
+          "getState",
+          "кэш",
+          "cache",
+          "duplicate",
+          "дублир",
+          "yield call",
+          "Promise",
+          "payload",
+          "takeEvery",
+          "takeLatest",
+          "бесконечн",
+          "цикл",
+          "AbortController",
+          "unmount",
+          "cleanup",
+          "AbortError",
+          "useEffect",
+          "signal",
+          "React warning",
+          "module-level timer",
+          "hot reload"
+        ],
+        "falseClaims": [
+          "getState в thunk не нужен — reducer всё кэширует",
+          "api.get без yield call в saga работает корректно",
+          "takeEvery безопасен для быстрого ввода в search",
+          "thunk отменяется автоматически при unmount",
+          "dispatch после unmount безопасен для React"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "testing_migration",
+      "title": "Тестирование и миграция Thunk → Saga",
+      "expected": "Кандидат упоминает: Saga тестируется через iterator/yielded effects без моков; Thunk — mock dispatch/getState; миграция ломает await dispatch(thunk()); нужны take/eventChannel/callback.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Follow-up Q про testing и migration — бонус senior",
+        "mustConcepts": [
+          "iterator",
+          "yielded",
+          "mock dispatch",
+          "getState mock",
+          "await dispatch",
+          "migration",
+          "миграц",
+          "eventChannel",
+          "callback",
+          "слушать action",
+          "pure",
+          "чист"
+        ],
+        "falseClaims": [
+          "await dispatch(sagaAction()) возвращает результат как thunk",
+          "миграция thunk на saga не меняет API компонентов",
+          "saga нельзя тестировать без redux store",
+          "thunk проще тестировать чем saga всегда"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Thunk — action creator возвращает функцию, middleware видит typeof function и вызывает её с dispatch. Saga — generator yield-ит {call, put, take}, middleware выполняет инструкции через next(). Простой fetch — Thunk; debounce поиска, race двух API, cancel при unmount — Saga.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На проекте с RTK начали с thunk — один endpoint, CRUD. Когда появился WebSocket с reconnect и polling статуса — вынесли в saga: takeLatest, race, cancel из коробки. Bundle +20KB, но orchestration читается декларативно и тестируется без моков fetch.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "yield call(api.get, id) — middleware ждёт promise и резюмирует генератор с данными. yield put({type: SUCCESS}) — dispatch. takeLatest на SEARCH — предыдущий fetch cancel при новом символе. Thunk для того же нужен AbortController в useEffect cleanup.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Thunk и Saga — одно и то же, оба используют generators. Saga всегда лучше, Thunk deprecated.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В saga пишу const user = api.getUser(id) без yield — middleware сам await-ит. takeEvery отменяет предыдущую задачу как takeLatest.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Thunk нативно поддерживает cancel() и race. При миграции на saga компоненты продолжают await dispatch(thunk()) — всё работает.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "thunk_saga_mechanism",
+      "exampleType": "good",
+      "exampleText": "Thunk: fetchUser возвращает (dispatch) => { fetch(...).then(...) }. Saga: function* fetchUserSaga { yield call(fetch,...); yield put(SUCCESS) }.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "thunk_saga_mechanism",
+      "exampleType": "good",
+      "exampleText": "thunk — диспатчишь функцию, saga — диспатчишь plain action, watcher через takeEvery слушает и запускает generator",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "thunk_saga_mechanism",
+      "exampleType": "bad",
+      "exampleText": "Saga action creator тоже возвращает функцию dispatch => ..., middleware saga её вызывает.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "middleware_internals",
+      "exampleType": "good",
+      "exampleText": "Thunk middleware: if (typeof action === 'function') return action(dispatch, getState). Saga: цикл next(value) — yield call → await fn → next(result); reject → throw в генератор.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "middleware_internals",
+      "exampleType": "good",
+      "exampleText": "put кладёт action в очередь dispatch, take замирает generator пока не прилетит нужный type",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "middleware_internals",
+      "exampleType": "bad",
+      "exampleText": "Saga middleware синхронно вызывает fetch внутри generator без next loop.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Один GET пользователя — thunk, RTK уже настроен. Поиск с debounce 300ms — saga debounce effect без module timer. Два API race — saga race отменяет проигравший.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "меньше 10 async actions — thunk хватит; websocket + polling + file race в electron — saga оправдан",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Любой Redux проект должен использовать Saga, Thunk только для legacy.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "saga_effects",
+      "exampleType": "good",
+      "exampleText": "yield call([res, 'json']) — вызов метода на объекте. takeEvery('FETCH_USER', saga) — на каждый REQUEST. Тест: saga.next().value deepEqual call(fetch, url).",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "saga_effects",
+      "exampleType": "good",
+      "exampleText": "effects — plain js objects, saga не трогает fetch напрямую, middleware читает instruction",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "saga_effects",
+      "exampleType": "bad",
+      "exampleText": "yield put заменяет reducer и сразу меняет state без dispatch через store.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "saga_control_flow",
+      "exampleType": "good",
+      "exampleText": "race({primary: call(api1), fallback: call(api2)}) — кто первый resolved, второй cancel. debounce(300, 'SEARCH', saga) без внешнего setTimeout.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "saga_control_flow",
+      "exampleType": "good",
+      "exampleText": "fork — ошибка ребёнка убивает родителя; spawn — detached, fire-and-forget. select() читает store сразу, не ждёт action.",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "saga_control_flow",
+      "exampleType": "bad",
+      "exampleText": "Promise.race в thunk автоматически abort-ит проигравший fetch как saga race.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "fetchUser thunk: if (getState().users[id]) return; — не дублируем запрос. Saga: const u = yield call(api.get, id), не api.get без yield.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "search input — takeLatest не takeEvery. unmount — AbortController signal в thunk, ctrl.abort() в cleanup useEffect.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Module-level searchTimer в thunk debounce — норма для production и тестов, hot reload не ломает.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "testing_migration",
+      "exampleType": "good",
+      "exampleText": "Тест saga: const gen = fetchUserSaga(action); expect(gen.next().value).toEqual(call(api.get, 1)); — без mock fetch. Миграция: await dispatch(load()) перестаёт работать, слушаем SUCCESS action.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "testing_migration",
+      "exampleType": "good",
+      "exampleText": "thunk тест — mock dispatch, проверяем что после resolve вызван SUCCESS. saga — итератор по yield",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "testing_migration",
+      "exampleType": "bad",
+      "exampleText": "После перехода на saga компоненты как раньше await dispatch(createUser()) и получают id пользователя.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "redux-thunk-vs-saga",
+    "apiUrl": "https://api.itlead.org/api/questions/redux-thunk-vs-saga",
+    "pageUrl": "https://itlead.org/interview-questions/redux/redux-thunk-vs-saga",
+    "difficulty": "SENIOR",
+    "titleEn": "Redux Thunk vs Redux Saga - what is the difference?",
+    "categorySlug": "redux",
+    "syncedAt": "2026-06-18T15:00:00.000Z"
+  }
+}

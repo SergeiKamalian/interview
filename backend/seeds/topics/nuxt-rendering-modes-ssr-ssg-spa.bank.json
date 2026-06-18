@@ -1,0 +1,558 @@
+{
+  "topic": {
+    "code": "nuxt_rendering_modes_ssr_ssg_spa",
+    "name": "Режимы рендеринга Nuxt (SSR, SSG, SPA, Hybrid)",
+    "skillCode": "nuxt",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Какие режимы рендеринга есть в Nuxt (SSR, SSG, SPA, Hybrid) и когда какой выбирать?",
+    "shortAnswer": "Режимы рендеринга Nuxt определяют, где и когда генерируется HTML. SSR рендерит на сервере при каждом запросе (SEO и динамические данные). SSG собирает страницы заранее через `nuxi generate` (CDN и максимальная скорость). SPA рендерит в браузере без сервера (`ssr: false`). Hybrid комбинирует все три подхода на уровне маршрутов через `routeRules` в `nuxt.config.ts`. Ключевое: SSR и SSG сразу отдают готовый HTML; SPA отправляет JS-бандл, и браузер собирает страницу сам.",
+    "idealAnswer": "Режимы рендеринга Nuxt управляют тем, где и когда формируется HTML. SSR (Server-Side Rendering) — сервер генерирует полный HTML на каждый запрос: отличный SEO, актуальные данные через `useAsyncData`/`useFetch`, но нагрузка на сервер и средний TTFB. SSG (Static Site Generation) — HTML создаётся один раз при сборке командой `nuxi generate`, файлы отдаются с CDN: самый быстрый TTFB, нулевые server costs, но динамика только на этапе build. SPA (`ssr: false`) — сервер отдаёт пустую оболонку `#__nuxt`, Vue монтируется в браузере: нет SEO, медленный first paint, зато идеально для admin/dashboard за авторизацией. Hybrid (Nuxt 3) — per-route правила в `routeRules`: `/blog/**` → SSR, `/admin/**` → SPA, `/` → `prerender: true` для SSG; один проект, разное поведение без глобального переключателя. SSR и SSG оба отдают реальный HTML, который краулеры и пользователи видят сразу; разница во времени генерации (request vs build). SPA пропускает HTML и шлёт JS — браузер скачивает, парсит и выполняет код до появления контента. Nitro — серверный движок Nuxt для всех режимов: для SSR выполняет composables в Node, сериализует результат в HTML и JSON-payload в `<script>` для гидрации; для SSG делает то же на build и пишет `.html`; для SPA Vite собирает клиентский бандл без Nitro-renderer; Hybrid сканирует `routeRules` и маршрутизирует SSR-пути в Nitro, SPA — в client entry. Когда что: SEO + часто обновляемый контент → SSR; статика, доки, лендинги → SSG; интерактив без SEO → SPA; блог + админка → Hybrid. Типичные ошибки: `ssr: false` на публичном сайте (curl показывает пустой div); `useFetch` к недоступному API при `nuxi generate` без `{ server: false }`; компоненты с `window`/`document` без `<ClientOnly>` на SSR-роутах; `nuxi build` вместо `nuxi generate` для static deploy; ожидание SSG для неизвестных dynamic params (нужен SSR). Дополнительно: `swr` в `routeRules` — stale-while-revalidate, аналог ISR; `prerender: true` для статических страниц; e-commerce часто комбинирует SSG каталог + SSR checkout + SPA cart.",
+    "maxScore": 10,
+    "skills": [
+      "nuxt",
+      "vue"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "rendering_modes_overview",
+      "title": "Понимает четыре режима Nuxt",
+      "expected": "Кандидат перечисляет SSR, SSG, SPA и Hybrid; объясняет суть каждого: где генерируется HTML и кто его получает (сервер, build, браузер).",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — четыре режима и базовые определения",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "SSR",
+              "SSG",
+              "SPA",
+              "Hybrid"
+            ],
+            "ask": "чем SSR отличается от SSG и SPA по месту генерации HTML"
+          }
+        ],
+        "mustConcepts": [
+          "SSR",
+          "SSG",
+          "SPA",
+          "Hybrid",
+          "сервер",
+          "build",
+          "браузер",
+          "HTML",
+          "nuxi generate",
+          "ssr: false",
+          "routeRules",
+          "Nitro",
+          "гидрац",
+          "рендер",
+          "режим",
+          "статич",
+          "динамич"
+        ],
+        "falseClaims": [
+          "SPA отдаёт полный HTML как SSR",
+          "SSG рендерит HTML на каждый запрос",
+          "Hybrid — это отдельный четвёртый движок, не связанный с SSR/SPA",
+          "в Nuxt только два режима: SSR и SPA",
+          "SSG не требует JavaScript на клиенте вообще"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "html_delivery_difference",
+      "title": "Отличает доставку HTML в SSR, SSG и SPA",
+      "expected": "Кандидат объясняет: SSR и SSG отдают готовый HTML (разница — request time vs build time); SPA шлёт JS-бандл, контент появляется после выполнения JavaScript; влияние на SEO и perceived performance.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевое различие timing и SEO из ITLead Key difference",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "rendering_modes_overview",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "html_delivery_difference",
+            "oftenConfusedWith": [
+              "when_to_use_modes"
+            ],
+            "anchorTermsExpected": [
+              "request time",
+              "build time",
+              "JS bundle",
+              "SEO",
+              "TTFB",
+              "готовый HTML"
+            ],
+            "anchorTermsWrongTopic": [
+              "SSR и SPA одинаково отдают HTML",
+              "SSG не нужен для SEO"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "готовый HTML",
+          "request time",
+          "build time",
+          "JS bundle",
+          "бандл",
+          "SEO",
+          "TTFB",
+          "краулер",
+          "пустая оболонка",
+          "__nuxt",
+          "first paint",
+          "выполнен",
+          "JavaScript",
+          "сразу",
+          "задержк",
+          "perceived"
+        ],
+        "falseClaims": [
+          "SSR и SPA одинаково влияют на SEO",
+          "SSG генерирует HTML при каждом запросе пользователя",
+          "SPA сразу показывает контент без загрузки JS",
+          "SSR и SSG не требуют гидрации на клиенте",
+          "HTML в SPA формируется на сервере"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use_modes",
+      "title": "Знает когда выбирать SSR, SSG, SPA или Hybrid",
+      "expected": "Кандидат называет сценарии: SSR — SEO + часто меняющиеся данные (новости, e-commerce); SSG — статика, доки, CDN; SPA — admin/dashboard без SEO; Hybrid — смешанный сайт (блог + админка).",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "таблица When to use из ITLead",
+        "mustConcepts": [
+          "SEO",
+          "e-commerce",
+          "новост",
+          "блог",
+          "документац",
+          "лендинг",
+          "CDN",
+          "admin",
+          "dashboard",
+          "авторизац",
+          "динамич",
+          "статич",
+          "nuxt.com",
+          "персонализ",
+          "каталог",
+          "checkout"
+        ],
+        "falseClaims": [
+          "SSR всегда лучше для любого проекта",
+          "SPA подходит для публичного SEO-сайта",
+          "SSG нельзя использовать для e-commerce",
+          "Hybrid нужен только в Nuxt 2",
+          "admin-панели обязательно на SSR"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "nuxt_config_routeRules",
+      "title": "Настраивает режимы через nuxt.config и routeRules",
+      "expected": "Кандидат описывает `ssr: true/false` глобально, `nuxi generate` для SSG, `routeRules` для Hybrid per-route; приводит примеры `ssr: true`, `ssr: false`, `prerender: true`, `swr`.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевая практическая конфигурация Nuxt 3",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "routeRules",
+              "nuxt.config"
+            ],
+            "ask": "как в одном приложении сделать блог SSR, а admin SPA через routeRules"
+          },
+          {
+            "match": [
+              "nuxi generate",
+              "nuxi build",
+              "prerender"
+            ],
+            "ask": "чем отличается nuxi build от nuxi generate и когда нужен prerender"
+          }
+        ],
+        "mustConcepts": [
+          "nuxt.config",
+          "defineNuxtConfig",
+          "ssr: true",
+          "ssr: false",
+          "routeRules",
+          "nuxi generate",
+          "nuxi build",
+          "prerender",
+          "swr",
+          "stale-while-revalidate",
+          "per-route",
+          "глобальн",
+          "Hybrid",
+          "blog",
+          "admin",
+          "dashboard"
+        ],
+        "falseClaims": [
+          "routeRules работает только в Nuxt 2",
+          "nuxi build и nuxi generate дают одинаковый static output",
+          "ssr: false включает SSG автоматически",
+          "prerender и ssr: false — одно и то же",
+          "routeRules нельзя комбинировать swr и ssr на одном пути"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "nitro_rendering_flow",
+      "title": "Понимает роль Nitro в режимах рендеринга",
+      "expected": "Кандидат объясняет: Nitro компилирует Vue для SSR/SSG, выполняет useAsyncData/useFetch, сериализует payload в HTML; SPA обходит renderer; Hybrid маршрутизирует по routeRules; последовательность для SSR-роута.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "How Nitro handles this — механизм middle+",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Nitro",
+              "useAsyncData",
+              "payload"
+            ],
+            "ask": "что делает Nitro при SSR-запросе к /blog/post — от request до HTML"
+          }
+        ],
+        "mustConcepts": [
+          "Nitro",
+          "useAsyncData",
+          "useFetch",
+          "сериализ",
+          "payload",
+          "script",
+          "гидрац",
+          "hydration",
+          "server-renderer",
+          "@vue/server-renderer",
+          "Node",
+          "Vite",
+          "client entry",
+          "stream",
+          "HTML string",
+          "build time",
+          "request"
+        ],
+        "falseClaims": [
+          "Nitro не участвует в SSG",
+          "SPA mode всё равно рендерит Vue на сервере через Nitro",
+          "useAsyncData выполняется только в браузере при SSR",
+          "Nitro заменяет Vite полностью в SPA",
+          "JSON payload для гидрации не нужен при SSR"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки режимов рендеринга",
+      "expected": "Кандидат называет: ssr:false на SEO-сайте; useFetch без server:false при SSG build; window/document без ClientOnly; nuxi build вместо generate; SSG для неизвестных dynamic params; проверка через curl.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — частые production-ловушки",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "nuxt_config_routeRules",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ssr: false",
+              "SEO",
+              "curl"
+            ],
+            "ask": "как проверить что SSR реально работает и что видят краулеры"
+          },
+          {
+            "match": [
+              "ClientOnly",
+              "window",
+              "document"
+            ],
+            "ask": "почему компонент с window ломает SSR и как исправить"
+          },
+          {
+            "match": [
+              "server: false",
+              "nuxi generate",
+              "build"
+            ],
+            "ask": "почему useFetch к live API падает при SSG и что делать"
+          }
+        ],
+        "mustConcepts": [
+          "ssr: false",
+          "SEO",
+          "curl",
+          "__nuxt",
+          "пустой div",
+          "useFetch",
+          "server: false",
+          "ClientOnly",
+          "window",
+          "document",
+          "nuxi build",
+          "nuxi generate",
+          "404",
+          "dynamic params",
+          "users/99",
+          "build time",
+          "API недоступ"
+        ],
+        "falseClaims": [
+          "ssr: false не влияет на SEO — Google всё равно ждёт JS",
+          "useFetch всегда безопасен при nuxi generate без опций",
+          "nuxi build подходит для деплоя на static CDN",
+          "SSG автоматически генерирует все возможные dynamic routes",
+          "ClientOnly нужен только в SPA mode"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "data_fetching_by_mode",
+      "title": "Связывает useAsyncData/useFetch с режимом",
+      "expected": "Кандидат объясняет: на SSR useAsyncData/useFetch выполняются на сервере — контент в HTML; при SSG — только на build; server:false для client-only fetch; useLazyFetch для некритичных данных.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "связка data fetching с режимом — бонус middle",
+        "mustConcepts": [
+          "useAsyncData",
+          "useFetch",
+          "server: false",
+          "useLazyFetch",
+          "build",
+          "SSR",
+          "SSG",
+          "клиент",
+          "сервер",
+          "view source",
+          "разметк"
+        ],
+        "falseClaims": [
+          "useFetch всегда выполняется только на клиенте",
+          "useAsyncData не работает в SSG",
+          "server:false заставляет fetch выполняться на сервере",
+          "данные из useState переживают refresh в SSG как в SSR"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "SSR — HTML на каждый запрос через Nitro, SEO ок. SSG — `nuxi generate`, файлы на CDN. SPA — `ssr: false`, пустая оболонка. Hybrid — `routeRules`: блог SSR, admin SPA. SSR и SSG сразу отдают HTML; SPA ждёт JS.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для маркетплейса: каталог SSG или swr, checkout SSR с персонализацией, корзина SPA. В nuxt.config routeRules для /products/** — swr:3600, /cart — ssr:false. Блог — useAsyncData на сервере, view source показывает title в markup.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну ssr рендерит на запрос, ssg заранее при generate, spa всё в браузере. hybrid через routeRules — разные роуты по-разному. nitro для ssr/ssg, vite для spa",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Все режимы Nuxt одинаковы: сервер всегда отдаёт пустой div, а Vue рисует в браузере. SSG и SSR — синонимы.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для SEO ставлю ssr:false — Google сам выполнит JavaScript. SSG генерирует любой /users/:id автоматически без конфига.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "nuxi build и nuxi generate — одно и то же для static deploy. useFetch('/api/live') при generate всегда работает без опций.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "rendering_modes_overview",
+      "exampleType": "good",
+      "exampleText": "Четыре режима: SSR per request, SSG at build, SPA in browser, Hybrid per route через routeRules.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "rendering_modes_overview",
+      "exampleType": "good",
+      "exampleText": "ssr — сервер каждый раз, ssg — один раз при сборке, spa — только клиент, hybrid — микс по путям",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "rendering_modes_overview",
+      "exampleType": "bad",
+      "exampleText": "Hybrid — это когда включён ssr:true глобально и всё работает как universal mode Nuxt 2.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "html_delivery_difference",
+      "exampleType": "good",
+      "exampleText": "SSR и SSG отдают готовый HTML — разница когда: request vs build. SPA шлёт JS, контент после execute.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "html_delivery_difference",
+      "exampleType": "good",
+      "exampleText": "spa — curl покажет пустой __nuxt, ssr — полный article в html сразу",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "html_delivery_difference",
+      "exampleType": "bad",
+      "exampleText": "SPA отлично для SEO, потому что Google всегда ждёт полной загрузки JS без проблем.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "when_to_use_modes",
+      "exampleType": "good",
+      "exampleText": "Новости и товары — SSR. Доки nuxt.com — SSG generate. Admin dashboard — SPA ssr:false. Смешанный сайт — Hybrid routeRules.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "when_to_use_modes",
+      "exampleType": "good",
+      "exampleText": "seo + частые обновления — ssr, статика на cdn — ssg, за логином без seo — spa",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "when_to_use_modes",
+      "exampleType": "bad",
+      "exampleText": "Всегда SPA — проще и быстрее для любого публичного сайта.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "nuxt_config_routeRules",
+      "exampleType": "good",
+      "exampleText": "routeRules: '/blog/**': { ssr: true }, '/admin/**': { ssr: false }, '/': { prerender: true }. SSG — nuxi generate, не nuxi build.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "nuxt_config_routeRules",
+      "exampleType": "good",
+      "exampleText": "e-commerce: products swr 600, cart ssr false, checkout ssr true — всё в одном config",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "nuxt_config_routeRules",
+      "exampleType": "bad",
+      "exampleText": "Для SSG достаточно nuxi build — получишь static html на CDN без Node-сервера.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "nitro_rendering_flow",
+      "exampleType": "good",
+      "exampleText": "Запрос → Nitro → routeRules match → Vue server-renderer → useAsyncData в Node → HTML + JSON payload в script → гидрация.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "nitro_rendering_flow",
+      "exampleType": "good",
+      "exampleText": "nitro на ssr крутит composables, пишет html; на ssg то же но один раз; spa — vite bundle без nitro renderer",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "nitro_rendering_flow",
+      "exampleType": "bad",
+      "exampleText": "Nitro не используется в Nuxt 3 — только Vite рендерит всё на сервере и клиенте одинаково.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "ssr:false на публичном сайте — curl покажет пустой div. Fix: ssr:true и проверка curl. Chart с window — в ClientOnly.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "useFetch live-prices при generate упадёт — server:false. SSG /users/99 без prerender — 404, нужен SSR для всех id.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Компонент с document.body можно рендерить на SSR без ClientOnly — Nitro эмулирует window.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "data_fetching_by_mode",
+      "exampleType": "good",
+      "exampleText": "useAsyncData на SSR выполняется в Node — title уже в HTML для SEO. Dashboard: useFetch(..., { server: false }).",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "data_fetching_by_mode",
+      "exampleType": "good",
+      "exampleText": "на ssg fetch только на build, live api — server false. useLazyFetch для некритичного чтобы ttfb быстрее",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "data_fetching_by_mode",
+      "exampleType": "bad",
+      "exampleText": "useState в SSG переживает F5 так же как SSR — сервер восстановит state при refresh.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nuxt-rendering-modes-ssr-ssg-spa",
+    "apiUrl": "https://api.itlead.org/api/questions/nuxt-rendering-modes-ssr-ssg-spa",
+    "pageUrl": "https://itlead.org/interview-questions/nuxt/nuxt-rendering-modes-ssr-ssg-spa",
+    "difficulty": "MIDDLE",
+    "titleEn": "What are rendering modes in Nuxt (SSR, SSG, SPA, Hybrid)?",
+    "categorySlug": "nuxt",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

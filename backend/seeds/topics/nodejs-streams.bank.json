@@ -1,0 +1,574 @@
+{
+  "topic": {
+    "code": "nodejs_streams",
+    "name": "Streams (потоки) в Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое streams (потоки) в Node.js?",
+    "shortAnswer": "Streams в Node.js — объекты, которые читают или записывают данные по частям (chunk), не загружая весь объём в память сразу. `pipe()` соединяет потоки и автоматически обрабатывает backpressure; в production предпочтительнее `pipeline()` (Node 10+) — он закрывает все потоки в цепочке при любой ошибке.",
+    "idealAnswer": "Streams — объекты Node.js для обработки данных по частям вместо загрузки всего файла в RAM. `fs.readFileSync('4gb.mp4')` съедает 4 GB; `fs.createReadStream('4gb.mp4').pipe(res)` читает ~64 KB, обрабатывает, отдаёт и берёт следующий chunk — память остаётся ~1–2 MB даже для 50 GB файла. Четыре типа: Readable (источник — `fs.createReadStream`, `http.IncomingMessage`), Writable (приёмник — `fs.createWriteStream`, `http.ServerResponse`), Duplex (оба направления — `net.Socket`), Transform (читает, модифицирует, отдаёт — `zlib.createGzip`, `crypto.createCipheriv`). Backpressure: если Writable не успевает, Readable автоматически pause(); когда буфер опустошается — resume(). `pipe()` делает это внутри; при ручном `.on('data')` backpressure нужно реализовывать самому — частая причина OOM в production. `pipe()` возвращается сразу — передача асинхронна, завершение по `'finish'`. `pipeline()` (stream.pipeline) при ошибке уничтожает все потоки в цепочке; без обработчиков error — unhandled error. `highWaterMark` (по умолчанию 64 KB) — порог буфера до паузы; завышение до 10 MB убивает смысл streaming. Readable можно прочитать один раз — второй `pipe()` на тот же stream пустой. Для JS-объектов нужен `objectMode: true`, иначе `[object Object]`. Когда streams: файлы 50 MB+, HTTP req/res bodies, real-time (WebSocket, DB cursors, child stdout), on-the-fly gzip/encrypt/parse. Для конфигов и JSON < 1 MB без конкуренции — `readFileSync` проще. Внутри libuv читает диск chunk'ами; `writable.write()` возвращает false при полном буфере — именно это проверяет pipe(). В Express `res` — Writable; Mongoose `.cursor()`, csv-parser, child_process stdout — типичные кейсы. В кастомном Transform с async API вызывать callback только после await — иначе backpressure не сработает.",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "streams_definition",
+      "title": "Понимает суть streams",
+      "expected": "Кандидат объясняет: streams обрабатывают данные по chunk, а не загружают всё в память; createReadStream vs readFileSync; память остаётся постоянной независимо от размера файла.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — ядро темы chunk-by-chunk vs RAM",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "chunk",
+              "част",
+              "памят",
+              "readFileSync"
+            ],
+            "ask": "чем createReadStream отличается от readFileSync для 4 GB файла"
+          }
+        ],
+        "mustConcepts": [
+          "stream",
+          "поток",
+          "chunk",
+          "шмат",
+          "част",
+          "памят",
+          "RAM",
+          "readFileSync",
+          "createReadStream",
+          "не загруж",
+          "постоянн",
+          "64KB",
+          "64 KB",
+          "конвейер",
+          "piece by piece",
+          "по частям"
+        ],
+        "falseClaims": [
+          "streams загружают весь файл в память перед обработкой",
+          "createReadStream и readFileSync одинаково используют RAM",
+          "streams нужны для любого файла включая 1 KB конфиг",
+          "размер файла напрямую определяет потребление памяти при streaming",
+          "pipe() синхронно ждёт окончания передачи"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "four_stream_types",
+      "title": "Знает четыре типа потоков",
+      "expected": "Кандидат перечисляет Readable, Writable, Duplex, Transform с примерами: createReadStream/IncomingMessage, createWriteStream/ServerResponse, net.Socket, createGzip/createCipheriv.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "таблица четырёх типов — базовая классификация ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "streams_definition",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Readable",
+              "Writable",
+              "Transform"
+            ],
+            "ask": "примеры Readable, Writable и Transform в Node.js"
+          },
+          {
+            "match": [
+              "Duplex",
+              "Socket"
+            ],
+            "ask": "чем Duplex отличается от Transform"
+          }
+        ],
+        "mustConcepts": [
+          "Readable",
+          "Writable",
+          "Duplex",
+          "Transform",
+          "createReadStream",
+          "createWriteStream",
+          "IncomingMessage",
+          "ServerResponse",
+          "net.Socket",
+          "createGzip",
+          "createCipheriv",
+          "источник",
+          "приёмник",
+          "оба направлен",
+          "модифиц",
+          "zlib",
+          "crypto"
+        ],
+        "falseClaims": [
+          "Transform — это только Writable stream",
+          "http.ServerResponse — Readable stream",
+          "Duplex и Transform — одно и то же",
+          "Readable может только писать данные",
+          "в Node.js существует только два типа потоков"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "backpressure",
+      "title": "Понимает backpressure",
+      "expected": "Кандидат объясняет: при переполнении буфера Writable Readable pause(); после drain — resume(); pipe() делает автоматически; writable.write() возвращает false при полном буфере; ручной on('data') без backpressure → OOM.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "backpressure — ключевой механизм и частая production-ошибка",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "backpressure",
+              "pause",
+              "resume"
+            ],
+            "ask": "что происходит когда Writable медленнее Readable"
+          },
+          {
+            "match": [
+              "write(",
+              "false",
+              "буфер"
+            ],
+            "ask": "когда writable.write возвращает false и как это связано с pipe"
+          }
+        ],
+        "mustConcepts": [
+          "backpressure",
+          "обратн давлен",
+          "pause",
+          "resume",
+          "буфер",
+          "buffer",
+          "drain",
+          "pipe",
+          "on('data')",
+          "OOM",
+          "медленн",
+          "переполн",
+          "writable.write",
+          "false",
+          "автомат",
+          "источник"
+        ],
+        "falseClaims": [
+          "backpressure нужно включать отдельным флагом в Node.js",
+          "pipe() не обрабатывает backpressure",
+          "Readable всегда читает на максимальной скорости без пауз",
+          "writable.write всегда возвращает true",
+          "ручной on('data') без pause/resume безопасен для медленного сокета"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "pipe_vs_pipeline",
+      "title": "Сравнивает pipe() и pipeline()",
+      "expected": "Кандидат объясняет: pipe() соединяет потоки асинхронно, но не уничтожает цепочку при ошибке; pipeline() закрывает все streams при сбое; pipe() возвращается сразу — finish для завершения; в production — pipeline().",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "production-critical — error handling и cleanup из ITLead mistakes",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "pipe",
+              "pipeline",
+              "finish"
+            ],
+            "ask": "почему console.log('Done') после pipe срабатывает до конца передачи"
+          },
+          {
+            "match": [
+              "pipeline",
+              "error",
+              "destroy"
+            ],
+            "ask": "что делает pipeline при ошибке посередине цепочки"
+          }
+        ],
+        "mustConcepts": [
+          "pipe",
+          "pipeline",
+          "stream.pipeline",
+          "finish",
+          "error",
+          "destroy",
+          "асинхрон",
+          "сразу",
+          "production",
+          "unhandled",
+          "cleanup",
+          "цепочк",
+          "закрыва",
+          "колбек",
+          "Node 10",
+          "Node.js 10"
+        ],
+        "falseClaims": [
+          "pipe() синхронно блокирует до конца копирования",
+          "pipe() автоматически destroy все streams при ошибке",
+          "pipeline() не нужен если нет явных error listener",
+          "pipe() и pipeline() идентичны по обработке ошибок",
+          "без error listener ошибка stream просто игнорируется без последствий"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Знает когда использовать streams",
+      "expected": "Кандидат называет: большие файлы 50 MB+, HTTP bodies, real-time, on-the-fly transform; для < 1 MB конфигов — readFileSync проще; правило: 50 MB+ или real-time → streams.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "decision rule из ITLead When to use",
+        "mustConcepts": [
+          "50MB",
+          "50 MB",
+          "1MB",
+          "1 MB",
+          "больш",
+          "файл",
+          "HTTP",
+          "req",
+          "res",
+          "Express",
+          "real-time",
+          "WebSocket",
+          "cursor",
+          "gzip",
+          "encrypt",
+          "readFileSync",
+          "конфиг",
+          "JSON",
+          "overhead"
+        ],
+        "falseClaims": [
+          "streams обязательны для любого чтения файла",
+          "readFileSync всегда хуже streams",
+          "для 500 KB JSON нужен createReadStream",
+          "HTTP response нельзя стримить",
+          "streams не подходят для сжатия на лету"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "stream_internals",
+      "title": "Знает highWaterMark и libuv",
+      "expected": "Кандидат упоминает: libuv читает chunk'ами; highWaterMark по умолчанию 64 KB; порог буфера до backpressure; завышение highWaterMark накапливает память и снижает пользу streaming.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "How it works internally — highWaterMark из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "highWaterMark",
+              "64",
+              "libuv"
+            ],
+            "ask": "что делает highWaterMark и какой дефолт"
+          }
+        ],
+        "mustConcepts": [
+          "highWaterMark",
+          "64KB",
+          "64 KB",
+          "256KB",
+          "libuv",
+          "I/O",
+          "буфер",
+          "порог",
+          "data",
+          "событ",
+          "pause",
+          "дефолт",
+          "накоп",
+          "10MB",
+          "10 MB"
+        ],
+        "falseClaims": [
+          "highWaterMark задаёт размер файла за один read",
+          "увеличение highWaterMark до 10 MB улучшает streaming",
+          "libuv загружает весь файл перед emit data",
+          "highWaterMark не влияет на backpressure",
+          "дефолт highWaterMark — 1 MB"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки streams",
+      "expected": "Кандидат называет: pipe не синхронен; нет error handling; завышенный highWaterMark; два pipe на один Readable; объекты без objectMode; async Transform — callback только после await.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "пять Common mistakes из ITLead markdown",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "objectMode",
+              "object Object"
+            ],
+            "ask": "почему Transform без objectMode превращает объект в строку"
+          },
+          {
+            "match": [
+              "два pipe",
+              "второй pipe",
+              "один Readable"
+            ],
+            "ask": "почему второй pipe на тот же createReadStream пустой"
+          },
+          {
+            "match": [
+              "async",
+              "callback",
+              "Transform"
+            ],
+            "ask": "как сохранить backpressure в Transform с async API"
+          }
+        ],
+        "mustConcepts": [
+          "objectMode",
+          "object Object",
+          "два pipe",
+          "один Readable",
+          "прочитан",
+          "finish",
+          "Done",
+          "синхрон",
+          "error",
+          "unhandled",
+          "highWaterMark",
+          "10MB",
+          "async",
+          "await",
+          "callback",
+          "Transform",
+          "копи",
+          "copy1",
+          "copy2"
+        ],
+        "falseClaims": [
+          "один Readable можно pipe в несколько Writable одновременно без tee",
+          "objectMode включён по умолчанию для Transform",
+          "можно вызывать callback в Transform до завершения await",
+          "console.log после pipe гарантирует завершение копирования",
+          "highWaterMark 10 MB — рекомендуемая практика"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Streams читают файл по 64 KB chunk'ами — память ~1–2 MB даже для гигабайтного видео. Четыре типа: Readable, Writable, Duplex, Transform. pipe() связывает потоки и сам pause/resume при backpressure; в production — pipeline() с колбеком на error, иначе unhandled error и утечки.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На Express отдаю большой mp4 через fs.createReadStream().pipe(res) — клиент получает первый chunk за миллисекунды. CSV на 500 MB гоняю через csv-parser + Transform с objectMode: true — строка за строкой, не гружу в RAM. Мелкий config.json на 20 KB — readFileSync, overhead streams не окупается.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну потоки — это когда не readFileSync на 4 гига, а createReadStream и pipe, память не растёт. pipeline лучше pipe потому что при ошибке всё закроет",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Streams загружают файл целиком в Buffer, потом отдают клиенту. pipe() синхронный — после него сразу можно удалять исходник. Один createReadStream можно pipe в два writeStream для двух копий.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Backpressure не нужен — Node сам держит всё в RAM пока Writable не успеет. highWaterMark ставлю 50 MB чтобы быстрее читать. objectMode не нужен — объекты и так сериализуются в JSON автоматически в Transform.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "pipe() в production лучше pipeline потому что pipeline медленнее. Для любого файла включая env на 200 байт обязательно createReadStream. Ошибки stream не эмитятся если нет listener — данные просто теряются тихо.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "streams_definition",
+      "exampleType": "good",
+      "exampleText": "createReadStream читает chunk, память flat; readFileSync на 4 GB — OOM.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "streams_definition",
+      "exampleType": "good",
+      "exampleText": "поток как конвейер — по кусочку, не весь файл в ram сразу",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "streams_definition",
+      "exampleType": "bad",
+      "exampleText": "createReadStream загружает весь файл перед первым emit data.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "four_stream_types",
+      "exampleType": "good",
+      "exampleText": "Readable — createReadStream; Writable — res в Express; Transform — createGzip в середине pipeline.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "four_stream_types",
+      "exampleType": "good",
+      "exampleText": "Duplex — net.Socket, оба направления; Transform меняет chunk на лету",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "four_stream_types",
+      "exampleType": "bad",
+      "exampleText": "ServerResponse — Readable, IncomingMessage — Writable.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "backpressure",
+      "exampleType": "good",
+      "exampleText": "Writable медленный — Readable pause; drain — resume; pipe() проверяет writable.write() === false.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "backpressure",
+      "exampleType": "good",
+      "exampleText": "ручной on data без pause на медленный tcp — буфер растёт до oom, pipe решает",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "backpressure",
+      "exampleType": "bad",
+      "exampleText": "backpressure в Node.js отключён по умолчанию, нужен модуль backpressure.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "pipe_vs_pipeline",
+      "exampleType": "good",
+      "exampleText": "pipe() return сразу — жду finish; pipeline при err destroy всей цепочки.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "pipe_vs_pipeline",
+      "exampleType": "good",
+      "exampleText": "в проде pipeline с колбеком — диск заполнился посередине gzip, pipe оставит висящие streams",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "pipe_vs_pipeline",
+      "exampleType": "bad",
+      "exampleText": "pipe() блокирует event loop до конца копирования файла.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "2 GB video — createReadStream.pipe(res); 5 KB config — readFileSync.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "mongo cursor stream, websocket, gzip on the fly — streams; маленький json без нагрузки — sync ок",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "readFileSync запрещён в Node.js для файлов больше 1 KB.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "stream_internals",
+      "exampleType": "good",
+      "exampleText": "libuv читает с диска chunk'ами; highWaterMark 64 KB — порог до pause.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "stream_internals",
+      "exampleType": "good",
+      "exampleText": "highWaterMark 10mb — накопит 10 мегабайт до паузы, смысл streaming теряется",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "stream_internals",
+      "exampleType": "bad",
+      "exampleText": "highWaterMark — это максимальный размер файла который Node может прочитать.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Два copy с одного readable — второй пустой; нужны два createReadStream. Transform с objectMode: true для объектов.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "async transform: await apiCall(chunk); потом callback — иначе очередь не заполнится и backpressure не сработает",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "После pipe сразу console.log Done — значит файл уже скопирован полностью.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-streams",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-streams",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-streams",
+    "difficulty": "MIDDLE",
+    "titleEn": "What are streams in Node.js?",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T15:00:00.000Z"
+  }
+}

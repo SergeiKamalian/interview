@@ -1,0 +1,632 @@
+{
+  "topic": {
+    "code": "rules_for_using_hooks_in_react",
+    "name": "Правила использования хуков в React",
+    "skillCode": "react",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Какие правила использования хуков в React обязательны и почему их нельзя нарушать?",
+    "shortAnswer": "Хуки вызывают только на верхнем уровне функционального компонента или кастомного хука — не внутри условий, циклов, вложенных функций и обработчиков событий. Вызывать их можно только из React-компонентов или кастомных хуков (функций с префиксом use). React отслеживает хуки по порядку вызова, а не по имени: одинаковый порядок на каждом рендере сохраняет стабильный state.",
+    "idealAnswer": "Rules of Hooks — два главных правила: (1) вызывать хуки только на верхнем уровне компонента или кастомного хука, никогда внутри if/for/map, вложенных функций и тел обработчиков; (2) вызывать хуки только из функциональных компонентов React или кастомных хуков (функции с префиксом use), не из обычных JS-функций и не на уровне модуля. React хранит состояние хуков в связанном списке (linked list) на fiber-узле компонента. При первом рендере строятся слоты 1, 2, 3… При каждом re-render React проходит тот же список в том же порядке и восстанавливает значения. Идентификация по позиции вызова, не по имени — два useState в одном компоненте различаются только порядком. Условный вызов useState сдвигает все последующие слоты: слот 2 получает данные слота 1, React бросает «Rendered more/fewer hooks than during the previous render». Правильный паттерн: все хуки в начале, условия и return — ниже. Ранний return после всех хуков валиден: if (!userId) return null после useState — ок; хук после return — нарушение. Условная логика — внутри хука (deps, callback) или после всех вызовов, не вокруг них. В циклах — один useState/useReducer наверху, значения в объекте/массиве по id. В обработчиках — state на уровне компонента, useCallback для мемоизации, не useState внутри handleClick. Кастомный хук — функция useMyLogic, вызывающая другие хуки; префикс use нужен React и eslint-plugin-react-hooks. Повторяющуюся stateful-логику выносят в кастомный хук, не в plain function. React обнаруживает нарушения: при update фаза сравнивает число вызовов с предыдущим рендером через ReactCurrentDispatcher; eslint-plugin-react-hooks ловит большинство нарушений статически по AST. Типичные ошибки миграции с классов: useState внутри .map(), хук в if (isLoggedIn), myFetchLogic без use-префикса, useState на module scope. Примеры из экосистемы: useSelector/useDispatch (Redux), useQuery (TanStack Query), useSWR (Next.js), useStore (Zustand) — все подчиняются тем же правилам. Counter: два useState всегда в слотах 1 и 2. TodoList: useState + useMemo без условий вокруг. Profile: оба useState до if (!userId) return.",
+    "maxScore": 10,
+    "skills": [
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "top_level_only",
+      "title": "Знает правило верхнего уровня",
+      "expected": "Кандидат формулирует: хуки только на top level компонента или кастомного хука; не в if/for/map, не во вложенных функциях и обработчиках; сначала все хуки, потом условия.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро Rules of Hooks — top level из TL;DR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "top_level_only",
+            "oftenConfusedWith": [
+              "early_return_valid"
+            ],
+            "anchorTermsExpected": [
+              "верхн",
+              "top level",
+              "не в if",
+              "не в цикл",
+              "не в map",
+              "сначала хуки"
+            ],
+            "anchorTermsWrongTopic": [
+              "ранний return до хуков",
+              "хуки в обработчике ок",
+              "условие вокруг useState норма"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "if",
+              "useState",
+              "услов"
+            ],
+            "ask": "почему useState внутри if ломает порядок слотов"
+          }
+        ],
+        "mustConcepts": [
+          "верхн",
+          "top level",
+          "не в услов",
+          "не в if",
+          "не в цикл",
+          "не в map",
+          "не во вложен",
+          "не в обработчик",
+          "сначала хуки",
+          "потом услов",
+          "return ниже",
+          "кастомный хук",
+          "useState",
+          "useEffect",
+          "правила хуков",
+          "Rules of Hooks",
+          "стабильн порядок"
+        ],
+        "falseClaims": [
+          "хуки можно вызывать внутри if если условие редко меняется",
+          "в map можно вызывать useState для каждого элемента",
+          "хуки в handleClick — нормальный паттерн",
+          "порядок хуков важен только при первом mount",
+          "вложенная функция внутри компонента может вызывать useState"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "react_components_only",
+      "title": "Вызывает хуки только из React-контекста",
+      "expected": "Кандидат объясняет: хуки только из функциональных компонентов или кастомных хуков; не из plain functions, не на module scope, не из class components.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "второе базовое правило — откуда можно вызывать",
+        "mustConcepts": [
+          "функциональн компонент",
+          "кастомный хук",
+          "префикс use",
+          "не plain function",
+          "не модуль",
+          "module scope",
+          "не class",
+          "React компонент",
+          "useMyLogic",
+          "только из React",
+          "functional component"
+        ],
+        "falseClaims": [
+          "useState можно вызвать на уровне модуля для глобального state",
+          "обычная утилита fetchData может внутри вызывать useEffect",
+          "class component может вызывать useState в render",
+          "хуки работают в любой JS-функции",
+          "helper без use-префикса может безопасно вызывать useSWR"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "call_order_fiber",
+      "title": "Понимает отслеживание по порядку вызова",
+      "expected": "Кандидат объясняет: React хранит state в linked list на fiber; слоты по позиции вызова, не по имени; одинаковый порядок каждый render; сдвиг слота ломает все последующие значения.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "механизм memoizedState / fiber — почему правило не произвольное",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "top_level_only",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "call_order_fiber",
+            "oftenConfusedWith": [
+              "hooks_in_condition"
+            ],
+            "anchorTermsExpected": [
+              "порядок",
+              "слот",
+              "linked list",
+              "fiber",
+              "не по имени",
+              "memoizedState"
+            ],
+            "anchorTermsWrongTopic": [
+              "React находит хук по имени useState",
+              "два useState не конфликтуют по имени",
+              "порядок важен только для useEffect"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useState",
+              "useState",
+              "два"
+            ],
+            "ask": "как React различает два useState в одном компоненте без имён"
+          },
+          {
+            "match": [
+              "fiber",
+              "memoizedState",
+              "linked list"
+            ],
+            "ask": "что происходит в fiber когда слот 1 пропускается на re-render"
+          }
+        ],
+        "mustConcepts": [
+          "порядок вызова",
+          "call order",
+          "не по имени",
+          "слот",
+          "slot",
+          "linked list",
+          "связанный список",
+          "fiber",
+          "файбер",
+          "memoizedState",
+          "позици",
+          "индекс",
+          "стабильн",
+          "re-render",
+          "сдвиг",
+          "offset",
+          "Rendered more hooks",
+          "fewer hooks"
+        ],
+        "falseClaims": [
+          "React идентифицирует хуки по имени переменной count vs label",
+          "можно менять порядок useState и useEffect между рендерами",
+          "слоты пересчитываются по имени хука при каждом render",
+          "fiber хранит state хуков в глобальном store приложения",
+          "нарушение порядка даёт warning но state остаётся корректным"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "hooks_in_condition",
+      "title": "Избегает условных вызовов хуков",
+      "expected": "Кандидат называет ошибку useState в if; объясняет сдвиг слотов; fix — безусловный вызов, условие после; знает ошибку «Rendered more/fewer hooks».",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "самая частая runtime-ошибка из ITLead quick example",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "call_order_fiber",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "showCount",
+              "BadComponent",
+              "GoodComponent"
+            ],
+            "ask": "чем BadComponent с useState в if отличается от GoodComponent"
+          },
+          {
+            "match": [
+              "isLoggedIn",
+              "услов"
+            ],
+            "ask": "как исправить useState внутри if (isLoggedIn)"
+          }
+        ],
+        "mustConcepts": [
+          "услов",
+          "if",
+          "useState в if",
+          "сдвиг слот",
+          "Rendered more hooks",
+          "fewer hooks",
+          "previous render",
+          "безусловн",
+          "сначала хук",
+          "потом проверк",
+          "showCount",
+          "BadComponent",
+          "GoodComponent",
+          "condition inside",
+          "не вокруг хука"
+        ],
+        "falseClaims": [
+          "useState в if безопасен если ветка всегда true",
+          "React пересоздаёт слоты при смене условия без ошибки",
+          "можно обернуть useEffect в if для оптимизации",
+          "тернарный оператор вокруг useState допустим",
+          "условный хук работает в production но падает только в dev"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "hooks_loop_handler_module",
+      "title": "Знает ошибки в циклах, handlers и module scope",
+      "expected": "Кандидат называет: useState в map — fix один state + объект по id; useState в handleClick — fix state на уровне компонента + useCallback; useState на module scope — fix внутрь компонента/хука.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "три типичных anti-pattern из Common mistakes ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "map",
+              "items",
+              "active"
+            ],
+            "ask": "как заменить useState внутри items.map на один хук с объектом по id"
+          },
+          {
+            "match": [
+              "handleClick",
+              "обработчик",
+              "event"
+            ],
+            "ask": "почему useState внутри handleClick не отслеживается React"
+          },
+          {
+            "match": [
+              "globalCount",
+              "module",
+              "модуль"
+            ],
+            "ask": "почему useState на уровне модуля недопустим"
+          }
+        ],
+        "mustConcepts": [
+          "map",
+          "цикл",
+          "loop",
+          "useState в map",
+          "объект по id",
+          "массив",
+          "handleClick",
+          "обработчик",
+          "event handler",
+          "useCallback",
+          "module scope",
+          "глобальн",
+          "уровень компонента",
+          "plain JS функция",
+          "не отслеж",
+          "items.map",
+          "active setActive"
+        ],
+        "falseClaims": [
+          "useState в map создаёт стабильный state для каждого item",
+          "обработчик события — валидное место для первого useState",
+          "module-level useState шарит state между компонентами корректно",
+          "useCallback заменяет необходимость state на уровне компонента",
+          "хук в forEach безопаснее чем в map"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "custom_hooks_prefix",
+      "title": "Понимает кастомные хуки и префикс use",
+      "expected": "Кандидат объясняет: кастомный хук — функция use* с вызовами других хуков; префикс use для React и ESLint; повторяющуюся логику выносят в useMyLogic, не в plain function; myFetchLogic без use — ESLint не поймает нарушения внутри.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "custom Hook + naming convention из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useMyLogic",
+              "кастом",
+              "custom"
+            ],
+            "ask": "когда создавать кастомный хук вместо дублирования useState/useEffect"
+          },
+          {
+            "match": [
+              "myFetchLogic",
+              "use префикс",
+              "eslint"
+            ],
+            "ask": "зачем переименовать myFetchLogic в useMyFetchLogic"
+          }
+        ],
+        "mustConcepts": [
+          "кастомный хук",
+          "custom hook",
+          "префикс use",
+          "useMyLogic",
+          "useMyFetchLogic",
+          "useSWR",
+          "useQuery",
+          "useSelector",
+          "повторяющ",
+          "логика",
+          "eslint-plugin-react-hooks",
+          "plain function",
+          "вынос",
+          "два компонента",
+          "stateful logic"
+        ],
+        "falseClaims": [
+          "кастомный хук может называться fetchLogic без use",
+          "plain function может вызывать useEffect если экспортировать из utils",
+          "префикс use — только стилистика без влияния на React",
+          "кастомный хук не обязан следовать Rules of Hooks",
+          "ESLint проверяет хуки только в компонентах с export default"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "early_return_valid",
+      "title": "Различает ранний return и хук после return",
+      "expected": "Кандидат объясняет: ранний return после всех хуков валиден (Profile/userId); хук после return пропускается и ломает счёт слотов; все хуки должны завершиться до любого условного выхода.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "частая путаница middle — early return vs hook after return",
+        "confusionPairs": [
+          {
+            "checkpointKey": "early_return_valid",
+            "oftenConfusedWith": [
+              "top_level_only",
+              "hooks_in_condition"
+            ],
+            "anchorTermsExpected": [
+              "ранний return",
+              "после хуков",
+              "до return",
+              "userId",
+              "Profile",
+              "два useState"
+            ],
+            "anchorTermsWrongTopic": [
+              "return до любого хука ок",
+              "хук после return если редко срабатывает",
+              "early return запрещён в React 18"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "ранний return",
+          "early return",
+          "после хуков",
+          "до return",
+          "хук после return",
+          "пропуск слот",
+          "userId",
+          "Profile",
+          "useState profile",
+          "useState posts",
+          "if (!userId)",
+          "валидн",
+          "React 18",
+          "условный выход",
+          "слот не меня"
+        ],
+        "falseClaims": [
+          "любой return до хуков — правильный паттерн",
+          "useEffect после early return безопасен если userId null",
+          "ранний return меняет количество слотов если хуки выше",
+          "хуки можно разместить после if (!data) return null",
+          "Profile пример нарушает Rules of Hooks"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Хуки только на top level: const [count, setCount] = useState(0) всегда вызывается, showCount влияет только на JSX. React хранит слоты в linked list на fiber — порядок фиксирован. useState в if сдвигает слоты и даёт «Rendered more hooks than during the previous render».",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В ревью часто вижу useState внутри map при миграции с классов. Фикс один: const [activeById, setActiveById] = useState({}) наверху, в map читаю activeById[item.id]. Кастомную логику fetch выношу в useMyFetchLogic с префиксом use — и React, и eslint-plugin-react-hooks отслеживают правила.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Profile: оба useState до if (!userId) return — слоты стабильны. Хук после return нельзя: он пропустится и сломает счёт. useSelector, useQuery, useSWR — те же Rules of Hooks что useState.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Правила хуков — формальность. Можно вызывать useState в if и в map, React сам разберётся по имени переменной.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Глобальный счётчик: const [count, setCount] = useState(0) на уровне модуля — удобно шарить между компонентами. В handleClick создаю локальный useState для временного state.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Ранний return всегда до хуков: if (!userId) return null; const [profile] = useState(null) — так быстрее. Кастомный хук называю fetchLogic без use, ESLint не нужен.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "top_level_only",
+      "exampleType": "good",
+      "exampleText": "Все useState/useEffect в начале компонента; if (showCount) влияет на разметку, не на вызов хуков.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "top_level_only",
+      "exampleType": "good",
+      "exampleText": "ну сначала все хуки, потом if и return — иначе React теряет порядок слотов",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "top_level_only",
+      "exampleType": "bad",
+      "exampleText": "useEffect оборачиваю в if (enabled) — так не вызываю лишний раз, это стандартная оптимизация.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "react_components_only",
+      "exampleType": "good",
+      "exampleText": "useState только в function Component() или useCustomHook(); утилита formatDate без use не может внутри вызвать useEffect.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "react_components_only",
+      "exampleType": "good",
+      "exampleText": "хуки из функционального компонента или use*-хука, не с module scope и не из class",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "react_components_only",
+      "exampleType": "bad",
+      "exampleText": "export function helpers() { const [x] = useState(0); } — нормальный shared state helper.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "call_order_fiber",
+      "exampleType": "good",
+      "exampleText": "Два useState — слот 1 и слот 2 по порядку вызова; React не смотрит на имена count и label. State в memoizedState linked list на fiber.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "call_order_fiber",
+      "exampleType": "good",
+      "exampleText": "fiber хранит linked list — пропустил слот 1, слот 2 читает чужие данные, дальше всё offset",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "call_order_fiber",
+      "exampleType": "bad",
+      "exampleText": "React различает хуки по строке 'useState' vs 'useEffect', порядок можно менять.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "hooks_in_condition",
+      "exampleType": "good",
+      "exampleText": "BadComponent: useState в if (showCount) — падает. GoodComponent: useState(0) всегда, showCount только в JSX.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "hooks_in_condition",
+      "exampleType": "good",
+      "exampleText": "if (isLoggedIn) { useState } — плохо; const [user] = useState(null) сверху, потом if (isLoggedIn) setUser(...)",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "hooks_in_condition",
+      "exampleType": "bad",
+      "exampleText": "Условный useState ок если ветка стабильна — React переназначит слоты автоматически без ошибки.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "hooks_loop_handler_module",
+      "exampleType": "good",
+      "exampleText": "items.map + useState внутри — антипаттерн; один useState({}) с ключами item.id снаружи цикла.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "hooks_loop_handler_module",
+      "exampleType": "good",
+      "exampleText": "handleClick с useState — нет; state в компоненте, useCallback для стабильной ссылки на handler",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "hooks_loop_handler_module",
+      "exampleType": "bad",
+      "exampleText": "const global = useState(0) вне компонента — shared counter для всего приложения, React это поддерживает.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "custom_hooks_prefix",
+      "exampleType": "good",
+      "exampleText": "Повторяющийся useSWR + useState — в useUserData(); префикс use включает проверку eslint-plugin-react-hooks.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "custom_hooks_prefix",
+      "exampleType": "good",
+      "exampleText": "myFetchLogic → useMyFetchLogic, иначе ESLint не считает функцию хуком и пропустит useSWR внутри if",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "custom_hooks_prefix",
+      "exampleType": "bad",
+      "exampleText": "Кастомные хуки без use — норма, главное вызывать их из компонента.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "early_return_valid",
+      "exampleType": "good",
+      "exampleText": "Profile: useState profile и posts, потом if (!userId) return — оба слота всегда; ранний return после хуков валиден.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "early_return_valid",
+      "exampleType": "good",
+      "exampleText": "ранний return после всех хуков ок; хук после return — слот пропущен, правило нарушено",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "early_return_valid",
+      "exampleType": "bad",
+      "exampleText": "if (!userId) return null в начале, потом useState — быстрее и правильно для Profile.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "rules-for-using-hooks-in-react",
+    "apiUrl": "https://api.itlead.org/api/questions/rules-for-using-hooks-in-react",
+    "pageUrl": "https://itlead.org/interview-questions/react/rules-for-using-hooks-in-react",
+    "difficulty": "MIDDLE",
+    "titleEn": "Rules for using hooks in React",
+    "categorySlug": "react",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

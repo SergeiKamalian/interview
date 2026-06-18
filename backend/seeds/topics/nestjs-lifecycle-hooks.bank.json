@@ -1,0 +1,673 @@
+{
+  "topic": {
+    "code": "nestjs_lifecycle_hooks",
+    "name": "Хуки жизненного цикла в NestJS",
+    "skillCode": "nestjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое хуки жизненного цикла (lifecycle hooks) в NestJS?",
+    "shortAnswer": "Хуки жизненного цикла в NestJS — интерфейсы, позволяющие провайдерам выполнять код на конкретных этапах запуска и остановки приложения. OnModuleInit срабатывает после готовности провайдеров модуля; OnApplicationBootstrap — после инициализации всех модулей, перед app.listen(). Без app.enableShutdownHooks() в main.ts хуки завершения не выполняются.",
+    "idealAnswer": "Lifecycle hooks в NestJS — интерфейсы (@nestjs/common), которые провайдеры реализуют через implements, чтобы запускать логику на этапах инициализации модулей и shutdown приложения. Два уровня: модульные (OnModuleInit, OnModuleDestroy) — per-module при bootstrap каждого модуля; уровень приложения (OnApplicationBootstrap, BeforeApplicationShutdown, OnApplicationShutdown) — один раз для всего приложения после готовности всех модулей. Пять хуков: onModuleInit() — после создания провайдеров модуля, до listen(); onApplicationBootstrap() — после всех OnModuleInit, перед listen(); onModuleDestroy() — после app.close(); beforeApplicationShutdown(signal?) — быстрая подготовка, получает SIGTERM/SIGINT; onApplicationShutdown(signal?) — после закрытия соединений, async cleanup. Порядок startup: depth-first — OnModuleInit дочерних модулей, затем родительских, затем OnApplicationBootstrap. Shutdown в обратном порядке: BeforeApplicationShutdown → сервер перестаёт принимать соединения → OnModuleDestroy → OnApplicationShutdown. Критично: app.enableShutdownHooks() в main.ts — без этого process.on('SIGTERM') не запускает chain NestJS и graceful shutdown не работает (типичная проблема в Kubernetes rolling deploy). Когда что: OnModuleInit — подключение DB/Redis в singleton-сервисе; OnApplicationBootstrap — cron, Bull workers, seed когда нужны все модули; OnApplicationShutdown + enableShutdownHooks — drain пулов, flush логов; BeforeApplicationShutdown — синхронно остановить intake (accepting=false); per-request логика — guards/interceptors, не hooks. Внутри NestJS сканирует провайдеры при instantiation, собирает ordered list по scope, вызывает через await в NestApplication.init()/close(). Reflect metadata + проверка прототипа ('onModuleInit' in provider) — implements в TypeScript не строго обязателен, но метод должен быть на prototype. Типичные ошибки: OnModuleInit в REQUEST-scoped провайдере (хук на каждый HTTP-запрос, leak соединений); sync CPU-heavy work в onModuleInit (блокирует bootstrap, dyno timeout); cross-module setup в OnModuleInit вместо OnApplicationBootstrap (race); отсутствие enableShutdownHooks(); onApplicationShutdown без await (процесс завершается до closeDB). Реальные паттерны: TypeORM dataSource.initialize() в OnModuleInit; @nestjs/bull workers в OnApplicationBootstrap; Prisma $disconnect в BeforeApplicationShutdown; Redis connect/disconnect парой OnModuleInit/OnModuleDestroy с quit() для drain. Dynamic и lazy modules: хуки регистрируются per instance; LazyModuleLoader откладывает до load(). Ошибка в хуке abort bootstrap — wrap в try/catch если нужен graceful fail. process.on('SIGTERM') напрямую теряет ordering и DI-контекст NestJS.",
+    "maxScore": 10,
+    "skills": [
+      "nestjs",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "hooks_definition",
+      "title": "Понимает lifecycle hooks и OnModuleInit",
+      "expected": "Кандидат объясняет: hooks — интерфейсы для кода на этапах startup/shutdown; OnModuleInit после DI resolve провайдеров модуля, один раз, до app.listen(), HTTP ещё не принимается.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — что такое hooks и базовый OnModuleInit",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "hooks_definition",
+            "oftenConfusedWith": [
+              "module_vs_app_level",
+              "all_five_hooks"
+            ],
+            "anchorTermsExpected": [
+              "OnModuleInit",
+              "onModuleInit",
+              "lifecycle",
+              "DI",
+              "провайдер",
+              "app.listen"
+            ],
+            "anchorTermsWrongTopic": [
+              "guard на каждый запрос",
+              "middleware lifecycle",
+              "OnModuleInit после listen"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "OnModuleInit",
+              "onModuleInit",
+              "lifecycle"
+            ],
+            "ask": "когда именно вызывается onModuleInit и сколько раз"
+          }
+        ],
+        "mustConcepts": [
+          "lifecycle",
+          "хук",
+          "OnModuleInit",
+          "onModuleInit",
+          "провайдер",
+          "startup",
+          "shutdown",
+          "DI",
+          "контейнер",
+          "implements",
+          "app.listen",
+          "один раз",
+          "до listen",
+          "HTTP",
+          "инициализац",
+          "запуск"
+        ],
+        "falseClaims": [
+          "OnModuleInit вызывается на каждый HTTP-запрос",
+          "lifecycle hooks заменяют guards для per-request логики",
+          "onModuleInit срабатывает после app.listen()",
+          "hooks работают только в controllers",
+          "OnModuleInit не связан с DI"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "module_vs_app_level",
+      "title": "Отличает модульные и app-level хуки",
+      "expected": "Кандидат разделяет: OnModuleInit/OnModuleDestroy per-module; OnApplicationBootstrap/BeforeApplicationShutdown/OnApplicationShutdown — один раз для всего приложения; для cross-module deps нужен OnApplicationBootstrap, не OnModuleInit.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "module vs app — ключ для выбора правильного хука",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "hooks_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "module_vs_app_level",
+            "oftenConfusedWith": [
+              "when_to_use",
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "модуль",
+              "приложен",
+              "OnApplicationBootstrap",
+              "cross-module",
+              "все модули"
+            ],
+            "anchorTermsWrongTopic": [
+              "OnModuleInit гарантирует порядок между модулей",
+              "app-level хуки per-request"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "cross-module",
+              "другой модуль",
+              "ServiceB"
+            ],
+            "ask": "ServiceA зависит от ServiceB из другого модуля — OnModuleInit или OnApplicationBootstrap"
+          }
+        ],
+        "mustConcepts": [
+          "модуль",
+          "приложен",
+          "OnModuleInit",
+          "OnModuleDestroy",
+          "OnApplicationBootstrap",
+          "BeforeApplicationShutdown",
+          "OnApplicationShutdown",
+          "per-module",
+          "один раз",
+          "cross-module",
+          "межмодуль",
+          "все модули",
+          "готов",
+          "race",
+          "порядок не гарант"
+        ],
+        "falseClaims": [
+          "OnModuleInit гарантирует что все модули уже инициализированы",
+          "OnApplicationBootstrap срабатывает per-module",
+          "cross-module setup безопасен в OnModuleInit",
+          "модульные и app-level хуки выполняются в одно время"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "all_five_hooks",
+      "title": "Знает все пять хуков и их timing",
+      "expected": "Кандидат перечисляет пять хуков с методами и моментом вызова: OnModuleInit, OnApplicationBootstrap, OnModuleDestroy, BeforeApplicationShutdown (signal), OnApplicationShutdown (после закрытия соединений).",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "таблица пяти хуков из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "BeforeApplicationShutdown",
+              "OnApplicationShutdown",
+              "signal"
+            ],
+            "ask": "разница между BeforeApplicationShutdown и OnApplicationShutdown"
+          }
+        ],
+        "mustConcepts": [
+          "OnModuleInit",
+          "OnApplicationBootstrap",
+          "OnModuleDestroy",
+          "BeforeApplicationShutdown",
+          "OnApplicationShutdown",
+          "onModuleInit",
+          "onApplicationBootstrap",
+          "onModuleDestroy",
+          "beforeApplicationShutdown",
+          "onApplicationShutdown",
+          "signal",
+          "SIGTERM",
+          "SIGINT",
+          "app.close",
+          "соединен"
+        ],
+        "falseClaims": [
+          "NestJS имеет только два lifecycle hooks",
+          "BeforeApplicationShutdown выполняется после OnApplicationShutdown",
+          "OnModuleDestroy срабатывает при SIGTERM без app.close()",
+          "shutdown hooks не получают signal от ОС"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "execution_order",
+      "title": "Знает порядок выполнения хуков",
+      "expected": "Кандидат описывает: startup depth-first — дочерние OnModuleInit, родительские, затем OnApplicationBootstrap; shutdown в обратном порядке — BeforeApplicationShutdown, stop accepting, OnModuleDestroy, OnApplicationShutdown.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "порядок между модулей — частый follow-up senior",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "порядок",
+              "дочерн",
+              "родитель",
+              "depth-first"
+            ],
+            "ask": "порядок OnModuleInit между child и parent модулями"
+          },
+          {
+            "match": [
+              "shutdown",
+              "обратн",
+              "reverse"
+            ],
+            "ask": "порядок shutdown hooks при SIGTERM"
+          }
+        ],
+        "mustConcepts": [
+          "порядок",
+          "дочерн",
+          "родитель",
+          "child",
+          "parent",
+          "depth-first",
+          "обратн",
+          "reverse",
+          "OnModuleInit",
+          "OnApplicationBootstrap",
+          "BeforeApplicationShutdown",
+          "OnModuleDestroy",
+          "OnApplicationShutdown",
+          "bootstrap",
+          "shutdown",
+          "все OnModuleInit"
+        ],
+        "falseClaims": [
+          "родительские модули инициализируются раньше дочерних",
+          "shutdown выполняется в том же порядке что startup",
+          "OnApplicationBootstrap до всех OnModuleInit",
+          "порядок хуков случайный между модулей"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "enable_shutdown_hooks",
+      "title": "Знает app.enableShutdownHooks()",
+      "expected": "Кандидат объясняет: без app.enableShutdownHooks() в main.ts shutdown hooks не вызываются, SIGTERM убивает процесс; нужно вызвать перед listen; критично для Kubernetes graceful deploy.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "самая частая production-ошибка из ITLead mistakes",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "enableShutdownHooks",
+              "SIGTERM",
+              "Kubernetes"
+            ],
+            "ask": "что происходит при SIGTERM без enableShutdownHooks в Kubernetes"
+          }
+        ],
+        "mustConcepts": [
+          "enableShutdownHooks",
+          "main.ts",
+          "shutdown",
+          "SIGTERM",
+          "SIGINT",
+          "process.on",
+          "graceful",
+          "Kubernetes",
+          "rolling deploy",
+          "не вызыва",
+          "без этого",
+          "listen",
+          "NestFactory",
+          "соединен"
+        ],
+        "falseClaims": [
+          "shutdown hooks работают автоматически без enableShutdownHooks",
+          "enableShutdownHooks нужен только в development",
+          "SIGTERM всегда запускает NestJS shutdown chain",
+          "graceful shutdown не нужен в production"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки lifecycle hooks",
+      "expected": "Кандидат называет: REQUEST scope (хук на каждый запрос); sync blocking в onModuleInit; cross-module deps в OnModuleInit; onApplicationShutdown без await; правильно — singleton, async/await, OnApplicationBootstrap, await close.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "пять mistakes из ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "REQUEST",
+              "scope",
+              "request-scoped"
+            ],
+            "ask": "почему OnModuleInit в REQUEST-scoped провайдере — ошибка"
+          },
+          {
+            "match": [
+              "await",
+              "async",
+              "closeDB",
+              "shutdown"
+            ],
+            "ask": "что не так с onApplicationShutdown без await"
+          },
+          {
+            "match": [
+              "readFileSync",
+              "блокир",
+              "sync"
+            ],
+            "ask": "почему fs.readFileSync в onModuleInit опасен"
+          }
+        ],
+        "mustConcepts": [
+          "REQUEST",
+          "scope",
+          "request-scoped",
+          "singleton",
+          "leak",
+          "виток",
+          "readFileSync",
+          "блокир",
+          "event loop",
+          "dyno timeout",
+          "cross-module",
+          "race",
+          "await",
+          "async",
+          "onApplicationShutdown",
+          "closeDB",
+          "процесс заверш",
+          "try/catch"
+        ],
+        "falseClaims": [
+          "REQUEST scope безопасен для DB connect в OnModuleInit",
+          "sync readFileSync в onModuleInit не блокирует bootstrap",
+          "await в shutdown hooks не важен",
+          "cross-module OnModuleInit всегда безопасен",
+          "ошибка в хуке игнорируется при bootstrap"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда какой хук использовать",
+      "expected": "Кандидат называет: DB/Redis connect — OnModuleInit; workers/cron/seed cross-module — OnApplicationBootstrap; graceful drain — OnApplicationShutdown + enableShutdownHooks; fast stop intake — BeforeApplicationShutdown; per-request — guards/interceptors.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "decision rule из ITLead when to use",
+        "mustConcepts": [
+          "DB",
+          "Redis",
+          "OnModuleInit",
+          "connect",
+          "worker",
+          "cron",
+          "Bull",
+          "OnApplicationBootstrap",
+          "seed",
+          "drain",
+          "flush",
+          "OnApplicationShutdown",
+          "BeforeApplicationShutdown",
+          "accepting",
+          "guard",
+          "interceptor",
+          "per-request",
+          "TypeORM",
+          "Prisma"
+        ],
+        "falseClaims": [
+          "cron jobs запускать в OnModuleInit когда нужны все модули",
+          "per-request auth проверять через OnModuleInit",
+          "DB connect лучше в OnApplicationBootstrap всегда",
+          "guards заменяют shutdown hooks"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "internal_mechanics",
+      "title": "Понимает внутреннюю механику NestJS",
+      "expected": "Кандидат упоминает: сканирование провайдеров при instantiation, ordered list по scope, await в init()/close(); Reflect metadata; метод на prototype ('onModuleInit' in provider); dynamic/lazy modules регистрируют хуки при load; ошибка в хуке abort bootstrap.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "senior bonus — detection и dynamic modules",
+        "mustConcepts": [
+          "сканир",
+          "instantiation",
+          "ordered list",
+          "scope",
+          "await",
+          "NestApplication.init",
+          "close",
+          "Reflect",
+          "metadata",
+          "prototype",
+          "implements",
+          "dynamic module",
+          "LazyModuleLoader",
+          "abort",
+          "bootstrap",
+          "process.on",
+          "DI контекст"
+        ],
+        "falseClaims": [
+          "NestJS вызывает hooks только если implements указан в TypeScript",
+          "dynamic modules не поддерживают lifecycle hooks",
+          "ошибка в onModuleInit не прерывает bootstrap",
+          "process.on SIGTERM даёт тот же ordering что NestJS hooks"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Lifecycle hooks — интерфейсы для startup/shutdown. OnModuleInit после DI resolve, до listen — подключаю Redis. OnApplicationBootstrap — seed и Bull workers когда все модули готовы. В main.ts app.enableShutdownHooks() — без этого SIGTERM в K8s не даст graceful shutdown. onApplicationShutdown с await closeDB.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для TypeORM — OnModuleInit с dataSource.initialize(). SeedService с UsersService из другого модуля — OnApplicationBootstrap, не OnModuleInit, иначе race. Queue: BeforeApplicationShutdown accepting=false синхронно, OnApplicationShutdown await drain. Redis парой OnModuleInit connect и OnModuleDestroy quit().",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Порядок: child OnModuleInit → parent → OnApplicationBootstrap. Shutdown reverse: BeforeApplicationShutdown → OnModuleDestroy → OnApplicationShutdown. Per-request логика — guards, не hooks. REQUEST scope + OnModuleInit = leak на каждый запрос.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Lifecycle hooks — это guards на каждый HTTP-запрос. OnModuleInit вызывается после app.listen() когда приходит первый клиент.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Shutdown hooks работают из коробки, enableShutdownHooks не нужен. OnModuleInit в REQUEST-scoped UserService для DB connect — нормальный паттерн.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Cross-module setup в OnModuleInit безопасен — NestJS гарантирует порядок. onApplicationShutdown: closeDB() без await, процесс сам дождётся.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "hooks_definition",
+      "exampleType": "good",
+      "exampleText": "OnModuleInit — один раз после DI resolve провайдеров модуля, до listen, HTTP ещё не принимается.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "hooks_definition",
+      "exampleType": "good",
+      "exampleText": "ну хук onModuleInit — после провайдеров готовы, подключаю пул до listen",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "hooks_definition",
+      "exampleType": "bad",
+      "exampleText": "OnModuleInit срабатывает на каждый запрос вместе с guard chain.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "module_vs_app_level",
+      "exampleType": "good",
+      "exampleText": "OnModuleInit/OnModuleDestroy per-module; OnApplicationBootstrap и shutdown hooks — один раз для всего приложения.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "module_vs_app_level",
+      "exampleType": "good",
+      "exampleText": "если ServiceA нужен ServiceB из другого модуля — OnApplicationBootstrap, в OnModuleInit race",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "module_vs_app_level",
+      "exampleType": "bad",
+      "exampleText": "OnModuleInit гарантирует что все модули приложения уже инициализированы.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "all_five_hooks",
+      "exampleType": "good",
+      "exampleText": "Пять хуков: OnModuleInit, OnApplicationBootstrap, OnModuleDestroy, BeforeApplicationShutdown(signal), OnApplicationShutdown после закрытия соединений.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "all_five_hooks",
+      "exampleType": "good",
+      "exampleText": "BeforeApplicationShutdown — быстрая prep и signal; OnApplicationShutdown — медленный async drain после close connections",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "all_five_hooks",
+      "exampleType": "bad",
+      "exampleText": "NestJS имеет только OnModuleInit и OnModuleDestroy, остальные — из Express.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "execution_order",
+      "exampleType": "good",
+      "exampleText": "Startup depth-first: child OnModuleInit → parent → OnApplicationBootstrap после всех OnModuleInit.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "execution_order",
+      "exampleType": "good",
+      "exampleText": "shutdown в обратном: BeforeApplicationShutdown, stop accept, OnModuleDestroy, OnApplicationShutdown",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "execution_order",
+      "exampleType": "bad",
+      "exampleText": "OnApplicationBootstrap выполняется до OnModuleInit дочерних модулей.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "enable_shutdown_hooks",
+      "exampleType": "good",
+      "exampleText": "main.ts: NestFactory.create → app.enableShutdownHooks() → listen. Без enableShutdownHooks SIGTERM в K8s убивает процесс без drain.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "enable_shutdown_hooks",
+      "exampleType": "good",
+      "exampleText": "rolling deploy обрывал соединения — не было enableShutdownHooks, shutdown hooks никогда не вызывались",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "enable_shutdown_hooks",
+      "exampleType": "bad",
+      "exampleText": "enableShutdownHooks нужен только локально, в production NestJS сам ловит SIGTERM.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "REQUEST scope + OnModuleInit = connect на каждый запрос, leak. Переношу в singleton CacheService.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "async onApplicationShutdown с await closeDB — без await процесс вышел до disconnect, потеряли 10k jobs в очереди",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "readFileSync в onModuleInit блокирует event loop — dyno timeout на Heroku, заменил на await fs.promises.readFile",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "OnModuleInit в @Injectable({ scope: Scope.REQUEST }) — стандарт для DB pool в NestJS.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Redis connect OnModuleInit; Bull workers OnApplicationBootstrap; Prisma $disconnect BeforeApplicationShutdown; auth per-request — JwtAuthGuard.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "db/redis — onModuleInit; cron когда все модули — onApplicationBootstrap; guards не hooks для request",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "JWT проверку делать в OnModuleInit — hooks для per-request логики.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "internal_mechanics",
+      "exampleType": "good",
+      "exampleText": "NestJS сканирует prototype при instantiation, 'onModuleInit' in provider + Reflect metadata; lazy module регистрирует hooks при LazyModuleLoader.load().",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "internal_mechanics",
+      "exampleType": "good",
+      "exampleText": "ошибка в onModuleInit abort bootstrap; process.on SIGTERM без Nest hooks — нет ordering и DI контекста",
+      "sortOrder": 26
+    },
+    {
+      "checkpointKey": "internal_mechanics",
+      "exampleType": "bad",
+      "exampleText": "Без implements OnModuleInit в TypeScript NestJS никогда не вызовет onModuleInit.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-lifecycle-hooks",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-lifecycle-hooks",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-lifecycle-hooks",
+    "difficulty": "SENIOR",
+    "titleEn": "What are lifecycle hooks in NestJS?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

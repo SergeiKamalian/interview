@@ -1,0 +1,654 @@
+{
+  "topic": {
+    "code": "why_useimperativehandle_is_needed_in_react",
+    "name": "Зачем нужен useImperativeHandle в React",
+    "skillCode": "react",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Зачем нужен useImperativeHandle в React и как его правильно использовать?",
+    "shortAnswer": "useImperativeHandle позволяет определить собственный публичный API дочернего компонента, доступный родителю через ref, вместо того чтобы открывать весь DOM-узел. Всегда используй вместе с forwardRef; применяй, когда родителю нужны императивные действия (focus, reset, validate), а не чтение состояния через ref.",
+    "idealAnswer": "useImperativeHandle — хук React, который задаёт, что именно родитель получит через ref на дочернем компоненте, вместо прямого доступа ко всему DOM-узлу. Это контролируемый «escape hatch»: данные обычно идут вниз через props, но иногда родителю нужно вызвать метод ребёнка (focus(), reset(), play(), validate()). Без useImperativeHandle ref на дочернем компоненте даёт родителю полный доступ к DOM — каждое свойство и метод. С хуком ты определяешь публичный API: родитель видит только focus и clear, не может случайно вызвать removeChild() или прочитать внутренние свойства. Внутренности можно рефакторить без поломки родителя. Сигнатура: useImperativeHandle(ref, createHandle, deps) — объект из createHandle() записывается в ref.current; при изменении deps React пересоздаёт handle. Обязательно оборачивать компонент в forwardRef — без него ref в функциональном компоненте undefined и хук не к чему привязать. Когда использовать: родителю нужны императивные методы (focus, reset, play, validate); ребёнок управляет сложным внутренним состоянием; обёртка над third-party (Monaco, video player, date picker); переиспользуемый компонент с стабильным внешним интерфейсом. Когда не нужен: достаточно props и колбеков (onValidate вместо ref.validate()); видимость модалки — controlled через isOpen prop, не open()/close() через ref; анимации — state и CSS transitions. Типичные ошибки: (1) открывать слишком много — inputRef, internalState, _privateMethod вместо методов-обёрток; (2) stale closure — getCount без [count] в deps возвращает застывшее значение без ошибки; (3) императивный API для state, который должен быть в props (Modal с open/close через ref вместо isOpen/onClose); (4) забыть forwardRef; (5) условный вызов хука — нарушение rules of hooks. Реальные кейсы: React Hook Form (focus, setValue), MUI TextField/Dialog, Framer Motion controls, Monaco getValue/setValue, video play/pause/seek. Senior: форма с 10 полями, каждое expose validate() — цикл на submit может дать до 10 отдельных re-render; fix — batch через flushSync, собирать результаты в ref и один setState, или React Hook Form/Formik. Вызов метода, обновляющего state в ребёнке, не перерендеривает родителя — только ребёнок; родитель увидит новые данные только при следующем вызове read-метода. Перед useImperativeHandle проверь, не решит ли задачу callback prop вниз.",
+    "maxScore": 10,
+    "skills": [
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "imperative_handle_definition",
+      "title": "Понимает назначение useImperativeHandle",
+      "expected": "Кандидат объясняет: хук задаёт кастомный публичный API через ref вместо полного DOM-узла; контролируемый escape hatch для императивных действий при декларативном потоке props.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — controlled escape hatch и encapsulation",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "imperative_handle_definition",
+            "oftenConfusedWith": [
+              "when_to_use",
+              "minimal_public_api"
+            ],
+            "anchorTermsExpected": [
+              "useImperativeHandle",
+              "публичн",
+              "API",
+              "ref",
+              "DOM",
+              "encapsulation",
+              "инкапсу",
+              "escape hatch"
+            ],
+            "anchorTermsWrongTopic": [
+              "useImperativeHandle заменяет props",
+              "ref всегда скрывает DOM без хука",
+              "useImperativeHandle для чтения state родителем"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useImperativeHandle",
+              "ref",
+              "API",
+              "DOM"
+            ],
+            "ask": "чем useImperativeHandle отличается от прямого ref на DOM-элементе"
+          }
+        ],
+        "mustConcepts": [
+          "useImperativeHandle",
+          "ref",
+          "публичн",
+          "API",
+          "DOM",
+          "DOM-узел",
+          "escape hatch",
+          "контролир",
+          "инкапсу",
+          "encapsulation",
+          "метод",
+          "родител",
+          "дочерн",
+          "props",
+          "декларатив",
+          "императив",
+          "focus",
+          "clear",
+          "createHandle"
+        ],
+        "falseClaims": [
+          "useImperativeHandle открывает родителю весь DOM как обычный ref",
+          "useImperativeHandle нужен для передачи данных вниз вместо props",
+          "useImperativeHandle автоматически синхронизирует state родителя и ребёнка",
+          "без useImperativeHandle ref на FC даёт ограниченный API"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "forwardref_requirement",
+      "title": "Знает связку с forwardRef",
+      "expected": "Кандидат объясняет: useImperativeHandle всегда в паре с forwardRef; без forwardRef ref undefined в функциональном компоненте и хук не к чему привязать.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "обязательная пара из ITLead TL;DR и mistake 4",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "imperative_handle_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "forwardref_requirement",
+            "oftenConfusedWith": [
+              "imperative_handle_definition"
+            ],
+            "anchorTermsExpected": [
+              "forwardRef",
+              "ref",
+              "undefined",
+              "второй параметр",
+              "функциональн"
+            ],
+            "anchorTermsWrongTopic": [
+              "useImperativeHandle заменяет forwardRef",
+              "forwardRef не нужен с useImperativeHandle"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "forwardRef",
+              "undefined",
+              "ref"
+            ],
+            "ask": "можно ли useImperativeHandle без forwardRef и что будет с ref"
+          }
+        ],
+        "mustConcepts": [
+          "forwardRef",
+          "useImperativeHandle",
+          "ref",
+          "undefined",
+          "функциональн",
+          "компонент",
+          "второй параметр",
+          "проброс",
+          "проглатыва",
+          "пара",
+          "вместе",
+          "attach",
+          "прикреп",
+          "без forwardRef",
+          "не получ",
+          "ref parameter"
+        ],
+        "falseClaims": [
+          "useImperativeHandle работает без forwardRef",
+          "forwardRef передаёт ref как обычный prop без обёртки",
+          "useImperativeHandle заменяет необходимость forwardRef",
+          "ref автоматически доступен вторым аргументом без forwardRef"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "create_handle_mechanism",
+      "title": "Понимает механизм createHandle и deps",
+      "expected": "Кандидат описывает: createHandle() возвращает объект методов → ref.current; deps пересоздают handle при изменении; ref — mutable container { current }.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "How it works internally из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "createHandle",
+              "deps",
+              "ref.current"
+            ],
+            "ask": "что делает createHandle и когда React пересоздаёт handle"
+          }
+        ],
+        "mustConcepts": [
+          "createHandle",
+          "ref.current",
+          "deps",
+          "зависимост",
+          "массив",
+          "пересозда",
+          "объект",
+          "метод",
+          "mutable",
+          "current",
+          "записыва",
+          "замен",
+          "useImperativeHandle",
+          "третий аргумент",
+          "dependency array"
+        ],
+        "falseClaims": [
+          "createHandle вызывается только один раз при mount без deps",
+          "ref.current immutable и не меняется после assign",
+          "deps в useImperativeHandle опциональны и не влияют на актуальность методов",
+          "useImperativeHandle создаёт новый ref объект каждый render"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Знает когда использовать и когда пропустить",
+      "expected": "Кандидат называет: focus/reset/play/validate, third-party libs, design system; пропускает для props/callbacks, controlled visibility, CSS animations; упоминает Hook Form, MUI, Monaco.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "When to use + real-world + senior batch validation из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "imperative_handle_definition",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "validate",
+              "форма",
+              "10 пол",
+              "re-render"
+            ],
+            "ask": "форма с 10 полями validate() через ref — проблема производительности и fix"
+          },
+          {
+            "match": [
+              "callback",
+              "onValidate",
+              "props"
+            ],
+            "ask": "когда callback prop лучше useImperativeHandle"
+          },
+          {
+            "match": [
+              "Hook Form",
+              "Monaco",
+              "video",
+              "MUI"
+            ],
+            "ask": "реальные библиотеки где imperative ref API оправдан"
+          }
+        ],
+        "mustConcepts": [
+          "focus",
+          "reset",
+          "validate",
+          "play",
+          "pause",
+          "seek",
+          "third-party",
+          "библиотек",
+          "Monaco",
+          "Hook Form",
+          "MUI",
+          "Framer Motion",
+          "video",
+          "date picker",
+          "props",
+          "callback",
+          "onValidate",
+          "controlled",
+          "CSS transition",
+          "design system",
+          "flushSync",
+          "batch",
+          "Formik",
+          "10 render",
+          "сабмит"
+        ],
+        "falseClaims": [
+          "useImperativeHandle нужен для любой передачи данных родителю",
+          "modal open/close через ref лучше controlled isOpen prop",
+          "callback prop всегда хуже imperative ref",
+          "10 validate() в цикле батчатся автоматически без проблем"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "stale_closures_deps",
+      "title": "Понимает stale closure без deps",
+      "expected": "Кандидат объясняет: метод без deps захватывает старое значение (getCount всегда 0); fix — [count] в dependency array; ошибки нет, только неверные данные.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Mistake 2 и VideoPlayer edge case — частая production ловушка",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "create_handle_mechanism",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "stale",
+              "застарел",
+              "closure",
+              "замыкание",
+              "deps"
+            ],
+            "ask": "getCount() возвращает 0 после setCount — почему и как починить deps"
+          },
+          {
+            "match": [
+              "getStatus",
+              "isPlaying",
+              "VideoPlayer"
+            ],
+            "ask": "getStatus false после play() — stale closure в exposed method"
+          }
+        ],
+        "mustConcepts": [
+          "stale",
+          "застарел",
+          "closure",
+          "замыкание",
+          "deps",
+          "зависимост",
+          "getCount",
+          "count",
+          "массив",
+          "dependency array",
+          "захват",
+          "capture",
+          "актуальн",
+          "пересозда",
+          "handle",
+          "без ошибки",
+          "debug",
+          "getStatus",
+          "isPlaying"
+        ],
+        "falseClaims": [
+          "метод без deps всегда читает актуальный state",
+          "stale closure в useImperativeHandle выбрасывает ошибку в runtime",
+          "пустой deps [] всегда безопасен для методов с state",
+          "React автоматически обновляет замыкания в ref без deps array"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "minimal_public_api",
+      "title": "Открывает минимальный публичный API",
+      "expected": "Кандидат: expose только методы-обёртки (focus, getValue), не raw inputRef/internalState/_privateMethod; иначе родитель ломает инкапсуляцию и рефакторинг.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Mistake 1 — exposing too much из ITLead",
+        "mustConcepts": [
+          "минимальн",
+          "публичн",
+          "API",
+          "inputRef",
+          "internalState",
+          "private",
+          "утечк",
+          "leak",
+          "обёртк",
+          "focus",
+          "getValue",
+          "removeChild",
+          "рефактор",
+          "инкапсу",
+          "DOM",
+          "метод",
+          "не открыва",
+          "огранич"
+        ],
+        "falseClaims": [
+          "можно безопасно expose inputRef родителю",
+          "открытие internalState не ломает логику компонента",
+          "чем больше методов в handle тем лучше для гибкости",
+          "expose _privateMethod — нормальная практика для shared lib"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes_imperative",
+      "title": "Знает типичные ошибки и rules of hooks",
+      "expected": "Кандидат называет: modal через open/close ref вместо isOpen prop; условный useImperativeHandle; родитель не re-render при state update в ребёнке через ref method.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Mistakes 3, 5 и follow-up про re-render родителя",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Modal",
+              "isOpen",
+              "open",
+              "close"
+            ],
+            "ask": "почему modal с open/close через ref хуже controlled isOpen/onClose"
+          },
+          {
+            "match": [
+              "условн",
+              "if",
+              "rules of hooks",
+              "different order"
+            ],
+            "ask": "что не так с условным вызовом useImperativeHandle"
+          },
+          {
+            "match": [
+              "родител",
+              "re-render",
+              "state",
+              "ребёнок"
+            ],
+            "ask": "перерендерится ли родитель если exposed method обновил state в ребёнке"
+          }
+        ],
+        "mustConcepts": [
+          "Modal",
+          "isOpen",
+          "onClose",
+          "controlled",
+          "контролируем",
+          "open",
+          "close",
+          "imperative",
+          "props",
+          "условн",
+          "rules of hooks",
+          "порядок",
+          "different order",
+          "Hooks called",
+          "родител",
+          "re-render",
+          "перерендер",
+          "state update",
+          "ребёнок",
+          "time-travel",
+          "debug"
+        ],
+        "falseClaims": [
+          "imperative open/close modal проще для time-travel debugging чем controlled",
+          "условный вызов useImperativeHandle допустим внутри if",
+          "родитель автоматически re-render при state update в exposed method ребёнка",
+          "visibility toggle всегда лучше через ref чем через prop"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "useImperativeHandle с forwardRef ограничивает ref.current методами focus и clear — родитель не видит сырой DOM input. Это controlled escape hatch: props для данных, ref для императивных действий. Без deps getCount() может вернуть stale closure.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В design system Input оборачиваю в forwardRef + useImperativeHandle: наружу focus(), clear(), getValue(). Внутри inputRef и validation — приватны. Modal делаю controlled через isOpen, не open() через ref. Форма на Hook Form — без 10 validate() refs в цикле.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Monaco wrapper: useImperativeHandle(ref, () => ({ getValue, setValue, layout }), [editor]). VideoPlayer — play/pause через ref, потому что HTML5 API императивный. Перед хуком проверяю — может хватит onValidate callback.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "useImperativeHandle заменяет forwardRef и props — через ref передаю весь state ребёнка родителю.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Modal с open/close через ref удобнее controlled — time-travel debugging работает лучше. getCount без deps всегда актуален, React сам обновит замыкание.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "if (disabled) useImperativeHandle(ref, () => ({})) — норм, хук только когда enabled. Expose inputRef родителю для гибкости.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "imperative_handle_definition",
+      "exampleType": "good",
+      "exampleText": "useImperativeHandle задаёт публичный API на ref — родитель вызывает focus(), не трогает весь DOM-узел.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "imperative_handle_definition",
+      "exampleType": "good",
+      "exampleText": "ну это escape hatch — props вниз, а focus/clear родитель дергает через ref.current",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "imperative_handle_definition",
+      "exampleType": "bad",
+      "exampleText": "useImperativeHandle нужен чтобы читать state ребёнка в родителе без props.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "forwardref_requirement",
+      "exampleType": "good",
+      "exampleText": "forwardRef + useImperativeHandle — без forwardRef ref undefined, хук не attach.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "forwardref_requirement",
+      "exampleType": "good",
+      "exampleText": "обязательно forwardRef, иначе ref вторым параметром не приходит",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "forwardref_requirement",
+      "exampleType": "bad",
+      "exampleText": "useImperativeHandle сам пробрасывает ref — forwardRef не нужен.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "create_handle_mechanism",
+      "exampleType": "good",
+      "exampleText": "createHandle возвращает { focus, clear } → ref.current; deps [value] пересоздают handle при смене value.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "create_handle_mechanism",
+      "exampleType": "good",
+      "exampleText": "ref это { current }, useImperativeHandle пишет туда объект методов, deps триггерят refresh",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "create_handle_mechanism",
+      "exampleType": "bad",
+      "exampleText": "createHandle вызывается один раз навсегда, deps игнорируются React.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Hook Form, Monaco, video player — imperative API оправдан. Visibility modal — isOpen prop, не ref.open(). 10 validate() в loop — batch или Formik.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "сначала думаю onValidate callback — useImperativeHandle только если реально нужен ref API",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Любой child component должен expose validate() через useImperativeHandle вместо props.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "stale_closures_deps",
+      "exampleType": "good",
+      "exampleText": "getCount без [count] — stale closure, всегда 0. Fix: useImperativeHandle(ref, () => ({ getCount: () => count }), [count]).",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "stale_closures_deps",
+      "exampleType": "good",
+      "exampleText": "VideoPlayer getStatus false после play — isPlaying не в deps, метод читает старое замыкание",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "stale_closures_deps",
+      "exampleType": "bad",
+      "exampleText": "Deps в useImperativeHandle не нужны — React всегда свежие значения в ref methods.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "minimal_public_api",
+      "exampleType": "good",
+      "exampleText": "Expose focus() и getValue(), не inputRef — иначе родитель вызовет removeChild и сломает инкапсуляцию.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "minimal_public_api",
+      "exampleType": "good",
+      "exampleText": "только публичные методы-обёртки, internalState не отдаю наружу",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "minimal_public_api",
+      "exampleType": "bad",
+      "exampleText": "В handle отдаю inputRef и internalState — так родителю проще кастомизировать.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes_imperative",
+      "exampleType": "good",
+      "exampleText": "Modal: isOpen/onClose controlled, не open()/close() ref. Условный useImperativeHandle ломает rules of hooks.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes_imperative",
+      "exampleType": "good",
+      "exampleText": "метод ребёнка обновил state — родитель не re-render, только ребёнок; данные родитель прочитает следующим вызовом getValue",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes_imperative",
+      "exampleType": "bad",
+      "exampleText": "Родитель re-render автоматически когда child validate() вызвал setError внутри.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "why-useimperativehandle-is-needed-in-react",
+    "apiUrl": "https://api.itlead.org/api/questions/why-useimperativehandle-is-needed-in-react",
+    "pageUrl": "https://itlead.org/interview-questions/react/why-useimperativehandle-is-needed-in-react",
+    "difficulty": "SENIOR",
+    "titleEn": "Why useImperativeHandle is needed in React",
+    "categorySlug": "react",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

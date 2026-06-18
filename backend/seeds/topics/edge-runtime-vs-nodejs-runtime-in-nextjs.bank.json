@@ -1,0 +1,622 @@
+{
+  "topic": {
+    "code": "edge_runtime_vs_nodejs_runtime_in_nextjs",
+    "name": "Edge runtime vs Node.js runtime в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "В чём разница между Edge runtime и Node.js runtime в Next.js и когда какой выбирать?",
+    "shortAnswer": "Edge runtime выполняет серверный код в V8 isolates на 200+ CDN-точках с cold start ~40ms, но без fs и Node.js built-ins — только Web APIs. Node.js runtime (по умолчанию) даёт полный доступ к fs, native modules и npm-пакетам с cold start ~400ms. Edge — для stateless auth, redirects и geo; Node.js — для БД, файлов и тяжёлых вычислений.",
+    "idealAnswer": "Next.js поддерживает два runtime для серверного кода: Node.js (default) и Edge (opt-in через export const runtime = 'edge'). Node.js — стандартный серверный процесс: V8 + libuv event loop, полный доступ к fs, crypto, net, native modules, persistent connection pools, heap без жёсткого лимита, CPU до 300s, cold start ~400ms, один регион или self-hosted. Edge компилирует код в V8 isolates через esbuild, убирает всё, что требует OS-level syscall, и разворачивает копии на 200+ PoP глобально: только Web standards (Fetch, URLSearchParams, crypto.subtle), без fs/path/net, без native modules, stateless, ~1MB памяти, CPU cap 30s, cold start ~40ms. Middleware в Next.js всегда на Edge — не настраивается; request.geo доступен только там. Правило выбора: JWT validation, auth checks, redirects, geo-routing, A/B — Edge; Prisma/Drizzle, fs, image processing, long compute (>1s), connection pools — Node.js. Сборка: импорт Node built-in в Edge route падает на next build, не в production. Типичные ошибки: fs в Edge route; env vars >4KB обрезаются в production без warning; Express-style (req, res) вместо Web Request API; crypto.createCipheriv в Edge (нужен crypto.subtle); буферизация больших payload в памяти при 1MB cap — стримить. Next.js 15: streaming в Edge до 4MB; React cache() не работает в Edge handlers. Redis rate-limit в Edge middleware: нет persistent TCP — Upstash Redis через HTTP/Fetch. Реальные кейсы: Stripe/Supabase JWT на Edge middleware, Shopify cart personalization, Linear webhook fan-out.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "edge_node_definition",
+      "title": "Понимает суть Edge и Node.js runtime",
+      "expected": "Кандидат объясняет: Edge — V8 isolates на CDN, Web APIs, stateless, быстрый cold start; Node.js — полный Node ecosystem, libuv, fs и native modules, default runtime.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — два runtime и их модель выполнения",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "edge_node_definition",
+            "oftenConfusedWith": [
+              "runtime_capabilities_comparison",
+              "when_to_choose_runtime"
+            ],
+            "anchorTermsExpected": [
+              "V8 isolate",
+              "Web API",
+              "Node.js",
+              "libuv",
+              "runtime = 'edge'",
+              "default"
+            ],
+            "anchorTermsWrongTopic": [
+              "Edge это CDN кеш HTML",
+              "Node.js runtime только на Vercel",
+              "middleware можно перевести на Node"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "V8 isolate",
+              "isolate",
+              "Web API"
+            ],
+            "ask": "чем Edge runtime отличается от обычного Node.js процесса на сервере"
+          }
+        ],
+        "mustConcepts": [
+          "Edge runtime",
+          "Node.js runtime",
+          "V8 isolate",
+          "изолят",
+          "Web API",
+          "libuv",
+          "event loop",
+          "runtime = 'edge'",
+          "default",
+          "по умолчанию",
+          "stateless",
+          "CDN",
+          "PoP",
+          "серверный код",
+          "Next.js",
+          "opt-in",
+          "esbuild"
+        ],
+        "falseClaims": [
+          "Edge runtime это тот же Node.js на CDN",
+          "Node.js runtime не поддерживает fetch",
+          "Edge даёт полный доступ к fs через polyfill",
+          "runtime можно не указывать — всегда Edge",
+          "middleware можно запустить на Node.js runtime"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "runtime_capabilities_comparison",
+      "title": "Сравнивает возможности и лимиты",
+      "expected": "Кандидат называет: Node — fs, crypto, net, native modules, full heap, 300s CPU, ~400ms cold start; Edge — Fetch, crypto.subtle, ~1MB RAM, 30s CPU, ~40ms cold start, без filesystem.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "таблица сравнения — ключ к правильному выбору runtime",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "edge_node_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "runtime_capabilities_comparison",
+            "oftenConfusedWith": [
+              "nextjs15_edge_limits"
+            ],
+            "anchorTermsExpected": [
+              "fs",
+              "cold start",
+              "40ms",
+              "400ms",
+              "1MB",
+              "crypto.subtle"
+            ],
+            "anchorTermsWrongTopic": [
+              "Edge без лимита памяти",
+              "Node.js cold start быстрее Edge"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "fs",
+          "filesystem",
+          "файлов",
+          "native module",
+          "нативн",
+          "npm",
+          "cold start",
+          "холодн",
+          "40ms",
+          "400ms",
+          "1MB",
+          "памят",
+          "heap",
+          "300s",
+          "30s",
+          "CPU",
+          "crypto.subtle",
+          "Fetch",
+          "URLSearchParams",
+          "streaming",
+          "connection pool",
+          "persistent",
+          "stateless"
+        ],
+        "falseClaims": [
+          "Edge поддерживает fs через path.join",
+          "Node.js runtime ограничен 1MB памяти",
+          "cold start одинаковый у обоих runtime",
+          "Edge поддерживает child_process",
+          "в Edge доступны все npm-пакеты"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_choose_runtime",
+      "title": "Знает когда Edge, когда Node.js",
+      "expected": "Кандидат применяет правило: Edge — JWT/auth, redirects, geo, A/B, stateless low-latency; Node.js — Prisma/Drizzle, fs, image processing, long compute, connection pools.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "decision rule — главный практический навык senior",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "JWT",
+              "auth",
+              "redirect"
+            ],
+            "ask": "почему JWT validation лучше на Edge, а Prisma query — на Node.js"
+          },
+          {
+            "match": [
+              "Prisma",
+              "Drizzle",
+              "database",
+              "баз"
+            ],
+            "ask": "почему native DB drivers не работают в Edge isolates"
+          },
+          {
+            "match": [
+              "geo",
+              "A/B",
+              "request.geo"
+            ],
+            "ask": "когда geo-routing и A/B testing выгоднее на Edge"
+          }
+        ],
+        "mustConcepts": [
+          "JWT",
+          "auth",
+          "авториз",
+          "redirect",
+          "редирект",
+          "geo",
+          "A/B",
+          "Prisma",
+          "Drizzle",
+          "database",
+          "баз",
+          "native driver",
+          "драйвер",
+          "fs",
+          "image",
+          "изображен",
+          "compute",
+          "вычислен",
+          "connection pool",
+          "stateless",
+          "low-latency",
+          "задержк"
+        ],
+        "falseClaims": [
+          "Prisma отлично работает в Edge runtime",
+          "Edge нужен для всех API routes с БД",
+          "Node.js runtime не подходит для auth",
+          "geo-routing одинаково на Node.js API route",
+          "long compute лучше на Edge из-за cold start"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "edge_build_internals",
+      "title": "Понимает сборку и middleware на Edge",
+      "expected": "Кандидат объясняет: esbuild бандлит Edge routes; Node built-in import → ошибка на next build; middleware всегда Edge; Cloudflare Workers-compatible окружение на Vercel.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "build-time fail vs runtime — важный механизм из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "next build",
+              "esbuild",
+              "build"
+            ],
+            "ask": "когда обнаружится импорт fs в Edge route — на build или в production"
+          }
+        ],
+        "mustConcepts": [
+          "esbuild",
+          "next build",
+          "сборк",
+          "build time",
+          "middleware",
+          "всегда Edge",
+          "не настраива",
+          "Cloudflare Workers",
+          "Vercel",
+          "Node built-in",
+          "импорт",
+          "Module not found",
+          "polyfill",
+          "bundle",
+          "бандл"
+        ],
+        "falseClaims": [
+          "ошибка fs в Edge проявится только в production",
+          "middleware можно переключить на Node.js",
+          "Edge routes компилируются через webpack с Node polyfills",
+          "libuv участвует в Edge runtime"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "edge_common_mistakes",
+      "title": "Знает типичные ошибки Edge",
+      "expected": "Кандидат называет: fs import; env >4KB truncation; Express (req,res) vs Request API; createCipheriv vs crypto.subtle; 1MB memory cap — стримить вместо buffer.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "production pitfalls из ITLead Common mistakes",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "edge_build_internals",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "fs",
+              "fetch",
+              "CDN"
+            ],
+            "ask": "как заменить fs.readFileSync в Edge route"
+          },
+          {
+            "match": [
+              "4KB",
+              "env",
+              "process.env",
+              "Edge Config"
+            ],
+            "ask": "почему большой process.env секрет обрезается в production на Edge"
+          },
+          {
+            "match": [
+              "createCipheriv",
+              "crypto.subtle",
+              "Web Crypto"
+            ],
+            "ask": "почему createCipheriv ломает Edge, а crypto.subtle работает в обоих"
+          }
+        ],
+        "mustConcepts": [
+          "fs",
+          "fetch",
+          "CDN",
+          "remote API",
+          "process.env",
+          "4KB",
+          "truncat",
+          "обреза",
+          "Edge Config",
+          "Express",
+          "req",
+          "res",
+          "Request API",
+          "Response.json",
+          "createCipheriv",
+          "crypto.subtle",
+          "Web Crypto",
+          "1MB",
+          "memory",
+          "stream",
+          "for await",
+          "chunk",
+          "буфер"
+        ],
+        "falseClaims": [
+          "process.env на Edge без ограничений по размеру",
+          "Express handler (req, res) работает в Edge route",
+          "createCipheriv доступен в Edge через polyfill",
+          "при нехватке памяти Edge покажет понятную ошибку",
+          "можно буферизовать весь response в Edge без риска"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "middleware_edge_geo",
+      "title": "Понимает Edge middleware и request.geo",
+      "expected": "Кандидат объясняет: middleware.ts всегда Edge; request.geo только там; geo redirect/bot blocking до origin; NextResponse.rewrite/redirect.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "production middleware pattern из ITLead examples",
+        "mustConcepts": [
+          "middleware.ts",
+          "request.geo",
+          "country",
+          "geo",
+          "NextResponse",
+          "redirect",
+          "rewrite",
+          "matcher",
+          "CDN layer",
+          "origin",
+          "bot",
+          "user-agent",
+          "Edge-only",
+          "до рендер",
+          "NextRequest"
+        ],
+        "falseClaims": [
+          "request.geo доступен в Node.js API routes",
+          "middleware выполняется на origin server",
+          "geo redirect требует Node.js runtime",
+          "middleware можно отключить от Edge"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "nextjs15_edge_limits",
+      "title": "Знает ограничения Edge в Next.js 15+",
+      "expected": "Кандидат упоминает: streaming cap 4MB в Edge; React cache() не работает в Edge handlers; Redis rate-limit через Upstash HTTP, не persistent TCP.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "senior follow-up: Next.js 15 limits и Redis на Edge",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Redis",
+              "rate-limit",
+              "Upstash"
+            ],
+            "ask": "почему прямой TCP к Redis не работает в Edge middleware и как решают через Upstash"
+          }
+        ],
+        "mustConcepts": [
+          "Next.js 15",
+          "streaming",
+          "4MB",
+          "cache()",
+          "React cache",
+          "Edge handler",
+          "Redis",
+          "Upstash",
+          "HTTP",
+          "rate-limit",
+          "stateless",
+          "TCP",
+          "roundtrip",
+          "TTL"
+        ],
+        "falseClaims": [
+          "React cache() работает в Edge route handlers",
+          "streaming в Edge без лимита размера",
+          "Edge middleware держит persistent Redis connection",
+          "Upstash не нужен — ioredis работает в Edge"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Edge — V8 isolates на CDN, только Web APIs, cold start ~40ms, stateless. Node.js default — fs, Prisma, native modules, pools, ~400ms cold start. Auth и redirects на Edge; запросы к БД и чтение файлов — Node.js. Middleware всегда Edge, request.geo только там.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для JWT check в middleware беру Edge — без roundtrip к origin. API с Drizzle — export const runtime оставляю node (default). fs.readFileSync в Edge route упадёт на next build; вместо этого fetch с CDN. Большие env секреты — Edge Config, не process.env >4KB.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Node как полная кухня: fs, net, heap. Edge как автомат в аэропорту: Fetch, crypto.subtle, 1MB RAM, 30s CPU. Geo rewrite в middleware.ts — блок ботов до origin за <20ms глобально.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Edge и Node.js — одно и то же, просто Edge быстрее. Prisma на Edge работает через polyfill fs. Middleware можно поставить на Node.js runtime.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Импортирую fs в Edge route — ошибка только в production, локально всё ок. request.geo читаю в app/api/route.ts на Node.js.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Rate limit через ioredis в Edge middleware — persistent connection экономит latency. createCipheriv в Edge route работает на Vercel.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "edge_node_definition",
+      "exampleType": "good",
+      "exampleText": "Edge — opt-in через runtime = 'edge', V8 isolates глобально; Node.js default — libuv + полный Node API.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "edge_node_definition",
+      "exampleType": "good",
+      "exampleText": "ну edge это isolates на cdn, web api только; node — обычный сервер с fs и npm",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "edge_node_definition",
+      "exampleType": "bad",
+      "exampleText": "Edge runtime — это SSR на CDN, Node.js runtime устарел в Next.js 15.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "runtime_capabilities_comparison",
+      "exampleType": "good",
+      "exampleText": "Node: fs, native modules, 300s CPU, ~400ms cold start. Edge: Fetch, crypto.subtle, ~1MB RAM, 30s CPU, ~40ms cold start, без filesystem.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "runtime_capabilities_comparison",
+      "exampleType": "good",
+      "exampleText": "edge без fs и child_process; node любой npm; cold start edge ~40ms vs node ~400ms по бенчмаркам vercel",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "runtime_capabilities_comparison",
+      "exampleType": "bad",
+      "exampleText": "Edge поддерживает path и net через built-in polyfills Next.js.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "when_to_choose_runtime",
+      "exampleType": "good",
+      "exampleText": "JWT validation и geo redirect — Edge, stateless и близко к пользователю. Prisma query и sharp для image — Node.js, нужны native bindings.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "when_to_choose_runtime",
+      "exampleType": "good",
+      "exampleText": "a/b и auth middleware — edge; long job >1s и db pool — node",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "when_to_choose_runtime",
+      "exampleType": "bad",
+      "exampleText": "Все API routes лучше на Edge из-за cold start, БД можно вызывать через fetch к Prisma.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "edge_build_internals",
+      "exampleType": "good",
+      "exampleText": "import fs в Edge route — Module not found на next build. middleware.ts всегда Edge, esbuild бандлит без libuv.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "edge_build_internals",
+      "exampleType": "good",
+      "exampleText": "ошибки node built-in ловим при сборке, не в prod; edge окружение workers-compatible",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "edge_build_internals",
+      "exampleType": "bad",
+      "exampleText": "Edge routes с fs падают только на Vercel production, локальный next dev пропускает.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "edge_common_mistakes",
+      "exampleType": "good",
+      "exampleText": "fs → fetch CDN; env >4KB обрезается в prod — Edge Config; Express req,res → Request/Response; шифрование через crypto.subtle, не createCipheriv.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "edge_common_mistakes",
+      "exampleType": "good",
+      "exampleText": "большой payload — for await chunk stream, не buffer всё в 1MB isolate",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "edge_common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "HUGE_PRIVATE_KEY в process.env на Edge без проблем; Express default export в route.ts работает на Edge.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "middleware_edge_geo",
+      "exampleType": "good",
+      "exampleText": "middleware.ts: request.geo.country, bot UA → redirect /blocked; UA → rewrite /ua; выполняется на CDN до origin.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "middleware_edge_geo",
+      "exampleType": "good",
+      "exampleText": "geo только в middleware edge; в api route на node geo поля нет",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "middleware_edge_geo",
+      "exampleType": "bad",
+      "exampleText": "request.geo читаю в server action на Node.js runtime — работает так же.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "nextjs15_edge_limits",
+      "exampleType": "good",
+      "exampleText": "Next.js 15: Edge streaming до 4MB; cache() React не в Edge handlers. Rate limit: Upstash Redis через HTTP, не TCP из middleware.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "nextjs15_edge_limits",
+      "exampleType": "good",
+      "exampleText": "redis в edge middleware — upstash http roundtrip, учитываю latency и ttl кеш",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "nextjs15_edge_limits",
+      "exampleType": "bad",
+      "exampleText": "cache() из React ускоряет Edge route handlers; ioredis pool в Edge middleware — стандартный паттерн.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "edge-runtime-vs-nodejs-runtime-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/edge-runtime-vs-nodejs-runtime-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/edge-runtime-vs-nodejs-runtime-in-nextjs",
+    "difficulty": "SENIOR",
+    "titleEn": "Edge runtime vs Node.js runtime in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T16:30:00.000Z"
+  }
+}

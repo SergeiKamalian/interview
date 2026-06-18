@@ -1,0 +1,566 @@
+{
+  "topic": {
+    "code": "nextjs_caching_in_nextjs",
+    "name": "Кеширование в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как устроено кеширование в Next.js и чем отличаются его четыре уровня?",
+    "shortAnswer": "Next.js кеширует fetch-ответы, HTML и RSC payload на четырёх уровнях: request memoization (дедупликация fetch в одном рендере), data cache (ответы fetch между запросами и деплоями), full route cache (HTML статических маршрутов на build) и router cache (RSC payload в браузере на время вкладки). Ключевой gotcha: `fetch` с `cache: 'no-store'` не отключает full route cache — нужен ещё `export const dynamic = 'force-dynamic'`.",
+    "idealAnswer": "Next.js 14+ складывает кеширование в четыре независимых слоя. Request memoization работает во время одного server render: React дедуплицирует одинаковые `fetch` (URL + options + body) в Map на время рендера; после завершения сбрасывается. Для Prisma/Drizzle без `fetch` — `React.cache()`. Data cache хранит сырые ответы fetch между запросами и деплоями (на Vercel — Edge KV, локально — filesystem); инвалидируется через `revalidateTag()` / `revalidatePath()`. Full route cache сохраняет готовый HTML и RSC payload статических маршрутов на build (или при ISR); маршрут остаётся статическим, пока не вызываются dynamic functions (`cookies()`, `headers()`, `searchParams`) и все fetch закешированы. Router cache — клиентский: хранит RSC payload посещённых маршрутов, prefetch `<Link>`, истекает через ~30 сек staleness или при закрытии вкладки. Static rendering: HTML на build/first ISR request → full route cache → мгновенная отдача (блоги, каталоги). Dynamic rendering: `cookies()`/`headers()`/`searchParams` или `dynamic = 'force-dynamic'` → сервер пересчитывает дерево на каждый запрос; full route cache не участвует, но data cache внутри dynamic route всё ещё работает — это два незавинимых переключателя. Revalidation: time-based `next: { revalidate: 300 }`; event-based `tags: ['problems']` + `revalidateTag('problems')` в Server Action; `export const revalidate = 3600` на странице — fallback, минимальное значение среди fetch определяет регенерацию. Типичные ошибки: (1) `no-store` без `force-dynamic` — data cache пропускается, но HTML всё ещё снимается на build; (2) `revalidate: 0` не отключает memoization и full route cache; (3) после мутации старые данные из router cache — fix `revalidatePath` или `router.refresh()`; (4) разные options fetch ломают memoization; (5) в `next dev` full route cache не работает — проверять через `next build && next start`. Hard refresh обходит router cache; soft navigation через `<Link>` — сначала router cache, потом server (full route → data). Edge runtime на Vercel — глобальный KV; Node.js — локальный filesystem на инстанс.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "react"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "four_cache_layers",
+      "title": "Понимает четыре уровня кеширования",
+      "expected": "Кандидат перечисляет request memoization, data cache, full route cache и router cache; кратко объясняет где каждый работает (один render / сервер между запросами / build HTML / браузер).",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — четыре слоя и их стадии",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "request memoization",
+              "data cache",
+              "full route",
+              "router cache"
+            ],
+            "ask": "на каком этапе срабатывает каждый из четырёх слоёв кеша"
+          }
+        ],
+        "mustConcepts": [
+          "request memoization",
+          "мемоизац",
+          "data cache",
+          "кеш дан",
+          "full route cache",
+          "кеш маршрут",
+          "router cache",
+          "кеш маршрутиз",
+          "один render",
+          "между запрос",
+          "build",
+          "браузер",
+          "RSC payload",
+          "HTML",
+          "четыре",
+          "слой",
+          "уровн"
+        ],
+        "falseClaims": [
+          "в Next.js только один уровень кеша",
+          "router cache хранится на сервере между деплоями",
+          "full route cache работает в next dev как в production",
+          "request memoization сохраняет данные между разными HTTP-запросами",
+          "data cache и full route cache — одно и то же"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "request_memoization",
+      "title": "Знает request memoization и React.cache",
+      "expected": "Кандидат объясняет: дедупликация одинаковых fetch в одном server render; ключ URL+options+body; сброс после render; для ORM — React.cache().",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый механизм из quick example ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "React.cache",
+              "memoization",
+              "дедупл"
+            ],
+            "ask": "как дедуплицировать Prisma-запрос без fetch в одном рендере"
+          }
+        ],
+        "mustConcepts": [
+          "дедупл",
+          "один render",
+          "один проход",
+          "URL",
+          "options",
+          "body",
+          "Map",
+          "сброс",
+          "React.cache",
+          "cache из react",
+          "Prisma",
+          "Drizzle",
+          "ORM",
+          "fetch",
+          "повторн",
+          "без лишн",
+          "HTTP"
+        ],
+        "falseClaims": [
+          "request memoization переживает разные HTTP-запросы пользователей",
+          "два fetch с одним URL но разным cache всегда мемоизируются вместе",
+          "React.cache() шарит данные между разными пользователями навсегда",
+          "memoization заменяет data cache"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "data_vs_full_route_cache",
+      "title": "Отличает data cache от full route cache",
+      "expected": "Кандидат сравнивает: data cache — сырые JSON-ответы fetch между запросами; full route cache — готовый HTML и RSC payload статического маршрута на build; независимые переключатели.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевое различие из follow-up questions ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "four_cache_layers",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "data_vs_full_route_cache",
+            "oftenConfusedWith": [
+              "static_vs_dynamic_rendering"
+            ],
+            "anchorTermsExpected": [
+              "JSON",
+              "HTML",
+              "RSC payload",
+              "fetch",
+              "build",
+              "статическ"
+            ],
+            "anchorTermsWrongTopic": [
+              "data cache хранит HTML страницы",
+              "full route cache хранит только JSON API"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "data cache",
+          "full route cache",
+          "JSON",
+          "HTML",
+          "RSC payload",
+          "fetch",
+          "build",
+          "статическ",
+          "маршрут",
+          "независим",
+          "переключ",
+          "Edge KV",
+          "filesystem",
+          "деплой",
+          "revalidateTag",
+          "revalidatePath"
+        ],
+        "falseClaims": [
+          "data cache хранит готовый HTML страницы",
+          "full route cache хранит только сырые fetch-ответы",
+          "отключив data cache автоматически отключается full route cache",
+          "full route cache обновляется на каждый fetch с revalidate"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "static_vs_dynamic_rendering",
+      "title": "Понимает static vs dynamic rendering",
+      "expected": "Кандидат объясняет триггеры dynamic: cookies(), headers(), searchParams, force-dynamic; static — HTML на build/ISR; dynamic route может всё ещё использовать data cache внутри.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "частая путаница двух независимых переключателей",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "cookies",
+              "headers",
+              "searchParams",
+              "force-dynamic"
+            ],
+            "ask": "что делает маршрут dynamic и как это связано с full route cache"
+          },
+          {
+            "match": [
+              "dynamic",
+              "data cache",
+              "no-store"
+            ],
+            "ask": "может ли dynamic страница всё ещё кешировать fetch через data cache"
+          }
+        ],
+        "mustConcepts": [
+          "static",
+          "dynamic",
+          "cookies",
+          "headers",
+          "searchParams",
+          "force-dynamic",
+          "build",
+          "ISR",
+          "full route",
+          "каждый запрос",
+          "пересчёт",
+          "data cache внутри",
+          "независим",
+          "статич",
+          "динамич",
+          "App Router"
+        ],
+        "falseClaims": [
+          "dynamic rendering полностью отключает все виды кеша",
+          "searchParams не влияет на static/dynamic",
+          "static страница всегда пересчитывается на каждый запрос",
+          "cookies() можно вызывать без перехода в dynamic mode"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "revalidation",
+      "title": "Знает revalidation: time-based и on-demand",
+      "expected": "Кандидат описывает next: { revalidate }, tags + revalidateTag, revalidatePath; export const revalidate как fallback; минимальное значение определяет регенерацию страницы.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ISR и event-based invalidation — core middle практика",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "revalidateTag",
+              "tags"
+            ],
+            "ask": "как инвалидировать только одну product page после updateStock"
+          },
+          {
+            "match": [
+              "revalidatePath",
+              "router.refresh"
+            ],
+            "ask": "чем revalidatePath отличается от router.refresh после мутации"
+          }
+        ],
+        "mustConcepts": [
+          "revalidate",
+          "revalidateTag",
+          "revalidatePath",
+          "tags",
+          "time-based",
+          "on-demand",
+          "ISR",
+          "stale",
+          "Server Action",
+          "export const revalidate",
+          "fallback",
+          "минимальн",
+          "инвалидац",
+          "3600",
+          "next/cache"
+        ],
+        "falseClaims": [
+          "revalidate: 0 полностью отключает все слои кеша",
+          "revalidateTag очищает только data cache, router cache не затрагивается никогда",
+          "page-level revalidate всегда перебивает fetch-level revalidate",
+          "revalidatePath работает только на клиенте"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки кеширования",
+      "expected": "Кандидат называет: no-store без force-dynamic; revalidate: 0 ≠ полный opt-out; stale router cache после мутации; разные fetch options ломают memoization; next dev не показывает full route cache.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "главный gotcha и 5 mistakes из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "static_vs_dynamic_rendering",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "no-store",
+              "force-dynamic"
+            ],
+            "ask": "почему fetch no-store не отключает full route cache"
+          },
+          {
+            "match": [
+              "router cache",
+              "revalidatePath",
+              "router.refresh"
+            ],
+            "ask": "почему после Server Action форма показывает старые данные"
+          }
+        ],
+        "mustConcepts": [
+          "no-store",
+          "force-dynamic",
+          "revalidate: 0",
+          "router cache",
+          "revalidatePath",
+          "router.refresh",
+          "memoization",
+          "разные options",
+          "next dev",
+          "next build",
+          "next start",
+          "production",
+          "gotcha",
+          "HTML на build",
+          "мутац",
+          "stale"
+        ],
+        "falseClaims": [
+          "cache no-store автоматически делает маршрут dynamic",
+          "revalidate 0 отключает request memoization и full route cache",
+          "router cache обновляется автоматически после каждой Server Action",
+          "поведение кеша в dev совпадает с production",
+          "два fetch с разным cache к одному URL всё равно мемоизируются"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "router_cache",
+      "title": "Понимает router cache и навигацию",
+      "expected": "Кандидат объясняет: клиентский RSC payload; prefetch Link; soft nav vs hard refresh; ~30 сек staleness; закрытие вкладки сбрасывает cache.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "router cache и soft/hard navigation из follow-up",
+        "mustConcepts": [
+          "router cache",
+          "клиент",
+          "браузер",
+          "RSC payload",
+          "Link",
+          "prefetch",
+          "soft navigation",
+          "hard refresh",
+          "back",
+          "назад",
+          "вкладк",
+          "30",
+          "staleness",
+          "instant",
+          "мгновен"
+        ],
+        "falseClaims": [
+          "hard refresh сначала проверяет router cache",
+          "router cache переживает закрытие браузера навсегда",
+          "router cache хранит HTML как full route cache на сервере",
+          "prefetch Link не использует router cache"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Четыре слоя: memoization в одном render, data cache для fetch между запросами, full route cache для HTML на build, router cache в браузере. Live metrics — no-store плюс force-dynamic, иначе HTML застынет на build.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Product page: fetch с tags и revalidate 3600, full route cache на build. После updateStock — revalidateTag по slug. Dashboard читает cookies → dynamic, но stats fetch всё ещё кешируется на 5 минут через data cache.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Soft nav по Link — сначала router cache. Hard refresh — сразу на сервер, там full route потом data. В dev full route не работает, проверяю через build и start.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Поставил cache no-store на fetch — значит страница всегда свежая, full route cache не при чём.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "revalidate 0 отключает вообще всё кеширование Next.js включая memoization и router cache.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Data cache и full route cache — одно хранилище HTML. Router cache живёт на сервере между деплоями.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "four_cache_layers",
+      "exampleType": "good",
+      "exampleText": "Request memoization — один render; data cache — между запросами; full route — HTML на build; router — RSC в браузере до закрытия вкладки.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "four_cache_layers",
+      "exampleType": "good",
+      "exampleText": "ну четыре кеша: на время рендера, серверный fetch, статический html, и клиентский при кликах назад",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "four_cache_layers",
+      "exampleType": "bad",
+      "exampleText": "В Next.js кеш один — CDN на Vercel, остальное marketing.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "request_memoization",
+      "exampleType": "good",
+      "exampleText": "Два PostList в одном Page — один fetch благодаря memoization; для db.user — React.cache(getUser).",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "request_memoization",
+      "exampleType": "good",
+      "exampleText": "мемоизация только в рамках одного server render, между юзерами не шарится",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "request_memoization",
+      "exampleType": "bad",
+      "exampleText": "Request memoization сохраняет fetch результат в data cache навсегда.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "data_vs_full_route_cache",
+      "exampleType": "good",
+      "exampleText": "Data cache — JSON от API между запросами; full route cache — уже собранный HTML+RSC статики на build.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "data_vs_full_route_cache",
+      "exampleType": "good",
+      "exampleText": "можно dynamic route с cookies, но fetch stats всё равно из data cache — слои независимы",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "data_vs_full_route_cache",
+      "exampleType": "bad",
+      "exampleText": "Full route cache — это просто другое имя data cache для fetch.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "static_vs_dynamic_rendering",
+      "exampleType": "good",
+      "exampleText": "searchParams или cookies() → dynamic, full route cache off; но отдельный fetch с revalidate 300 внутри dashboard всё ещё cached.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "static_vs_dynamic_rendering",
+      "exampleType": "good",
+      "exampleText": "блог статик на build, admin с force-dynamic на каждый запрос",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "static_vs_dynamic_rendering",
+      "exampleType": "bad",
+      "exampleText": "Dynamic страница не может использовать data cache ни при каких условиях.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "revalidation",
+      "exampleType": "good",
+      "exampleText": "fetch с tags product-slug, после PATCH — revalidateTag; page revalidate 3600 fallback, меньшее значение fetch побеждает.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "revalidation",
+      "exampleType": "good",
+      "exampleText": "после updateProfile делаю revalidatePath /profile — сброс server и router cache для пути",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "revalidation",
+      "exampleType": "bad",
+      "exampleText": "revalidateTag обновляет только JSON в data cache, навигация всегда покажет свежие данные без revalidatePath.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Live page: export const dynamic = 'force-dynamic' плюс fetch no-store — иначе HTML с build устаревший.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "форма сохранила профиль, но Link назад показал старое — router cache, fix revalidatePath или router.refresh()",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "revalidate 0 полностью opt-out из всех кешей, force-dynamic не нужен.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "router_cache",
+      "exampleType": "good",
+      "exampleText": "Клик Link — soft nav, router cache отдаёт RSC мгновенно; F5 — hard refresh, server full route then data.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "router_cache",
+      "exampleType": "good",
+      "exampleText": "prefetch на Link заранее кладёт payload, назад по history без запроса",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "router_cache",
+      "exampleType": "bad",
+      "exampleText": "Hard refresh всё равно сначала читает router cache в браузере.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nextjs-caching-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/nextjs-caching-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/nextjs-caching-in-nextjs",
+    "difficulty": "MIDDLE",
+    "titleEn": "Caching in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

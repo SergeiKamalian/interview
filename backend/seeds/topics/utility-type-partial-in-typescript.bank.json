@@ -1,0 +1,524 @@
+{
+  "topic": {
+    "code": "utility_type_partial_typescript",
+    "name": "Utility type Partial в TypeScript",
+    "skillCode": "typescript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое utility type Partial<T> в TypeScript и когда его использовать?",
+    "shortAnswer": "Partial<T> — встроенный utility type, который делает каждое свойство типа T необязательным на этапе компиляции. Удобен для PATCH-запросов, черновиков форм и частичных обновлений через spread; работает только на первом уровне вложенности и не добавляет runtime-проверок.",
+    "idealAnswer": "Partial<T> — встроенный utility type TypeScript, который превращает каждое свойство объекта T в опциональное: `{ name: string; email: string }` становится `{ name?: string; email?: string }`. Компилятор разворачивает его как mapped type `{ [K in keyof T]?: T[K] }` — проходит по каждому ключу T и добавляет `?`; в JavaScript ничего не попадает, zero runtime cost. Главное преимущество — автоматическое масштабирование: добавили поле в User — все Partial<User> в кодовой базе обновляются без ручной синхронизации, в отличие от ручного `{ name?: string; email?: string }`. Типичные сценарии: PATCH endpoints (отправляем только изменённые поля), состояние формы в React (`useState<Partial<Profile>>({})`), конфиги с дефолтами, reducer/slice с merge частичного payload. Паттерн обновления: `const updated: User = { ...fullUser, ...update }` — delta содержит только изменения, spread собирает полный объект. Критичная ловушка — Partial не рекурсивен: для `{ user: { name: string; age: number } }` при передаче `user` внутренние поля остаются обязательными; `{ user: { name: \"Alice\" } }` — ошибка, age всё ещё required. Для глубокой опциональности нужен DeepPartial через рекурсивный mapped type. Вторая ловушка — runtime: `data.id.toString()` компилируется при Partial<User>, но падает если id undefined; проверки `if (data.id !== undefined)` пишем сами. Если одно поле всегда обязательно (например id в PATCH), Partial не подходит — комбинируем: `Pick<User, 'id'> & Partial<Omit<User, 'id'>>`. Partial на примитиве бессмыслен: `Partial<number>` остаётся number. Partial снимает модификатор readonly: `Partial<{ readonly x: number }>` → `{ x?: number }` как writable. Partial идентичен ручному mapped type — alias из lib.es5.d.ts. В экосистеме: NestJS body для PATCH, Redux Toolkit partial updates, React Hook Form draft state, Prisma update data.",
+    "maxScore": 10,
+    "skills": [
+      "typescript",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "partial_definition",
+      "title": "Понимает что такое Partial<T>",
+      "expected": "Кандидат объясняет: Partial делает все свойства T опциональными на compile time; встроенный utility type; zero runtime cost; типы стираются при компиляции.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — optional properties из TL;DR ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Partial",
+              "опцион",
+              "optional",
+              "необяз"
+            ],
+            "ask": "во что превращается Partial<User> если User = { id: number; name: string; email: string }"
+          }
+        ],
+        "mustConcepts": [
+          "Partial",
+          "utility type",
+          "утилитар",
+          "опцион",
+          "optional",
+          "необяз",
+          "свойств",
+          "property",
+          "compile time",
+          "компил",
+          "runtime",
+          "стира",
+          "zero cost",
+          "встроен",
+          "keyof",
+          "T"
+        ],
+        "falseClaims": [
+          "Partial добавляет проверки в сгенерированный JavaScript",
+          "Partial работает в runtime как валидация полей",
+          "Partial меняет объект в runtime, делая поля undefined",
+          "Partial<T> и T | undefined для каждого поля — одно и то же"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "mapped_type_expansion",
+      "title": "Знает как компилятор разворачивает Partial",
+      "expected": "Кандидат объясняет: Partial<T> = `{ [K in keyof T]?: T[K] }`; mapped type; alias в lib.es5.d.ts; идентичен ручной записи.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "механизм mapped type из блока How the compiler handles this",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "partial_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "mapped",
+              "keyof",
+              "lib.es5"
+            ],
+            "ask": "чем Partial<T> отличается от `{ [K in keyof T]?: T[K] }`"
+          }
+        ],
+        "mustConcepts": [
+          "mapped type",
+          "mapped",
+          "keyof",
+          "K in keyof",
+          "T[K]",
+          "разворач",
+          "expand",
+          "lib.es5",
+          "alias",
+          "псевдоним",
+          "идентич",
+          "компилятор",
+          "добавл",
+          "вопросительн",
+          "?"
+        ],
+        "falseClaims": [
+          "Partial — это runtime helper из стандартной библиотеки JS",
+          "Partial и mapped type `{ [K in keyof T]?: T[K] }` дают разный результат",
+          "Partial работает только с interface, не с type alias",
+          "keyof T не участвует в развёртке Partial"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Знает когда применять Partial",
+      "expected": "Кандидат называет: PATCH endpoints, черновик формы, config с дефолтами, reducer merge; паттерн spread `{ ...full, ...partial }`.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use — практические сценарии из ITLead",
+        "mustConcepts": [
+          "PATCH",
+          "patch",
+          "форма",
+          "form",
+          "draft",
+          "черновик",
+          "config",
+          "конфиг",
+          "reducer",
+          "spread",
+          "merge",
+          "слиян",
+          "изменён",
+          "delta",
+          "useState",
+          "NestJS",
+          "Redux",
+          "Prisma"
+        ],
+        "falseClaims": [
+          "Partial нужен для создания полностью новых объектов с нуля",
+          "Partial заменяет необходимость передавать все поля в POST",
+          "spread merge с Partial всегда безопасен без проверок undefined",
+          "Partial подходит когда id всегда обязателен в PATCH без комбинации типов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "shallow_only_trap",
+      "title": "Понимает что Partial не рекурсивен",
+      "expected": "Кандидат объясняет: Partial только на первом уровне; вложенный объект остаётся fully required если передан; для deep optionality — DeepPartial.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "nested-object trap — главная ловушка из Common mistakes ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "рекурс",
+              "nested",
+              "вложен",
+              "DeepPartial"
+            ],
+            "ask": "почему `{ user: { name: \"Alice\" } }` ошибка для Partial<{ user: { name: string; age: number } }>"
+          },
+          {
+            "match": [
+              "DeepPartial",
+              "глубок",
+              "recursive"
+            ],
+            "ask": "как типизировать глубокую опциональность вместо Partial"
+          }
+        ],
+        "mustConcepts": [
+          "не рекурс",
+          "shallow",
+          "поверхност",
+          "первый уровень",
+          "top-level",
+          "вложен",
+          "nested",
+          "DeepPartial",
+          "age",
+          "required",
+          "обязатель",
+          "user",
+          "inner",
+          "внутрен",
+          "recursive mapped"
+        ],
+        "falseClaims": [
+          "Partial рекурсивно делает все вложенные поля опциональными",
+          "Partial<{ user: { name: string; age: number } }> позволяет передать user только с name",
+          "DeepPartial — встроенный utility type в стандартной lib TypeScript",
+          "Partial работает на любую глубину вложенности автоматически"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "runtime_undefined",
+      "title": "Понимает отсутствие runtime-проверок",
+      "expected": "Кандидат объясняет: TypeScript не генерирует guards; доступ к optional полю без проверки `!== undefined` может упасть в runtime.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Mistake 2 — compile vs runtime из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "undefined",
+              "runtime",
+              "toString",
+              "guard"
+            ],
+            "ask": "почему data.id.toString() компилируется при Partial<User>, но падает в runtime"
+          }
+        ],
+        "mustConcepts": [
+          "undefined",
+          "runtime",
+          "compile",
+          "guard",
+          "проверк",
+          "!== undefined",
+          "не генерир",
+          "crash",
+          "пада",
+          "optional",
+          "отсутств",
+          "toString",
+          "if",
+          "безопас"
+        ],
+        "falseClaims": [
+          "TypeScript автоматически проверяет наличие optional полей в runtime",
+          "Partial гарантирует что переданные поля не undefined",
+          "optional property и undefined в runtime — разные вещи для TS guards",
+          "strictNullChecks делает Partial безопасным в runtime без if"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "patch_required_field",
+      "title": "Комбинирует Partial с Pick и Omit",
+      "expected": "Кандидат объясняет паттерн `Pick<T, 'id'> & Partial<Omit<T, 'id'>>` когда одно поле всегда required, остальные optional.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Mistake 3 и senior follow-up PATCH endpoint из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Pick",
+              "Omit",
+              "PatchUser",
+              "id"
+            ],
+            "ask": "как типизировать PATCH где id обязателен, а name и email — опциональны"
+          }
+        ],
+        "mustConcepts": [
+          "Pick",
+          "Omit",
+          "intersection",
+          "пересеч",
+          "&",
+          "PatchUser",
+          "id",
+          "обязатель",
+          "required",
+          "остальн",
+          "optional",
+          "PATCH",
+          "endpoint",
+          "комбин",
+          "Partial<Omit"
+        ],
+        "falseClaims": [
+          "Partial<User> автоматически оставляет id обязательным",
+          "Pick и Omit нельзя комбинировать с Partial",
+          "для PATCH всегда достаточно Partial без исключений",
+          "Omit<User, 'id'> делает id опциональным"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает прочие типичные ошибки Partial",
+      "expected": "Кандидат называет: Partial на примитиве бессмыслен; Partial снимает readonly; compile-time only, без runtime impact.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Mistake 4 + readonly follow-up — бонус middle",
+        "mustConcepts": [
+          "примитив",
+          "primitive",
+          "number",
+          "readonly",
+          "снимает",
+          "writable",
+          "compile-time",
+          "performance",
+          "продуктив",
+          "lib.es5",
+          "бессмысл"
+        ],
+        "falseClaims": [
+          "Partial<number> делает number опциональным",
+          "Partial сохраняет модификатор readonly",
+          "Partial влияет на размер и скорость JavaScript bundle",
+          "Partial<number> эквивалентен number | undefined"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Partial<T> делает все свойства опциональными на compile time: Partial<User> → { id?: number; name?: string }. Разворачивается как mapped type `{ [K in keyof T]?: T[K] }`, в JS ничего не попадает. PATCH body, черновик формы, merge через spread `{ ...user, ...patch }`.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В NestJS PATCH принимаю Partial<UpdateUserDto> — клиент шлёт только изменённые поля. В React useState<Partial<Profile>>({}) — draft только touched полей, на save merge с user. Partial не рекурсивен: вложенный user требует все inner поля.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Если id в PATCH всегда нужен: Pick<User, 'id'> & Partial<Omit<User, 'id'>>. Runtime: if (data.id !== undefined) перед доступом. DeepPartial — свой recursive mapped type для глубокой опциональности.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Partial рекурсивно опционализирует вложенные объекты. TypeScript сам проверяет optional поля в runtime. Partial<number> = number | undefined.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Partial и `{ [K in keyof T]?: T[K] }` — разные типы. Partial сохраняет readonly. Для PATCH с обязательным id достаточно Partial<User>.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Partial добавляет runtime validation в bundle. data.id.toString() безопасен потому что Partial гарантирует id если компилятор не ругается.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "partial_definition",
+      "exampleType": "good",
+      "exampleText": "Partial — utility type: все ключи T становятся optional на этапе компиляции, zero runtime cost.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "partial_definition",
+      "exampleType": "good",
+      "exampleText": "ну partial как черновик — заполняешь только то что есть, остальное можно не передавать",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "partial_definition",
+      "exampleType": "bad",
+      "exampleText": "Partial<T> — runtime helper который ставит undefined на отсутствующие поля объекта.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "mapped_type_expansion",
+      "exampleType": "good",
+      "exampleText": "Partial<T> = `{ [K in keyof T]?: T[K] }` — mapped type, alias в lib.es5.d.ts, результат идентичен ручной записи.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "mapped_type_expansion",
+      "exampleType": "good",
+      "exampleText": "компилятор проходит keyof T и вешает ? на каждое свойство — в js этого нет",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "mapped_type_expansion",
+      "exampleType": "bad",
+      "exampleText": "Partial — отдельный runtime класс, не связанный с mapped types.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "PATCH API, form draft useState<Partial<Profile>>, config override, reducer merge — типичные кейсы Partial.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "const updated: User = { ...fullUser, ...update } — update: Partial<User> только изменённые поля",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Partial нужен для POST create когда все поля обязательны — Partial заменяет полный DTO.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "shallow_only_trap",
+      "exampleType": "good",
+      "exampleText": "Partial<{ user: { name: string; age: number } }> — если передаёшь user, age всё ещё required. Для deep — DeepPartial<T> recursive mapped.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "shallow_only_trap",
+      "exampleType": "good",
+      "exampleText": "partial только top-level, nested trap ловит всех — внутри объекта все поля обязательны",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "shallow_only_trap",
+      "exampleType": "bad",
+      "exampleText": "Partial автоматически делает user.name и user.age опциональными на любом уровне вложенности.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "runtime_undefined",
+      "exampleType": "good",
+      "exampleText": "function update(data: Partial<User>) { if (data.id !== undefined) data.id.toString(); } — TS не генерит guard сам.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "runtime_undefined",
+      "exampleType": "good",
+      "exampleText": "compile ok, runtime crash — partial не значит что поле есть, проверяй undefined",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "runtime_undefined",
+      "exampleType": "bad",
+      "exampleText": "strictNullChecks + Partial автоматически защищают от обращения к undefined полям в runtime.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "patch_required_field",
+      "exampleType": "good",
+      "exampleText": "type PatchUser = Pick<User, 'id'> & Partial<Omit<User, 'id'>> — id всегда в body, name/email optional.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "patch_required_field",
+      "exampleType": "good",
+      "exampleText": "partial на всём user плох для patch — id можно забыть, pick+omit+partial решает",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "patch_required_field",
+      "exampleType": "bad",
+      "exampleText": "Partial<User> для PATCH endpoint — id опционален, сервер сам разберётся без id в body.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Partial<number> остаётся number — примитивы без ключей. Partial снимает readonly. Ноль влияния на JS output.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "readonly x → partial делает x?: number writable, performance impact нет — чистый compile time",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Partial<ID> где ID=number даёт number | undefined и работает для optional id.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "utility-type-partial-in-typescript",
+    "apiUrl": "https://api.itlead.org/api/questions/utility-type-partial-in-typescript",
+    "pageUrl": "https://itlead.org/interview-questions/typescript/utility-type-partial-in-typescript",
+    "difficulty": "MIDDLE",
+    "titleEn": "Utility type partial in TypeScript",
+    "categorySlug": "typescript",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

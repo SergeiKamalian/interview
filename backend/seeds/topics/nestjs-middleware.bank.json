@@ -1,0 +1,598 @@
+{
+  "topic": {
+    "code": "nestjs_middleware",
+    "name": "Middleware в NestJS",
+    "skillCode": "nestjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое middleware в NestJS и чем оно отличается от guards?",
+    "shortAnswer": "Middleware в NestJS выполняется на уровне Express до guards, pipes и interceptors. Имеет доступ к `req`, `res` и `next()`, но не может читать метаданные маршрута или `ExecutionContext`. Middleware — для логирования, CORS и парсинга запросов; guards — для аутентификации и проверки ролей.",
+    "idealAnswer": "Middleware в NestJS — функция, которая перехватывает каждый HTTP-запрос до обработчика маршрута с прямым доступом к Express `req`, `res` и `next()`. NestJS оборачивает её в классовый формат через интерфейс `NestMiddleware` и `@Injectable()`. Middleware работает на слое Express — раньше любой обработки NestJS (pipes, guards, interceptors). Guards выполняются позже, per-route, с доступом к `ExecutionContext` и метаданным маршрута через `Reflector`. Аналогия: middleware — досмотр в аэропорту (все проходят), guards — проверка билета на конкретный рейс. Правило выбора: логирование, CORS, body parsing → middleware; JWT, роли, ownership → guards. CORS никогда через guards — preflight OPTIONS до них не доходит. Порядок: HTTP Request → Middleware (порядок регистрации) → Guards → Interceptors (до handler) → Pipes → Route Handler → Interceptors (после) → Response. NestJS компилирует middleware в стек Express через `app.use()`; `configure(consumer: MiddlewareConsumer)` в модуле, реализующем `NestModule`, регистрирует пути. Регистрация: `consumer.apply(LoggerMiddleware).forRoutes('*')`; exclude для публичных auth routes; цепочка `apply(Cors, Helmet, Logger)` — порядок фиксирован. Guard — `@UseGuards(JwtAuthGuard)` на контроллере/методе. Типичные ошибки: забытый `next()` — запрос зависает; `consumer.apply(new LoggerMiddleware())` ломает DI — передавать класс; CORS через guard — preflight падает; async middleware без `next(err)` — ошибки проглатываются в NestJS v9+. Middleware не читает `@Roles()` и custom decorators — для этого guard. В gRPC/microservice middleware не применяется — только HTTP-адаптер (Express/Fastify); для RPC — interceptors. Production-паттерн: лёгкий Logger на все routes, RateLimit на `api/*`, guards для JWT — каждый слой одна задача. Request ID / tenant ID из subdomain — middleware прикрепляет к `req`, controllers и guards читают позже.",
+    "maxScore": 10,
+    "skills": [
+      "nestjs",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "middleware_definition",
+      "title": "Понимает суть middleware",
+      "expected": "Кандидат объясняет: middleware — функция на слое Express до route handler; доступ к req, res, next(); NestMiddleware + @Injectable; next() продвигает запрос дальше по pipeline.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — что такое middleware и зачем next()",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "middleware_definition",
+            "oftenConfusedWith": [
+              "middleware_vs_guards",
+              "execution_order"
+            ],
+            "anchorTermsExpected": [
+              "middleware",
+              "req",
+              "res",
+              "next",
+              "Express",
+              "NestMiddleware"
+            ],
+            "anchorTermsWrongTopic": [
+              "middleware это guard",
+              "middleware читает ExecutionContext",
+              "middleware выполняется после pipes"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "middleware",
+              "next",
+              "NestMiddleware"
+            ],
+            "ask": "что произойдёт если в middleware не вызвать next()"
+          }
+        ],
+        "mustConcepts": [
+          "middleware",
+          "NestMiddleware",
+          "req",
+          "res",
+          "next",
+          "Express",
+          "перехват",
+          "до handler",
+          "route handler",
+          "обработчик",
+          "pipeline",
+          "Injectable",
+          "use(",
+          "продвига",
+          "завис",
+          "без next"
+        ],
+        "falseClaims": [
+          "middleware выполняется после guards",
+          "middleware имеет доступ к ExecutionContext",
+          "без next() запрос всё равно дойдёт до контроллера",
+          "middleware в NestJS не связан с Express middleware",
+          "middleware заменяет guards для JWT"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "middleware_vs_guards",
+      "title": "Отличает middleware от guards",
+      "expected": "Кандидат сравнивает: middleware — Express-слой, req/res/next, не знает контроллер; guard — ExecutionContext, Reflector, route metadata, auth/roles; таблица timing/scope/access.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевое различие из ITLead — смешение ломает CORS и auth",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "middleware_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "middleware_vs_guards",
+            "oftenConfusedWith": [
+              "when_to_use",
+              "http_only_limitations"
+            ],
+            "anchorTermsExpected": [
+              "ExecutionContext",
+              "Reflector",
+              "metadata",
+              "guard",
+              "middleware",
+              "req res next"
+            ],
+            "anchorTermsWrongTopic": [
+              "guard для CORS",
+              "middleware читает @Roles",
+              "guard и middleware взаимозаменяемы"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "guard",
+              "middleware",
+              "ExecutionContext"
+            ],
+            "ask": "почему JWT и проверку @Roles() нельзя перенести в middleware"
+          }
+        ],
+        "mustConcepts": [
+          "guard",
+          "middleware",
+          "ExecutionContext",
+          "Reflector",
+          "метадан",
+          "route metadata",
+          "req",
+          "res",
+          "next",
+          "контроллер",
+          "декоратор",
+          "@Roles",
+          "ForbiddenException",
+          "short-circuit",
+          "false",
+          "исключен",
+          "DI",
+          "классов"
+        ],
+        "falseClaims": [
+          "middleware может читать @Roles() через Reflector",
+          "guard выполняется раньше middleware",
+          "guard имеет только req/res/next без ExecutionContext",
+          "middleware и guard решают одни задачи — выбор не важен",
+          "CORS лучше настраивать через @UseGuards(CorsGuard)"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "execution_order",
+      "title": "Знает порядок выполнения pipeline",
+      "expected": "Кандидат называет цепочку: Middleware → Guards → Interceptors (до) → Pipes → Handler → Interceptors (после); middleware раньше pipes и guards.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "execution order из ITLead — база для middle",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "порядок",
+              "order",
+              "interceptors",
+              "pipes"
+            ],
+            "ask": "когда middleware выполняется относительно interceptors и pipes"
+          }
+        ],
+        "mustConcepts": [
+          "Middleware",
+          "Guards",
+          "Interceptors",
+          "Pipes",
+          "Handler",
+          "порядок",
+          "раньше",
+          "позже",
+          "до handler",
+          "после handler",
+          "регистрац",
+          "Express layer",
+          "lifecycle",
+          "pipeline",
+          "HTTP Request"
+        ],
+        "falseClaims": [
+          "pipes выполняются до middleware",
+          "interceptors всегда первые в pipeline",
+          "guards выполняются до middleware",
+          "middleware выполняется после route handler"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "registering_middleware",
+      "title": "Знает регистрацию через MiddlewareConsumer",
+      "expected": "Кандидат описывает NestModule.configure(consumer): apply(Class).forRoutes('*'|Controller|path+method), exclude для login/register, цепочка нескольких middleware; передавать класс, не instance.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "configure/consumer/forRoutes/exclude — практический паттерн ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "configure",
+              "MiddlewareConsumer",
+              "forRoutes"
+            ],
+            "ask": "как применить middleware только к POST /users и исключить auth/login"
+          },
+          {
+            "match": [
+              "apply",
+              "instance",
+              "класс"
+            ],
+            "ask": "почему consumer.apply(new LoggerMiddleware()) ломает DI"
+          }
+        ],
+        "mustConcepts": [
+          "NestModule",
+          "configure",
+          "MiddlewareConsumer",
+          "consumer.apply",
+          "forRoutes",
+          "exclude",
+          "RequestMethod",
+          "цепоч",
+          "chain",
+          "класс",
+          "не instance",
+          "new LoggerMiddleware",
+          "UsersController",
+          "path",
+          "method",
+          "POST",
+          "app.use",
+          "порядок регистрац"
+        ],
+        "falseClaims": [
+          "middleware регистрируется только через @UseMiddleware декоратор на методе",
+          "consumer.apply(new Middleware()) — правильный способ с DI",
+          "exclude работает только для guards, не для middleware",
+          "forRoutes не поддерживает конкретный HTTP method"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда middleware, а когда guard",
+      "expected": "Кандидат называет: logging, CORS, compression, request ID, tenant ID → middleware; JWT, roles, ownership → guards; business logic → services; CORS всегда middleware или enableCors.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "decision rule из TL;DR ITLead",
+        "mustConcepts": [
+          "логирован",
+          "CORS",
+          "compression",
+          "rate limit",
+          "JWT",
+          "рол",
+          "auth",
+          "request ID",
+          "tenant",
+          "subdomain",
+          "helmet",
+          "enableCors",
+          "preflight",
+          "OPTIONS",
+          "services",
+          "бизнес-логик",
+          "uniform",
+          "app-wide"
+        ],
+        "falseClaims": [
+          "JWT validation лучше в middleware чем в guard",
+          "CORS через guard работает для preflight OPTIONS",
+          "rate limiting только через guard",
+          "business logic допустима в middleware",
+          "middleware подходит для проверки @Roles()"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки middleware",
+      "expected": "Кандидат называет: забытый next(); instance вместо class в apply; CORS через guard; async без try/catch и next(err); res.send() без next для short-circuit.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — частые production-баги",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "middleware_definition",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "next()",
+              "завис",
+              "hang"
+            ],
+            "ask": "почему сервер перестаёт отвечать без next() в middleware"
+          },
+          {
+            "match": [
+              "async",
+              "next(err)",
+              "catch"
+            ],
+            "ask": "как правильно обрабатывать ошибки в async middleware"
+          }
+        ],
+        "mustConcepts": [
+          "next()",
+          "забыт",
+          "завис",
+          "instance",
+          "класс",
+          "DI",
+          "CORS",
+          "guard",
+          "preflight",
+          "async",
+          "try catch",
+          "next(err)",
+          "ошибк",
+          "проглаты",
+          "res.send",
+          "short-circuit",
+          "Stack Overflow"
+        ],
+        "falseClaims": [
+          "async middleware автоматически передаёт ошибки в error handler",
+          "new LoggerMiddleware() в apply сохраняет DI",
+          "CorsGuard на @Get() обрабатывает OPTIONS preflight",
+          "можно не вызывать next() если уже отправил res.json",
+          "ошибки в await someDbCheck() всегда доходят до exception filter без next(err)"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "http_only_limitations",
+      "title": "Понимает ограничения middleware",
+      "expected": "Кандидат объясняет: middleware только HTTP (Express/Fastify); нет ExecutionContext и Reflector; gRPC/microservice — interceptors; functional vs class-based — DI overhead; res.on('finish') для timing.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "HTTP-only и follow-up questions из ITLead — бонус middle",
+        "mustConcepts": [
+          "HTTP",
+          "Express",
+          "Fastify",
+          "gRPC",
+          "microservice",
+          "interceptor",
+          "RpcException",
+          "ExecutionContext",
+          "Reflector",
+          "не читает",
+          "декоратор",
+          "functional",
+          "class-based",
+          "DI overhead",
+          "stateless",
+          "finish",
+          "timing",
+          "requestId"
+        ],
+        "falseClaims": [
+          "middleware работает в gRPC transport так же как в HTTP",
+          "middleware может читать custom decorators через Reflector",
+          "functional middleware поддерживает inject сервисов из DI",
+          "class-based middleware всегда быстрее functional",
+          "res.on('finish') блокирует handler до завершения ответа"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Middleware — Express-слой до NestJS: req/res/next, логирование и CORS на все routes через configure(consumer). Guards позже — JwtAuthGuard читает @Roles() через Reflector. JWT и роли в guard, не в middleware; CORS только middleware или enableCors — preflight до guards не доходит.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "LoggerMiddleware на *, RateLimit на api/*, VersionMiddleware на api/v2 с exclude login/register. apply(LoggerMiddleware) — класс, не new. Async middleware — try/catch и next(err). RequestId кладу в req для трейсинга, guard потом читает тот же req.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Порядок: middleware → guards → interceptors → pipes → handler. Забыл next() — запрос висит. В gRPC middleware нет — interceptors. Functional middleware для простого лога без DI, class-based когда нужен сервис из контейнера.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Middleware и guard — одно и то же, JwtAuthGuard можно заменить middleware с req.headers.authorization. CORS через @UseGuards на контроллере — preflight OPTIONS отработает нормально.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "consumer.apply(new LoggerMiddleware()) — правильно, Nest сам инжектит. Async middleware кидает throw — exception filter поймает без next(err). Guards выполняются до middleware.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В gRPC microservice LoggerMiddleware на forRoutes('*') логирует все RPC. Middleware читает @Roles() через Reflector как guard.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "middleware_definition",
+      "exampleType": "good",
+      "exampleText": "Middleware implements NestMiddleware.use(req, res, next) — перехват до controller, next() обязателен иначе hang.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "middleware_definition",
+      "exampleType": "good",
+      "exampleText": "ну middleware как в express — логирует url, вызывает next, дальше nest pipeline",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "middleware_definition",
+      "exampleType": "bad",
+      "exampleText": "Middleware в NestJS — это guard с другим именем, выполняется после pipes с ExecutionContext.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "middleware_vs_guards",
+      "exampleType": "good",
+      "exampleText": "Middleware: req/res/next, не знает какой controller. Guard: ExecutionContext + Reflector, @Roles metadata, ForbiddenException.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "middleware_vs_guards",
+      "exampleType": "good",
+      "exampleText": "аэропорт security vs gate agent — middleware всем, guard per-route с билетом",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "middleware_vs_guards",
+      "exampleType": "bad",
+      "exampleText": "Guard раньше middleware и тоже только req/res/next без metadata.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "execution_order",
+      "exampleType": "good",
+      "exampleText": "Request → middleware chain → guards → interceptors before → pipes → handler → interceptors after → response.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "execution_order",
+      "exampleType": "good",
+      "exampleText": "лог middleware срабатывает до jwt guard — поэтому видим все запросы включая 401",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "execution_order",
+      "exampleType": "bad",
+      "exampleText": "Pipes валидируют body до middleware, потом guards, потом handler без interceptors.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "registering_middleware",
+      "exampleType": "good",
+      "exampleText": "AppModule implements NestModule: consumer.apply(Logger).forRoutes('*'); exclude auth/login POST; chain Cors, Helmet, Logger — порядок в apply.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "registering_middleware",
+      "exampleType": "good",
+      "exampleText": "forRoutes({ path: '/users', method: RequestMethod.POST }) — только POST; apply(AuthMiddleware) класс для DI",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "registering_middleware",
+      "exampleType": "bad",
+      "exampleText": "Middleware вешаю @UseGuards(LoggerMiddleware) на каждый метод — так же как guard.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Logging, helmet, cors, request-id, tenant из subdomain — middleware. JWT + @Roles — guards. Бизнес-правила — service.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "api gateway rate-limit middleware до любого route processing, auth guard на protected controllers",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Проверку ownership orderId === user.id делаю в middleware — guard для этого не нужен.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "use(req){ console.log } без next — классический hang. apply(new M()) ломает inject. async: catch → next(err). CORS — cors() middleware, не guard.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "v2 без api-key — res.status(401).json и return без next, short-circuit до guards",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "В async middleware await dbCheck() — если throw, NestJS v9+ сам вызовет next(err), try/catch не нужен.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "http_only_limitations",
+      "exampleType": "good",
+      "exampleText": "Middleware HTTP-only; gRPC — interceptors + RpcException. Нет Reflector — @Roles только в guard. res.on('finish') для duration после ответа.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "http_only_limitations",
+      "exampleType": "good",
+      "exampleText": "functional middleware без DI overhead для простого лога, class когда inject ConfigService",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "http_only_limitations",
+      "exampleType": "bad",
+      "exampleText": "Middleware в Nest microservice на TCP transport работает через forRoutes('*') как в REST.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-middleware",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-middleware",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-middleware",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is middleware in NestJS and how does it differ from guards?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

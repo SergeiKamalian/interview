@@ -1,0 +1,647 @@
+{
+  "topic": {
+    "code": "yaka_riznytsya_mizh_process_i_thread_v_nodejs",
+    "name": "Разница между process и thread в Node.js",
+    "skillCode": "javascript",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "В чём разница между process и thread в Node.js?",
+    "shortAnswer": "Process — изолированный экземпляр программы на уровне ОС со своим heap; thread — единица выполнения внутри process, разделяющая его память. Node по умолчанию выполняет JS в одном главном потоке на process плюс пул libuv из 4 C++ потоков для блокирующего I/O; для CPU-задач — worker_threads (~2 мс), для изоляции и масштабирования по ядрам — child_process/cluster (~20 мс).",
+    "idealAnswer": "Process — отдельная «квартира» с собственной кухней (изолированный heap, свой V8); thread — «соседи по комнате» внутри одного process, делят память (SharedArrayBuffer + Atomics). Node.js запускает один главный JS-поток на process: event loop, callbacks, promises и async/await живут там. libuv снимает блокирующий I/O (fs.readFile, DNS) в пул из 4 C++ потоков через uv_queue_work(); результаты возвращаются в event loop на фазе poll — JS-поток не блокируется. Для настоящего JS-параллелизма: worker_threads (новый V8 isolate в том же OS-process, ~2 мс, postMessage или SharedArrayBuffer) или child_process/cluster (отдельный OS-process с копией heap, ~20 мс, IPC через JSON/pipes). CPU-intensive (crypto, resize, PDF) → worker_threads; horizontal scale по ядрам → cluster.fork(); fault isolation → child_process.fork(); типичный I/O-heavy Express → главный поток + libuv, без лишней настройки. UV_THREADPOOL_SIZE по умолчанию 4 независимо от числа ядер — задаётся до любого require, max 128; после инициализации пула не меняется. Типичные ошибки: CPU-цикл на главном потоке замораживает все запросы; child.send() с circular refs; cluster без respawn на exit; UV_THREADPOOL_SIZE=128 на 4 ядрах. Сравнение: process — изолированная память, crash child не убивает parent; worker — shared memory, необработанная ошибка может убить весь process. Реальность: PM2 — process на ядро; Sharp — worker_threads внутри; Express+cluster — multi-core; sticky mode для WebSocket — один worker на клиента. У worker свой event loop, общий с другими worker нельзя.",
+    "maxScore": 10,
+    "skills": [
+      "javascript",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "process_vs_thread_definition",
+      "title": "Различает process и thread",
+      "expected": "Кандидат объясняет: process — изолированный OS-экземпляр со своим heap; thread — поток внутри process, разделяет память; один PID для всех потоков одного process, разный threadId.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — изоляция process vs shared memory thread",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "process_vs_thread_definition",
+            "oftenConfusedWith": [
+              "node_execution_model"
+            ],
+            "anchorTermsExpected": [
+              "process",
+              "thread",
+              "heap",
+              "изолир",
+              "разделя",
+              "PID",
+              "threadId"
+            ],
+            "anchorTermsWrongTopic": [
+              "каждый поток отдельный process",
+              "process делит heap с соседним process"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "process",
+              "thread",
+              "heap"
+            ],
+            "ask": "чем process отличается от thread по памяти и изоляции"
+          },
+          {
+            "match": [
+              "PID",
+              "threadId"
+            ],
+            "ask": "одинаковый ли process.pid у main thread и worker thread"
+          }
+        ],
+        "mustConcepts": [
+          "process",
+          "процесс",
+          "thread",
+          "поток",
+          "heap",
+          "изолир",
+          "разделя",
+          "памят",
+          "OS",
+          "PID",
+          "threadId",
+          "отдельн",
+          "экземпляр",
+          "сосед",
+          "квартира",
+          "shared",
+          "общ"
+        ],
+        "falseClaims": [
+          "thread всегда имеет свой отдельный heap как process",
+          "два thread в Node — это два OS-process",
+          "process и thread в Node — синонимы",
+          "process.pid разный у потоков одного process",
+          "thread не может делить память с другими потоками"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "node_execution_model",
+      "title": "Понимает модель выполнения Node.js",
+      "expected": "Кандидат описывает: один главный JS-поток на process, event loop на нём; libuv pool из 4 C++ потоков для blocking I/O; пул не трогает JS state; CPU на главном потоке блокирует все запросы.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "key difference — single JS thread + libuv background pool",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "process_vs_thread_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "node_execution_model",
+            "oftenConfusedWith": [
+              "libuv_thread_pool",
+              "worker_vs_child_process"
+            ],
+            "anchorTermsExpected": [
+              "event loop",
+              "один JS",
+              "libuv",
+              "4 поток",
+              "C++",
+              "не блокир"
+            ],
+            "anchorTermsWrongTopic": [
+              "Node параллелит JS на все ядра по умолчанию",
+              "libuv pool выполняет JavaScript"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "event loop",
+              "один поток",
+              "single thread"
+            ],
+            "ask": "где живут callbacks и что случится при тяжёлом CPU-цикле на главном потоке"
+          },
+          {
+            "match": [
+              "libuv",
+              "4",
+              "pool"
+            ],
+            "ask": "зачем libuv pool и трогает ли он JS state"
+          }
+        ],
+        "mustConcepts": [
+          "event loop",
+          "главн",
+          "один JS",
+          "single thread",
+          "call stack",
+          "libuv",
+          "пул",
+          "4 поток",
+          "C++",
+          "blocking I/O",
+          "fs.readFile",
+          "DNS",
+          "poll",
+          "callback",
+          "не блокир",
+          "JS state",
+          "CPU",
+          "завис",
+          "запрос"
+        ],
+        "falseClaims": [
+          "Node по умолчанию использует все ядра для JavaScript",
+          "libuv pool выполняет user JavaScript код",
+          "event loop работает в отдельном OS-process",
+          "async/await автоматически уходит в другой JS-поток",
+          "I/O и CPU одинаково обрабатываются без блокировки главного потока"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "worker_vs_child_process",
+      "title": "Сравнивает worker_threads и child_process/cluster",
+      "expected": "Кандидат сравнивает: Worker ~2 мс, V8 isolate, postMessage/SharedArrayBuffer, crash может убить process; fork/cluster ~20 мс, копия heap, IPC JSON, изоляция crash; cluster — process на ядро, sticky для WebSocket.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "comparison table и follow-up fork vs Worker — senior core",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "when_to_use",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Worker",
+              "fork",
+              "20",
+              "2"
+            ],
+            "ask": "стоимость запуска cluster.fork vs new Worker и почему"
+          },
+          {
+            "match": [
+              "postMessage",
+              "IPC",
+              "JSON"
+            ],
+            "ask": "как общаются worker_threads и child_process"
+          },
+          {
+            "match": [
+              "sticky",
+              "WebSocket",
+              "cluster"
+            ],
+            "ask": "зачем sticky mode в cluster для WebSocket"
+          }
+        ],
+        "mustConcepts": [
+          "worker_threads",
+          "Worker",
+          "child_process",
+          "cluster",
+          "fork",
+          "V8 isolate",
+          "heap",
+          "postMessage",
+          "IPC",
+          "JSON",
+          "pipes",
+          "SharedArrayBuffer",
+          "2 мс",
+          "20 мс",
+          "изоляц",
+          "crash",
+          "sticky",
+          "WebSocket",
+          "round-robin",
+          "multi-core"
+        ],
+        "falseClaims": [
+          "Worker и fork одинаковы по памяти и стоимости",
+          "cluster workers делят один V8 heap",
+          "child_process может напрямую писать в parent heap",
+          "Worker имеет тот же event loop что main thread",
+          "fork дешевле Worker для коротких CPU-задач"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "libuv_thread_pool",
+      "title": "Знает libuv thread pool и UV_THREADPOOL_SIZE",
+      "expected": "Кандидат объясняет: fs.readFile через uv_queue_work в пул; default 4 потока; UV_THREADPOOL_SIZE до require, max 128; после init не меняется; senior killer — 16 ядер но 4 потока I/O.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "follow-up UV_THREADPOOL_SIZE и how libuv handles — частая production ловушка",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "UV_THREADPOOL_SIZE",
+              "4",
+              "16"
+            ],
+            "ask": "почему fs.readFile на 16 ядрах использует 4 потока и как исправить"
+          },
+          {
+            "match": [
+              "uv_queue_work",
+              "syscall"
+            ],
+            "ask": "как libuv выполняет fs.readFile без блокировки JS-потока"
+          }
+        ],
+        "mustConcepts": [
+          "libuv",
+          "uv_queue_work",
+          "thread pool",
+          "UV_THREADPOOL_SIZE",
+          "4",
+          "default",
+          "fs.readFile",
+          "syscall",
+          "poll",
+          "до require",
+          "инициализац",
+          "128",
+          "ядр",
+          "bottleneck",
+          "узк",
+          "environment",
+          "переменн"
+        ],
+        "falseClaims": [
+          "UV_THREADPOOL_SIZE можно менять после первого fs.readFile",
+          "libuv автоматически использует все ядра CPU",
+          "UV_THREADPOOL_SIZE default равен числу ядер",
+          "увеличение пула до 128 всегда ускоряет I/O",
+          "worker_threads заменяют libuv pool для fs.readFile"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Выбирает process vs thread по сценарию",
+      "expected": "Кандидат называет: CPU-intensive → worker_threads; scale по ядрам → cluster; fault isolation → child_process.fork; I/O API → main thread + libuv; PM2/Sharp/Express+cluster примеры.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use таблица из ITLead",
+        "mustConcepts": [
+          "CPU",
+          "crypto",
+          "image",
+          "PDF",
+          "worker_threads",
+          "cluster",
+          "horizontal",
+          "fault isolation",
+          "child_process",
+          "I/O",
+          "Express",
+          "PM2",
+          "Sharp",
+          "workerpool",
+          "NestJS",
+          "multi-core",
+          "zero-downtime"
+        ],
+        "falseClaims": [
+          "для любого Express всегда нужен cluster",
+          "CPU-задачи лучше на главном потоке ради простоты",
+          "child_process нужен для каждого fs.readFile",
+          "worker_threads подходят для fault isolation лучше fork",
+          "I/O-heavy сервер обязан использовать worker_threads"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки process/thread в Node",
+      "expected": "Кандидат называет: CPU-цикл блокирует event loop → Worker; circular refs в child.send; cluster без respawn на exit; UV_THREADPOOL_SIZE завышен → context switching.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — production паттерны из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "node_execution_model",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "for",
+              "1e9",
+              "hash",
+              "блокир"
+            ],
+            "ask": "почему /hash с циклом 1e9 на главном потоке убивает API"
+          },
+          {
+            "match": [
+              "circular",
+              "JSON",
+              "child.send"
+            ],
+            "ask": "что не так с circular reference в child.send"
+          },
+          {
+            "match": [
+              "cluster.on",
+              "exit",
+              "respawn"
+            ],
+            "ask": "что случится с cluster без обработчика exit"
+          }
+        ],
+        "mustConcepts": [
+          "блокир",
+          "event loop",
+          "CPU",
+          "Worker",
+          "hash",
+          "circular",
+          "JSON",
+          "child.send",
+          "serializ",
+          "cluster",
+          "exit",
+          "respawn",
+          "OOM",
+          "UV_THREADPOOL_SIZE",
+          "128",
+          "context switching",
+          "plain data",
+          "userId"
+        ],
+        "falseClaims": [
+          "тяжёлый for-цикл на главном потоке не влияет на другие запросы",
+          "child.send сериализует функции и circular refs без ошибок",
+          "упавший cluster worker автоматически перезапускается без кода",
+          "UV_THREADPOOL_SIZE=128 на 4 ядрах всегда быстрее",
+          "offload CPU в setImmediate решает блокировку event loop"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "shared_memory_atomics",
+      "title": "Понимает SharedArrayBuffer и Atomics",
+      "expected": "Кандидат объясняет: worker threads в одном process могут делить память через SharedArrayBuffer; Atomics.add/load/store для атомарности; без Atomics — race condition; postMessage копирует данные.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "advanced example Atomics — бонус senior",
+        "mustConcepts": [
+          "SharedArrayBuffer",
+          "Atomics",
+          "Int32Array",
+          "race condition",
+          "атомар",
+          "postMessage",
+          "копир",
+          "workerData",
+          "parentPort",
+          "общ памят"
+        ],
+        "falseClaims": [
+          "postMessage передаёт shared memory без копирования по умолчанию",
+          "два worker могут безопасно инкрементировать обычную переменную без Atomics",
+          "SharedArrayBuffer работает между разными OS-process",
+          "Atomics нужны только в browser не в Node",
+          "worker threads не могут делить память в Node"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Process — отдельный OS-экземпляр с изолированным heap; thread живёт внутри process и делит память. Node держит один JS-поток на process и event loop на нём; libuv снимает fs.readFile в 4 C++ потока. CPU-hash — в Worker (~2 мс); масштаб по ядрам — cluster.fork (~20 мс); UV_THREADPOOL_SIZE ставлю до require, иначе на 16 ядрах I/O всё равно в 4 потока.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Express на I/O — главный поток ок, libuv сам. Resize картинок — worker_threads, Sharp так и делает. Multi-core traffic — cluster + respawn на exit. ML inference изолированно — child_process.fork, краш child не валит parent. WebSocket в cluster — sticky, иначе round-robin ломает сессию.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Main и Worker — один process.pid, разный threadId. postMessage для сообщений; SharedArrayBuffer + Atomics.add для счётчика без race. child.send только plain JSON — circular ref упадёт.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Node сам параллелит JavaScript на все ядра — главный поток только для синхронного кода, async/await идут в другие JS-потоки автоматически.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Worker и fork одинаковые: оба ~20 мс, оба изолируют crash полностью, оба делят heap через SharedArrayBuffer.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "На 16-ядерном сервере fs.readFile использует 16 потоков libuv по умолчанию; UV_THREADPOOL_SIZE можно поменять в runtime после старта приложения.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "process_vs_thread_definition",
+      "exampleType": "good",
+      "exampleText": "Process — изолированный heap на уровне ОС; thread — поток внутри process с общей памятью; у main и worker один PID, разный threadId.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "process_vs_thread_definition",
+      "exampleType": "good",
+      "exampleText": "ну process как отдельная квартира с кухней, thread — соседи в одной квартире, всё общее",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "process_vs_thread_definition",
+      "exampleType": "bad",
+      "exampleText": "Thread в Node — это всегда отдельный process с новым PID для каждого потока.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "node_execution_model",
+      "exampleType": "good",
+      "exampleText": "Один JS-поток на process: event loop, callbacks, promises. libuv pool из 4 C++ потоков для blocking I/O — JS state не трогают. CPU-цикл на главном — все запросы стоят.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "node_execution_model",
+      "exampleType": "good",
+      "exampleText": "fs.readFile уходит в libuv, syscall в фоне, callback на poll — js не блокировался",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "node_execution_model",
+      "exampleType": "bad",
+      "exampleText": "libuv pool выполняет JavaScript callbacks параллельно на всех ядрах — event loop не нужен.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "worker_vs_child_process",
+      "exampleType": "good",
+      "exampleText": "new Worker ~2 мс, V8 isolate, postMessage или SharedArrayBuffer; cluster.fork ~20 мс, копия heap, IPC JSON, crash child изолирован. WebSocket в cluster — sticky по IP.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "worker_vs_child_process",
+      "exampleType": "good",
+      "exampleText": "короткий cpu — worker дешевле; нужна изоляция oom — fork; scale — cluster по числу ядер",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "worker_vs_child_process",
+      "exampleType": "bad",
+      "exampleText": "Worker threads делят event loop с main thread — postMessage синхронно блокирует poll.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "libuv_thread_pool",
+      "exampleType": "good",
+      "exampleText": "UV_THREADPOOL_SIZE default 4; на 16 ядрах fs.readFile всё равно 4 потока — ставлю env до require, max 128; после init бесполезно менять.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "libuv_thread_pool",
+      "exampleType": "good",
+      "exampleText": "uv_queue_work кладёт read в пул, syscall в c++ потоке, результат в poll phase",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "libuv_thread_pool",
+      "exampleType": "bad",
+      "exampleText": "UV_THREADPOOL_SIZE автоматически равен os.cpus().length при старте Node без настройки.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "PDF/crypto → worker_threads; traffic multi-core → Express+cluster; ML module crash isolation → child_process.fork; типичный REST I/O → main thread.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "pm2 по процессу на ядро, sharp внутри workers, обычный crud api — libuv хватит",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Любой Express обязан стартовать cluster и worker_threads даже для простого CRUD.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "/hash с for 1e9 на главном — freeze; fix Worker. child.send({ self: data }) — circular JSON error; fix plain userId. cluster без exit handler — кластер сжимается после OOM.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "uv_threadpool_size 128 на 4 ядрах — context switch hell; ставлю по cpus().length до require",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "CPU offload через setImmediate на главном потоке параллелит работу и не блокирует другие запросы.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "shared_memory_atomics",
+      "exampleType": "good",
+      "exampleText": "SharedArrayBuffer + Atomics.add — атомарный инкремент между main и worker; без Atomics счётчик меньше ожидаемого из-за race.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "shared_memory_atomics",
+      "exampleType": "good",
+      "exampleText": "postMessage копирует payload; shared buffer — один сегмент памяти в process",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "shared_memory_atomics",
+      "exampleType": "bad",
+      "exampleText": "Два worker без Atomics безопасно инкрементируют обычный let counter в parent scope.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "yaka-riznytsya-mizh-process-i-thread-v-nodejs",
+    "apiUrl": "https://api.itlead.org/api/questions/yaka-riznytsya-mizh-process-i-thread-v-nodejs",
+    "pageUrl": "https://itlead.org/interview-questions/general/yaka-riznytsya-mizh-process-i-thread-v-nodejs",
+    "difficulty": "SENIOR",
+    "titleEn": "What is the difference between process and thread in Node.js?",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

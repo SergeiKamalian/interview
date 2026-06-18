@@ -1,0 +1,670 @@
+{
+  "topic": {
+    "code": "nodejs_garbage_collection",
+    "name": "Сбор мусора в Node.js (V8)",
+    "skillCode": "nodejs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как работает сбор мусора (Garbage Collection) в Node.js (V8)?",
+    "shortAnswer": "V8 автоматически освобождает память в двух поколениях кучи. Молодое поколение использует scavenge (1–5 мс): живые объекты копируются в свежий полупространство, мёртвые исчезают. Старое поколение — mark-sweep-compact (100 мс+): V8 обходит корни, помечает достижимые объекты, очищает остальное и при необходимости уплотняет кучу. Неограниченные кеши и замыкания над крупными объектами продвигают данные в старое поколение и вызывают длинные паузы.",
+    "idealAnswer": "Garbage collection в Node.js — автоматический процесс V8: движок отслеживает объекты, достижимые от корней (глобальная область, стеки вызовов, внутренние handles V8), и освобождает всё остальное. Куча разделена на два поколения с разными стратегиями. Молодое поколение (1–32 МБ): алгоритм scavenge (Cheney's copy) — два равных полупространства From/To; новые объекты в From; при заполнении живые копируются в To, From очищается, роли меняются; пауза 1–5 мс. Объекты, пережившие два scavenge (~25% молодых), продвигаются в старое поколение. Старое поколение (до ~1.5 ГБ на 64-bit): mark-sweep-compact — фаза Mark (обход графа от корней), Sweep (освобождение мёртвых, фрагментация), Compact (сдвиг живых объектов; с V8 8.0 частично в фоне; пропускается при низкой фрагментации, экономия 20–50% CPU). Современный V8: инкрементная маркировка (с V8 6.x, Node 12+ по умолчанию) — mark порциями <5 мс между тиками JS; concurrent sweeping и compaction в фоне; lazy sweeping страниц. Старый stop-the-world заменён, но при заполнении old gen паузы всё равно заметны. Мониторинг: `node --trace-gc`, PerformanceObserver с entryTypes ['gc'], `v8.getHeapStatistics()`, `v8.getHeapSpaceStatistics()`. Флаги: `--max-old-space-size`, `--max-semi-space-size`. Паузы >50 мс в production — признак давления GC; повторяющиеся mark-sweep 80–100 мс в trace-gc — ранний сигнал до OOM. Типичные ошибки: глобальные Map-кеши без eviction (корень → вечная жизнь); слушатели событий без removeListener/once — замыкание держит heavyObject; ручной `global.gc()` в production (нужен `--expose-gc`, блокирует 100–500 мс); игнорирование promotion rate >25%; создание больших Buffer в цикле вместо переиспользования. Реальные кейсы: Express — LRUCache с max/TTL; Puppeteer — page.close(); NestJS — WeakRef для singleton scope; SSR — `--max-semi-space-size=16` для короткоживущих VDOM-объектов. WeakRef и FinalizationRegistry (Node 14.6+): слабая ссылка не мешает сбору; callback после collection. V8 не детектирует утечки автоматически — heap snapshot через --inspect и Chrome DevTools.",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "gc_overview",
+      "title": "Понимает модель GC V8",
+      "expected": "Кандидат объясняет: V8 автоматически освобождает память; два поколения кучи; обход от корней; достижимое живёт, остальное собирается.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — две генерации, корни, автоматический GC",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "gc_overview",
+            "oftenConfusedWith": [
+              "young_scavenge",
+              "old_mark_sweep_compact"
+            ],
+            "anchorTermsExpected": [
+              "V8",
+              "два поколения",
+              "корни",
+              "достижим",
+              "young",
+              "old"
+            ],
+            "anchorTermsWrongTopic": [
+              "GC вручную в каждом цикле event loop",
+              "Node использует malloc/free как C"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "корни",
+              "roots",
+              "достижим"
+            ],
+            "ask": "откуда V8 начинает обход и почему глобальная переменная мешает сбору"
+          }
+        ],
+        "mustConcepts": [
+          "V8",
+          "garbage collection",
+          "сбор мусора",
+          "GC",
+          "куча",
+          "heap",
+          "корни",
+          "roots",
+          "достижим",
+          "молодое поколение",
+          "старое поколение",
+          "young",
+          "old",
+          "автоматич",
+          "освобожда",
+          "памят",
+          "два поколения",
+          "генерац"
+        ],
+        "falseClaims": [
+          "Node.js не использует GC — память освобождает разработчик вручную",
+          "V8 собирает только объекты без ссылок на них из кода",
+          "корни GC — только глобальный объект, стек вызовов не учитывается",
+          "все объекты сразу попадают в старое поколение",
+          "GC в Node работает независимо от движка V8"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "young_scavenge",
+      "title": "Знает scavenge в молодом поколении",
+      "expected": "Кандидат описывает: From/To полупространства; копирование живых; смена ролей; пауза 1–5 мс; продвижение после двух scavenge (~25%).",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "scavenge и promotion — ключевой механизм young gen",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "gc_overview",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "young_scavenge",
+            "oftenConfusedWith": [
+              "old_mark_sweep_compact"
+            ],
+            "anchorTermsExpected": [
+              "scavenge",
+              "From",
+              "To",
+              "копир",
+              "1-5мс",
+              "продвижен"
+            ],
+            "anchorTermsWrongTopic": [
+              "scavenge сканирует всю old gen",
+              "mark-sweep в young gen"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "scavenge",
+              "From",
+              "To",
+              "полупростран"
+            ],
+            "ask": "как устроены From/To и что происходит при заполнении young gen"
+          },
+          {
+            "match": [
+              "продвижен",
+              "promotion",
+              "два scavenge",
+              "25%"
+            ],
+            "ask": "когда объект переходит в старое поколение и какой типичный процент выживает"
+          }
+        ],
+        "mustConcepts": [
+          "scavenge",
+          "молодое поколение",
+          "young gen",
+          "From",
+          "To",
+          "полупростран",
+          "semi-space",
+          "копир",
+          "Cheney",
+          "1-5",
+          "миллисекунд",
+          "продвижен",
+          "promotion",
+          "два scavenge",
+          "25%",
+          "выжив",
+          "короткоживущ",
+          "request-scoped"
+        ],
+        "falseClaims": [
+          "scavenge помечает мёртвые объекты на месте без копирования",
+          "все объекты young gen сразу продвигаются в old gen",
+          "scavenge занимает 100 мс+ как major GC",
+          "From и To — это young и old generation",
+          "временные переменные в функции никогда не попадают в scavenge"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "old_mark_sweep_compact",
+      "title": "Знает mark-sweep-compact в старом поколении",
+      "expected": "Кандидат описывает три фазы: Mark от корней, Sweep освобождает мёртвые, Compact уплотняет; пауза 100 мс+; compact опционален при низкой фрагментации.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "major GC — главный источник длинных пауз в production",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "young_scavenge",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "mark",
+              "sweep",
+              "compact",
+              "фаз"
+            ],
+            "ask": "что делает каждая фаза mark-sweep-compact и зачем нужен compact"
+          },
+          {
+            "match": [
+              "фрагмент",
+              "compact пропуск"
+            ],
+            "ask": "когда V8 пропускает compact и сколько CPU это экономит"
+          }
+        ],
+        "mustConcepts": [
+          "mark",
+          "sweep",
+          "compact",
+          "mark-sweep",
+          "старое поколение",
+          "old gen",
+          "мажорн",
+          "major GC",
+          "100",
+          "миллисекунд",
+          "фрагмент",
+          "уплотн",
+          "мёртв",
+          "достижим",
+          "корни",
+          "обход граф",
+          "stop-the-world",
+          "фонов",
+          "sliding"
+        ],
+        "falseClaims": [
+          "mark-sweep копирует живые объекты как scavenge",
+          "compact всегда выполняется на каждом major GC",
+          "sweep перемещает живые объекты вместе",
+          "major GC работает только в young generation",
+          "пауза mark-sweep обычно 1–5 мс как scavenge"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "incremental_concurrent_gc",
+      "title": "Понимает инкрементный и параллельный GC",
+      "expected": "Кандидат упоминает: инкрементная маркировка порциями <5 мс; concurrent sweep/compact в фоне; lazy sweeping; Node 12+ по умолчанию; при полной old gen паузы остаются.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "современный V8 снижает stop-the-world — senior differentiator",
+        "confusionPairs": [
+          {
+            "checkpointKey": "incremental_concurrent_gc",
+            "oftenConfusedWith": [
+              "old_mark_sweep_compact"
+            ],
+            "anchorTermsExpected": [
+              "инкремент",
+              "concurrent",
+              "фон",
+              "5мс",
+              "Node 12"
+            ],
+            "anchorTermsWrongTopic": [
+              "инкрементный GC полностью убирает паузы",
+              "concurrent значит GC в отдельном OS-process"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "инкремент",
+              "incremental",
+              "mark"
+            ],
+            "ask": "что изменило инкрементное marking по сравнению со stop-the-world"
+          },
+          {
+            "match": [
+              "concurrent",
+              "lazy sweep",
+              "фон"
+            ],
+            "ask": "какие фазы major GC могут идти параллельно с выполнением JS"
+          }
+        ],
+        "mustConcepts": [
+          "инкремент",
+          "incremental marking",
+          "concurrent",
+          "параллельн",
+          "фонов",
+          "background",
+          "lazy sweep",
+          "stop-the-world",
+          "5мс",
+          "порци",
+          "срез",
+          "Node 12",
+          "V8 6",
+          "V8 7",
+          "V8 8",
+          "sweep",
+          "compact",
+          "пауз",
+          "old gen полн"
+        ],
+        "falseClaims": [
+          "инкрементный GC полностью устраняет паузы даже при переполненной old gen",
+          "concurrent compaction выполняется только на главном JS-потоке",
+          "до Node 12 инкрементная маркировка была по умолчанию",
+          "lazy sweeping очищает все страницы сразу после mark",
+          "инкрементный GC заменил scavenge в young gen"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "monitoring_tuning",
+      "title": "Знает мониторинг и настройку GC",
+      "expected": "Кандидат называет: --trace-gc, PerformanceObserver gc, v8.getHeapStatistics; флаги max-old-space-size, max-semi-space-size; паузы >50 мс — сигнал давления.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "практический мониторинг из ITLead monitoring section",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "trace-gc",
+              "PerformanceObserver",
+              "getHeapStatistics"
+            ],
+            "ask": "как увидеть события GC и отловить паузы дольше 50 мс"
+          }
+        ],
+        "mustConcepts": [
+          "--trace-gc",
+          "trace-gc",
+          "PerformanceObserver",
+          "perf_hooks",
+          "getHeapStatistics",
+          "getHeapSpaceStatistics",
+          "max-old-space-size",
+          "max-semi-space-size",
+          "50мс",
+          "пауз",
+          "Scavenge",
+          "Mark-sweep",
+          "heapUsed",
+          "memoryUsage",
+          "давлен",
+          "монитор"
+        ],
+        "falseClaims": [
+          "V8 автоматически логирует все GC в production без флагов",
+          "global.gc() — рекомендуемый способ мониторинга в production",
+          "пауза 100 мс mark-sweep — норма для здорового Express под нагрузкой",
+          "--max-semi-space-size меняет лимит old generation",
+          "process.memoryUsage() показывает только RSS без heap"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки и утечки памяти",
+      "expected": "Кандидат называет: глобальные кеши без eviction; слушатели без cleanup; ручной gc() в production; высокий promotion rate; большие буферы в цикле; правильные паттерны LRU, once/removeListener, переиспользование буфера.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — главный production impact senior Node",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "gc_overview",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "global",
+              "Map",
+              "кеш",
+              "LRU"
+            ],
+            "ask": "почему global.cache = new Map() — утечка и как ограничить кеш"
+          },
+          {
+            "match": [
+              "listener",
+              "on(",
+              "closure",
+              "removeListener"
+            ],
+            "ask": "как слушатель событий удерживает большой объект через замыкание"
+          },
+          {
+            "match": [
+              "global.gc",
+              "expose-gc",
+              "Buffer.alloc"
+            ],
+            "ask": "почему setInterval(global.gc) вреден и как избежать promotion буферов в цикле"
+          }
+        ],
+        "mustConcepts": [
+          "глобальн",
+          "global",
+          "корень",
+          "Map",
+          "кеш",
+          "LRUCache",
+          "eviction",
+          "слушател",
+          "listener",
+          "on(",
+          "once",
+          "removeListener",
+          "замыкан",
+          "closure",
+          "global.gc",
+          "expose-gc",
+          "promotion rate",
+          "продвижен",
+          "25%",
+          "Buffer.alloc",
+          "переиспольз",
+          "allocUnsafe",
+          "утечк",
+          "OOM",
+          "Express",
+          "Puppeteer",
+          "page.close"
+        ],
+        "falseClaims": [
+          "глобальный Map сам очищается когда ключи перестают использоваться в коде",
+          "emitter.on() не создаёт замыкание и не удерживает captured variables",
+          "global.gc() в production ускоряет приложение без пауз",
+          "создание нового Buffer.alloc(1e6) в цикле — норма, scavenge всё соберёт мгновенно",
+          "promotion rate не влияет на частоту major GC"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "weakref_promotion",
+      "title": "Понимает WeakRef и promotion rate",
+      "expected": "Кандидат объясняет: WeakRef не мешает сбору; FinalizationRegistry — callback после collection; promotion rate >25% → частый major GC; heap snapshot для диагностики утечек.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "бонус senior — WeakRef и диагностика утечек из follow-up",
+        "mustConcepts": [
+          "WeakRef",
+          "FinalizationRegistry",
+          "слабая ссылка",
+          "promotion rate",
+          "продвижен",
+          "25%",
+          "heap snapshot",
+          "--inspect",
+          "Chrome DevTools",
+          "detached",
+          "Node 14.6",
+          "кеш",
+          "NestJS"
+        ],
+        "falseClaims": [
+          "WeakRef гарантирует что объект всегда доступен",
+          "V8 автоматически находит утечки памяти без профилирования",
+          "FinalizationRegistry вызывается до сборки объекта",
+          "promotion rate 50% — норма для I/O-heavy API",
+          "heap snapshot можно снять только после OOM crash"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "V8 делит кучу на young и old gen. Короткоживущие объекты умирают в scavenge за 1–5 мс. Выжившие после двух циклов (~25%) продвигаются в old gen, где major GC mark-sweep-compact может паузить на 100 мс+. Инкрементная маркировка режет паузы, но неограниченный Map-кеш в middleware всё равно раздувает old gen.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На Express под нагрузкой смотрю --trace-gc: если mark-sweep каждые 2 с по 85 мс — это давление old gen, а не норма. Кеш делаю через LRUCache с max и TTL, слушатели снимаю removeListener, в цикле переиспользую Buffer.allocUnsafe. global.gc() только в тестах с --expose-gc.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Scavenge копирует живое из From в To и меняет роли — быстро, потому что трогает только survivors. Major GC помечает от корней, sweep чистит мёртвое, compact сдвигает при фрагментации. Пауза >50 мс в perf_hooks gc — повод копать promotion rate и утечки через heap snapshot.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "GC в Node — это когда разработчик вызывает delete на объектах. V8 собирает память раз в минуту по таймеру setInterval.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Scavenge и mark-sweep — одно и то же, оба сканируют всю кучу 100 мс. Глобальный cache = new Map() безопасен — V8 сам удалит старые ключи.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В production ставлю setInterval(global.gc, 1000) — так память не растёт. Инкрементный GC полностью убрал паузы, trace-gc не нужен.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "gc_overview",
+      "exampleType": "good",
+      "exampleText": "V8 автоматически собирает недостижимое: стартует от корней (global, стеки, handles), young gen для короткоживущих, old gen для долгоживущих survivors.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "gc_overview",
+      "exampleType": "good",
+      "exampleText": "ну gc — v8 сам чистит кучу, от корней смотрит кто живой, два поколения young/old",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "gc_overview",
+      "exampleType": "bad",
+      "exampleText": "Node не использует V8 для памяти — это делает libuv через malloc.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "young_scavenge",
+      "exampleType": "good",
+      "exampleText": "Young gen: From/To, scavenge копирует живых в To, From затирается, роли flip. Два scavenge — promotion в old gen, обычно ~25% выживает.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "young_scavenge",
+      "exampleType": "good",
+      "exampleText": "parsed в handleRequest умирает после return — следующий scavenge за 1-5мс, не ждём major GC",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "young_scavenge",
+      "exampleType": "bad",
+      "exampleText": "Scavenge помечает мёртвые на месте и занимает 100 мс как mark-sweep.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "old_mark_sweep_compact",
+      "exampleType": "good",
+      "exampleText": "Major GC: mark от корней → sweep освобождает мёртвое → compact сдвигает живое при фрагментации. Compact можно пропустить и сэкономить 20–50% CPU.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "old_mark_sweep_compact",
+      "exampleType": "good",
+      "exampleText": "в trace-gc mark-sweep 180→90 MB за 85мс — это old gen давление, не scavenge на 1мс",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "old_mark_sweep_compact",
+      "exampleType": "bad",
+      "exampleText": "Mark-sweep копирует объекты между From и To как scavenge.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "incremental_concurrent_gc",
+      "exampleType": "good",
+      "exampleText": "Инкрементный mark режет stop-the-world на куски <5 мс; sweep/compact частично в фоне с Node 12+. Но если old gen забита — пауза всё равно будет.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "incremental_concurrent_gc",
+      "exampleType": "good",
+      "exampleText": "lazy sweep — страницы чистятся когда нужно место под аллокацию, не сразу после mark",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "incremental_concurrent_gc",
+      "exampleType": "bad",
+      "exampleText": "Инкрементный GC значит JS никогда не останавливается даже при full old gen.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "monitoring_tuning",
+      "exampleType": "good",
+      "exampleText": "node --trace-gc + PerformanceObserver на gc duration >50мс; v8.getHeapStatistics() для тренда; --max-old-space-size если реально нужен больший потолок.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "monitoring_tuning",
+      "exampleType": "good",
+      "exampleText": "повторяющиеся 80-100мс mark-sweep в логе — деградация до oom, не жду краша",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "monitoring_tuning",
+      "exampleType": "bad",
+      "exampleText": "Мониторинг GC — просто смотреть process.uptime(), heap не важен.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "global Map-кеш — корень, entries вечные; LRUCache max 500 + TTL. emitter.on без remove держит 8MB lookupTable в 1000 замыканиях — один listener + wrapper lookup.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "в цикле Buffer.alloc(1e6) гонит в old gen — переиспользую allocUnsafe + fill. global.gc в проде блокирует поток на сотни мс",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Слушатели событий не влияют на GC — V8 собирает closure автоматически при on().",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "weakref_promotion",
+      "exampleType": "good",
+      "exampleText": "WeakRef не блокирует сбор; FinalizationRegistry — callback после collect. Promotion >25% — частый major GC; утечки ищу heap snapshot в DevTools.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "weakref_promotion",
+      "exampleType": "good",
+      "exampleText": "в nest можно weakref на singleton scope — объект умрёт когда ссылок нет, без ручного eviction",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "weakref_promotion",
+      "exampleType": "bad",
+      "exampleText": "V8 сам пишет в лог когда нашёл memory leak, WeakRef делает объект вечным.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-garbage-collection",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-garbage-collection",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-garbage-collection",
+    "difficulty": "SENIOR",
+    "titleEn": "How does Garbage Collection work in Node.js (V8)?",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T15:00:00.000Z"
+  }
+}

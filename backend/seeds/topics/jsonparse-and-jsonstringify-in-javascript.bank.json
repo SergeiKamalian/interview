@@ -1,0 +1,475 @@
+{
+  "topic": {
+    "code": "jsonparse_jsonstringify_javascript",
+    "name": "JSON.parse и JSON.stringify в JavaScript",
+    "skillCode": "javascript",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Как работают JSON.stringify() и JSON.parse() в JavaScript и когда их использовать?",
+    "shortAnswer": "JSON.stringify() преобразует JavaScript-значение в JSON-строку; JSON.parse() преобразует JSON-строку обратно в JavaScript-значение. stringify тихо отбрасывает функции, undefined и Symbol; parse выбрасывает SyntaxError на некорректном JSON.",
+    "idealAnswer": "JSON.stringify() сериализует JavaScript-значение в переносимую текстовую строку JSON; JSON.parse() делает обратную операцию — восстанавливает объект из строки. Round-trip не lossless: то, что stringify отбросил или преобразовал, parse не вернёт в исходном виде. stringify рекурсивно обходит значение, вызывает toJSON() у объектов с этим методом и пропускает всё без JSON-эквивалента: функции, undefined и Symbol в объекте исчезают; в массиве undefined и функции становятся null; Date → ISO-строка; NaN и Infinity → null; BigInt → TypeError. parse — строгий парсер по RFC 8259: одинарные кавычки, ключи без кавычек, trailing comma — SyntaxError; дублирующиеся ключи — побеждает последнее значение. Оба метода принимают опциональные replacer (stringify) и reviver (parse): replacer как массив — whitelist свойств, как функция — фильтрация и трансформация (BigInt → string, password → undefined); reviver восстанавливает типы снизу вверх (ISO-строка → new Date). Типичные сценарии: body POST через fetch (stringify), response.json() (parse), localStorage (setItem/stringify, getItem/parse с проверкой на null), конфиг Node.js (readFileSync + parse), логи JSON.stringify(obj, null, 2). Не использовать для: Date без reviver, функций, классов, циклических ссылок, BigInt без replacer — для deep clone с Date/Map лучше structuredClone(). Частые ошибки: забыть parse после getItem (raw.name undefined); ожидать Date после JSON.parse(JSON.stringify(obj)); JSON.stringify на circular graph; JSON.parse({a:1}) — объект приводится к \"[object Object]\" и падает; eval вместо parse на недоверенных данных — XSS-риск.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "stringify_parse_basics",
+      "title": "Понимает назначение stringify и parse",
+      "expected": "Кандидат объясняет: stringify упаковывает JS-значение в JSON-строку; parse распаковывает строку обратно в объект; round-trip не сохраняет функции, undefined и Symbol.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — два метода и их направление преобразования",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "stringify",
+              "parse",
+              "строк"
+            ],
+            "ask": "чем отличается результат JSON.stringify(obj) и JSON.parse(json) по типу и содержимому"
+          }
+        ],
+        "mustConcepts": [
+          "stringify",
+          "parse",
+          "сериализ",
+          "десериализ",
+          "JSON-строк",
+          "строк",
+          "object",
+          "объект",
+          "упаков",
+          "распаков",
+          "round-trip",
+          "не lossless",
+          "функц",
+          "undefined",
+          "Symbol",
+          "typeof json",
+          "typeof parsed"
+        ],
+        "falseClaims": [
+          "stringify и parse — одно и то же направление",
+          "parse принимает объект напрямую без строки",
+          "round-trip всегда возвращает идентичный объект со всеми полями",
+          "stringify возвращает объект, а не строку"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "stringify_drops_types",
+      "title": "Знает что stringify отбрасывает и преобразует",
+      "expected": "Кандидат перечисляет: функции, undefined, Symbol — отбрасываются в объекте; в массиве undefined/функции → null; Date → ISO; NaN/Infinity → null; BigInt → TypeError.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевые gotcha из What stringify changes or drops",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "stringify_parse_basics",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "undefined",
+              "массив",
+              "объект"
+            ],
+            "ask": "что происходит с undefined в объекте и в массиве при stringify"
+          },
+          {
+            "match": [
+              "BigInt",
+              "Date",
+              "NaN"
+            ],
+            "ask": "как stringify обрабатывает Date, NaN и BigInt"
+          }
+        ],
+        "mustConcepts": [
+          "функц",
+          "undefined",
+          "Symbol",
+          "отбрасы",
+          "drop",
+          "массив",
+          "null",
+          "Date",
+          "ISO",
+          "NaN",
+          "Infinity",
+          "BigInt",
+          "TypeError",
+          "toJSON",
+          "объект",
+          "ключ"
+        ],
+        "falseClaims": [
+          "undefined в массиве исчезает как в объекте",
+          "Date остаётся Date после stringify",
+          "BigInt тихо превращается в number",
+          "функции сериализуются как строка кода",
+          "Symbol сохраняется в JSON"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "replacer_reviver",
+      "title": "Понимает replacer и reviver",
+      "expected": "Кандидат объясняет: replacer в stringify — массив (whitelist) или функция (фильтр/трансформация, top-down); reviver в parse — восстановление типов bottom-up (Date из ISO-строки).",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "replacer/reviver — практический инструмент для BigInt, password, Date",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "replacer",
+              "whitelist",
+              "массив"
+            ],
+            "ask": "когда replacer передают массивом, а когда функцией"
+          },
+          {
+            "match": [
+              "reviver",
+              "Date",
+              "birthday"
+            ],
+            "ask": "как reviver восстанавливает Date после parse"
+          }
+        ],
+        "mustConcepts": [
+          "replacer",
+          "reviver",
+          "whitelist",
+          "функц",
+          "фильтр",
+          "трансформ",
+          "BigInt",
+          "toString",
+          "password",
+          "undefined",
+          "Date",
+          "ISO",
+          "top-down",
+          "bottom-up",
+          "сверху",
+          "снизу",
+          "null",
+          "2"
+        ],
+        "falseClaims": [
+          "replacer и reviver — один и тот же параметр",
+          "reviver вызывается сверху вниз от корня",
+          "replacer может только массив, функция не поддерживается",
+          "reviver не может восстановить Date"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с JSON",
+      "expected": "Кандидат называет: забыть parse после localStorage; Date не переживает round-trip без reviver; circular reference ломает stringify; JSON.parse на не-строке; JSON deep clone ломает Date/Map — structuredClone.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — самые частые production-баги",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "localStorage",
+              "getItem",
+              "raw.name"
+            ],
+            "ask": "почему raw.name undefined после getItem без parse"
+          },
+          {
+            "match": [
+              "circular",
+              "WeakSet",
+              "self"
+            ],
+            "ask": "почему JSON.stringify падает на циклической ссылке и как обойти"
+          }
+        ],
+        "mustConcepts": [
+          "localStorage",
+          "getItem",
+          "setItem",
+          "parse",
+          "null",
+          "Date",
+          "round-trip",
+          "reviver",
+          "circular",
+          "циклич",
+          "WeakSet",
+          "TypeError",
+          "SyntaxError",
+          "object Object",
+          "structuredClone",
+          "Map",
+          "deep clone",
+          "instanceof Date"
+        ],
+        "falseClaims": [
+          "localStorage.getItem возвращает объект",
+          "JSON.parse(JSON.stringify({date: new Date()})) сохраняет Date",
+          "JSON.stringify без проблем сериализует circular graph",
+          "JSON.parse принимает plain object без ошибки",
+          "JSON deep clone эквивалентен structuredClone для Map и Date"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда использовать JSON",
+      "expected": "Кандидат называет: fetch body/response, localStorage, конфиг-файлы, debug JSON.stringify(null,2); не использовать для Date без reviver, функций, BigInt, circular refs.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "When to use из ITLead — практические сценарии junior",
+        "mustConcepts": [
+          "fetch",
+          "POST",
+          "body",
+          "response.json",
+          "localStorage",
+          "config",
+          "readFileSync",
+          "Express",
+          "express.json",
+          "Redux Persist",
+          "debug",
+          "null",
+          "2",
+          "отступ",
+          "Content-Type",
+          "application/json",
+          "не использовать",
+          "skip"
+        ],
+        "falseClaims": [
+          "JSON.stringify нужен для любого deep clone",
+          "response.text() всегда возвращает готовый объект",
+          "localStorage хранит объекты без stringify",
+          "JSON подходит для сериализации функций в API"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "parse_strictness",
+      "title": "Знает строгость parse и безопасность",
+      "expected": "Кандидат объясняет: parse валидирует RFC 8259 и бросает SyntaxError; дубли ключей — последний побеждает; eval опасен на недоверенных данных, parse только данные без выполнения кода.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Follow-up: parse vs eval, duplicate keys, malformed JSON",
+        "mustConcepts": [
+          "SyntaxError",
+          "RFC",
+          "8259",
+          "валид",
+          "malformed",
+          "одинарн",
+          "кавыч",
+          "trailing comma",
+          "дубликат",
+          "ключ",
+          "последн",
+          "eval",
+          "безопас",
+          "untrusted",
+          "недоверен",
+          "XSS",
+          "код"
+        ],
+        "falseClaims": [
+          "JSON.parse принимает JavaScript object literal с trailing comma",
+          "eval безопасен для данных с API",
+          "при дублирующихся ключах parse бросает ошибку",
+          "JSON.parse выполняет произвольный JavaScript"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "JSON.stringify упаковывает объект в строку для сети и localStorage; JSON.parse распаковывает обратно. stringify тихо убирает функции и undefined; parse строгий — битый JSON даёт SyntaxError. Date после round-trip — строка, нужен reviver.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "POST fetch: body JSON.stringify(data), ответ await response.json(). localStorage: setItem('settings', JSON.stringify(s)), загрузка raw=getItem — если null дефолт, иначе JSON.parse(raw). BigInt через replacer toString.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну stringify — obj в текст, parse — текст в obj. в объекте undefined пропадает, в массиве null. circular — TypeError, eval для json с api не юзаю, только parse",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "JSON.stringify возвращает объект. localStorage сам парсит JSON. Date и Map нормально клонируются через JSON.parse(JSON.stringify). eval и parse одинаково безопасны.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "undefined в массиве исчезает как ключ в объекте. BigInt stringify превращает в number. JSON.parse({a:1}) работает без ошибки.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "replacer только массив, reviver сверху вниз. circular reference stringify заменяет на пустой объект без ошибки.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "stringify_parse_basics",
+      "exampleType": "good",
+      "exampleText": "const json = JSON.stringify({name:'Alice', age:30}) — строка; const obj = JSON.parse(json) — снова object. typeof json === 'string', typeof obj === 'object'.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "stringify_parse_basics",
+      "exampleType": "good",
+      "exampleText": "stringify — упаковка для wire/storage, parse — обратно в рабочий объект; функции при round-trip не вернутся",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "stringify_parse_basics",
+      "exampleType": "bad",
+      "exampleText": "JSON.parse и JSON.stringify делают одно и то же — превращают объект в объект для передачи.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "stringify_drops_types",
+      "exampleType": "good",
+      "exampleText": "stringify({fn:()=>{}, undef:undefined, date:new Date()}) — только date как ISO и nan→null; [1,undefined,()=>{},3] → [1,null,null,3]; {id:123n} — TypeError.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "stringify_drops_types",
+      "exampleType": "good",
+      "exampleText": "в объекте undefined ключ выкидывается — '{}'; в массиве undefined → null чтобы сохранить индексы",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "stringify_drops_types",
+      "exampleType": "bad",
+      "exampleText": "Date после stringify остаётся Date в строке, parse вернёт объект Date автоматически без reviver.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "replacer_reviver",
+      "exampleType": "good",
+      "exampleText": "stringify(user, ['name','email']) — whitelist. replacer (k,v) => typeof v==='bigint' ? v.toString() : v. parse с reviver: key==='createdAt' ? new Date(v) : v.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "replacer_reviver",
+      "exampleType": "good",
+      "exampleText": "password в replacer return undefined — поле исчезает; reviver снизу вверх восстанавливает Date из ISO",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "replacer_reviver",
+      "exampleType": "bad",
+      "exampleText": "reviver вызывается от корня к листьям; replacer не может быть функцией, только массив имён полей.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "raw = localStorage.getItem('user'); raw.name undefined — нужен JSON.parse(raw). clone = parse(stringify({birthday:new Date()})) — birthday строка, getFullYear TypeError без reviver.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "obj.self=obj; stringify падает. safe — WeakSet в replacer. deep clone с Map — structuredClone, не JSON.",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "getItem уже возвращает parsed object, parse не нужен. circular stringify заменяет ссылку на {} без TypeError.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "API: stringify body, response.json() на ответ. localStorage темы. config.json через readFileSync+parse. логи: stringify(obj,null,2). не для функций, BigInt без replacer, circular.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Express express.json() парсит вход; res.json stringify ответ. Redux Persist — stringify slices в storage",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Для любого deep clone всегда JSON.parse(JSON.stringify), structuredClone не нужен.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "parse_strictness",
+      "exampleType": "good",
+      "exampleText": "parse('{\"a\":1,\"a\":2}') → {a:2}. битый JSON — SyntaxError. eval на user input опасен — parse не выполняет код.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "parse_strictness",
+      "exampleType": "good",
+      "exampleText": "JSON.parse({a:1}) — SyntaxError, объект стал '[object Object]'. только строка с валидным JSON",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "parse_strictness",
+      "exampleType": "bad",
+      "exampleText": "JSON.parse принимает объект literal с одинарными кавычками и trailing comma как в JS.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "jsonparse-and-jsonstringify-in-javascript",
+    "apiUrl": "https://api.itlead.org/api/questions/jsonparse-and-jsonstringify-in-javascript",
+    "pageUrl": "https://itlead.org/interview-questions/javascript/jsonparse-and-jsonstringify-in-javascript",
+    "difficulty": "JUNIOR",
+    "titleEn": "Json.parse and json.stringify in JavaScript",
+    "categorySlug": "javascript",
+    "syncedAt": "2026-06-18T20:00:00.000Z"
+  }
+}

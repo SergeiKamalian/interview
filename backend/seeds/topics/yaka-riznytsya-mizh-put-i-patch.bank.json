@@ -1,0 +1,575 @@
+{
+  "topic": {
+    "code": "yaka_riznytsya_mizh_put_i_patch",
+    "name": "Разница между PUT и PATCH",
+    "skillCode": "architecture",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "В чём разница между HTTP-методами PUT и PATCH?",
+    "shortAnswer": "PUT полностью заменяет ресурс телом запроса — поля, которых нет в теле, перезаписываются null или значением по умолчанию схемы. PATCH обновляет только указанные поля, остальные остаются без изменений. Большой ресурс с редкими правками — PATCH; полная замена небольшого объекта — PUT.",
+    "idealAnswer": "PUT и PATCH решают разные задачи обновления ресурса. PUT (RFC 7231) трактует тело запроса как новое полное представление ресурса: сервер заменяет сохранённый объект целиком, а поля, отсутствующие в теле, перезаписывает null или дефолтом схемы — без ошибки и предупреждения. PATCH (RFC 5789) применяет diff: меняются только явно указанные поля, остальные сохраняются. Аналогия: PUT — новый паспорт вместо старого; PATCH — наклейка на действующий документ. Пример: PATCH /users/123 с { email: 'new@mail.com' } оставит phone нетронутым; PUT с тем же телом обнулит все остальные поля, включая phone. PUT идемпотентен по спецификации: десять одинаковых запросов дают один результат. PATCH идемпотентен не гарантирован — зависит от реализации: merge-patch с replace значения идемпотентен, а handler с item.count += amount при retry удвоит счётчик. Когда PUT: клиент владеет полным состоянием, ресурс маленький (конфиг, CRUD-форма со всеми полями), нужен идемпотентный полный reset. Когда PATCH: большой объект (профиль, billing), меняется одно-два поля, нельзя сначала fetch полного состояния, экономия трафика. Content-Type: PUT — application/json; PATCH — application/json-patch+json (массив операций RFC 6902) или application/merge-patch+json (объект-diff RFC 7396, null удаляет поле). На сервере PUT часто mapится на replaceOne/replace целиком; PATCH — updateOne с $set или fast-json-patch applyPatch. Типичные ошибки: PUT для частичного обновления (тихая потеря phone); неидемпотентный PATCH с increment; application/json вместо json-patch+json на серверах, которые трактуют PATCH как PUT; слепой PUT без If-Match/ETag при конкурентных правках — перезапись чужих изменений, нужен 412 Precondition Failed. JSON Patch (RFC 6902) — ops add/remove/replace/test; JSON Merge Patch (RFC 7396) — проще объект с null=delete, но без ordering и test-and-set. Безопасный PATCH: клиент читает ETag, шлёт If-Match, при 412 re-fetch; для collaborative editing — test операции перед replace. Реальные API: Firebase update()=PATCH, set()=PUT; Stripe PATCH /customers/{id}; MongoDB replaceOne vs $set. PUT может нарушить идемпотентность, если сервер каждый раз генерирует updatedAt независимо от тела.",
+    "maxScore": 10,
+    "skills": [
+      "architecture",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "put_patch_core",
+      "title": "Понимает суть PUT vs PATCH",
+      "expected": "Кандидат объясняет: PUT — полная замена ресурса телом запроса; PATCH — частичное обновление только указанных полей; остальное при PATCH сохраняется.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — full replacement vs partial update",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "put_patch_core",
+            "oftenConfusedWith": [
+              "unspecified_fields",
+              "when_to_use"
+            ],
+            "anchorTermsExpected": [
+              "PUT",
+              "PATCH",
+              "полная замена",
+              "частичн",
+              "partial",
+              "replace",
+              "diff"
+            ],
+            "anchorTermsWrongTopic": [
+              "POST создаёт",
+              "GET обновляет",
+              "PATCH всегда идемпотентен без оговорок"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "PUT",
+              "PATCH",
+              "полная",
+              "частичн"
+            ],
+            "ask": "чем PUT отличается от PATCH на примере обновления email пользователя"
+          }
+        ],
+        "mustConcepts": [
+          "PUT",
+          "PATCH",
+          "полная замена",
+          "частичн",
+          "partial update",
+          "replace",
+          "diff",
+          "ресурс",
+          "тело запроса",
+          "указанн",
+          "поля",
+          "сохран",
+          "RFC 7231",
+          "RFC 5789",
+          "authoritative state"
+        ],
+        "falseClaims": [
+          "PUT и PATCH делают одно и то же",
+          "PATCH заменяет весь ресурс как PUT",
+          "PUT обновляет только переданные поля",
+          "PATCH не стандартизирован в HTTP"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "unspecified_fields",
+      "title": "Знает судьбу неуказанных полей",
+      "expected": "Кандидат объясняет: при PUT отсутствующие в теле поля перезаписываются null или дефолтом схемы; при PATCH они сохраняются; необережный PUT тихо уничтожает данные.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Key difference из ITLead — production data loss без warning",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "put_patch_core",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "phone",
+              "null",
+              "не указан"
+            ],
+            "ask": "что случится с phone при PUT /users/123 только с { name: 'Alice' } если phone был '123-456'"
+          },
+          {
+            "match": [
+              "PATCH",
+              "email",
+              "сохран"
+            ],
+            "ask": "что произойдёт с phone при PATCH только email"
+          }
+        ],
+        "mustConcepts": [
+          "не указан",
+          "отсутств",
+          "null",
+          "дефолт",
+          "schema default",
+          "перезапис",
+          "сохран",
+          "phone",
+          "email",
+          "потеря данных",
+          "без ошибки",
+          "без warning",
+          "unspecified",
+          "intact",
+          "остаётся"
+        ],
+        "falseClaims": [
+          "PUT сохраняет поля, которых нет в теле",
+          "сервер вернёт ошибку если PUT не содержит все поля",
+          "PATCH обнуляет непереданные поля",
+          "null в PATCH всегда означает сохранить поле"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "idempotency",
+      "title": "Понимает идемпотентность PUT и PATCH",
+      "expected": "Кандидат объясняет: PUT идемпотентен по спецификации; PATCH — не гарантирован; additive logic (increment) ломает идемпотентность; replace значения идемпотентен.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "TL;DR idempotent rule из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "идемпотент",
+              "retry",
+              "повтор"
+            ],
+            "ask": "почему PATCH с count += amount опасен при retry, а PUT с полным телом — нет"
+          }
+        ],
+        "mustConcepts": [
+          "идемпотент",
+          "idempotent",
+          "PUT",
+          "PATCH",
+          "retry",
+          "повтор",
+          "одинаков",
+          "результат",
+          "increment",
+          "+= ",
+          "replace",
+          "merge-patch",
+          "updatedAt",
+          "генерир"
+        ],
+        "falseClaims": [
+          "PATCH всегда идемпотентен по RFC",
+          "PUT никогда не идемпотентен",
+          "retry PUT всегда опасен",
+          "идемпотентность не зависит от server handler"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Выбирает PUT или PATCH по контексту",
+      "expected": "Кандидат называет: PUT — маленький ресурс, полный state у клиента, CRUD-форма, idempotent reset; PATCH — большой объект, редкие изменения, экономия bandwidth, concurrent updates с merge/json patch.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "When to use таблица ITLead",
+        "mustConcepts": [
+          "маленьк",
+          "больш",
+          "полный state",
+          "конфиг",
+          "CRUD",
+          "профиль",
+          "billing",
+          "bandwidth",
+          "трафик",
+          "fetch",
+          "sparse",
+          "редк",
+          "изменен",
+          "Firebase set",
+          "Firebase update",
+          "Stripe"
+        ],
+        "falseClaims": [
+          "PATCH всегда лучше PUT",
+          "PUT нужен для любого обновления одного поля",
+          "большой профиль всегда обновляют через PUT",
+          "PATCH запрещён для billing данных"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки PUT/PATCH",
+      "expected": "Кандидат называет: PUT для partial update (потеря phone); неидемпотентный PATCH handler с increment; неверный Content-Type; PUT без If-Match при конкурентных правках.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — 4 production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "unspecified_fields",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "PUT",
+              "name",
+              "phone",
+              "стерт"
+            ],
+            "ask": "почему fetch PUT с только name стирает phone без ошибки"
+          },
+          {
+            "match": [
+              "If-Match",
+              "ETag",
+              "412"
+            ],
+            "ask": "как защитить PUT от перезаписи чужих изменений между read и write"
+          },
+          {
+            "match": [
+              "count +=",
+              "increment",
+              "retry"
+            ],
+            "ask": "как сделать PATCH handler идемпотентным для счётчика"
+          }
+        ],
+        "mustConcepts": [
+          "PUT partial",
+          "phone стерт",
+          "fetch merge",
+          "count +=",
+          "increment",
+          "retry",
+          "Content-Type",
+          "application/json",
+          "If-Match",
+          "ETag",
+          "412",
+          "Precondition Failed",
+          "слепой PUT",
+          "конкурент",
+          "перезапис"
+        ],
+        "falseClaims": [
+          "PUT с одним полем безопасен если сервер умный",
+          "application/json всегда правильный Content-Type для PATCH",
+          "If-Match нужен только для DELETE",
+          "increment в PATCH идемпотентен при retry"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "json_patch_formats",
+      "title": "Различает JSON Patch и Merge Patch",
+      "expected": "Кандидат объясняет: JSON Patch (RFC 6902) — массив ops add/remove/replace/test; Merge Patch (RFC 7396) — объект-diff, null удаляет поле; Content-Type json-patch+json vs merge-patch+json.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Follow-up JSON Patch vs Merge Patch из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "JSON Patch",
+              "RFC 6902",
+              "op replace"
+            ],
+            "ask": "чем JSON Patch ops array отличается от merge-patch объекта"
+          },
+          {
+            "match": [
+              "test",
+              "operation",
+              "precondition"
+            ],
+            "ask": "зачем test операция в JSON Patch при concurrent editing"
+          }
+        ],
+        "mustConcepts": [
+          "JSON Patch",
+          "JSON Merge Patch",
+          "RFC 6902",
+          "RFC 7396",
+          "json-patch+json",
+          "merge-patch+json",
+          "op replace",
+          "op add",
+          "op remove",
+          "op test",
+          "null delete",
+          "fast-json-patch",
+          "applyPatch",
+          "ordering",
+          "test-and-set"
+        ],
+        "falseClaims": [
+          "JSON Patch и Merge Patch — одно и то же",
+          "null в merge-patch сохраняет поле",
+          "application/json-patch+json принимает простой объект diff",
+          "Merge Patch поддерживает test операции как JSON Patch"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "server_handling",
+      "title": "Знает обработку на сервере",
+      "expected": "Кандидат описывает: PUT → replaceOne/replace целиком; PATCH → updateOne $set или applyPatch; Express/MongoDB паттерны; Stripe/Firebase семантика.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Examples replaceOne vs $set из ITLead",
+        "mustConcepts": [
+          "replaceOne",
+          "updateOne",
+          "$set",
+          "Express",
+          "MongoDB",
+          "Firebase set",
+          "Firebase update",
+          "Strapi",
+          "React Query",
+          "useMutation",
+          "replace",
+          "partial body",
+          "applyPatch"
+        ],
+        "falseClaims": [
+          "PUT и PATCH на MongoDB всегда используют updateOne",
+          "replaceOne безопасен для partial update",
+          "$set перезаписывает весь документ как replaceOne",
+          "Firebase update() заменяет весь документ"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "PUT заменяет ресурс целиком — если отправить только name, phone станет null. PATCH меняет только переданные поля, phone останется. PUT идемпотентен; PATCH с increment при retry удвоит count — нужен replace значения.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Профиль с 20 полями — PATCH email, не тащу весь объект. Маленький конфиг где форма всегда шлёт всё — PUT. На Mongo: replaceOne для PUT, updateOne $set для PATCH. Concurrent edit — ETag + If-Match, иначе 412.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "JSON Patch: [{ op: replace, path: /email, value: new@mail.com }] с Content-Type application/json-patch+json. Merge Patch проще — { email: new@mail.com }, null удаляет поле. Firebase update() = PATCH, set() = PUT.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "PUT и PATCH одно и то же — оба обновляют только переданные поля, разницы нет.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для смены email делаю PUT с { email: 'new@mail.com' } — phone сам сохранится, сервер умный.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "PATCH всегда идемпотентен по RFC, можно спокойно делать count += amount и ретраить запрос.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "put_patch_core",
+      "exampleType": "good",
+      "exampleText": "PUT — полная замена ресурса телом; PATCH — diff только указанных полей, остальное intact.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "put_patch_core",
+      "exampleType": "good",
+      "exampleText": "ну put это как новый паспорт целиком, patch — наклейка, меняешь только email",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "put_patch_core",
+      "exampleType": "bad",
+      "exampleText": "PATCH заменяет весь user object как PUT, просто другой HTTP-метод.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "unspecified_fields",
+      "exampleType": "good",
+      "exampleText": "PUT /users/123 { name: Alice } — phone '123-456' станет null без warning. PATCH с тем же телом — phone сохранится.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "unspecified_fields",
+      "exampleType": "good",
+      "exampleText": "не указанные поля при put затираются null или дефолтом схемы, patch их не трогает",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "unspecified_fields",
+      "exampleType": "bad",
+      "exampleText": "PUT без phone в теле оставит старый phone — сервер merge-ит автоматически.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "idempotency",
+      "exampleType": "good",
+      "exampleText": "PUT идемпотентен: 10 одинаковых запросов — один state. PATCH с count = req.body.count тоже; count += amount — нет.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "idempotency",
+      "exampleType": "good",
+      "exampleText": "merge-patch replace значения идемпотентен, increment в handler — нет, retry удвоит",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "idempotency",
+      "exampleType": "bad",
+      "exampleText": "PATCH по RFC всегда идемпотентен, PUT — нет.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Billing profile 30 полей, меняю адрес — PATCH. Feature flag config 5 полей, форма шлёт всё — PUT.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "stripe patch customer для редких правок, маленький json config — put overwrite",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Всегда PUT, PATCH устарел и не нужен.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Wrong: fetch PUT { name: Alice } — phone erased. Fix: PATCH или GET merge then PUT full object.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "PUT без If-Match перезапишет чужие правки — нужен ETag и 412 при конфликте",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "PATCH Content-Type application/json-patch+json для ops array, не plain json если сервер трактует как full replace",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "If-Match только для GET, PUT можно слать слепым после stale read.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "json_patch_formats",
+      "exampleType": "good",
+      "exampleText": "JSON Patch RFC 6902: [{ op: replace, path: /email, value: new@mail.com }]. Merge Patch RFC 7396: { email: new@mail.com }, null = delete field.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "json_patch_formats",
+      "exampleType": "good",
+      "exampleText": "test op перед replace — если email уже другой, patch fail до записи, защита от stale write",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "json_patch_formats",
+      "exampleType": "bad",
+      "exampleText": "Merge Patch и JSON Patch — один формат, null в merge-patch означает set null value.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "server_handling",
+      "exampleType": "good",
+      "exampleText": "Express Mongo: put → User.replaceOne entire doc; patch → updateOne $set partial body.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "server_handling",
+      "exampleType": "good",
+      "exampleText": "firebase update() patch semantics, set() put; react query mutation patch для optimistic ui",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "server_handling",
+      "exampleType": "bad",
+      "exampleText": "На MongoDB PUT и PATCH оба делают replaceOne — разницы в коде нет.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "yaka-riznytsya-mizh-put-i-patch",
+    "apiUrl": "https://api.itlead.org/api/questions/yaka-riznytsya-mizh-put-i-patch",
+    "pageUrl": "https://itlead.org/interview-questions/general/yaka-riznytsya-mizh-put-i-patch",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is the difference between PUT and PATCH?",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

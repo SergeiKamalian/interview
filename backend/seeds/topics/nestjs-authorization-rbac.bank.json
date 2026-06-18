@@ -1,0 +1,603 @@
+{
+  "topic": {
+    "code": "nestjs_authorization_rbac",
+    "name": "Авторизация RBAC в NestJS",
+    "skillCode": "nestjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как реализовать Role-Based Access Control (RBAC) в NestJS?",
+    "shortAnswer": "RBAC в NestJS строится на декораторе `@Roles()`, который через `SetMetadata` записывает требуемые роли на handler или controller, и `RolesGuard`, который через `Reflector.getAllAndOverride` читает метаданные и сравнивает их с `user.roles` из запроса. Критично: перед `RolesGuard` всегда ставить `AuthGuard('jwt')` — JWT-стратегия заполняет `request.user`, без неё Guard нечего проверять.",
+    "idealAnswer": "RBAC (Role-Based Access Control) в NestJS — паттерн, где Guard читает метаданные ролей с handler/controller, сравнивает с `user.roles` из запроса и пропускает или блокирует вызов до бизнес-логики. Декоратор `@Roles()` вызывает `SetMetadata(ROLES_KEY, roles)` и «штампует» требуемые роли на маршрут; `RolesGuard` через `Reflector.getAllAndOverride` сначала читает handler, затем class — так `@Roles` на контроллере защищает все маршруты, если handler не переопределяет. NestJS загружает `reflect-metadata` при `NestFactory.create()`; Guard выполняется в цепочке middleware после `AuthGuard`, который парсит JWT и кладёт `user` в `request`. При несовпадении — `ForbiddenException` (403), handler не вызывается. Порядок guards обязателен: `@UseGuards(AuthGuard('jwt'), RolesGuard)` — без JWT `user?.roles` undefined, guard падает или молча пропускает всех. Роли хранить массивом в JWT payload (`roles: ['admin', 'moderator']`), не строкой — иначе multi-role пользователи ломаются. Глобальная регистрация через `APP_GUARD`: `{ provide: APP_GUARD, useClass: JwtAuthGuard }` и `RolesGuard`; публичные маршруты без `@Roles()` проходят благодаря `if (!requiredRoles) return true` или декоратору `@Public()`. Для granular control — `PermissionsGuard`: роли мапятся на permissions (`read:users`, `write:users`), Guard проверяет `required.every(perm => userPermissions.includes(perm))`. Resource ownership — отдельный `OwnershipGuard`: admin bypass, обычный user редактирует только свой ресурс (`post.authorId === user.id`). RBAC vs ABAC: RBAC — статические роли, микросекунды на lookup метаданных, хватает для CRUD/SaaS до ~100 ролей; ABAC — атрибуты (время, IP, состояние ресурса), сложнее, для enterprise/compliance; при >10–15 комбинаций правил — Casbin/nest-casbin. Типичные ошибки: `reflector.get` вместо `getAllAndOverride` (class-level `@Roles` игнорируется — все маршруты незащищены); RolesGuard без AuthGuard; role string вместо array; global guard без обработки public routes (`/health` → 403); fetch ролей из БД на каждый запрос — bottleneck, класть в JWT + короткий expiry (15 мин) + refresh с re-read ролей. Иерархия ролей: `roleHierarchy` map в памяти, `hasRole` проверяет наследование (superadmin → admin). Тестирование: mock `Reflector.getAllAndOverride`, mock `ExecutionContext.switchToHttp().getRequest()` с `{ user: { roles: ['admin'] } }`. Микросервисы: роли в JWT, каждый сервис свой RolesGuard, межсервисных проверок не нужно.",
+    "maxScore": 10,
+    "skills": [
+      "nestjs",
+      "typescript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "rbac_core_pattern",
+      "title": "Понимает базовый паттерн RBAC",
+      "expected": "Кандидат объясняет: `@Roles()` через SetMetadata записывает роли на маршрут; RolesGuard через Reflector читает метаданные и сравнивает с user.roles; CanActivate до вызова handler.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — декоратор + Guard + Reflector из ITLead TL;DR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "rbac_core_pattern",
+            "oftenConfusedWith": [
+              "auth_guard_chain",
+              "permissions_based_access"
+            ],
+            "anchorTermsExpected": [
+              "Roles",
+              "SetMetadata",
+              "RolesGuard",
+              "Reflector",
+              "CanActivate",
+              "метадан",
+              "user.roles"
+            ],
+            "anchorTermsWrongTopic": [
+              "Passport strategy это RBAC",
+              "Interceptor проверяет роли",
+              "Pipe блокирует по ролям"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Roles",
+              "SetMetadata",
+              "RolesGuard"
+            ],
+            "ask": "как @Roles() связывается с RolesGuard через метаданные"
+          }
+        ],
+        "mustConcepts": [
+          "RBAC",
+          "Roles",
+          "SetMetadata",
+          "ROLES_KEY",
+          "RolesGuard",
+          "CanActivate",
+          "Reflector",
+          "метадан",
+          "handler",
+          "controller",
+          "user.roles",
+          "403",
+          "Forbidden",
+          "Guard",
+          "авторизац",
+          "рол"
+        ],
+        "falseClaims": [
+          "RBAC в NestJS реализуется только через Interceptor",
+          "SetMetadata вызывается внутри Guard, а не в декораторе",
+          "RolesGuard не использует Reflector",
+          "авторизация и аутентификация — одно и то же в NestJS"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "auth_guard_chain",
+      "title": "Знает порядок AuthGuard и RolesGuard",
+      "expected": "Кандидат объясняет: AuthGuard('jwt') первым — Passport валидирует токен и заполняет request.user; без него RolesGuard не имеет user.roles и падает или пропускает всех.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевой point ITLead — order matters",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "rbac_core_pattern",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "auth_guard_chain",
+            "oftenConfusedWith": [
+              "rbac_core_pattern"
+            ],
+            "anchorTermsExpected": [
+              "AuthGuard",
+              "jwt",
+              "request.user",
+              "Passport",
+              "порядок",
+              "перед RolesGuard"
+            ],
+            "anchorTermsWrongTopic": [
+              "RolesGuard сам парсит JWT",
+              "порядок guards не важен"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "AuthGuard",
+              "jwt",
+              "request.user"
+            ],
+            "ask": "что произойдёт если поставить только RolesGuard без AuthGuard"
+          }
+        ],
+        "mustConcepts": [
+          "AuthGuard",
+          "jwt",
+          "Passport",
+          "request.user",
+          "порядок",
+          "UseGuards",
+          "перед",
+          "RolesGuard",
+          "стратег",
+          "токен",
+          "payload",
+          "undefined",
+          "аутентификац",
+          "авторизац"
+        ],
+        "falseClaims": [
+          "RolesGuard может работать без AuthGuard — он сам достанет user из JWT",
+          "порядок @UseGuards не влияет на выполнение",
+          "request.user заполняется автоматически без Passport",
+          "AuthGuard и RolesGuard можно объединить в один Guard всегда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "reflector_getAllAndOverride",
+      "title": "Использует getAllAndOverride, не get",
+      "expected": "Кандидат объясняет: getAllAndOverride читает handler, затем class; reflector.get только handler — class-level @Roles игнорируется и маршруты остаются незащищёнными.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "самый частый RBAC-баг из ITLead Common mistakes",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "getAllAndOverride",
+              "getHandler",
+              "getClass"
+            ],
+            "ask": "чем getAllAndOverride отличается от reflector.get и почему это критично для @Roles на классе"
+          }
+        ],
+        "mustConcepts": [
+          "getAllAndOverride",
+          "reflector.get",
+          "getHandler",
+          "getClass",
+          "class-level",
+          "controller",
+          "handler",
+          "override",
+          "fallback",
+          "метадан",
+          "незащищ",
+          "Stack Overflow"
+        ],
+        "falseClaims": [
+          "reflector.get и getAllAndOverride дают одинаковый результат",
+          "@Roles на controller не применяется к дочерним маршрутам",
+          "getAllAndOverride читает только class, не handler",
+          "class-level metadata автоматически наследуется reflector.get"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "global_guard_public",
+      "title": "Настраивает глобальный Guard и public routes",
+      "expected": "Кандидат объясняет: APP_GUARD для JwtAuthGuard и RolesGuard; маршруты без @Roles проходят через `if (!requiredRoles) return true`; для явных public — @Public() decorator.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "global setup + health check pitfall из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "APP_GUARD",
+              "global",
+              "public"
+            ],
+            "ask": "как сделать /health публичным при глобальном RolesGuard"
+          }
+        ],
+        "mustConcepts": [
+          "APP_GUARD",
+          "global",
+          "глобальн",
+          "public",
+          "Public",
+          "requiredRoles",
+          "return true",
+          "health",
+          "403",
+          "без декоратор",
+          "app.module"
+        ],
+        "falseClaims": [
+          "глобальный RolesGuard блокирует все маршруты включая без @Roles",
+          "APP_GUARD нельзя зарегистрировать для RolesGuard",
+          "public routes требуют @Roles(Role.Public)"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "permissions_based_access",
+      "title": "Различает роли и permissions",
+      "expected": "Кандидат объясняет: roles — coarse-grained; permissions (`read:users`, `write:users`) через rolePermissions map; PermissionsGuard проверяет required.every против flatMap permissions пользователя.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Permission-based access pattern из ITLead для SaaS",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Permission",
+              "PermissionsGuard",
+              "RequirePermissions"
+            ],
+            "ask": "когда RBAC по ролям недостаточно и нужен PermissionsGuard"
+          }
+        ],
+        "mustConcepts": [
+          "Permission",
+          "permissions",
+          "PermissionsGuard",
+          "RequirePermissions",
+          "rolePermissions",
+          "flatMap",
+          "granular",
+          "read:users",
+          "write:users",
+          "every",
+          "SaaS",
+          "coarse"
+        ],
+        "falseClaims": [
+          "роли и permissions — одно и то же, отдельный Guard не нужен",
+          "PermissionsGuard проверяет some вместо every",
+          "permissions всегда хранятся только в БД на каждый запрос"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "resource_ownership",
+      "title": "Понимает проверку владения ресурсом",
+      "expected": "Кандидат объясняет: OwnershipGuard отдельно от RolesGuard; admin bypass; обычный user — только свой ресурс (authorId === user.id); цепочка guards при необходимости.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Resource ownership pattern — role alone not enough",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "OwnershipGuard",
+              "authorId",
+              "bypass"
+            ],
+            "ask": "почему RolesGuard недостаточен для «редактировать только свой пост»"
+          }
+        ],
+        "mustConcepts": [
+          "OwnershipGuard",
+          "владен",
+          "authorId",
+          "user.id",
+          "admin bypass",
+          "bypass",
+          "свой ресурс",
+          "params.id",
+          "async",
+          "findOne",
+          "отдельн"
+        ],
+        "falseClaims": [
+          "RBAC по ролям полностью заменяет проверку ownership",
+          "OwnershipGuard должен быть внутри RolesGuard, не отдельным Guard",
+          "admin всегда проходит любой OwnershipGuard без явного bypass"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "rbac_vs_abac",
+      "title": "Сравнивает RBAC и ABAC, знает Casbin",
+      "expected": "Кандидат сравнивает: RBAC — статические роли, низкая сложность, CRUD/SaaS; ABAC — атрибуты (время, IP, состояние ресурса); при сложных политиках — Casbin/nest-casbin.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "таблица RBAC vs ABAC — when to escalate",
+        "mustConcepts": [
+          "RBAC",
+          "ABAC",
+          "Casbin",
+          "nest-casbin",
+          "атрибут",
+          "статическ",
+          "policy engine",
+          "compliance",
+          "whiteboard"
+        ],
+        "falseClaims": [
+          "RBAC всегда лучше ABAC для enterprise",
+          "Casbin заменяет Guards в NestJS полностью",
+          "ABAC быстрее RBAC по lookup метаданных"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки RBAC",
+      "expected": "Кандидат называет: roles string vs array в JWT; fetch ролей из БД на каждый запрос; reflector.get; RolesGuard без AuthGuard; global guard без public; короткий JWT expiry + refresh для смены ролей.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "JWT array, DB bottleneck, role revocation из ITLead mistakes",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "roles",
+              "array",
+              "JWT"
+            ],
+            "ask": "почему role: 'admin' string ломает multi-role и что делать при смене ролей mid-session"
+          }
+        ],
+        "mustConcepts": [
+          "roles array",
+          "массив",
+          "role string",
+          "JWT payload",
+          "refresh token",
+          "15 минут",
+          "БД на каждый запрос",
+          "bottleneck",
+          "1000 req",
+          "revocation"
+        ],
+        "falseClaims": [
+          "одна строка role в JWT достаточна для multi-role",
+          "роли нужно читать из БД на каждый HTTP-запрос",
+          "долгоживущий JWT решает проблему отзыва ролей",
+          "multi-role пользователи — редкий edge case, можно игнорировать"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "RBAC: @Roles(Role.Admin) через SetMetadata, RolesGuard с Reflector.getAllAndOverride сравнивает с user.roles. @UseGuards(AuthGuard('jwt'), RolesGuard) — порядок важен. Роли в JWT массивом. Class-level @Roles защищает все методы контроллера.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На проекте: JWT guard первый, roles guard второй. Роли кладём в payload при логине, не дергаем БД на каждый запрос. Для «редактировать свой пост» — OwnershipGuard отдельно, admin bypass. Если правил >15 — смотрим Casbin.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "PermissionsGuard для granular: admin может write posts но не delete users — rolePermissions map, flatMap по ролям user, required.every. Глобальный APP_GUARD + if (!required) return true для /health.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Ставлю только RolesGuard — он сам разберётся с JWT. reflector.get достаточно для @Roles на controller. role: 'admin' в токене ок для всех случаев.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "RBAC и ABAC одно и то же. Interceptor заменяет Guard для ролей. Роли из БД на каждый запрос — правильный паттерн для 1000 rps.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "getAllAndOverride читает только handler, class metadata не нужна. Глобальный RolesGuard без обработки public — /health должен падать с 403, это норма.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "rbac_core_pattern",
+      "exampleType": "good",
+      "exampleText": "@Roles через SetMetadata пишет ROLES_KEY на handler; RolesGuard.canActivate читает Reflector и сравнивает required.some с user.roles.includes.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "rbac_core_pattern",
+      "exampleType": "good",
+      "exampleText": "ну декоратор штампует роли на роут, guard до handler проверяет — admin 200, user 403",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "rbac_core_pattern",
+      "exampleType": "bad",
+      "exampleText": "RBAC делается через @Injectable Pipe который смотрит headers напрямую, Reflector не нужен.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "auth_guard_chain",
+      "exampleType": "good",
+      "exampleText": "AuthGuard('jwt') первый — Passport кладёт user в request; RolesGuard второй — без user.roles нечего проверять, будет undefined.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "auth_guard_chain",
+      "exampleType": "good",
+      "exampleText": "если только RolesGuard — request.user undefined, guard падает или пропускает всех",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "auth_guard_chain",
+      "exampleType": "bad",
+      "exampleText": "RolesGuard сам валидирует JWT через @nestjs/jwt, AuthGuard не обязателен.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "reflector_getAllAndOverride",
+      "exampleType": "good",
+      "exampleText": "getAllAndOverride([getHandler(), getClass()]) — handler override, иначе class. reflector.get только handler — @Roles на AdminController не защитит методы.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "reflector_getAllAndOverride",
+      "exampleType": "good",
+      "exampleText": "класс @Roles(Admin) + get только handler = все роуты открыты, классический баг",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "reflector_getAllAndOverride",
+      "exampleType": "bad",
+      "exampleText": "reflector.get(ROLES_KEY, context.getHandler()) достаточно — Nest автоматически мержит class metadata.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "global_guard_public",
+      "exampleType": "good",
+      "exampleText": "APP_GUARD RolesGuard глобально; if (!requiredRoles) return true — /health без @Roles проходит; или @Public() декоратор.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "global_guard_public",
+      "exampleType": "good",
+      "exampleText": "глобальный guard без проверки no-metadata — health check 403 при деплое",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "global_guard_public",
+      "exampleType": "bad",
+      "exampleText": "При APP_GUARD все маршруты требуют @Roles, иначе 403 — public routes невозможны.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "permissions_based_access",
+      "exampleType": "good",
+      "exampleText": "rolePermissions: Admin → [ReadUsers, WriteUsers, ManageSettings]; PermissionsGuard flatMap roles user, required.every(perm => includes).",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "permissions_based_access",
+      "exampleType": "good",
+      "exampleText": "роли грубо, permissions fine — admin write posts но не delete users через RequirePermissions",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "permissions_based_access",
+      "exampleType": "bad",
+      "exampleText": "PermissionsGuard проверяет some — достаточно одного permission из списка для delete users.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "resource_ownership",
+      "exampleType": "good",
+      "exampleText": "OwnershipGuard: admin roles.includes(Admin) return true; иначе post.authorId === user.id через postsService.findOne.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "resource_ownership",
+      "exampleType": "good",
+      "exampleText": "роль user не даёт edit чужого поста — ownership отдельно от RolesGuard, chain UseGuards jwt roles ownership",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "resource_ownership",
+      "exampleType": "bad",
+      "exampleText": "@Roles(Role.User) достаточно — Guard сам проверит authorId без отдельного OwnershipGuard.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "rbac_vs_abac",
+      "exampleType": "good",
+      "exampleText": "RBAC — роли на доске за 5 минут, CRUD API; ABAC — время/IP/состояние ресурса, Casbin когда правил >10-15.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "rbac_vs_abac",
+      "exampleType": "good",
+      "exampleText": "до 100 ролей без time/location — rbac хватит, enterprise compliance — abac или casbin",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "rbac_vs_abac",
+      "exampleType": "bad",
+      "exampleText": "ABAC всегда проще RBAC, Casbin не нужен в NestJS.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "JWT: roles: ['admin','moderator'] массив, не role string. Смена ролей — 15min JWT + refresh re-read из БД.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "не тянуть роли из бд каждый запрос на 1000 rps — в payload при login",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "{ role: 'admin' } в JWT — норма, multi-role добавим потом строкой через запятую.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-authorization-rbac",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-authorization-rbac",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-authorization-rbac",
+    "difficulty": "SENIOR",
+    "titleEn": "How to implement Role-Based Access Control (RBAC) in NestJS?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

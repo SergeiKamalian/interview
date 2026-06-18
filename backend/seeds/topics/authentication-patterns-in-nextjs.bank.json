@@ -1,0 +1,590 @@
+{
+  "topic": {
+    "code": "authentication_patterns_in_nextjs",
+    "name": "Паттерны аутентификации в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Какие паттерны аутентификации есть в Next.js и где на каком этапе жизненного цикла запроса проверять сессию?",
+    "shortAnswer": "В Next.js аутентификацию строят слоями: Middleware блокирует на edge до загрузки страницы, Server Components проверяют сессию и получают данные за один SSR-проход, Route Handlers защищают API, Server Actions — мутации. Всегда проверяй на сервере; токены храни в HttpOnly cookies, не в localStorage.",
+    "idealAnswer": "Паттерны аутентификации в Next.js распределяют проверку по жизненному циклу запроса. Middleware выполняется в Edge Runtime (V8 isolates) до маршрутизации: читает cookies/headers через NextRequest, может редиректить неавторизованных, но не имеет Node.js API — нельзя вызывать Prisma, pg, Drizzle или полноценные ORM. На edge используют JWT через jose или внешние сервисы вроде Upstash Redis. Server Components работают в Node.js при SSR: cookies() из next/headers, getSession()/auth() — проверка и fetch данных пользователя за один проход без client round-trip; для ролей — redirect() или notFound(). Route Handlers — per-endpoint API guards в Node.js с доступом к БД. Server Actions — публичные сетевые эндпоинты; getSession() обязателен в начале каждой мутации. Комбинируют слои: Middleware ранний broad protection, Server Components — данные страницы, Server Actions — guard записи. Matcher в middleware лучше делать явным (/dashboard/:path*), а не широким negative-lookahead — иначе auth на каждый CSS/JS/image и health check. При редиректе на login сохраняют callbackUrl. Клиентские проверки document.cookie обходятся — только server-side. Статические страницы обходят middleware, если не попали в matcher; исключают /_next/static и /_next/image. Экосистема: Auth.js v5 (auth() + middleware export), Clerk, Supabase createServerClient(), Lucia, custom JWT с jose. HttpOnly cookies для токенов. Миграция Pages Router: _app/getServerSideProps → Middleware + Server Components + auth(). Parallel routes наследуют сессию из layout — auth() один раз в layout.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "auth_layers_overview",
+      "title": "Знает четыре слоя auth в Next.js",
+      "expected": "Кандидат перечисляет Middleware (edge), Server Components (SSR + data), Route Handlers (API), Server Actions (mutations) и называет, где каждый слой уместен.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — где и когда проверять auth",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "auth_layers_overview",
+            "oftenConfusedWith": [
+              "middleware_edge",
+              "server_component_auth"
+            ],
+            "anchorTermsExpected": [
+              "Middleware",
+              "Server Component",
+              "Route Handler",
+              "Server Action",
+              "edge",
+              "SSR",
+              "API",
+              "мутац"
+            ],
+            "anchorTermsWrongTopic": [
+              "только client-side",
+              "localStorage достаточно",
+              "один слой на всё"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Middleware",
+              "Server Component",
+              "Route Handler",
+              "Server Action"
+            ],
+            "ask": "на каком этапе жизненного цикла запроса работает каждый слой и для чего его выбирают"
+          }
+        ],
+        "mustConcepts": [
+          "Middleware",
+          "Server Component",
+          "Route Handler",
+          "Server Action",
+          "edge",
+          "SSR",
+          "Node.js",
+          "API",
+          "мутац",
+          "жизненн цикл",
+          "запрос",
+          "защит",
+          "проверк",
+          "слой",
+          "четыре",
+          "App Router"
+        ],
+        "falseClaims": [
+          "достаточно одного client-side redirect",
+          "Server Actions не являются публичными эндпоинтами",
+          "Route Handlers не нуждаются в отдельной проверке сессии",
+          "Middleware может заменить все остальные слои полностью"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "middleware_edge",
+      "title": "Понимает Middleware и Edge Runtime",
+      "expected": "Кандидат объясняет: middleware до page code, NextRequest/cookies, redirect с callbackUrl, matcher; Edge без Node.js и без запросов к БД.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "edge — самый быстрый, но ограниченный слой",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "auth_layers_overview",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "matcher",
+              "Edge",
+              "NextRequest"
+            ],
+            "ask": "что делает middleware до загрузки страницы и какие ограничения Edge Runtime"
+          },
+          {
+            "match": [
+              "callbackUrl",
+              "redirect",
+              "login"
+            ],
+            "ask": "зачем callbackUrl при редиректе на login"
+          }
+        ],
+        "mustConcepts": [
+          "Middleware",
+          "Edge Runtime",
+          "V8",
+          "NextRequest",
+          "NextResponse",
+          "cookies",
+          "redirect",
+          "callbackUrl",
+          "matcher",
+          "до page code",
+          "без Node.js",
+          "без БД",
+          "jose",
+          "JWT",
+          "edge latency"
+        ],
+        "falseClaims": [
+          "в middleware можно вызывать Prisma или pg",
+          "middleware выполняется в полном Node.js",
+          "широкий matcher без исключения static — норма для auth",
+          "middleware заменяет getSession в Server Component"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "server_component_auth",
+      "title": "Auth в Server Components",
+      "expected": "Кандидат описывает getSession/auth(), cookies() из next/headers, один SSR-проход с fetch данных, redirect()/notFound() для ролей.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "page-level auth + data — ключевой App Router паттерн",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "server_component_auth",
+            "oftenConfusedWith": [
+              "middleware_edge"
+            ],
+            "anchorTermsExpected": [
+              "getSession",
+              "cookies()",
+              "redirect",
+              "notFound",
+              "SSR",
+              "role"
+            ],
+            "anchorTermsWrongTopic": [
+              "document.cookie",
+              "useEffect проверка",
+              "только middleware"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "getSession",
+              "auth()",
+              "cookies"
+            ],
+            "ask": "как Server Component проверяет сессию и получает данные за один проход"
+          },
+          {
+            "match": [
+              "role",
+              "notFound",
+              "admin"
+            ],
+            "ask": "как реализовать role-based доступ через notFound вместо утечки существования страницы"
+          }
+        ],
+        "mustConcepts": [
+          "Server Component",
+          "getSession",
+          "auth()",
+          "cookies()",
+          "next/headers",
+          "redirect",
+          "notFound",
+          "SSR",
+          "один проход",
+          "без client round-trip",
+          "RSC payload",
+          "role",
+          "рол",
+          "layout",
+          "fetch user"
+        ],
+        "falseClaims": [
+          "Server Component может читать localStorage",
+          "redirect в Client Component достаточен для защиты страницы",
+          "notFound() раскрывает что страница существует",
+          "getSession в middleware и SC полностью взаимозаменяемы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "route_handlers_actions",
+      "title": "Защита Route Handlers и Server Actions",
+      "expected": "Кандидат объясняет: оба — публичные сетевые эндпоинты; getSession() в начале; Route Handler для OAuth/API; Server Action перед записью в БД.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "частая уязвимость — пропуск auth в mutations",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Server Action",
+              "use server",
+              "getSession"
+            ],
+            "ask": "почему Server Action обязан вызывать getSession и что будет без проверки"
+          },
+          {
+            "match": [
+              "Route Handler",
+              "OAuth",
+              "NextAuth"
+            ],
+            "ask": "где Route Handler защищает API и OAuth flow"
+          }
+        ],
+        "mustConcepts": [
+          "Route Handler",
+          "Server Action",
+          "use server",
+          "публичн",
+          "эндпоинт",
+          "getSession",
+          "Unauthorized",
+          "OAuth",
+          "NextAuth",
+          "handlers",
+          "мутац",
+          "API route",
+          "явная проверк",
+          "Node.js"
+        ],
+        "falseClaims": [
+          "Server Actions вызываются только из своего UI и не нуждаются в auth",
+          "Route Handlers наследуют защиту middleware автоматически без проверки",
+          "можно молча пропустить unauthorized в Server Action",
+          "Server Action не проходит через сеть как обычный API"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки Next.js auth",
+      "expected": "Кандидат называет: широкий matcher на static, нет callbackUrl, БД в middleware, client-only checks, пропуск auth в Server Actions; HttpOnly cookies.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "production pitfalls из ITLead Common mistakes",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "matcher",
+              "_next/static",
+              "static"
+            ],
+            "ask": "почему auth matcher не должен трогать CSS/JS/image и health checks"
+          },
+          {
+            "match": [
+              "localStorage",
+              "HttpOnly",
+              "document.cookie"
+            ],
+            "ask": "почему токены в HttpOnly cookies, а не localStorage или client cookie check"
+          }
+        ],
+        "mustConcepts": [
+          "matcher",
+          "_next/static",
+          "_next/image",
+          "static assets",
+          "callbackUrl",
+          "Prisma",
+          "edge",
+          "client-side",
+          "document.cookie",
+          "HttpOnly",
+          "localStorage",
+          "Server Action",
+          "jose",
+          "явный matcher",
+          "health check"
+        ],
+        "falseClaims": [
+          "можно проверять auth через document.cookie в Client Component",
+          "Prisma в middleware работает на edge",
+          "localStorage безопаснее HttpOnly cookie для JWT",
+          "callbackUrl не нужен — пользователь сам найдёт страницу"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "layered_defense",
+      "title": "Комбинирует слои защиты",
+      "expected": "Кандидат описывает defense in depth: Middleware early block, SC data+auth, Actions guard writes; не полагается на один слой.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "комбинация слоёв — ключевой принцип ITLead TL;DR",
+        "mustConcepts": [
+          "комбин",
+          "слои",
+          "defense",
+          "ранн",
+          "блок",
+          "Middleware",
+          "Server Component",
+          "Server Action",
+          "Route Handler",
+          "не один слой",
+          "broad protection",
+          "mutation guard",
+          "данные страниц"
+        ],
+        "falseClaims": [
+          "middleware полностью заменяет проверки в Server Actions",
+          "достаточно только Server Component без middleware для admin",
+          "Route Handler не нужен если есть middleware"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "auth_ecosystem",
+      "title": "Знает экосистему и миграцию",
+      "expected": "Кандидат упоминает Auth.js v5 auth()/middleware, Clerk, Supabase, jose JWT; миграцию Pages→App Router; parallel routes через layout session.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "бонус — real-world tools и migration из follow-up",
+        "mustConcepts": [
+          "Auth.js",
+          "NextAuth",
+          "auth()",
+          "Clerk",
+          "Supabase",
+          "Lucia",
+          "jose",
+          "Pages Router",
+          "getServerSideProps",
+          "parallel routes",
+          "layout",
+          "миграц"
+        ],
+        "falseClaims": [
+          "getServerSession и auth() несовместимы при миграции",
+          "parallel routes требуют отдельный middleware на каждый slot",
+          "Auth.js v5 не экспортирует middleware"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Middleware на edge проверяет cookie и редиректит на /login с callbackUrl до загрузки dashboard. Server Component через getSession() и cookies() за один SSR-проход получает пользователя и stats. Server Action updateProfile начинает с getSession() — это публичный эндпоинт. Токен в HttpOnly cookie, не в localStorage.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для admin секции matcher только /admin/:path* и /dashboard/:path* — static не трогаем. На edge jose jwtVerify, без Prisma. В page.tsx if (!session) redirect('/login'), if (session.role !== 'admin') notFound(). Auth.js v5: export { auth as middleware } и auth() в layout для parallel routes.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Четыре слоя: middleware блокирует рано, SC тянет данные, route handler для OAuth callback, server action guard перед db.update. Клиентский router.push по cookie — не security boundary.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Auth только в use client: if (!document.cookie.includes('token')) router.push('/login'). Prisma в middleware для проверки роли. Токен в localStorage.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Server Action updateProfile без getSession — форма же на своей странице, значит безопасно. Matcher на все пути кроме api — пусть CSS тоже через edge auth.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Middleware заменяет все проверки — Server Components и Actions можно без session check. Редirect на login без callbackUrl норм, пользователь сам найдёт dashboard.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "auth_layers_overview",
+      "exampleType": "good",
+      "exampleText": "Middleware — edge до страницы; Server Component — auth+data при SSR; Route Handler — API; Server Action — guard мутаций. Каждый слой для своего этапа.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "auth_layers_overview",
+      "exampleType": "good",
+      "exampleText": "ну четыре точки: middleware на входе, sc на рендере, api route на эндпоинтах, server action перед записью",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "auth_layers_overview",
+      "exampleType": "bad",
+      "exampleText": "В Next.js auth делается только через middleware, остальное лишнее.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "middleware_edge",
+      "exampleType": "good",
+      "exampleText": "middleware.ts читает auth-token из NextRequest.cookies, без токена redirect на /login?callbackUrl=pathname. config.matcher — явные /dashboard/:path*, не весь сайт.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "middleware_edge",
+      "exampleType": "good",
+      "exampleText": "на edge только jwtVerify через jose — prisma там упадёт, node api нет",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "middleware_edge",
+      "exampleType": "bad",
+      "exampleText": "В middleware вызываю prisma.user.findUnique — edge же это Node.js сервер.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "server_component_auth",
+      "exampleType": "good",
+      "exampleText": "DashboardPage: const session = await getSession(); if (!session) redirect('/login'); const stats = await fetchUserStats(session.user.id) — один SSR проход.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "server_component_auth",
+      "exampleType": "good",
+      "exampleText": "для admin if (session.role !== 'admin') notFound() — 404 вместо утечки что страница есть",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "server_component_auth",
+      "exampleType": "bad",
+      "exampleText": "Проверяю login в Client Component через useEffect и document.cookie — SSR уже отдал HTML.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "route_handlers_actions",
+      "exampleType": "good",
+      "exampleText": "updateProfile: 'use server'; const session = await getSession(); if (!session) throw new Error('Unauthorized'); потом db.update.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "route_handlers_actions",
+      "exampleType": "good",
+      "exampleText": "OAuth через app/api/auth/[...nextauth]/route.ts handlers — route handler как guard api",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "route_handlers_actions",
+      "exampleType": "bad",
+      "exampleText": "Server Action вызывается только из моей формы — getSession не нужен, middleware уже всё проверил.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Не matcheю _next/static — иначе каждый chunk через edge auth. callbackUrl сохраняет /dashboard/settings после login.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "токен только httponly cookie, localstorage xss сожрёт",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Matcher /((?!api).*) — пусть auth проверяет favicon и css, это безопаснее.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "layered_defense",
+      "exampleType": "good",
+      "exampleText": "Middleware отсекает без cookie, SC проверяет роль и грузит data, Action снова getSession перед write — defense in depth.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "layered_defense",
+      "exampleType": "good",
+      "exampleText": "middleware broad block + sc page auth + action mutation guard — не один слой",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "layered_defense",
+      "exampleType": "bad",
+      "exampleText": "Если middleware пропустил — Server Action всё равно можно без проверки, edge же главный.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "auth_ecosystem",
+      "exampleType": "good",
+      "exampleText": "Auth.js v5: export { auth as middleware } и auth() в Server Components. Pages Router getServerSideProps → SC + cookies().",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "auth_ecosystem",
+      "exampleType": "good",
+      "exampleText": "clerk middleware для ролей, supabase createServerClient в sc, custom jwt через jose на edge",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "auth_ecosystem",
+      "exampleType": "bad",
+      "exampleText": "Parallel routes требуют отдельный middleware на каждый slot — layout session не наследуется.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "authentication-patterns-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/authentication-patterns-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/authentication-patterns-in-nextjs",
+    "difficulty": "SENIOR",
+    "titleEn": "Authentication patterns in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

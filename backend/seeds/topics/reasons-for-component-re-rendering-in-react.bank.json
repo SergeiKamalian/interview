@@ -1,0 +1,546 @@
+{
+  "topic": {
+    "code": "reasons_component_re_rendering_react",
+    "name": "Причины повторного рендеринга компонентов в React",
+    "skillCode": "react",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Почему React-компонент перерендеривается? Какие изменения запускают повторный вызов функции компонента и чем re-render отличается от обновления DOM?",
+    "shortAnswer": "Re-render происходит при изменении state (useState/useReducer), при перерендере родителя (каскадом на всех детей) и при обновлении значения контекста у всех потребителей. React снова вызывает функцию компонента, строит новое виртуальное дерево и сравнивает его с предыдущим; DOM обновляется только на этапе commit, если diff нашёл изменения.",
+    "idealAnswer": "Re-render — это повторный вызов функции компонента: React строит свежее виртуальное дерево и сравнивает его с предыдущим (reconciliation). Основные триггеры: (1) изменение state — любой вызов setState/useState setter или dispatch в useReducer ставит компонент в очередь на re-render; в React 18 несколько setState в одном обработчике события батчатся в один проход, то же для async (Promise, setTimeout); (2) перерендер родителя — по умолчанию любой re-render родителя заново вызывает все дочерние компоненты, даже если их props не менялись; React не сравнивает props до вызова ребёнка — для блокировки нужен React.memo с shallow compare; (3) изменение context — все компоненты с useContext(MyContext) перерендериваются при смене value провайдера; если передавать value={{ theme: 'dark' }} без useMemo, каждый render родителя создаёт новый объект и все consumers ре-рендерятся. Re-render и DOM commit — разные шаги: компонент может перерендериться десятки раз без DOM-мутаций, если JSX на выходе идентичен; commit записывает минимальный diff в реальный DOM. Типичные ошибки: мутация state (arr.push + setArr(arr) — та же ссылка, Object.is → bail out без re-render); inline object/function props ломают React.memo; inline arrow в props; value контекста как новый литерал; заблуждение, что useEffect предотвращает re-render (он выполняется после render). Оптимизация: сначала React DevTools Profiler; затем React.memo на строках списков, useCallback для колбеков, useMemo для объектов и вычислений, разбиение крупного context; для 10k элементов — windowing (react-window) + memo. Внутри React scheduler ставит fiber-узлы в очередь, reconciler сравнивает props shallow equality, commit phase пишет diff — поэтому 50 re-render могут дать 3 DOM update.",
+    "maxScore": 10,
+    "skills": [
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "rerender_definition",
+      "title": "Понимает что такое re-render",
+      "expected": "Кандидат объясняет: re-render — повторный вызов функции компонента, React строит новое виртуальное дерево и сравнивает с предыдущим; это не обязательно обновление DOM.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — определение re-render и цикл diff",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "re-render",
+              "перерендер",
+              "virtual",
+              "виртуальн"
+            ],
+            "ask": "что именно происходит при re-render — вызывается ли DOM сразу"
+          }
+        ],
+        "mustConcepts": [
+          "re-render",
+          "перерендер",
+          "вызов функции компонента",
+          "virtual DOM",
+          "виртуальн",
+          "diff",
+          "reconciliation",
+          "сравн",
+          "новое дерево",
+          "повторн",
+          "render pass",
+          "fiber"
+        ],
+        "falseClaims": [
+          "re-render всегда обновляет DOM",
+          "re-render это пересоздание всего DOM",
+          "re-render и commit одно и то же",
+          "React сравнивает DOM напрямую при каждом render"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "state_triggers",
+      "title": "Знает триггеры через state и useReducer",
+      "expected": "Кандидат называет: setState/useState setter и dispatch useReducer всегда ставят re-render в очередь; React 18 batching объединяет несколько обновлений в один проход; тот же state по ссылке может bail out.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "state change — первый триггер из ITLead TL;DR",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "batch",
+              "батч",
+              "React 18"
+            ],
+            "ask": "сколько re-render дадут два setState в одном click handler в React 18"
+          }
+        ],
+        "mustConcepts": [
+          "useState",
+          "setState",
+          "setCount",
+          "useReducer",
+          "dispatch",
+          "очеред",
+          "batch",
+          "батч",
+          "React 18",
+          "automatic batching",
+          "Object.is",
+          "та же ссылка",
+          "bail out",
+          "один проход",
+          "event handler"
+        ],
+        "falseClaims": [
+          "два setState в одном handler всегда дают два re-render",
+          "setState с тем же примитивом всегда вызывает DOM update",
+          "dispatch useReducer не триггерит re-render",
+          "batching работает только в React 17"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "parent_cascade",
+      "title": "Понимает каскад от родителя и роль React.memo",
+      "expected": "Кандидат объясняет: re-render родителя по умолчанию вызывает всех детей без сравнения props; React.memo блокирует через shallow compare props; нестабильные ссылки ломают memo.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "самый частый источник лишних re-render в production",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "parent_cascade",
+            "oftenConfusedWith": [
+              "context_triggers"
+            ],
+            "anchorTermsExpected": [
+              "родител",
+              "parent",
+              "React.memo",
+              "shallow",
+              "props",
+              "каскад",
+              "дет"
+            ],
+            "anchorTermsWrongTopic": [
+              "только context",
+              "memo сравнивает deep"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "React.memo",
+              "memo",
+              "родител",
+              "parent"
+            ],
+            "ask": "почему Child без props всё равно re-render при update родителя"
+          },
+          {
+            "match": [
+              "shallow",
+              "поверхностн",
+              "props"
+            ],
+            "ask": "как React.memo решает пропускать re-render"
+          }
+        ],
+        "mustConcepts": [
+          "родител",
+          "parent re-render",
+          "каскад",
+          "cascade",
+          "дочерн",
+          "child",
+          "props",
+          "React.memo",
+          "memo",
+          "shallow",
+          "поверхностн",
+          "не сравнива",
+          "по умолчанию",
+          "блокир",
+          "лишн"
+        ],
+        "falseClaims": [
+          "React сравнивает props детей перед каждым render",
+          "дети без props никогда не re-render",
+          "React.memo делает deep compare",
+          "обёртка в memo гарантирует zero re-render без стабильных props"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "context_triggers",
+      "title": "Знает re-render от Context",
+      "expected": "Кандидат объясняет: useContext re-render при смене value провайдера; новый object literal в value={{ }} на каждом render — все consumers re-render; fix — useMemo или state.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "context — отдельный триггер из ITLead; частая ловушка с value literal",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useContext",
+              "context",
+              "контекст",
+              "Provider"
+            ],
+            "ask": "почему value={{ theme: 'dark' }} без useMemo re-render всех consumers"
+          }
+        ],
+        "mustConcepts": [
+          "useContext",
+          "context",
+          "контекст",
+          "Provider",
+          "consumer",
+          "потребител",
+          "value",
+          "новая ссылка",
+          "object literal",
+          "литерал",
+          "useMemo",
+          "все компонент",
+          "дерев"
+        ],
+        "falseClaims": [
+          "context re-render только ближайшего consumer",
+          "одинаковые данные в новом объекте не вызывают re-render",
+          "Context.Provider не триггерит детей без useContext",
+          "разбиение context не помогает от лишних render"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "rerender_vs_commit",
+      "title": "Отличает re-render от DOM commit",
+      "expected": "Кандидат объясняет: render — вызов компонента и diff; commit — запись изменений в DOM; много re-render может дать мало DOM update; Profiler показывает render count отдельно от paint.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "ключевая разница из ITLead — render vs commit",
+        "mustConcepts": [
+          "commit",
+          "коммит",
+          "DOM",
+          "render phase",
+          "commit phase",
+          "diff",
+          "мутац",
+          "paint",
+          "Profiler",
+          "идентичн",
+          "без изменений DOM",
+          "минимальн",
+          "fiber"
+        ],
+        "falseClaims": [
+          "каждый re-render всегда меняет DOM",
+          "commit происходит до render",
+          "Profiler не различает render и paint",
+          "re-render и commit синонимы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки и ловушки memo",
+      "expected": "Кандидат называет: мутация state (та же ссылка); inline object/function props; inline arrow callbacks; context value literal; useEffect не предотвращает render.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production bugs",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "push",
+              "мутац",
+              "та же ссылка"
+            ],
+            "ask": "почему arr.push(3); setArr(arr) не вызывает ожидаемый re-render"
+          },
+          {
+            "match": [
+              "inline",
+              "стрелочн",
+              "useCallback"
+            ],
+            "ask": "почему React.memo бесполезен с onClick={() => doSomething()}"
+          },
+          {
+            "match": [
+              "useEffect",
+              "предотвращ"
+            ],
+            "ask": "может ли useEffect заменить memo и пропустить render"
+          }
+        ],
+        "mustConcepts": [
+          "мутац",
+          "arr.push",
+          "та же ссылка",
+          "Object.is",
+          "spread",
+          "inline object",
+          "inline function",
+          "стрелочн",
+          "useCallback",
+          "useMemo",
+          "useEffect после render",
+          "не вместо",
+          "ломает memo",
+          "новая ссылка",
+          "UserCard",
+          "Dashboard"
+        ],
+        "falseClaims": [
+          "можно мутировать state если потом вызвать setState",
+          "useEffect предотвращает re-render",
+          "React.memo игнорирует function props",
+          "одинаковое содержимое object literal равно по ссылке"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "optimization_patterns",
+      "title": "Знает когда и как оптимизировать",
+      "expected": "Кандидат называет: сначала Profiler; React.memo на строках списка; useCallback для колбеков; useMemo для объектов и вычислений; split context; windowing для больших списков.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "when to optimize — бонус middle; measure first",
+        "mustConcepts": [
+          "Profiler",
+          "измер",
+          "React.memo",
+          "useCallback",
+          "useMemo",
+          "windowing",
+          "react-window",
+          "react-virtual",
+          "split context",
+          "разбить контекст",
+          "10000",
+          "список",
+          "стабильн"
+        ],
+        "falseClaims": [
+          "оптимизировать нужно всегда без профилирования",
+          "memo решает все проблемы performance",
+          "useMemo заменяет React.memo для списков",
+          "windowing не нужен если есть memo"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Re-render — React снова вызывает функцию компонента и строит новое виртуальное дерево. Три главных триггера: setState, re-render родителя (каскад на детей) и смена context value. DOM обновляется только на commit, если diff нашёл изменения — можно 20 render и 2 DOM patch.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Счётчик кликает — setCount → Counter re-render. Родитель тикает — все дети тоже, даже без props, пока не оберну в React.memo со стабильными props через useCallback/useMemo. Context с value={{ theme }} без memo — каждый render родителя дёргает всех consumers.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Сначала Profiler — вижу лишние render на TodoItems. Ставлю memo + useCallback на addTodo + useMemo на user object. Для 10k строк — react-window, memo на Row. Два setState в одном onClick в React 18 — один render, не два.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Re-render сразу переписывает весь DOM. React сравнивает props детей перед render, поэтому дети без изменений props никогда не вызываются.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Чтобы не re-render, добавлю useEffect — он выполнится вместо render. arr.push(3); setArr(arr) — нормальный способ обновить массив.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "React.memo с onClick={() => foo()} и user={{ name: 'Alice' }} каждый render — memo всё равно блокирует re-render, ссылки не важны.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "rerender_definition",
+      "exampleType": "good",
+      "exampleText": "Re-render — повторный вызов компонента, React diff виртуальных деревьев; DOM может не меняться.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "rerender_definition",
+      "exampleType": "good",
+      "exampleText": "ну перерендер — react опять дергает функцию компонента, строит vdom и сравнивает, не обязательно трогая dom",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "rerender_definition",
+      "exampleType": "bad",
+      "exampleText": "Re-render — это когда браузер сразу перерисовывает все узлы DOM заново.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "state_triggers",
+      "exampleType": "good",
+      "exampleText": "setCount(count + 1) ставит Counter в очередь render; dispatch reducer тоже. В React 18 два setState в одном handler — один batch, один render.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "state_triggers",
+      "exampleType": "good",
+      "exampleText": "клик — setState, компонент снова выполняется; если setArr(arr) с той же ссылкой после push — react может bail out",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "state_triggers",
+      "exampleType": "bad",
+      "exampleText": "useReducer dispatch не вызывает re-render, только useState.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "parent_cascade",
+      "exampleType": "good",
+      "exampleText": "Parent обновил count — все Children re-render по умолчанию, props не проверяются. React.memo + stable props пропускает лишние вызовы.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "parent_cascade",
+      "exampleType": "good",
+      "exampleText": "типичный баг — counter в header, весь список карточек re-render; memo на Row режет каскад если todos ref тот же",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "parent_cascade",
+      "exampleType": "bad",
+      "exampleText": "React автоматически не re-render детей если их props не менялись — memo не нужен.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "context_triggers",
+      "exampleType": "good",
+      "exampleText": "useContext(ThemeContext) — re-render при любом новом value провайдера; value={{ theme: 'dark' }} без useMemo — новая ссылка каждый render.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "context_triggers",
+      "exampleType": "good",
+      "exampleText": "mui theme context сменился — все styled components вниз; split на Theme и User context или memo value",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "context_triggers",
+      "exampleType": "bad",
+      "exampleText": "Context re-render только компонент, который вызвал useContext, siblings не трогает — wait, siblings тоже если подписаны.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "rerender_vs_commit",
+      "exampleType": "good",
+      "exampleText": "Render — вызов функции и diff fiber; commit — запись в DOM. Одинаковый JSX → много render, zero DOM mutation.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "rerender_vs_commit",
+      "exampleType": "good",
+      "exampleText": "profiler показывает render count отдельно от paint — 50 render могут дать 3 dom update",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "rerender_vs_commit",
+      "exampleType": "bad",
+      "exampleText": "Каждый console.log 'rendered' означает что DOM уже обновился.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "arr.push(3); setArr(arr) — та же ссылка, re-render не случится; fix setArr([...arr, 3]). UserCard с memo но user={{ name: 'Alice' }} inline — memo бесполезен.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "onClick={() => doSomething()} каждый render новая функция — child memo не спасёт; useCallback. useEffect после render, не вместо него.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "React.memo делает deep compare props, inline objects с одинаковыми полями пропускает.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "optimization_patterns",
+      "exampleType": "good",
+      "exampleText": "Сначала DevTools Profiler, потом memo на Row, useCallback на handlers, useMemo на derived data; 10k items — react-window.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "optimization_patterns",
+      "exampleType": "good",
+      "exampleText": "без профайлера memo везде — преждевременно; split fat context если consumers лишние",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "optimization_patterns",
+      "exampleType": "bad",
+      "exampleText": "Оптимизирую сразу useMemo на всё, Profiler не нужен для списков.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "reasons-for-component-re-rendering-in-react",
+    "apiUrl": "https://api.itlead.org/api/questions/reasons-for-component-re-rendering-in-react",
+    "pageUrl": "https://itlead.org/interview-questions/react/reasons-for-component-re-rendering-in-react",
+    "difficulty": "MIDDLE",
+    "titleEn": "Reasons for component re-rendering in React",
+    "categorySlug": "react",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

@@ -1,0 +1,626 @@
+{
+  "topic": {
+    "code": "nestjs_dynamic_modules",
+    "name": "Динамические модули в NestJS",
+    "skillCode": "nestjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое динамические модули в NestJS и когда их использовать?",
+    "shortAnswer": "Динамический модуль в NestJS возвращает объект DynamicModule из статического метода вроде forRoot(), позволяя передавать конфигурацию при импорте. Используйте dynamic modules, когда настройка различается между окружениями или экземплярами приложения; для провайдеров без конфигурации достаточно статического модуля.",
+    "idealAnswer": "Динамический модуль (dynamic module) в NestJS — это модуль, который возвращает настроенный объект DynamicModule из статического метода (forRoot(), forFeature(), register()), позволяя передавать конфигурацию при импорте, а не хардкодить её в декораторе @Module. Статический модуль экспортирует фиксированный @Module({}) с одинаковыми провайдерами при каждом импорте — подходит для утилит без настроек. Динамический вызывает статический метод, который возвращает { module, providers?, imports?, exports?, global? }; опции инжектируются при регистрации. Стандартное именование: forRoot() — глобальная одноразовая настройка в AppModule; forFeature() — per-module кастомизация (TypeOrmModule.forFeature([User])); forRootAsync() — когда опции приходят из ConfigService через useFactory + inject. Обязательное поле — module; без него NestJS не регистрирует метаданные, а ошибка «Nest can't resolve dependencies» указывает в другое место. При bootstrap NestModuleLoader.create() сканирует imports[]: вызов LoggerModule.forRoot('debug') выполняется синхронно, возвращает plain object, NestJS мержит providers/imports/exports в ModulesContainer до резолва провайдеров. forRootAsync регистрирует useFactory, но откладывает вызов до готовности зависимостей из inject. Когда использовать: конфиг различается по окружению (DB, JWT secret) — forRoot/forRootAsync; per-module entities/queues — forFeature; shared service без конфига — static; тесты с mock-опциями — dynamic. Типичные ошибки: забытый ключ module; мутация объекта opts (нужен spread/clone); exports в декораторе класса вместо return object; forRoot внутри feature-модуля (дубли провайдеров — нужен forFeature); отсутствие inject в forRootAsync (factory получает undefined, TypeScript не ловит). Реальные библиотеки: TypeOrmModule.forRoot + forFeature, JwtModule.register, BullModule.forRoot + forFeature, ConfigModule.forRoot, MongooseModule.forRoot + forFeature. Продвинутый паттерн: forRoot с global: true для общего StorageService, forFeature создаёт scoped bucket-провайдер без дублирования соединения. Два forRoot() для одного модуля мержат провайдеры; global: true для shared config; изолированные инстансы — forFeature. Dynamic module может вкладывать другие dynamic modules в imports. Когда dynamic избыточен: одноразовый setup одного приложения — useFactory провайдер прямо в AppModule проще. Если forRoot() бросает при bootstrap — приложение не стартует; отладка через nest start --debug, лог перед return, циклические импорты между forRootAsync модулями.",
+    "maxScore": 10,
+    "skills": [
+      "nestjs",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "dynamic_definition",
+      "title": "Понимает суть dynamic module",
+      "expected": "Кандидат объясняет: статический метод forRoot()/register() возвращает DynamicModule; конфигурация передаётся при импорте; NestJS воспринимает plain object как метаданные модуля; токены вроде LOG_LEVEL инжектируются через useValue.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — DynamicModule из статического метода",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "dynamic_definition",
+            "oftenConfusedWith": [
+              "static_vs_dynamic",
+              "forroot_forfeature_async"
+            ],
+            "anchorTermsExpected": [
+              "DynamicModule",
+              "forRoot",
+              "статическ",
+              "метод",
+              "импорт",
+              "конфигурац"
+            ],
+            "anchorTermsWrongTopic": [
+              "dynamic module это декоратор",
+              "forRoot выполняется в runtime каждого запроса"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "DynamicModule",
+              "forRoot",
+              "статическ"
+            ],
+            "ask": "что возвращает forRoot() и когда выполняется этот вызов"
+          }
+        ],
+        "mustConcepts": [
+          "DynamicModule",
+          "динамическ",
+          "forRoot",
+          "register",
+          "статическ",
+          "метод",
+          "импорт",
+          "конфигурац",
+          "useValue",
+          "провайдер",
+          "метаданн",
+          "plain object",
+          "LOG_LEVEL",
+          "при импорте",
+          "не хардкод",
+          "настройк"
+        ],
+        "falseClaims": [
+          "dynamic module — это отдельный тип класса, не связанный с @Module",
+          "forRoot() выполняется при каждом HTTP-запросе",
+          "DynamicModule создаётся декоратором @DynamicModule",
+          "конфигурацию dynamic module нельзя передать извне",
+          "forRoot() возвращает класс модуля, а не объект метаданных"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "static_vs_dynamic",
+      "title": "Отличает static и dynamic модули",
+      "expected": "Кандидат сравнивает: static — фиксированный @Module с одинаковыми провайдерами; dynamic — метаданные генерируются по опциям; static для утилит без конфига; dynamic для credentials, multi-tenant, библиотек.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "базовое сравнение из ITLead TL;DR",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "dynamic_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "static_vs_dynamic",
+            "oftenConfusedWith": [
+              "when_to_use"
+            ],
+            "anchorTermsExpected": [
+              "статическ",
+              "динамическ",
+              "фиксирован",
+              "опци",
+              "credentials"
+            ],
+            "anchorTermsWrongTopic": [
+              "static module всегда лучше",
+              "dynamic module не использует @Module"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "статическ",
+          "динамическ",
+          "фиксирован",
+          "@Module",
+          "провайдер",
+          "одинаков",
+          "опци",
+          "регистрац",
+          "credentials",
+          "креденшал",
+          "multi-tenant",
+          "библиотек",
+          "утилит",
+          "без конфиг",
+          "hardcode",
+          "хардкод"
+        ],
+        "falseClaims": [
+          "статический модуль может принимать разные опции при каждом импорте",
+          "динамический модуль не использует декоратор @Module на классе",
+          "для DB credentials достаточно static module без API",
+          "static и dynamic дают одинаковую гибкость конфигурации",
+          "динамический модуль заменяет DI-контейнер"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "forroot_forfeature_async",
+      "title": "Знает forRoot, forFeature, forRootAsync",
+      "expected": "Кандидат описывает: forRoot — глобальная настройка в AppModule; forFeature — per-module (entities, queues, buckets); forRootAsync — useFactory + inject из ConfigService; интерфейс DynamicModule: module обязателен, providers/imports/exports/global опциональны.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевой API senior — naming и async config",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "forRoot",
+              "forFeature",
+              "forRootAsync"
+            ],
+            "ask": "когда forRoot, когда forFeature и чем forRootAsync отличается от forRoot"
+          },
+          {
+            "match": [
+              "useFactory",
+              "inject",
+              "ConfigService"
+            ],
+            "ask": "как forRootAsync резолвит ConfigService и зачем массив inject"
+          },
+          {
+            "match": [
+              "module",
+              "global",
+              "providers",
+              "exports"
+            ],
+            "ask": "какие поля принимает DynamicModule и какое обязательное"
+          }
+        ],
+        "mustConcepts": [
+          "forRoot",
+          "forFeature",
+          "forRootAsync",
+          "useFactory",
+          "inject",
+          "ConfigService",
+          "module",
+          "providers",
+          "imports",
+          "exports",
+          "global",
+          "AppModule",
+          "feature",
+          "синхрон",
+          "async",
+          "интерфейс",
+          "обязательн"
+        ],
+        "falseClaims": [
+          "forFeature вызывают один раз в AppModule для глобального конфига",
+          "forRootAsync не требует inject — NestJS сам найдёт ConfigService",
+          "поле module в DynamicModule опционально",
+          "forRoot и register — разные механизмы NestJS, не паттерн библиотек",
+          "forRootAsync выполняет factory синхронно при импорте модуля"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "bootstrap_processing",
+      "title": "Понимает bootstrap dynamic modules",
+      "expected": "Кандидат описывает: при bootstrap NestModuleLoader сканирует imports; forRoot() выполняется синхронно при импорте; providers/imports/exports мержатся в ModulesContainer до резолва; forRootAsync откладывает factory до готовности inject-зависимостей; после bootstrap overhead нет.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "механизм обработки из ITLead theory",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "bootstrap",
+              "ModulesContainer",
+              "импорт"
+            ],
+            "ask": "когда выполняется forRoot() и что происходит с metadata до старта провайдеров"
+          }
+        ],
+        "mustConcepts": [
+          "bootstrap",
+          "NestModuleLoader",
+          "ModulesContainer",
+          "imports",
+          "синхрон",
+          "мерж",
+          "метаданн",
+          "провайдер",
+          "резолв",
+          "forRootAsync",
+          "откладыва",
+          "inject",
+          "DI",
+          "контейнер",
+          "импорт"
+        ],
+        "falseClaims": [
+          "forRoot() выполняется лениво при первом инжекте провайдера",
+          "dynamic module добавляет overhead на каждый HTTP-запрос",
+          "ModulesContainer обновляется динамически после bootstrap",
+          "forRootAsync вызывает factory до загрузки ConfigService",
+          "bootstrap не обрабатывает вызовы forRoot в imports"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда нужен dynamic module",
+      "expected": "Кандидат называет: конфиг по окружению — forRoot; опции из сервиса — forRootAsync; per-module entities/queues — forFeature; shared без конфига — static; тесты с mock — dynamic; одноразовый setup — plain useFactory в AppModule достаточно.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use таблица ITLead",
+        "mustConcepts": [
+          "окружен",
+          "forRoot",
+          "forRootAsync",
+          "forFeature",
+          "ConfigService",
+          "static",
+          "тест",
+          "mock",
+          "entities",
+          "очеред",
+          "TypeOrmModule",
+          "useFactory",
+          "AppModule",
+          "одноразов",
+          "библиотек",
+          "переиспольз"
+        ],
+        "falseClaims": [
+          "dynamic module обязателен для любого NestJS приложения",
+          "static module нельзя использовать в production",
+          "forFeature заменяет forRoot для глобального DB connection",
+          "plain useFactory в AppModule всегда антипаттерн",
+          "dynamic modules нужны только для TypeORM"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки dynamic modules",
+      "expected": "Кандидат называет: забытый module в return; мутация opts (нужен spread/clone); exports в @Module декораторе класса; forRoot в feature-модуле (дубли — forFeature); отсутствие inject в forRootAsync (undefined в factory).",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — частая production-ловушка senior",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "forroot_forfeature_async",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "module",
+              "return",
+              "забыт"
+            ],
+            "ask": "что будет если забыть ключ module в объекте forRoot"
+          },
+          {
+            "match": [
+              "inject",
+              "undefined",
+              "forRootAsync"
+            ],
+            "ask": "почему factory получает undefined без inject и ловит ли TypeScript"
+          },
+          {
+            "match": [
+              "forRoot",
+              "feature",
+              "дубли"
+            ],
+            "ask": "почему forRoot в feature-модуле создаёт дубли провайдеров"
+          }
+        ],
+        "mustConcepts": [
+          "module",
+          "ключ",
+          "return",
+          "resolve dependencies",
+          "мутац",
+          "spread",
+          "clone",
+          "opts",
+          "exports",
+          "декоратор",
+          "класс",
+          "forRoot",
+          "feature",
+          "дубли",
+          "forFeature",
+          "inject",
+          "forRootAsync",
+          "undefined",
+          "useFactory",
+          "TypeScript"
+        ],
+        "falseClaims": [
+          "без module NestJS выдаёт понятную ошибку про отсутствующий ключ",
+          "мутация opts безопасна если forRoot вызывается один раз",
+          "exports в @Module класса — правильный паттерн для dynamic module",
+          "forRoot в UsersModule — норма для глобального конфига",
+          "inject в forRootAsync опционален если параметр типизирован ConfigService"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "real_world_libraries",
+      "title": "Знает реальные библиотеки и forFeature",
+      "expected": "Кандидат приводит примеры: TypeOrmModule.forRoot + forFeature, JwtModule.register, BullModule, ConfigModule.forRoot, MongooseModule; forRoot global + forFeature scoped (StorageModule buckets); вложенные dynamic imports; два forRoot мержат провайдеры, global: true для shared.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "real-world usage и advanced forFeature из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "TypeOrmModule",
+              "forFeature",
+              "forRoot"
+            ],
+            "ask": "как TypeORM разделяет forRoot и forFeature в типичном приложении"
+          },
+          {
+            "match": [
+              "global",
+              "forFeature",
+              "scoped"
+            ],
+            "ask": "паттерн StorageModule: global forRoot + forFeature per bucket"
+          }
+        ],
+        "mustConcepts": [
+          "TypeOrmModule",
+          "JwtModule",
+          "BullModule",
+          "ConfigModule",
+          "MongooseModule",
+          "forRoot",
+          "forFeature",
+          "register",
+          "entities",
+          "репозитор",
+          "global",
+          "scoped",
+          "bucket",
+          "StorageService",
+          "вложен",
+          "imports",
+          "мерж",
+          "провайдер",
+          "библиотек"
+        ],
+        "falseClaims": [
+          "каждая NestJS библиотека использует только static modules",
+          "forFeature создаёт отдельное DB-соединение на каждый вызов",
+          "JwtModule не является dynamic module",
+          "global: true регистрирует модуль в каждом feature автоматически без forRoot",
+          "два forRoot для одного модуля создают изолированные DI-контейнеры"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Dynamic module — LoggerModule.forRoot('debug') возвращает { module, providers, exports } при импорте. LOG_LEVEL инжектируется через useValue. Для DB в AppModule — DatabaseModule.forRootAsync с useFactory и inject: [ConfigService]. В UsersModule — TypeOrmModule.forFeature([User]), не forRoot.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Статический модуль — общий хелпер без настроек. Dynamic — когда secret, host, redis различаются по env. forRoot один раз в AppModule, forFeature в каждом feature. Без ключа module в return — «can't resolve dependencies» и 20 минут дебага. opts клонирую spread'ом, inject в async не забываю.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "При bootstrap NestModuleLoader вызывает forRoot синхронно, мержит metadata в ModulesContainer. forRootAsync ждёт ConfigService. StorageModule: forRoot global StorageService, forFeature('avatars') — scoped bucket token без дубля соединения. Одноразовый pet-проект — useFactory в AppModule, dynamic не обязателен.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Dynamic module — это когда @Module декоратор принимает функцию. forRoot можно вызывать в каждом feature-модуле для глобального конфига. inject в forRootAsync не нужен — Nest сам резолвит по типам.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Возвращаю из forRoot только providers без module — Nest покажет точную ошибку. Мутирую opts.host прямо в forRoot — это нормально для performance. exports ставлю в @Module({ exports }) на классе.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "forFeature — для глобального TypeORM connection в AppModule. Dynamic modules выполняются на каждый запрос. Static module лучше для JWT secret из env.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "dynamic_definition",
+      "exampleType": "good",
+      "exampleText": "forRoot() — статический метод, возвращает DynamicModule с module, providers, exports; конфиг передаётся при imports: [LoggerModule.forRoot('debug')].",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "dynamic_definition",
+      "exampleType": "good",
+      "exampleText": "ну dynamic module — вызываешь forRoot при импорте, nest получает plain object с провайдерами и токенами типа LOG_LEVEL",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "dynamic_definition",
+      "exampleType": "bad",
+      "exampleText": "Dynamic module создаётся отдельным @DynamicModule() декоратором и работает только в runtime запросов.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "static_vs_dynamic",
+      "exampleType": "good",
+      "exampleText": "Static — одинаковые провайдеры всегда; dynamic — метаданные по опциям. DB credentials без dynamic — хардкод или globals.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "static_vs_dynamic",
+      "exampleType": "good",
+      "exampleText": "утилита без конфига — static @Module; библиотека с host/port/secret — dynamic forRoot",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "static_vs_dynamic",
+      "exampleType": "bad",
+      "exampleText": "Static module принимает разные опции через второй аргумент imports — как forRoot.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "forroot_forfeature_async",
+      "exampleType": "good",
+      "exampleText": "forRoot в AppModule глобально; forFeature([User]) в UsersModule; forRootAsync: useFactory(config) + inject: [ConfigService], порядок inject = порядок параметров factory.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "forroot_forfeature_async",
+      "exampleType": "good",
+      "exampleText": "DynamicModule: module обязателен, остальное опционально; global: true делает провайдеры доступными везде после forRoot",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "forroot_forfeature_async",
+      "exampleType": "bad",
+      "exampleText": "forRootAsync вызывает factory сразу при парсинге imports, ConfigService ещё не нужен. forFeature — синоним forRoot для AppModule.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "bootstrap_processing",
+      "exampleType": "good",
+      "exampleText": "При старте forRoot() в imports выполняется синхронно, metadata в ModulesContainer до резолва DI. forRootAsync — factory после готовности inject deps.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "bootstrap_processing",
+      "exampleType": "good",
+      "exampleText": "после bootstrap dynamic не добавляет cost на запрос — провайдеры резолвятся лениво как обычно",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "bootstrap_processing",
+      "exampleType": "bad",
+      "exampleText": "NestModuleLoader вызывает forRoot при первом inject LoggerService, не при bootstrap.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Env-specific JWT/DB — dynamic forRoot; entities per module — forFeature; один app один DB без переиспользования — useFactory в AppModule ок.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "тесты: forRoot с mock opts без правки исходников; shared logger без уровня — static хватит",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Любой NestJS проект обязан использовать dynamic modules для всех провайдеров.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Без module в return — can't resolve dependencies, стек ведёт не туда. opts мутировать нельзя — { ...opts }. inject: [ConfigService] обязателен в forRootAsync.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "@Module({ exports }) на классе срабатывает без forRoot — баг в multi-tenant. forRoot только AppModule, feature — forFeature.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "TypeScript поймает отсутствие inject в forRootAsync на этапе компиляции.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "real_world_libraries",
+      "exampleType": "good",
+      "exampleText": "TypeOrmModule.forRoot в AppModule, forFeature([Order]) в OrdersModule. BullModule.forRoot redis + forFeature processor per queue.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "real_world_libraries",
+      "exampleType": "good",
+      "exampleText": "StorageModule forRoot global + forFeature('documents') — scoped bucket token, одно соединение",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "real_world_libraries",
+      "exampleType": "bad",
+      "exampleText": "JwtModule.register — static module, dynamic pattern в NestJS не используется.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-dynamic-modules",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-dynamic-modules",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-dynamic-modules",
+    "difficulty": "SENIOR",
+    "titleEn": "What are Dynamic Modules in NestJS and when to use them?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

@@ -1,0 +1,594 @@
+{
+  "topic": {
+    "code": "forms_and_form_handling_in_react",
+    "name": "Формы и обработка форм в React",
+    "skillCode": "react",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как обрабатывать формы в React: controlled и uncontrolled компоненты, валидация и React 19 form actions?",
+    "shortAnswer": "React предлагает controlled (значение в state, onChange на каждый символ) и uncontrolled (значение в DOM, чтение через useRef при submit). Controlled — для live-валидации и условных полей; uncontrolled — для file input и больших форм. React 19 добавляет server actions и useActionState с FormData.",
+    "idealAnswer": "Обработка форм в React сводится к выбору: кто владеет значением input — React state или DOM. Controlled: value + onChange связывают input с state; каждый символ → onChange → setState → re-render с новым value. Uncontrolled: DOM хранит текст, useRef прикрепляется к host-узлу в commit phase, ref.current.value читают только при submit — почти нулевой overhead на keystroke. Controlled — puppet на нитках (React тянет каждое движение); uncontrolled — сейф (открывают только когда нужно). Когда controlled: live-ошибки («invalid email» при вводе), условные поля (показать поле если checkbox включён). Когда uncontrolled: 100+ полей без lag, input type=file (браузер блокирует value по безопасности), third-party (React-Select). Сравнение: controlled — state в React, re-render каждый keystroke, валидация в onChange; uncontrolled — state в DOM, re-render нет, валидация on submit/blur; React 19 actions — server function, FormData, isPending из useActionState. Внутренний механизм controlled: browser input event → synthetic onChange → setState → scheduleUpdateOnFiber → re-render. Uncontrolled: ref в commit phase, чтение ref.current.value идёт напрямую в DOM без scheduler. React 19: form action сериализует поля в FormData и POST на server action; useActionState возвращает [state, action, isPending]. Типичные ошибки: забыть e.preventDefault() — native submit перезагружает страницу; мутация state in-place в onChange (тот же reference — React не видит изменения); попытка controlled file input; чтение ref.current в render (null до mount); server action с JSON.stringify вместо FormData (FileList не сериализуется). Production: React Hook Form — uncontrolled по умолчанию (refs), Zod/Yup; Formik — controlled через Field; Next.js app router — use server без отдельного API route; useReducer для 10–15 полей, дальше RHF. Performance 200 полей controlled: каждый keystroke — reconciler pass; fix — useDeferredValue, локальный useState на поле, или uncontrolled + read on submit. Async validation: useTransition для non-urgent update + debounce. Optimistic + server action: useOptimistic + useActionState; race при double submit — disable через isPending/useFormStatus.",
+    "maxScore": 10,
+    "skills": [
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "controlled_components",
+      "title": "Понимает controlled components",
+      "expected": "Кандидат объясняет: value prop связывает input с React state, onChange обновляет state на каждый keystroke; React владеет отображаемым значением.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — controlled feedback loop из ITLead TL;DR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "controlled_components",
+            "oftenConfusedWith": [
+              "uncontrolled_components",
+              "when_to_use"
+            ],
+            "anchorTermsExpected": [
+              "controlled",
+              "value",
+              "onChange",
+              "useState",
+              "React state",
+              "re-render"
+            ],
+            "anchorTermsWrongTopic": [
+              "useRef при каждом символе",
+              "DOM владеет value",
+              "controlled без onChange"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "controlled",
+              "value",
+              "onChange"
+            ],
+            "ask": "что происходит при каждом символе в controlled input"
+          }
+        ],
+        "mustConcepts": [
+          "controlled",
+          "контролир",
+          "value",
+          "onChange",
+          "useState",
+          "React state",
+          "состоян",
+          "re-render",
+          "перерисов",
+          "keystroke",
+          "символ",
+          "feedback loop",
+          "связ",
+          "input",
+          "setState",
+          "отобража"
+        ],
+        "falseClaims": [
+          "controlled input работает без onChange",
+          "controlled хранит значение только в DOM",
+          "controlled не вызывает re-render при вводе",
+          "value prop необязателен для controlled"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "uncontrolled_components",
+      "title": "Понимает uncontrolled components",
+      "expected": "Кандидат объясняет: DOM хранит значение, useRef читает ref.current.value при submit или в event handler; re-render на keystroke нет.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "вторая половина TL;DR — ref и DOM ownership",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "controlled_components",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "uncontrolled_components",
+            "oftenConfusedWith": [
+              "controlled_components",
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "uncontrolled",
+              "useRef",
+              "ref.current",
+              "DOM",
+              "submit"
+            ],
+            "anchorTermsWrongTopic": [
+              "value + onChange обязательны",
+              "re-render каждый символ"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useRef",
+              "uncontrolled",
+              "ref.current"
+            ],
+            "ask": "когда и где безопасно читать ref.current.value"
+          }
+        ],
+        "mustConcepts": [
+          "uncontrolled",
+          "неконтролир",
+          "useRef",
+          "ref",
+          "ref.current",
+          "DOM",
+          "submit",
+          "отправ",
+          "commit phase",
+          "host node",
+          "без re-render",
+          "overhead",
+          "читать при submit",
+          "defaultValue",
+          "значение в DOM"
+        ],
+        "falseClaims": [
+          "uncontrolled требует value и onChange",
+          "ref.current доступен в render phase",
+          "uncontrolled вызывает re-render на каждый символ",
+          "useRef заменяет controlled для live-валидации без trade-off"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Выбирает controlled vs uncontrolled",
+      "expected": "Кандидат называет: controlled — live validation, условные поля; uncontrolled — file input, большие формы, third-party libs; может упомянуть React 19 server actions для full-stack.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "таблица when to use из ITLead",
+        "mustConcepts": [
+          "live validation",
+          "живая валидац",
+          "условн",
+          "conditional",
+          "file input",
+          "type=file",
+          "100 пол",
+          "больш",
+          "lag",
+          "React-Select",
+          "third-party",
+          "server action",
+          "Next.js",
+          "FormData",
+          "email",
+          "invalid format"
+        ],
+        "falseClaims": [
+          "file input всегда controlled",
+          "controlled всегда быстрее для 200 полей",
+          "uncontrolled нельзя валидировать",
+          "server actions заменяют controlled полностью"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "form_internal_mechanics",
+      "title": "Знает как React обрабатывает ввод",
+      "expected": "Кандидат описывает: controlled — input event → synthetic onChange → setState → scheduleUpdateOnFiber → re-render; uncontrolled — ref в commit phase, чтение DOM без scheduler.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "internal processing из ITLead — middle depth",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "scheduleUpdateOnFiber",
+              "reconciler",
+              "synthetic"
+            ],
+            "ask": "цепочка от keystroke до re-render в controlled input"
+          },
+          {
+            "match": [
+              "commit phase",
+              "ref",
+              "scheduler"
+            ],
+            "ask": "почему uncontrolled не задействует scheduler на каждый символ"
+          }
+        ],
+        "mustConcepts": [
+          "input event",
+          "synthetic",
+          "onChange",
+          "setState",
+          "scheduleUpdateOnFiber",
+          "reconciler",
+          "fiber",
+          "commit phase",
+          "ReactFiberCommitWork",
+          "ref attach",
+          "host DOM",
+          "scheduler",
+          "re-render",
+          "V8 bail out",
+          "props unchanged"
+        ],
+        "falseClaims": [
+          "uncontrolled input проходит reconciler на каждый символ",
+          "controlled не использует synthetic events",
+          "ref читается React scheduler при каждом keystroke"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки форм",
+      "expected": "Кандидат называет: preventDefault на submit; immutable update в onChange (spread); file input всегда uncontrolled; ref.current только в handler; FormData для server action, не JSON.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "controlled_components",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "preventDefault",
+              "submit",
+              "reload"
+            ],
+            "ask": "что случится без e.preventDefault() в handleSubmit"
+          },
+          {
+            "match": [
+              "мутац",
+              "spread",
+              "reference"
+            ],
+            "ask": "почему data.name = x и setData(data) не вызывает re-render"
+          },
+          {
+            "match": [
+              "file",
+              "value",
+              "security"
+            ],
+            "ask": "почему нельзя controlled value на input type=file"
+          }
+        ],
+        "mustConcepts": [
+          "preventDefault",
+          "page reload",
+          "перезагруз",
+          "мутац",
+          "immutable",
+          "spread",
+          "reference",
+          "ссылк",
+          "file input",
+          "type=file",
+          "security",
+          "безопас",
+          "ref.current",
+          "render phase",
+          "null",
+          "FormData",
+          "JSON.stringify",
+          "FileList"
+        ],
+        "falseClaims": [
+          "можно без preventDefault если есть React state",
+          "React сравнивает объекты по deep equality",
+          "file input принимает controlled value",
+          "ref.current валиден в render body",
+          "server action принимает JSON.stringify с файлами"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "react19_form_actions",
+      "title": "Знает React 19 form actions",
+      "expected": "Кандидат объясняет: form action + useActionState; FormData сериализация полей; [state, action, isPending]; server action без отдельного API route; useFormStatus для pending submit.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "React 19 third model из ITLead comparison table",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useActionState",
+              "isPending",
+              "FormData"
+            ],
+            "ask": "чем useActionState лучше ручного useState + fetch для формы"
+          },
+          {
+            "match": [
+              "useOptimistic",
+              "race",
+              "double submit"
+            ],
+            "ask": "race condition при optimistic update и как блокировать повторный submit"
+          }
+        ],
+        "mustConcepts": [
+          "useActionState",
+          "form action",
+          "server action",
+          "use server",
+          "FormData",
+          "isPending",
+          "useFormStatus",
+          "POST",
+          "сериализ",
+          "state tuple",
+          "кортеж",
+          "Next.js",
+          "без API route",
+          "useOptimistic",
+          "rollback",
+          "disabled submit"
+        ],
+        "falseClaims": [
+          "server action получает JSON body по умолчанию",
+          "useActionState не даёт isPending",
+          "FormData не работает с file upload",
+          "optimistic update не требует защиты от double submit"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "production_libraries",
+      "title": "Знает библиотеки и паттерны форм",
+      "expected": "Кандидат упоминает React Hook Form (uncontrolled refs), Formik (controlled Field), useReducer для средних форм; async validation через useTransition + debounce; useDeferredValue для больших controlled.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "real-world usage и follow-up performance из ITLead",
+        "mustConcepts": [
+          "React Hook Form",
+          "RHF",
+          "Formik",
+          "Field",
+          "useReducer",
+          "Zod",
+          "Yup",
+          "useDeferredValue",
+          "useTransition",
+          "debounce",
+          "async validation",
+          "200 пол",
+          "production",
+          "React Final Form",
+          "tRPC"
+        ],
+        "falseClaims": [
+          "Formik всегда uncontrolled",
+          "React Hook Form controlled по умолчанию",
+          "useReducer заменяет RHF для любых форм",
+          "async validation должна блокировать input синхронно"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Controlled: value + onChange в useState — live-ошибки email при вводе. Uncontrolled: useRef, ref.current.value только в handleSubmit — для file upload и тяжёлых форм. На submit всегда e.preventDefault(). File input только uncontrolled — браузер блокирует value.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для логина с inline-ошибками беру controlled. Для upload 50 файлов — React Hook Form или ref + FormData. В Next.js 19 — useActionState, new FormData(form), isPending на кнопке. Мутацию state в onChange не делаю — spread создаёт новую ссылку.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Controlled каждый символ → setState → re-render. Uncontrolled ref в commit phase, DOM сам хранит текст. React 19: action на form, server получает FormData, не JSON.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Controlled и uncontrolled одинаковы — оба читают value через ref в render. File input делаю controlled с value={file}.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "handleSubmit без preventDefault — React сам отменит reload. В onChange пишу data.email = e.target.value и setData(data) — React увидит изменение.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Server action отправляю через JSON.stringify(formData) с FileList — файлы сериализуются нормально. ref.current читаю прямо в render для default value.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "controlled_components",
+      "exampleType": "good",
+      "exampleText": "const [email, setEmail] = useState(''); input value={email} onChange={e => setEmail(e.target.value)} — React владеет значением, re-render на каждый символ.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "controlled_components",
+      "exampleType": "good",
+      "exampleText": "ну controlled — value из state, onChange обновляет, react тянет строки как кукла на нитках",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "controlled_components",
+      "exampleType": "bad",
+      "exampleText": "Controlled input — просто value без onChange, React сам синхронизирует DOM.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "uncontrolled_components",
+      "exampleType": "good",
+      "exampleText": "const ref = useRef(null); input ref={ref}; в handleSubmit читаю ref.current.value — DOM хранит текст, re-render на keystroke нет.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "uncontrolled_components",
+      "exampleType": "good",
+      "exampleText": "uncontrolled — ref, значение достаю только на submit, dom сам живёт",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "uncontrolled_components",
+      "exampleType": "bad",
+      "exampleText": "Uncontrolled — это input с value и onChange, но без useState.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Email с ошибкой пока печатаешь — controlled. 150 полей анкеты — uncontrolled или RHF. type=file — только ref, никогда value.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "условное поле если checkbox — controlled; react-select — uncontrolled; next fullstack — server action",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Всегда controlled — uncontrolled deprecated. File input controlled для preview имени файла через value.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "form_internal_mechanics",
+      "exampleType": "good",
+      "exampleText": "Keystroke → synthetic onChange → setState → scheduleUpdateOnFiber → reconciler re-render с новым value prop.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "form_internal_mechanics",
+      "exampleType": "good",
+      "exampleText": "uncontrolled ref цепляется в commit phase, чтение ref.current.value — прямо dom, scheduler не на каждый символ",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "form_internal_mechanics",
+      "exampleType": "bad",
+      "exampleText": "Uncontrolled input на каждый символ вызывает scheduleUpdateOnFiber как controlled.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "handleSubmit: e.preventDefault(); setData({ ...data, name: e.target.value }) — новая ссылка. File: ref only, не value.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "без preventDefault страница перезагрузится; data.name = x + setData(data) — react не увидит; ref в render всегда null",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Мутирую state объект в onChange — React сравнивает поля по значению. File input value={selectedFile} работает в Chrome.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "react19_form_actions",
+      "exampleType": "good",
+      "exampleText": "const [state, action, isPending] = useActionState(uploadAction, null); submitAction(new FormData(e.currentTarget)) — server получает FormData, isPending на кнопке.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "react19_form_actions",
+      "exampleType": "good",
+      "exampleText": "useOptimistic для мгновенного ui, useActionState на сервер; double submit блокирую isPending из useFormStatus",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "react19_form_actions",
+      "exampleType": "bad",
+      "exampleText": "submitAction(JSON.stringify(Object.fromEntries(formData))) — server action так и задуман для файлов.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "production_libraries",
+      "exampleType": "good",
+      "exampleText": "Сложная форма — React Hook Form + Zod resolver, refs внутри. 12 полей регистрации — useReducer SET_FIELD. 200 controlled полей — useDeferredValue или split state.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "production_libraries",
+      "exampleType": "good",
+      "exampleText": "async email check — useTransition + debounce 300ms, input не блокируется",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "production_libraries",
+      "exampleType": "bad",
+      "exampleText": "Formik uncontrolled по умолчанию, RHF требует value/onChange на каждое поле вручную.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "forms-and-form-handling-in-react",
+    "apiUrl": "https://api.itlead.org/api/questions/forms-and-form-handling-in-react",
+    "pageUrl": "https://itlead.org/interview-questions/react/forms-and-form-handling-in-react",
+    "difficulty": "MIDDLE",
+    "titleEn": "Forms and form handling in React",
+    "categorySlug": "react",
+    "syncedAt": "2026-06-18T16:30:00.000Z"
+  }
+}

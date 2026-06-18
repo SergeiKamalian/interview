@@ -1,0 +1,449 @@
+{
+  "topic": {
+    "code": "yaka_riznytsya_mizh_functions_i_procedures_v_sql",
+    "name": "Функции и процедуры в SQL",
+    "skillCode": "sql",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "В чём разница между функциями (functions) и процедурами (procedures) в SQL?",
+    "shortAnswer": "SQL-функция возвращает одно значение и встраивается в SELECT, WHERE или JOIN. SQL-процедура выполняет серию операций и вызывается отдельно через CALL или EXEC, а не внутри выражения запроса. Нужно значение в запросе — функция; нужно обновить данные, записать лог и управлять транзакцией — процедура.",
+    "idealAnswer": "Функция — composable building block: возвращает ровно одно значение и встраивается в SELECT, WHERE, JOIN, ORDER BY. Процедура — standalone executor: выполняет набор операций (UPDATE, INSERT, audit log), по умолчанию ничего не возвращает (или output-параметры), вызывается CALL/EXEC, не может стоять внутри SQL-выражения. Ключевой вопрос: «нужно значение в запросе» vs «нужно что-то сделать». Функция: расчёт налога, скидки, возраста из даты рождения, трансформация для отображения. Процедура: batch payroll, multi-step workflow на нескольких таблицах, миграция данных, явный COMMIT/ROLLBACK. Сравнение: функция — input only, без side effects; процедура — input/output params, side effects ожидаемы, полный контроль транзакций. Движок: функция в запросе вычисляется inline — в WHERE на 100k строк может выполниться 100k раз; процедура — compiled unit, state между statements. Ошибки: UPDATE внутри функции — optimizer вызовет 0/1/N раз непредсказуемо; процедура в WHERE не компилируется; скалярная функция на большой таблице — row-by-row overhead, лучше CASE или колонка в таблице. Функция не может вызывать процедуру (side-effect-free contract); процедура может вызывать функцию. Ошибки: процедура — COMMIT/ROLLBACK/retry; функция — exception или NULL. Индексация результата функции: SQL Server/Oracle computed column + index; PostgreSQL — IMMUTABLE. Примеры: CalculateBonus(salary) в SELECT; EXEC UpdateSalary с audit_log.",
+    "maxScore": 10,
+    "skills": ["sql"]
+  },
+  "checkpoints": [
+    {
+      "key": "function_procedure_definition",
+      "title": "Понимает ключевую разницу function vs procedure",
+      "expected": "Кандидат объясняет: функция возвращает одно значение и встраивается в запрос; процедура выполняет действия, вызывается отдельно; «нужно значение» vs «нужно сделать».",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR и Key Difference из ITLead",
+        "mustConcepts": [
+          "функция",
+          "function",
+          "процедура",
+          "procedure",
+          "возвращает",
+          "одно значение",
+          "RETURNS",
+          "действия",
+          "скрипт",
+          "калькулятор",
+          "значение в запросе",
+          "сделать",
+          "composable",
+          "standalone",
+          "выражение",
+          "не внутри запроса"
+        ],
+        "falseClaims": [
+          "функция и процедура — одно и то же",
+          "процедура обязана возвращать значение в SELECT",
+          "функция не может возвращать значение",
+          "процедура встраивается в WHERE как функция",
+          "разница только в синтаксисе CREATE без семантики"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "return_value_in_queries",
+      "title": "Знает возврат значения и использование в запросах",
+      "expected": "Кандидат: функция обязана вернуть ровно одно значение и работает в SELECT/WHERE/JOIN; процедура по умолчанию ничего не возвращает (или output-параметры) и не может быть в SQL-выражении.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Comparison table — return value и usage in queries",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "function_procedure_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "mustConcepts": [
+          "одно значение",
+          "RETURNS",
+          "SELECT",
+          "WHERE",
+          "JOIN",
+          "ORDER BY",
+          "ничего не возвращает",
+          "output",
+          "параметр",
+          "SQL-выражение",
+          "не внутри",
+          "CalculateBonus",
+          "inline",
+          "результат запроса"
+        ],
+        "falseClaims": [
+          "процедура может стоять в SELECT как скаляр",
+          "функция может не возвращать значение",
+          "процедура всегда возвращает одно значение в RETURN",
+          "функция вызывается только через EXEC",
+          "RETURN в процедуре делает её usable в WHERE"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "invocation_call_exec",
+      "title": "Знает способы вызова CALL и EXEC",
+      "expected": "Кандидат: функция — SELECT FunctionName() или в выражении; процедура — CALL ProcedureName() или EXEC ProcedureName; отдельный statement, не часть SELECT.",
+      "score": 1.0,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Invocation из comparison table и quick example",
+        "mustConcepts": [
+          "CALL",
+          "EXEC",
+          "SELECT",
+          "FunctionName",
+          "ProcedureName",
+          "отдельно",
+          "standalone",
+          "statement",
+          "не внутри SELECT",
+          "вызов",
+          "CalculateBonus",
+          "UpdateSalary"
+        ],
+        "falseClaims": [
+          "процедуру вызывают только через SELECT",
+          "функцию вызывают только через EXEC",
+          "CALL работает для функций в стандартном SQL",
+          "EXEC встраивает процедуру в WHERE",
+          "функция и процедура вызываются одинаково"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Выбирает function или procedure по задаче",
+      "expected": "Кандидат: функция — расчёты, трансформации, значение в результате запроса; процедура — batch, multi-step, audit, COMMIT/ROLLBACK, миграция.",
+      "score": 1.0,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "When to use из ITLead",
+        "mustConcepts": [
+          "расчёт",
+          "налог",
+          "скидка",
+          "возраст",
+          "трансформация",
+          "batch",
+          "payroll",
+          "multi-step",
+          "несколько таблиц",
+          "миграция",
+          "COMMIT",
+          "ROLLBACK",
+          "audit",
+          "лог",
+          "значение в запросе",
+          "обновить строки"
+        ],
+        "falseClaims": [
+          "для UPDATE всегда функция",
+          "batch payroll лучше через функцию в SELECT",
+          "расчёт бонуса в SELECT — процедура",
+          "транзакции управляют только функции",
+          "процедура только для SELECT-запросов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат: side effects (UPDATE) внутри функции — непредсказуемые вызовы; процедура в WHERE не компилируется; скалярная функция на большой таблице — row-by-row slowdown.",
+      "score": 2.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — критичные junior pitfalls",
+        "mustConcepts": [
+          "side effect",
+          "побочн",
+          "UPDATE в функции",
+          "оптимизатор",
+          "0, 1 или N раз",
+          "непредсказуем",
+          "процедура в WHERE",
+          "не компилируется",
+          "скалярная",
+          "row-by-row",
+          "execution plan",
+          "CASE",
+          "колонка в таблице",
+          "ProcessRefund",
+          "GetCustomerTier",
+          "10x slowdown"
+        ],
+        "falseClaims": [
+          "UPDATE в функции безопасен — выполнится ровно один раз",
+          "процедуру можно поставить в WHERE если она возвращает 1",
+          "скалярные функции всегда быстрее inline SQL",
+          "optimizer никогда не вызывает функцию в WHERE повторно",
+          "side effects в функции — нормальная практика"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "side_effects_transactions",
+      "title": "Понимает side effects и транзакции",
+      "expected": "Кандидат: функция должна избегать side effects; процедура — ожидаемы UPDATE/INSERT/audit; процедура — полный COMMIT/ROLLBACK; функция — ограниченный контроль транзакций.",
+      "score": 1.0,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Comparison table side effects и transaction control",
+        "mustConcepts": [
+          "side effect",
+          "побочн",
+          "избегать",
+          "ожидаем",
+          "UPDATE",
+          "INSERT",
+          "audit",
+          "COMMIT",
+          "ROLLBACK",
+          "транзакц",
+          "ограничен",
+          "полный контроль",
+          "stateless",
+          "состояние между операциями"
+        ],
+        "falseClaims": [
+          "функции предназначены для UPDATE и INSERT",
+          "процедуры не должны иметь side effects",
+          "функция управляет COMMIT/ROLLBACK как процедура",
+          "side effects в функции — стандарт SQL",
+          "процедура не может делать INSERT в audit_log"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "call_rules_and_performance",
+      "title": "Знает взаимный вызов и производительность",
+      "expected": "Кандидат: функция не вызывает процедуру (side-effect-free); процедура может вызывать функцию; inline в запросе — per-row cost; set-based SQL/CASE быстрее на больших данных.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Follow-up questions и How the engine handles",
+        "mustConcepts": [
+          "функция не вызывает процедуру",
+          "процедура вызывает функцию",
+          "side-effect-free",
+          "inline",
+          "per-row",
+          "100 000 раз",
+          "set-based",
+          "оптимизатор",
+          "IMMUTABLE",
+          "computed column",
+          "индекс",
+          "exception",
+          "NULL при ошибке"
+        ],
+        "falseClaims": [
+          "функция может вызывать процедуру в стандартном SQL",
+          "процедура не может использовать return value функции",
+          "функция в WHERE всегда выполняется один раз",
+          "inline SQL всегда медленнее скалярной функции",
+          "ошибки в процедуре только через RETURN NULL"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Функция возвращает одно значение и встраивается в SELECT: SELECT name, CalculateBonus(salary) AS bonus FROM employees. Процедура — отдельный EXEC UpdateSalary(1, 50000) с UPDATE и audit_log. Нужно значение в запросе — function; batch с транзакцией — procedure.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "функция как калькулятор в where/select, процедура как скрипт — exec/call, не в выражении. update внутри функции плохо — optimizer дергает сколько угодно раз",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "CalculateOrderTotal в SELECT — ок, одно значение на строку. Monthly payroll — процедура с COMMIT. GetCustomerTier на миллионе строк — смотрю execution plan, часто CASE или колонка tier в таблице.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Функция и процедура одинаковы — обе возвращают значение в SELECT. Процедуру можно в WHERE: WHERE ProcessOrder(id) = 1.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "UPDATE внутри функции — нормально, выполнится ровно один раз. Скалярные функции всегда быстрее CASE.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Функция вызывает процедуру для commit. Процедура встраивается в JOIN как CalculateBonus.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "function_procedure_definition",
+      "exampleType": "good",
+      "exampleText": "Function — значение в запросе; procedure — выполнить действия отдельным CALL/EXEC.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "function_procedure_definition",
+      "exampleType": "good",
+      "exampleText": "функция калькулятор, процедура скрипт — главный вопрос: значение или действие",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "function_procedure_definition",
+      "exampleType": "bad",
+      "exampleText": "Разницы нет — и function и procedure возвращают scalar в SELECT.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "return_value_in_queries",
+      "exampleType": "good",
+      "exampleText": "RETURNS DECIMAL — одно значение в SELECT/WHERE/JOIN; процедура без return в выражении.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "return_value_in_queries",
+      "exampleType": "good",
+      "exampleText": "calculatebonus в select ок, processorder в where — не скомпилируется",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "return_value_in_queries",
+      "exampleType": "bad",
+      "exampleText": "Процедура с output-параметром работает в WHERE как функция.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "invocation_call_exec",
+      "exampleType": "good",
+      "exampleText": "SELECT CalculateBonus(salary); EXEC UpdateSalary(1, 50000) — отдельный statement.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "invocation_call_exec",
+      "exampleType": "good",
+      "exampleText": "call или exec для процедуры, select func() для функции",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "invocation_call_exec",
+      "exampleType": "bad",
+      "exampleText": "Процедуру вызывают SELECT ProcedureName() FROM dual.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Налог из birthdate — function в SELECT; ночной payroll batch — procedure с COMMIT.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "трансформация для отчёта — func, миграция на три таблицы — proc",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Любой UPDATE делаю функцией в WHERE для удобства.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "ProcessRefund с UPDATE внутри function — optimizer вызовет 0/1/N раз, непредсказуемо.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "getcustomertier на join миллион строк — execution plan, лучше case или tier в таблице",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "SELECT * FROM orders WHERE ProcessOrder(id) = 1 — нормальный паттерн.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "side_effects_transactions",
+      "exampleType": "good",
+      "exampleText": "Функция stateless без UPDATE; процедура — audit_log + COMMIT/ROLLBACK.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "side_effects_transactions",
+      "exampleType": "good",
+      "exampleText": "побочки в proc ожидаемы, в function — антипаттерн",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "side_effects_transactions",
+      "exampleType": "bad",
+      "exampleText": "Функция с INSERT в audit — best practice для отчётов.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "call_rules_and_performance",
+      "exampleType": "good",
+      "exampleText": "Процедура вызывает CalculateBonus; функция не может вызвать proc. WHERE на 100k rows — func 100k раз.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "call_rules_and_performance",
+      "exampleType": "good",
+      "exampleText": "на больших данных set-based case быстрее scalar func, immutable для индекса в pg",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "call_rules_and_performance",
+      "exampleType": "bad",
+      "exampleText": "Функция внутри вызывает EXEC MigrateData — стандарт SQL.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "yaka-riznytsya-mizh-functions-i-procedures-v-sql",
+    "apiUrl": "https://api.itlead.org/api/questions/yaka-riznytsya-mizh-functions-i-procedures-v-sql",
+    "pageUrl": "https://itlead.org/interview-questions/general/yaka-riznytsya-mizh-functions-i-procedures-v-sql",
+    "difficulty": "JUNIOR",
+    "titleEn": "What is the difference between functions and procedures in SQL?",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T20:00:00.000Z"
+  }
+}

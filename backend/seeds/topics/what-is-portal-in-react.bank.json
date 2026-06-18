@@ -1,0 +1,623 @@
+{
+  "topic": {
+    "code": "what_is_portal_in_react",
+    "name": "Портал в React",
+    "skillCode": "react",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое портал (portal) в React и зачем он нужен?",
+    "shortAnswer": "React Portal через `createPortal` рендерит дочерние элементы в другой DOM-узел вне иерархии родителя, но оставляет их в React-дереве компонентов. Дочерний элемент обходит родительский CSS (`overflow`, `z-index`, `transform`), сохраняя доступ к state, контексту и событиям React.",
+    "idealAnswer": "React Portal (`createPortal` из `react-dom`) рендерит children в указанный DOM-узел вне иерархии родительского компонента, при этом оставаясь подключённым к Virtual DOM, state и системе событий React. Аналогия: JSX «доставляется» на другой DOM-адрес, но связь с вызывающим компонентом не разрывается. Portal отделяет только финальный DOM-вывод от родительского поддерева — fiber-узел остаётся под компонентом, который вызвал portal, поэтому хуки, эффекты и провайдеры контекста работают как при обычном вложении. Меняется лишь место финальной отрисовки в DOM. Типичные кейсы: модальное окно поверх родителя с `z-index: 10` — portal на `document.body` с `z-index: 9999`; tooltip внутри контейнера с `transform` — portal выходит из stacking context; dropdown в ячейке таблицы с `overflow: hidden` — portal на `body` избегает обрезания; стек уведомлений на краю экрана. Не нужен portal, если дочерний элемент вписывается в стили родителя или требует позиционирования относительно него. Внутри: reconciler создаёт fiber для portal-child под вызывающим компонентом, но `containerInfo` указывает на целевой DOM-узел; в commit phase мутации идут через `container.appendChild`. Синтетические события React проходят через React-дерево, а не DOM-дерево — `onClick` на portal-элементе всплывает к React-предкам, не к DOM-предкам. Контекст читается из fiber-дерева: portal-child видит всех ancestor providers. Типичные ошибки: portal в несуществующий узел (`getElementById('missing')` → null, React 18 бросает ошибку) — создавать контейнер в `useEffect` и append к `body`; путаница DOM-родителя и React-родителя — обход DOM не отражает дерево компонентов; SSR hydration mismatch — на сервере нет `#portal-root`, клиент порталит — guard через `mounted` state в `useEffect`, на сервере placeholder; отсутствие cleanup при ручном создании контейнера — DOM-узлы накапливаются. SSR-safe паттерн: `ClientOnlyPortal` с `mounted` и `useRef` для контейнера. Portal ≠ Shadow DOM: portal сохраняет глобальные стили и React-события; Shadow DOM изолирует стили и события полностью. В продакшене: Material-UI, Chakra UI, Headless UI, React Bootstrap используют portals для модалов, dropdown и tooltip.",
+    "maxScore": 10,
+    "skills": [
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "portal_definition",
+      "title": "Понимает определение portal",
+      "expected": "Кандидат объясняет: `createPortal` рендерит children в другой DOM-узел вне родительской иерархии, но компонент остаётся в React-дереве; обходит родительский CSS без потери state и контекста.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — createPortal и escape CSS",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "createPortal",
+              "portal",
+              "портал"
+            ],
+            "ask": "что делает createPortal и куда попадает DOM-вывод"
+          }
+        ],
+        "mustConcepts": [
+          "portal",
+          "портал",
+          "createPortal",
+          "react-dom",
+          "DOM-узел",
+          "вне иерарх",
+          "родительск",
+          "React-дерев",
+          "дерев компонент",
+          "Virtual DOM",
+          "обход",
+          "CSS",
+          "overflow",
+          "z-index",
+          "transform",
+          "state",
+          "контекст"
+        ],
+        "falseClaims": [
+          "portal выносит компонент из React-дерева",
+          "createPortal рендерит только в document.body",
+          "portal ломает state и хуки вызывающего компонента",
+          "portal — это отдельный React root",
+          "portal нужен для любого вложенного UI"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "dom_vs_react_tree",
+      "title": "Отличает DOM-иерархию от React-дерева",
+      "expected": "Кандидат объясняет: portal отделяет только финальный DOM; fiber остаётся под вызывающим компонентом — hooks, effects, context providers работают; DOM parentNode не совпадает с React parent.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевая разница из ITLead — DOM detach vs fiber tree",
+        "confusionPairs": [
+          {
+            "checkpointKey": "dom_vs_react_tree",
+            "oftenConfusedWith": [
+              "portal_definition"
+            ],
+            "anchorTermsExpected": [
+              "fiber",
+              "DOM",
+              "React-дерев",
+              "контекст",
+              "state"
+            ],
+            "anchorTermsWrongTopic": [
+              "portal создаёт новый React root",
+              "DOM parent равен React parent"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "fiber",
+              "fiber-узел",
+              "вызывающ"
+            ],
+            "ask": "где в fiber-дереве остаётся portal-child и почему hooks работают"
+          },
+          {
+            "match": [
+              "parentNode",
+              "DOM",
+              "иерарх"
+            ],
+            "ask": "почему DOM parent portal-элемента не совпадает с React parent"
+          }
+        ],
+        "mustConcepts": [
+          "DOM",
+          "React-дерев",
+          "fiber",
+          "fiber-узел",
+          "вызывающ",
+          "компонент",
+          "отделя",
+          "финальн",
+          "DOM-вывод",
+          "parentNode",
+          "иерарх",
+          "hooks",
+          "эффект",
+          "useEffect",
+          "контекст",
+          "провайдер",
+          "state",
+          "не совпада"
+        ],
+        "falseClaims": [
+          "portal переносит fiber в другой React root",
+          "DOM parentNode portal-элемента всегда совпадает с React parent",
+          "обход DOM отражает дерево компонентов",
+          "portal отключает context providers родителя",
+          "portal создаёт изолированное React-поддерево"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Знает когда использовать portal",
+      "expected": "Кандидат называет кейсы: модалы, tooltip, dropdown над `overflow: hidden`, z-index/stacking context, transform; portal на body; когда не нужен — обычное вложение и relative positioning.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use из ITLead — модалы, tooltip, dropdown",
+        "mustConcepts": [
+          "модал",
+          "modal",
+          "tooltip",
+          "подсказк",
+          "dropdown",
+          "выпадающ",
+          "overflow",
+          "hidden",
+          "z-index",
+          "stacking context",
+          "transform",
+          "document.body",
+          "body",
+          "обрезан",
+          "клиппинг",
+          "уведомлен",
+          "notification",
+          "relative",
+          "позицион"
+        ],
+        "falseClaims": [
+          "portal нужен для любого overlay",
+          "portal заменяет position: fixed",
+          "dropdown в таблице всегда работает без portal",
+          "portal обязателен для всех модальных окон",
+          "portal не помогает с z-index проблемами"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "internal_mechanism",
+      "title": "Понимает внутренний механизм portal",
+      "expected": "Кандидат описывает: reconciler создаёт fiber под вызывающим компонентом, `containerInfo` — целевой DOM; commit phase — `appendChild`; синтетические события всплывают по React-дереву, не по DOM.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "How it works internally — fiber, commit, synthetic events",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "dom_vs_react_tree",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "containerInfo",
+              "commit",
+              "appendChild"
+            ],
+            "ask": "куда reconciler направляет DOM-мутации при portal"
+          },
+          {
+            "match": [
+              "onClick",
+              "всплыв",
+              "синтетич",
+              "bubble"
+            ],
+            "ask": "как всплывает onClick на portal-элементе — по DOM или по React-дереву"
+          }
+        ],
+        "mustConcepts": [
+          "reconciler",
+          "fiber",
+          "containerInfo",
+          "commit",
+          "commit phase",
+          "appendChild",
+          "DOM-мутац",
+          "целев",
+          "DOM-узел",
+          "синтетич",
+          "событ",
+          "onClick",
+          "всплыв",
+          "bubble",
+          "React-дерев",
+          "не DOM-дерев",
+          "proxy",
+          "вызывающ"
+        ],
+        "falseClaims": [
+          "нативные DOM-события portal всплывают к React-предкам",
+          "portal меняет fiber parent на target DOM node",
+          "DOM-мутации portal идут в родительский DOM-узел компонента",
+          "portal отключает synthetic event system React",
+          "commit phase не участвует в portal rendering"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с portal",
+      "expected": "Кандидат называет: portal в null/несуществующий узел; путаница DOM и React parent; SSR hydration mismatch без mounted guard; отсутствие cleanup при ручном создании контейнера в useEffect.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — null node, SSR, cleanup из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "ssr_safe_portal",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "getElementById",
+              "null",
+              "missing",
+              "не существ"
+            ],
+            "ask": "что произойдёт если createPortal target null и как исправить"
+          },
+          {
+            "match": [
+              "cleanup",
+              "removeChild",
+              "демонт"
+            ],
+            "ask": "зачем cleanup при ручном создании portal-контейнера в useEffect"
+          }
+        ],
+        "mustConcepts": [
+          "null",
+          "не существ",
+          "getElementById",
+          "missing",
+          "useEffect",
+          "созда",
+          "контейнер",
+          "append",
+          "document.body",
+          "DOM parent",
+          "React parent",
+          "путаниц",
+          "hydration",
+          "mismatch",
+          "cleanup",
+          "removeChild",
+          "демонт",
+          "накоплен",
+          "React 18",
+          "ошибк"
+        ],
+        "falseClaims": [
+          "createPortal с null target безопасен — React молча игнорирует",
+          "DOM parentNode portal-элемента отражает React parent",
+          "portal на сервере работает так же как на клиенте без guard",
+          "cleanup при portal не нужен — React сам удаляет контейнер",
+          "hydration mismatch при portal только warning без влияния"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "context_and_events",
+      "title": "Понимает контекст и события portal",
+      "expected": "Кандидат объясняет: context читается из fiber-дерева — portal-child видит ancestor providers; onClick всплывает по React-дереву; отличает portal от Shadow DOM (стили и изоляция).",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up questions — context, bubbling, Shadow DOM",
+        "confusionPairs": [
+          {
+            "checkpointKey": "context_and_events",
+            "oftenConfusedWith": [
+              "internal_mechanism"
+            ],
+            "anchorTermsExpected": [
+              "контекст",
+              "fiber",
+              "Shadow DOM",
+              "всплыв"
+            ],
+            "anchorTermsWrongTopic": [
+              "portal изолирует как Shadow DOM",
+              "контекст читается из DOM-дерева"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "контекст",
+              "provider",
+              "Context"
+            ],
+            "ask": "видит ли portal-child context от родительских providers"
+          },
+          {
+            "match": [
+              "Shadow DOM",
+              "shadow"
+            ],
+            "ask": "чем portal отличается от Shadow DOM"
+          }
+        ],
+        "mustConcepts": [
+          "контекст",
+          "context",
+          "provider",
+          "провайдер",
+          "fiber-дерев",
+          "ancestor",
+          "предк",
+          "onClick",
+          "всплыв",
+          "bubble",
+          "React-дерев",
+          "DOM-дерев",
+          "Shadow DOM",
+          "shadow",
+          "изоляц",
+          "стил",
+          "глобальн",
+          "виджет",
+          "треть"
+        ],
+        "falseClaims": [
+          "portal-child не видит context родительских providers",
+          "portal и Shadow DOM решают одну задачу одинаково",
+          "onClick на portal всплывает к DOM-предкам в body",
+          "Shadow DOM сохраняет React synthetic events",
+          "контекст читается из DOM parent chain"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "ssr_safe_portal",
+      "title": "Знает SSR-safe паттерн portal",
+      "expected": "Кандидат описывает: `mounted` state в useEffect; на сервере placeholder/div; ClientOnlyPortal с useRef; предотвращает hydration mismatch в React 18 / Next.js.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "SSR-safe portal и Next.js follow-up из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "mounted",
+              "useEffect",
+              "placeholder"
+            ],
+            "ask": "как избежать hydration mismatch при portal в Next.js"
+          }
+        ],
+        "mustConcepts": [
+          "mounted",
+          "useEffect",
+          "useState",
+          "useRef",
+          "SSR",
+          "сервер",
+          "клиент",
+          "placeholder",
+          "скрыт",
+          "hidden",
+          "hydration",
+          "mismatch",
+          "React 18",
+          "Next.js",
+          "ClientOnlyPortal",
+          "portal-root",
+          "гидрат"
+        ],
+        "falseClaims": [
+          "portal можно безопасно вызывать на сервере с document.getElementById",
+          "mounted guard не нужен — React сам согласует server и client",
+          "SSR portal рендерит в body так же как на клиенте",
+          "hydration mismatch при portal только в dev mode",
+          "placeholder на сервере ломает SEO модального окна навсегда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Portal через createPortal рендерит модал в document.body, обходя overflow:hidden родителя. В React-дереве модал остаётся дочерним DropdownMenu — state и context работают. onClick всплывает к React-предкам, не к DOM-предкам в body.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для tooltip внутри transform-контейнера порталю на body — stacking context больше не обрезает. На SSR ClientOnlyPortal: mounted=false до useEffect, на сервере скрытый div, потом createPortal — без hydration error.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Material-UI Dialog и Headless UI Menu используют portal на body для z-index. Fiber portal-child под вызывающим компонентом, containerInfo — target DOM. Контекст theme provider доступен внутри portal.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Portal выносит компонент из React-дерева в отдельный root — state и context теряются. onClick всплывает по DOM к body, не по React.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "createPortal(children, document.getElementById('missing')) — норм, React сам создаст узел. На SSR можно сразу порталить без mounted guard.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Portal и Shadow DOM одно и то же — полная изоляция стилей и событий. Portal-child не видит Context от родителя.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "portal_definition",
+      "exampleType": "good",
+      "exampleText": "createPortal(jsx, document.body) — DOM вне родителя, компонент в React-дереве, обход overflow и z-index.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "portal_definition",
+      "exampleType": "good",
+      "exampleText": "ну портал — jsx уезжает в другой dom-узел, но react его не теряет, state на месте",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "portal_definition",
+      "exampleType": "bad",
+      "exampleText": "Portal — это когда React рендерит в iframe, полностью отдельно от основного дерева.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "dom_vs_react_tree",
+      "exampleType": "good",
+      "exampleText": "Fiber portal-child под ModalTrigger — hooks и useContext работают, хотя DOM parent — body, не trigger.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "dom_vs_react_tree",
+      "exampleType": "good",
+      "exampleText": "modal-root.children[0].parentNode !== app-root — DOM и React иерархии разные вещи",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "dom_vs_react_tree",
+      "exampleType": "bad",
+      "exampleText": "После portal fiber переезжает под body в React-дереве, context от App пропадает.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Dropdown в td с overflow:hidden — portal на body. Модал поверх sidebar с z-index:10 — portal + z-index:9999.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "tooltip в rotateX контейнере — portal, иначе transform origin ломает позицию",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Portal нужен для любой кнопки внутри div — иначе React не отрендерит children.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "internal_mechanism",
+      "exampleType": "good",
+      "exampleText": "Reconciler ставит containerInfo на target DOM; commit appendChild туда; synthetic onClick bubble по React ancestors.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "internal_mechanism",
+      "exampleType": "good",
+      "exampleText": "нативный click идёт по dom, а react onClick — по fiber-дереву, не по body chain",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "internal_mechanism",
+      "exampleType": "bad",
+      "exampleText": "Portal отключает synthetic events — только нативные DOM listeners работают.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "getElementById('portal-root') null на SSR — создаю div в useEffect, append body, cleanup removeChild.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "без cleanup контейнеры копятся при remount модала — каждый open создаёт новый div в body",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "createPortal в null target — React 17 молча рендерит inline, ошибки нет.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "context_and_events",
+      "exampleType": "good",
+      "exampleText": "ThemeProvider оборачивает App — portal-modal читает theme из fiber context, не из DOM location.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "context_and_events",
+      "exampleType": "good",
+      "exampleText": "portal для overlay, shadow dom для изоляции стороннего виджета — разные задачи",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "context_and_events",
+      "exampleType": "bad",
+      "exampleText": "Portal-child в body не наследует React context — нужен отдельный Provider внутри portal.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "ssr_safe_portal",
+      "exampleType": "good",
+      "exampleText": "ClientOnlyPortal: mounted после useEffect, до этого <div hidden>{children}</div> — server/client DOM совпадают.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "ssr_safe_portal",
+      "exampleType": "good",
+      "exampleText": "в next.js модал только после mount — иначе react 18 strict mode hydration error",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "ssr_safe_portal",
+      "exampleType": "bad",
+      "exampleText": "На сервере createPortal в #portal-root работает — getElementById есть и на SSR.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "what-is-portal-in-react",
+    "apiUrl": "https://api.itlead.org/api/questions/what-is-portal-in-react",
+    "pageUrl": "https://itlead.org/interview-questions/react/what-is-portal-in-react",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is portal in React",
+    "categorySlug": "react",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

@@ -1,0 +1,495 @@
+{
+  "topic": {
+    "code": "git_conflict_resolution",
+    "name": "Разрешение merge-конфликтов в Git",
+    "skillCode": "git",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как разрешать merge-конфликты в Git?",
+    "shortAnswer": "Merge-конфликт — состояние, когда Git не может автоматически объединить две ветки, потому что обе изменили одни и те же строки по-разному. Git помечает конфликт маркерами `<<<<<<<`, `=======`, `>>>>>>>`. Нужно вручную отредактировать файл, удалить все маркеры, написать итоговый код, затем `git add <файл>` и `git commit`. После merge проверяй `git status` — не должно остаться нерешённых файлов.",
+    "idealAnswer": "Merge-конфликт — Git не может автоматически слить две ветки, потому что обе изменили одни и те же строки по-разному; Git останавливается и просит решить вручную. Git выполняет three-way merge: сравнивает текущую ветку (HEAD), входящую ветку и общего предка через `git merge-base`. Если только одна сторона изменила строку — Git берёт её автоматически. Если обе изменили одну строку по-разному — Git вставляет маркеры в файл и ждёт. Маркеры: от `<<<<<<< HEAD` до `=======` — текущая ветка; от `=======` до `>>>>>>> branch-name` — входящая ветка. Цикл разрешения: открыть файл, убрать все три маркера, написать финальный код, `git add <файл>`, `git commit` (или `git rebase --continue` при rebase). `git merge --abort` отменяет merge и возвращает состояние до слияния. `git mergetool` открывает визуальный diff (Meld, VS Code) с тремя панелями: предок, наша версия, их версия. Бинарные файлы Git не сливает — явно выбрать `git checkout --ours file.png` или `git checkout --theirs`, затем `git add` и commit. `git config --global merge.conflictstyle diff3` добавляет в блок конфликта версию общего предка — часто проясняет контекст. При rebase маркеры такие же, но конфликты разрешаются per-commit: после каждого — `git rebase --continue`, не `git commit`. Типичные ошибки: commit без `git add` после редактирования; слепой `git checkout --ours` без чтения обеих сторон; маркеры `<<<<<<<` остаются в коде и ломают синтаксис; после multi-file merge не проверили `git status` и закоммитили с unresolved файлами. Modify/delete конфликт: rename detection не сработал (схожесть <50%) — файл удалён на одной ветке и изменён на другой; решение: `git rm old`, перенести правки в новый файл, `git add`, commit. На практике: конфликты в `package.json` при merge PR, lock-файлы часто регенерируют после merge, а не правят вручную.",
+    "maxScore": 10,
+    "skills": [
+      "git"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "conflict_definition",
+      "title": "Понимает merge-конфликт",
+      "expected": "Кандидат объясняет: Git не может автоматически объединить ветки, когда обе изменили одни строки по-разному; Git останавливается и ждёт ручного решения.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — что такое конфликт и когда Git останавливается",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "конфликт",
+              "merge conflict",
+              "автоматическ"
+            ],
+            "ask": "при каких условиях Git не может слить ветки сам и останавливается"
+          }
+        ],
+        "mustConcepts": [
+          "merge конфликт",
+          "конфликт",
+          "автоматическ",
+          "не может объедин",
+          "не может слить",
+          "одни строки",
+          "разные изменен",
+          "останавлива",
+          "вручную",
+          "две ветки",
+          "Git ждёт",
+          "ручное решен"
+        ],
+        "falseClaims": [
+          "Git всегда автоматически сливает любые изменения",
+          "конфликт означает что репозиторий повреждён",
+          "конфликт возможен только при rebase, не при merge",
+          "при конфликте Git сам выбирает версию HEAD"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "conflict_markers",
+      "title": "Знает маркеры конфликта",
+      "expected": "Кандидат описывает `<<<<<<< HEAD`, `=======`, `>>>>>>> branch-name`: HEAD — текущая ветка, между ======= и >>>>>>> — входящая ветка.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "маркеры — базовый навык чтения конфликта",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "<<<<<<<",
+              "HEAD",
+              "======="
+            ],
+            "ask": "что означает каждая секция между маркерами"
+          }
+        ],
+        "mustConcepts": [
+          "<<<<<<<",
+          "=======",
+          ">>>>>>>",
+          "HEAD",
+          "маркер",
+          "текущая ветка",
+          "входящ",
+          "incoming",
+          "наша версия",
+          "их версия",
+          "branch-name",
+          "блок конфликта"
+        ],
+        "falseClaims": [
+          "маркеры конфликта — комментарии Git, можно оставить в коде",
+          "<<<<<<< HEAD означает входящую ветку",
+          "======= разделяет два коммита одной ветки",
+          "маркеры автоматически удаляются при git commit"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "resolution_workflow",
+      "title": "Знает цикл разрешения",
+      "expected": "Кандидат: редактировать файл → удалить все маркеры → написать итог → `git add` → `git commit`; без add Git не знает что конфликт решён.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "основной workflow — edit, add, commit",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "conflict_markers",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "git add",
+              "git commit",
+              "разрешен"
+            ],
+            "ask": "почему после редактирования нужен git add перед commit"
+          }
+        ],
+        "mustConcepts": [
+          "редактир",
+          "удалить маркер",
+          "убрать маркер",
+          "git add",
+          "git commit",
+          "staged",
+          "индекс",
+          "index",
+          "разрешен",
+          "итоговый код",
+          "финальн",
+          "без add",
+          "nothing to commit",
+          "закоммит"
+        ],
+        "falseClaims": [
+          "после редактирования можно сразу git commit без git add",
+          "git add не нужен — Git сам видит что файл исправлен",
+          "маркеры можно оставить если код работает",
+          "git status не нужен после merge"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "three_way_merge",
+      "title": "Понимает three-way merge",
+      "expected": "Кандидат: Git сравнивает HEAD, incoming и общего предка через merge-base; одна сторона изменила — автоматически; обе изменили одну строку — конфликт.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "merge-base и автоматическое слияние из Theory",
+        "mustConcepts": [
+          "three-way",
+          "трёхсторон",
+          "merge-base",
+          "общий предок",
+          "ancestor",
+          "HEAD",
+          "incoming",
+          "одна сторона",
+          "автоматическ",
+          "обе стороны",
+          "одна строка",
+          "разные изменен"
+        ],
+        "falseClaims": [
+          "Git сравнивает только две ветки без общего предка",
+          "если обе стороны изменили файл — всегда конфликт даже в разных строках",
+          "merge-base не используется при merge",
+          "Git всегда берёт версию incoming при конфликте"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "tools_and_abort",
+      "title": "Знает mergetool, abort и бинарные файлы",
+      "expected": "Кандидат: `git mergetool` для визуального diff; `git merge --abort` отменяет merge; бинарные — `git checkout --ours/--theirs` + add; diff3 для контекста предка.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "инструменты и edge cases из When to use",
+        "mustConcepts": [
+          "mergetool",
+          "git merge --abort",
+          "abort",
+          "отмен",
+          "бинарн",
+          "binary",
+          "--ours",
+          "--theirs",
+          "checkout",
+          "diff3",
+          "conflictstyle",
+          "предок",
+          "Meld",
+          "VS Code",
+          "визуальн"
+        ],
+        "falseClaims": [
+          "Git автоматически сливает PNG и бинарные файлы",
+          "merge --abort удаляет коммиты с обеих веток",
+          "diff3 показывает только две стороны без предка",
+          "mergetool заменяет необходимость git add"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "merge_vs_rebase",
+      "title": "Отличает конфликт merge и rebase",
+      "expected": "Кандидат: маркеры одинаковые; при merge — один commit после всех файлов; при rebase — per-commit, после каждого `git rebase --continue`, не commit.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "merge vs rebase из follow-up и When to use",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "rebase",
+              "rebase --continue"
+            ],
+            "ask": "чем отличается разрешение конфликта при rebase от merge"
+          }
+        ],
+        "mustConcepts": [
+          "rebase",
+          "git rebase --continue",
+          "merge",
+          "маркеры одинаков",
+          "per-commit",
+          "каждый коммит",
+          "один коммит",
+          "продолж",
+          "continue",
+          "не git commit",
+          "линейн",
+          "история"
+        ],
+        "falseClaims": [
+          "при rebase конфликт разрешается через git commit",
+          "маркеры при rebase отличаются от merge",
+          "rebase никогда вызывает конфликты",
+          "git merge --continue завершает rebase"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат: commit без add; слепой --ours без чтения обеих сторон; маркеры в коде; не проверили git status после multi-file merge; modify/delete при rename.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — частые production-ошибки",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "<<<<<<<",
+              "маркер"
+            ],
+            "ask": "что происходит если маркеры конфликта остаются в JS/JSX"
+          },
+          {
+            "match": [
+              "modify/delete",
+              "rename"
+            ],
+            "ask": "как разрешить modify/delete конфликт при переносе файла"
+          }
+        ],
+        "mustConcepts": [
+          "commit без add",
+          "nothing to commit",
+          "checkout --ours",
+          "слепо",
+          "не читая",
+          "маркер в коде",
+          "<<<<<<< в javascript",
+          "синтаксическ",
+          "git status",
+          "both modified",
+          "нерешён",
+          "unresolved",
+          "modify/delete",
+          "rename detection",
+          "50%",
+          "git rm",
+          "lock file",
+          "package-lock",
+          "регенерир"
+        ],
+        "falseClaims": [
+          "маркеры в коде безопасны — bundler их игнорирует",
+          "git checkout --ours всегда правильный выбор",
+          "после fix одного файла можно commit без проверки status",
+          "modify/delete означает что репозиторий сломан безвозвратно"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Merge-конфликт — Git не может автоматически слить ветки, когда обе изменили одну строку по-разному. В файле маркеры <<<<<<< HEAD, =======, >>>>>>> feature. Удаляю маркеры, пишу финальный код, git add file.txt, git commit. После merge — git status, убеждаюсь что unresolved нет.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну конфликт — две ветки тронули одну строку, git остановился. правлю файл, убираю <<<<<<<, add, commit. если передумал — merge --abort. для картинки — checkout --theirs logo.png и add.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "При rebase маркеры такие же, но после каждого конфликта git rebase --continue, не commit. diff3 в конфиге помогает видеть что было в предке. package-lock после merge обычно не правлю вручную — регенерирую.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "При конфликте Git сам выбирает версию HEAD, маркеры можно оставить — они комментарии. После правки файла сразу commit без add.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "git checkout --ours на всё — быстрее чем читать. При rebase после конфликта обычный git commit. modify/delete — значит надо клонировать репо заново.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Конфликт возможен только в package.json. merge --abort удаляет feature-ветку. mergetool сам закоммитит без git add.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "conflict_definition",
+      "exampleType": "good",
+      "exampleText": "Конфликт — обе ветки изменили одни строки разным способом, Git не может выбрать и останавливается.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "conflict_definition",
+      "exampleType": "good",
+      "exampleText": "main и feature поменяли price на 15 и 12 — git merge остановился, нужно решить вручную",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "conflict_definition",
+      "exampleType": "bad",
+      "exampleText": "Конфликт — когда Git не может найти remote. Любой merge всегда автоматический.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "conflict_markers",
+      "exampleType": "good",
+      "exampleText": "<<<<<<< HEAD — моя ветка до =======, после ======= до >>>>>>> feature — их версия.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "conflict_markers",
+      "exampleType": "good",
+      "exampleText": "верхний блок HEAD наш, нижний блок feature их, между ======= разделитель",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "conflict_markers",
+      "exampleType": "bad",
+      "exampleText": ">>>>>>> означает начало текущей ветки. Маркеры Git удалит при следующем pull.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "resolution_workflow",
+      "exampleType": "good",
+      "exampleText": "Редактирую file.txt, убираю все маркеры, git add file.txt, git commit -m Resolve conflict. Без add — nothing to commit.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "resolution_workflow",
+      "exampleType": "good",
+      "exampleText": "объединил role и email в App.js, add, commit, потом запускаю приложение — jsx ошибка часто от оставшегося <<<<<<<",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "resolution_workflow",
+      "exampleType": "bad",
+      "exampleText": "После правки conflicted.js сразу git commit -m fixed — add не нужен, Git видит diff.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "three_way_merge",
+      "exampleType": "good",
+      "exampleText": "Git сравнивает HEAD, incoming и merge-base. Одна сторона поменяла строку — берёт автоматически. Обе поменяли одну строку — конфликт.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "three_way_merge",
+      "exampleType": "good",
+      "exampleText": "трёхсторонний merge через общего предка — если только feature тронул файл, merge без конфликта",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "three_way_merge",
+      "exampleType": "bad",
+      "exampleText": "Git при merge сравнивает только последние коммиты двух веток, предок не используется.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "tools_and_abort",
+      "exampleType": "good",
+      "exampleText": "git mergetool — три панели: предок, ours, theirs. merge --abort если передумал. logo.png — checkout --theirs, add, commit.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "tools_and_abort",
+      "exampleType": "good",
+      "exampleText": "diff3 в конфиге — в блоке конфликта видно что было в ancestor, проще выбрать правильную сторону",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "tools_and_abort",
+      "exampleType": "bad",
+      "exampleText": "Бинарные PNG Git мержит как текст. merge --abort удаляет все коммиты feature-ветки.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "merge_vs_rebase",
+      "exampleType": "good",
+      "exampleText": "При merge все конфликты в одном merge commit. При rebase — конфликт на каждый replayed commit, после fix — rebase --continue.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "merge_vs_rebase",
+      "exampleType": "good",
+      "exampleText": "rebase main на feature — маркеры те же, но не commit а continue после каждого шага",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "merge_vs_rebase",
+      "exampleType": "bad",
+      "exampleText": "При rebase после конфликта git commit, rebase --continue не существует. Маркеры при rebase другие.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Не делать checkout --ours без чтения — коллега мог починить баг на своей ветке. После multi-file merge — git status, both modified список.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "modify/delete: main переименовал file1→file2, feature правил file1 — git rm file1, правки в file2, add, commit",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "<<<<<<< HEAD в JSX — нормально, webpack пропустит. Закоммитил один файл, остальные unresolved — не проблема.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "git-conflict-resolution",
+    "apiUrl": "https://api.itlead.org/api/questions/git-conflict-resolution",
+    "pageUrl": "https://itlead.org/interview-questions/git/git-conflict-resolution",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to resolve merge conflicts in Git?",
+    "categorySlug": "git",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

@@ -1,0 +1,598 @@
+{
+  "topic": {
+    "code": "shcho_take_idempotentnist",
+    "name": "Идемпотентность",
+    "skillCode": "javascript",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое идемпотентность и почему она критична при retry в распределённых системах?",
+    "shortAnswer": "Идемпотентность — свойство операции, при котором многократный вызов даёт тот же конечный результат, что и однократный. PUT /balance {balance: 200} три раза → balance: 200; POST /charge {amount: 100} три раза → списано 300. GET, PUT и DELETE идемпотентны по RFC 9110; POST без idempotency key — нет.",
+    "idealAnswer": "Идемпотентность — повторный вызов операции не меняет конечное состояние сверх первого эффекта. Аналогия: покрасить стену в красный дважды — всё равно красная. Важен intended effect на сервере, а не идентичность HTTP-ответа: второй DELETE может вернуть 404 вместо 204, но ресурс отсутствует — идемпотентность сохранена (RFC 9110). Safe — без побочных эффектов (GET, HEAD); idempotent — повтор не добавляет новых эффектов (PUT, DELETE). PUT перезаписывает абсолютное значение — retry безопасен; POST создаёт/накапливает — каждый retry добавляет эффект. PATCH зависит от реализации: increment: 1 — относительная операция, retry опасен; PUT с абсолютным {visits: 5} — идемпотентен. Для POST: idempotency key (UUID в заголовке), сервер кэширует результат в Redis на 24h — Stripe /v1/charges. Типичные ошибки: считать PATCH всегда идемпотентным; INSERT без UNIQUE/ON CONFLICT — дубликаты при retry Kafka consumer; GET идемпотентен, но /users?offset=10 может вернуть разные данные между retry — кэш по полному URL; PUT при replica lag в eventually-consistent системе — временно разный state, решают conditional writes (ETag, compare-and-swap). Практика: retry GET/PUT/DELETE; POST только с idempotency key; Kafka/SQS at-least-once — проверка paymentId перед insert; PostgreSQL INSERT ... ON CONFLICT DO NOTHING / UPSERT. Senior: идемпотентный increment в шардированной БД — PUT с абсолютным target или unique operation ID в транзакции (outbox pattern).",
+    "maxScore": 10,
+    "skills": ["javascript"]
+  },
+  "checkpoints": [
+    {
+      "key": "idempotence_definition",
+      "title": "Понимает определение идемпотентности",
+      "expected": "Кандидат объясняет: многократный вызов → тот же конечный state, что и один раз; важен intended effect, а не идентичность HTTP-кода ответа.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — final state vs response code",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "idempotence_definition",
+            "oftenConfusedWith": ["http_methods_safe_idempotent"],
+            "anchorTermsExpected": [
+              "конечн",
+              "final state",
+              "intended effect",
+              "повтор",
+              "один раз",
+              "RFC 9110"
+            ],
+            "anchorTermsWrongTopic": [
+              "идентичный response body",
+              "идемпотентность это safe",
+              "только HTTP"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["идемпотент", "idempoten", "конечн", "final state"],
+            "ask": "чем идемпотентность отличается от «одинакового HTTP-ответа» при retry"
+          }
+        ],
+        "mustConcepts": [
+          "идемпотент",
+          "idempoten",
+          "конечн",
+          "final state",
+          "повтор",
+          "один раз",
+          "intended effect",
+          "намеренн",
+          "эффект",
+          "состоян",
+          "RFC 9110",
+          "retry",
+          "повторн",
+          "не меняет дальше",
+          "красн",
+          "стен"
+        ],
+        "falseClaims": [
+          "идемпотентность требует идентичного HTTP status и body при каждом retry",
+          "идемпотентность означает отсутствие любых побочных эффектов",
+          "идемпотентность применима только к GET",
+          "второй вызов идемпотентной операции обязан вернуть 200",
+          "идемпотентность — это кэширование ответа клиентом"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "http_methods_safe_idempotent",
+      "title": "Знает идемпотентные HTTP-методы и safe",
+      "expected": "Кандидат называет GET, HEAD, PUT, DELETE как идемпотентные; POST и PATCH — нет по умолчанию; safe (GET, HEAD) vs idempotent (PUT, DELETE); PUT меняет state, но повтор не добавляет эффект.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "таблица HTTP methods — ключевое decision rule для retry",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "idempotence_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "http_methods_safe_idempotent",
+            "oftenConfusedWith": ["put_vs_post"],
+            "anchorTermsExpected": [
+              "GET",
+              "PUT",
+              "DELETE",
+              "safe",
+              "POST",
+              "PATCH"
+            ],
+            "anchorTermsWrongTopic": [
+              "POST идемпотентен",
+              "safe и idempotent одно",
+              "PATCH всегда идемпотентен"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["GET", "PUT", "DELETE", "safe"],
+            "ask": "какие HTTP-методы идемпотентны по RFC 9110 и чем safe отличается от idempotent"
+          }
+        ],
+        "mustConcepts": [
+          "GET",
+          "HEAD",
+          "PUT",
+          "DELETE",
+          "POST",
+          "PATCH",
+          "safe",
+          "безопасн",
+          "идемпотент",
+          "read-only",
+          "только чтение",
+          "побочн",
+          "side effect",
+          "RFC 9110",
+          "retry",
+          "HEAD",
+          "метод"
+        ],
+        "falseClaims": [
+          "POST идемпотентен по RFC 9110",
+          "PATCH всегда идемпотентен по спецификации",
+          "safe и idempotent — синонимы",
+          "PUT не идемпотентен потому что меняет state",
+          "DELETE не идемпотентен потому что удаляет ресурс"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "put_vs_post",
+      "title": "Отличает PUT от POST при retry",
+      "expected": "Кандидат: PUT перезаписывает абсолютное значение — три одинаковых вызова → тот же balance; POST накапливает/создаёт — три charge → тройное списание.",
+      "score": 1.0,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "quick example PUT vs POST — базовый механизм",
+        "probeConceptGroups": [
+          {
+            "match": ["PUT", "POST", "balance", "charge"],
+            "ask": "почему retry PUT /balance безопасен, а retry POST /charge — нет"
+          }
+        ],
+        "mustConcepts": [
+          "PUT",
+          "POST",
+          "перезапис",
+          "overwrite",
+          "абсолютн",
+          "balance",
+          "charge",
+          "накаплива",
+          "accumul",
+          "retry",
+          "три раза",
+          "200",
+          "300",
+          "создаёт",
+          "новый"
+        ],
+        "falseClaims": [
+          "PUT и POST одинаково ведут себя при retry",
+          "POST перезаписывает state как PUT",
+          "PUT накапливает значения при каждом вызове",
+          "retry POST безопасен для платежей",
+          "PUT создаёт новый ресурс при каждом вызове"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "patch_trap",
+      "title": "Понимает ловушку PATCH с increment",
+      "expected": "Кандидат: PATCH с increment: 1 — относительная операция, retry увеличивает visits 2, 3, 4; PUT с абсолютным значением — идемпотентная альтернатива.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "PATCH trap — частая production-ошибка",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["PATCH", "increment", "visits"],
+            "ask": "почему PATCH с increment: 1 ломает идемпотентность при retry"
+          },
+          {
+            "match": ["абсолют", "PUT", "visits: 5"],
+            "ask": "как сделать обновление visits идемпотентным"
+          }
+        ],
+        "mustConcepts": [
+          "PATCH",
+          "increment",
+          "относительн",
+          "relative",
+          "абсолютн",
+          "absolute",
+          "visits",
+          "retry",
+          "перезапис",
+          "PUT",
+          "payload",
+          "одинаков",
+          "разный state",
+          "update",
+          "инкремент"
+        ],
+        "falseClaims": [
+          "PATCH всегда идемпотентен по HTTP-спецификации",
+          "increment: 1 идемпотентен при одинаковом payload",
+          "PATCH и PUT взаимозаменяемы для идемпотентности",
+          "retry PATCH с increment безопасен",
+          "HTTP spec гарантирует идемпотентность PATCH"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "idempotency_keys",
+      "title": "Знает idempotency key для POST",
+      "expected": "Кандидат описывает: клиент генерирует UUID в заголовке; сервер проверяет Redis/Map; первый вызов обрабатывает, retry возвращает кэшированный результат; Stripe pattern, TTL 24h.",
+      "score": 2.0,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "idempotency key — ключевой паттерн для POST retry",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": ["idempotency", "idempotency-key", "UUID", "Stripe"],
+            "ask": "как idempotency key делает POST безопасным для retry"
+          },
+          {
+            "match": ["Redis", "кэш", "dedup", "дедуп"],
+            "ask": "где и как долго сервер хранит результат по ключу"
+          }
+        ],
+        "mustConcepts": [
+          "idempotency key",
+          "idempotency-key",
+          "UUID",
+          "заголовок",
+          "header",
+          "Stripe",
+          "Redis",
+          "кэш",
+          "dedup",
+          "дедуп",
+          "retry",
+          "POST",
+          "double-charge",
+          "подвойн",
+          "86400",
+          "24",
+          "charge",
+          "payment"
+        ],
+        "falseClaims": [
+          "idempotency key генерирует сервер после первого ответа",
+          "retry с новым ключом вернёт тот же результат",
+          "idempotency key нужен только для GET",
+          "без Redis idempotency key невозможен",
+          "клиент может менять ключ при каждом retry"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки идемпотентности",
+      "expected": "Кандидат: DELETE 404 vs 204 не ломает идемпотентность; INSERT без ON CONFLICT → дубликаты; GET идемпотентен, но результат может меняться; PUT при replica lag в eventually-consistent системе.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — DELETE, DB insert, GET stability, eventual consistency",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": ["404", "204", "DELETE"],
+            "ask": "почему второй DELETE с 404 не нарушает идемпотентность"
+          },
+          {
+            "match": ["ON CONFLICT", "INSERT", "Kafka", "duplicate"],
+            "ask": "как избежать дубликатов при retry insert в Kafka consumer"
+          },
+          {
+            "match": ["replica lag", "eventually", "ETag", "conditional"],
+            "ask": "когда PUT может временно нарушить идемпотентность в distributed system"
+          }
+        ],
+        "mustConcepts": [
+          "404",
+          "204",
+          "DELETE",
+          "ON CONFLICT",
+          "INSERT",
+          "UNIQUE",
+          "дубликат",
+          "Kafka",
+          "consumer",
+          "offset",
+          "GET",
+          "offset=10",
+          "кэш",
+          "полный URL",
+          "replica lag",
+          "eventually consistent",
+          "ETag",
+          "compare-and-swap",
+          "conditional write",
+          "DynamoDB",
+          "CockroachDB"
+        ],
+        "falseClaims": [
+          "404 на втором DELETE нарушает идемпотентность",
+          "INSERT без constraint безопасен при at-least-once delivery",
+          "GET всегда возвращает стабильные данные при retry",
+          "PUT всегда идемпотентен даже при replica lag",
+          "PATCH с increment проходит code review как идемпотентный"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "message_queue_consumer",
+      "title": "Проектирует идемпотентный consumer очереди",
+      "expected": "Кандидат: at-least-once delivery → сообщение может прийти дважды; проверка paymentId / natural key перед insert; ON CONFLICT или skip if exists; effectively-once processing.",
+      "score": 1.0,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "advanced",
+        "weightRationale": "Senior Kafka/SQS consumer pattern из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "idempotency_keys",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["Kafka", "at-least-once", "paymentId", "SQS"],
+            "ask": "как сделать обработку платежа идемпотентной при at-least-once delivery"
+          },
+          {
+            "match": ["operation ID", "outbox", "absolute", "PUT", "counter"],
+            "ask": "как спроектировать идемпотентный increment счётчика в шардированной БД"
+          }
+        ],
+        "mustConcepts": [
+          "Kafka",
+          "SQS",
+          "RabbitMQ",
+          "at-least-once",
+          "effectively-once",
+          "paymentId",
+          "natural key",
+          "findUnique",
+          "skip",
+          "дубликат",
+          "consumer",
+          "offset",
+          "commit",
+          "transaction",
+          "operation ID",
+          "outbox",
+          "absolute value",
+          "шард"
+        ],
+        "falseClaims": [
+          "at-least-once delivery гарантирует exactly-once без дополнительной логики",
+          "Kafka consumer не нуждается в dedup при crash до commit offset",
+          "increment counter идемпотентен без unique operation ID",
+          "dedup на стороне брокера заменяет проверку на consumer",
+          "повторное сообщение всегда безопасно игнорировать без проверки в БД"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Идемпотентность — повторный вызов не меняет конечный state: PUT {balance: 200} три раза → 200. POST /charge три раза → 300. GET, PUT, DELETE — retry безопасен; POST — только с idempotency key в заголовке.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну идемпотентность — как покрасить стену дважды, всё равно красная. DELETE второй раз 404 — ок, ресурса нет. PATCH с increment — ловушка, retry накручивает visits. Stripe: UUID в Idempotency-Key, Redis 24h.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Kafka at-least-once: consumer проверяет paymentId перед insert, ON CONFLICT DO NOTHING. GET идемпотентен, но /users?offset=10 между retry может вернуть разное — кэш по полному URL. PUT при replica lag — conditional write через ETag.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Идемпотентность — когда HTTP-ответ всегда одинаковый. POST идемпотентен по RFC. PATCH с increment безопасен при retry.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "DELETE 404 на втором вызове нарушает идемпотентность. INSERT без UNIQUE constraint нормален для Kafka consumer. Safe и idempotent — одно и то же.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Idempotency key генерирует сервер. Retry POST без ключа безопасен для платежей. GET всегда возвращает те же данные при любом retry.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "idempotence_definition",
+      "exampleType": "good",
+      "exampleText": "Intended effect одинаков: три PUT → balance 200. Важен final state, не status code.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "idempotence_definition",
+      "exampleType": "good",
+      "exampleText": "повтор не добавляет новых эффектов сверх первого — RFC 9110 про intended effect",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "idempotence_definition",
+      "exampleType": "bad",
+      "exampleText": "Идемпотентность = одинаковый HTTP body при каждом retry, иначе не идемпотентно.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "http_methods_safe_idempotent",
+      "exampleType": "good",
+      "exampleText": "GET, HEAD — safe и idempotent; PUT, DELETE — idempotent но не safe; POST — ни то ни другое.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "http_methods_safe_idempotent",
+      "exampleType": "good",
+      "exampleText": "retry GET PUT DELETE — ok по RFC 9110, POST — только с ключом",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "http_methods_safe_idempotent",
+      "exampleType": "bad",
+      "exampleText": "POST и PATCH идемпотентны по умолчанию. Safe = idempotent.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "put_vs_post",
+      "exampleType": "good",
+      "exampleText": "PUT overwrite balance:200 — три retry → 200. POST charge +100 — три retry → 300 total.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "put_vs_post",
+      "exampleType": "good",
+      "exampleText": "PUT ставит целевой state, POST фиксирует событие каждый раз",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "put_vs_post",
+      "exampleType": "bad",
+      "exampleText": "POST и PUT одинаково перезаписывают state при retry.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "patch_trap",
+      "exampleType": "good",
+      "exampleText": "PATCH increment:1 — visits 1→2→3 при retry; PUT {visits:5} — всегда 5.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "patch_trap",
+      "exampleType": "good",
+      "exampleText": "относительная операция ломает idempotence — нужно абсолютное значение",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "patch_trap",
+      "exampleType": "bad",
+      "exampleText": "PATCH всегда идемпотентен, increment безопасен при network retry.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "idempotency_keys",
+      "exampleType": "good",
+      "exampleText": "Client UUID в Idempotency-Key → Redis lookup → первый charge, retry тот же paymentId без double-charge.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "idempotency_keys",
+      "exampleType": "good",
+      "exampleText": "клиент не знает дошёл ли запрос — шлёт тот же ключ, сервер дедупит",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "idempotency_keys",
+      "exampleType": "bad",
+      "exampleText": "Idempotency key меняют при каждом retry чтобы получить свежий результат.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "DELETE 404 ok — resource gone. INSERT ON CONFLICT (payment_id) DO NOTHING для Kafka retry.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "GET idempotent но /users?offset=10 unstable — cache key full URL. PUT + replica lag → ETag conditional.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "404 на DELETE = нарушение идемпотентности. INSERT без constraint ok для payments.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "message_queue_consumer",
+      "exampleType": "good",
+      "exampleText": "processPaymentMessage: findUnique paymentId → skip if exists → transaction create + decrement balance.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "message_queue_consumer",
+      "exampleType": "good",
+      "exampleText": "at-least-once + dedup check = effectively-once. counter: PUT absolute или unique operation ID в tx",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "message_queue_consumer",
+      "exampleType": "bad",
+      "exampleText": "Kafka exactly-once из коробки — dedup на consumer не нужен.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "shcho-take-idempotentnist",
+    "apiUrl": "https://api.itlead.org/api/questions/shcho-take-idempotentnist",
+    "pageUrl": "https://itlead.org/interview-questions/javascript/shcho-take-idempotentnist",
+    "difficulty": "SENIOR",
+    "titleEn": "What is idempotence?",
+    "categorySlug": "javascript",
+    "syncedAt": "2026-06-18T20:00:00.000Z"
+  }
+}

@@ -1,0 +1,605 @@
+{
+  "topic": {
+    "code": "git_bisect",
+    "name": "Git bisect",
+    "skillCode": "git",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое git bisect и как с его помощью найти коммит, который внёс баг?",
+    "shortAnswer": "**git bisect** находит коммит с багом через бинарный поиск: помечаешь один коммит как `good` (работал) и один как `bad` (сломан), Git сам переключается на середины диапазона, пока не останется первый плохой коммит. Для ~1000 коммитов нужно ~10 проверок вместо N.",
+    "idealAnswer": "**git bisect** — команда Git для поиска коммита, который внёс регрессию, через бинарный поиск по истории. Вы задаёте известный рабочий (`good`) и известный сломанный (`bad`) коммит; Git топологически сортирует диапазон, выбирает середину (с учётом формы DAG, не просто деление пополам) и checkout'ит её — вы тестируете и помечаете `git bisect good` или `git bisect bad`, пока не найдётся «first bad commit». Сложность ~O(log N): 1000 коммитов ≈ 10 шагов, 100 000 ≈ 17. Базовый flow: `git bisect start` → `git bisect bad` (сломанный HEAD) → `git bisect good <старый-тег>` → на каждой середине тест → `git bisect reset` в конце. Автоматизация: `git bisect run ./test.sh` — скрипт с exit 0 = good, 1–127 = bad, 125 = skip (не компилируется/нет deps), 128+ = abort. Когда использовать: большой merge/PR, прод регрессия между релизами, стабильно воспроизводимый failing test; правило: >30 коммитов с последнего good — bisect, меньше — часто быстрее `git log -p`. Типичные ошибки: `bisect good HEAD` когда HEAD уже bad (пересечение границ); забыть `bisect reset` (detached HEAD); dirty working tree (stash перед start); недетерминированный ручной тест; rebase во время сессии (сохранить `git bisect log > session.log`, восстановить `replay`). Внутри: состояние в `.git/refs/bisect/` и `BISECT_LOG`; merge-коммиты по умолчанию deprioritized; `git bisect visualize` для графа кандидатов. Bisect работает на уровне коммитов, не файлов — для файла сначала сузить через `git log --follow -- path`. Самая сложная часть на практике — надёжный тестовый скрипт, воспроизводящий баг.",
+    "maxScore": 10,
+    "skills": [
+      "git"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "bisect_definition",
+      "title": "Понимает суть git bisect",
+      "expected": "Кандидат объясняет: git bisect — бинарный поиск по истории коммитов; помечает good/bad; Git checkout'ит середины, пока не найдёт first bad commit.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — бинарный поиск коммита с багом",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "bisect_definition",
+            "oftenConfusedWith": [
+              "basic_workflow",
+              "binary_search_complexity"
+            ],
+            "anchorTermsExpected": [
+              "bisect",
+              "бинарн",
+              "good",
+              "bad",
+              "first bad commit",
+              "середин"
+            ],
+            "anchorTermsWrongTopic": [
+              "git blame",
+              "git log -p вместо bisect",
+              "bisect ищет по файлам"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "bisect",
+              "бинарн",
+              "good",
+              "bad"
+            ],
+            "ask": "чем git bisect отличается от перебора коммитов по одному"
+          }
+        ],
+        "mustConcepts": [
+          "git bisect",
+          "bisect",
+          "бинарн",
+          "binary search",
+          "good",
+          "bad",
+          "first bad commit",
+          "первый плох",
+          "середин",
+          "midpoint",
+          "диапазон",
+          "коммит",
+          "регресс",
+          "баг",
+          "checkout",
+          "переключ",
+          "помеча"
+        ],
+        "falseClaims": [
+          "git bisect перебирает коммиты по порядку от HEAD",
+          "bisect работает на уровне отдельных файлов без коммитов",
+          "достаточно одной метки good без bad",
+          "bisect заменяет git blame для поиска автора строки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "binary_search_complexity",
+      "title": "Знает сложность бинарного поиска",
+      "expected": "Кандидат объясняет: log2(N) проверок вместо до N; ~10 шагов на 1000 коммитов; выигрыш критичен, когда каждый тест долгий.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "log2(N) — ключевой аргумент за bisect из ITLead TL;DR",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "bisect_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "log2",
+              "log",
+              "1000",
+              "10"
+            ],
+            "ask": "сколько шагов bisect для 1000 и 100 000 коммитов"
+          }
+        ],
+        "mustConcepts": [
+          "log2",
+          "log",
+          "O(log",
+          "сложност",
+          "1000",
+          "10",
+          "100 000",
+          "17",
+          "20",
+          "N проверок",
+          "линейн",
+          "по одному",
+          "делит пополам",
+          "эффектив",
+          "долгий тест",
+          "минут"
+        ],
+        "falseClaims": [
+          "bisect всегда требует ровно N/2 проверок",
+          "для 10 коммитов bisect быстрее ручного git log -p в любом случае",
+          "сложность bisect линейная O(N)",
+          "количество шагов не зависит от размера истории"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "basic_workflow",
+      "title": "Знает базовый workflow bisect",
+      "expected": "Кандидат описывает: bisect start → bisect bad (сломанный) → bisect good (старый рабочий) → тест середины → good/bad → bisect reset; порядок: сначала bad, потом good.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "quick example из ITLead — минимальный рабочий сценарий",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "bisect start",
+              "bisect bad",
+              "bisect good",
+              "bisect reset"
+            ],
+            "ask": "правильный порядок команд при старте сессии bisect"
+          }
+        ],
+        "mustConcepts": [
+          "bisect start",
+          "bisect bad",
+          "bisect good",
+          "bisect reset",
+          "HEAD",
+          "тег",
+          "v1.0",
+          "release",
+          "detached",
+          "сначала bad",
+          "потом good",
+          "старый",
+          "рабоч",
+          "сломан",
+          "Bisecting",
+          "revisions left"
+        ],
+        "falseClaims": [
+          "начинать с bisect good HEAD когда HEAD сломан",
+          "bisect reset не обязателен после сессии",
+          "можно bisect без bisect start",
+          "good всегда должен быть HEAD"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "bisect_run_automation",
+      "title": "Автоматизирует через bisect run",
+      "expected": "Кандидат объясняет: bisect run запускает скрипт на каждой середине; exit 0 = good, 1–127 = bad, 125 = skip, 128+ = abort; скрипт должен быть детерминированным.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "bisect run и exit codes — ключ production-паттерн senior",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "bisect run",
+              "exit",
+              "125",
+              "skip"
+            ],
+            "ask": "какие exit codes ожидает bisect run и когда использовать 125"
+          },
+          {
+            "match": [
+              "test.sh",
+              "npm test",
+              "скрипт",
+              "автомат"
+            ],
+            "ask": "как автоматизировать поиск регрессии в auth-тесте между двумя тегами"
+          }
+        ],
+        "mustConcepts": [
+          "bisect run",
+          "автомат",
+          "скрипт",
+          "test.sh",
+          "exit code",
+          "код выхода",
+          "0",
+          "good",
+          "bad",
+          "125",
+          "skip",
+          "пропуст",
+          "128",
+          "abort",
+          "перерв",
+          "npm test",
+          "node test",
+          "детермин",
+          "стабильн",
+          "воспроизвод"
+        ],
+        "falseClaims": [
+          "bisect run принимает любой ненулевой exit как good",
+          "exit 125 помечает коммит как bad",
+          "bisect run работает только с make test",
+          "ручная проверка надёжнее скрипта при flaky тестах"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use_bisect",
+      "title": "Понимает когда использовать bisect",
+      "expected": "Кандидат называет: большой merge/PR, прод между релизами, стабильный failing test; правило >30 коммитов; для малого диапазона — git log -p; bisect на локальной копии при активных push.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use и rule of thumb из ITLead",
+        "mustConcepts": [
+          "merge",
+          "PR",
+          "production",
+          "релиз",
+          "тег",
+          "регресс",
+          "30 коммит",
+          "git log -p",
+          "мало коммит",
+          "failing test",
+          "стабильн",
+          "локальн",
+          "ветк",
+          "push",
+          "история сдвига",
+          "merge base",
+          "HEAD"
+        ],
+        "falseClaims": [
+          "bisect нужен всегда при любом баге",
+          "git log -p всегда медленнее bisect",
+          "bisect безопасен на общей ветке при активных push коллег",
+          "bisect заменяет code review при поиске причины"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки bisect",
+      "expected": "Кандидат называет: bisect good на сломанном HEAD; забытый bisect reset; dirty working tree (stash); недетерминированный ручной тест; rebase во время сессии (log/replay).",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — критичные pitfalls из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "dirty",
+              "stash",
+              "working tree"
+            ],
+            "ask": "почему bisect start падает на dirty working tree и что делать"
+          },
+          {
+            "match": [
+              "reset",
+              "detached",
+              "забыл"
+            ],
+            "ask": "что случится если не сделать bisect reset после сессии"
+          },
+          {
+            "match": [
+              "rebase",
+              "replay",
+              "BISECT_LOG"
+            ],
+            "ask": "как сохранить прогресс bisect при rebase или паузе"
+          }
+        ],
+        "mustConcepts": [
+          "bisect good HEAD",
+          "пересеч",
+          "границ",
+          "bisect reset",
+          "detached HEAD",
+          "dirty",
+          "working tree",
+          "stash",
+          "stash pop",
+          "недетермин",
+          "на глаз",
+          "rebase",
+          "bisect log",
+          "bisect replay",
+          "session.log",
+          "SHA",
+          "abort",
+          "fatal",
+          "cannot bisect"
+        ],
+        "falseClaims": [
+          "можно bisect с незакоммиченными изменениями без stash",
+          "detached HEAD после bisect — норма для daily work без reset",
+          "bisect переживает rebase той же ветки без replay",
+          "ручная оценка «выглядит ок» достаточна для bisect"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "internals_and_advanced",
+      "title": "Знает внутренности и edge cases",
+      "expected": "Кандидат упоминает: refs/bisect/, BISECT_LOG, replay; merge-коммиты deprioritized; visualize; DAG midpoint не просто count/2; сужение по файлу через git log --follow.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "internals и follow-up questions — бонус senior",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "merge",
+              "visualize",
+              "DAG"
+            ],
+            "ask": "как bisect обрабатывает merge-коммиты и как их проверить"
+          },
+          {
+            "match": [
+              "файл",
+              "git log --follow",
+              "log -L"
+            ],
+            "ask": "можно ли bisect только по одному файлу"
+          }
+        ],
+        "mustConcepts": [
+          "refs/bisect",
+          "BISECT_LOG",
+          "bisect replay",
+          "bisect visualize",
+          "merge commit",
+          "merge-коммит",
+          "DAG",
+          "тополог",
+          "bisect--helper",
+          "середин",
+          "не делит пополам",
+          "git log --follow",
+          "файл",
+          "log -L",
+          "functionName",
+          "уровень коммит",
+          "kernel",
+          "Chromium",
+          "Node.js"
+        ],
+        "falseClaims": [
+          "Git всегда делит количество коммитов ровно пополам",
+          "bisect напрямую ищет изменения в одном файле",
+          "merge-коммиты всегда первыми тестируются bisect",
+          "BISECT_LOG только для отладки Git internals, replay не работает"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "git bisect — бинарный поиск: помечаю bad на HEAD и good на v1.0, Git checkout'ит середины, я тестирую и ставлю good/bad. ~10 шагов на 1000 коммитов. В конце bisect reset. Для автоматизации — bisect run с тестом: 0 good, 125 skip если не собирается.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Регрессия auth между v4.18 и v4.19 — bisect start, bad на v4.19.2, good на v4.18.0, bisect run node test/auth.test.js. Git сам гоняет тест на серединах, в конце git show на first bad commit. Если рабочее дерево грязное — stash перед start.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну bisect когда коммитов много — log2(N) вместо перебора. меньше 30 — быстрее log -p. merge-коммиты git часто пропускает, visualize смотрю если подозреваю merge. после сессии reset обязательно",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "git bisect — это git blame для поиска автора бага. Перебирает все коммиты от HEAD к main по порядку.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Сначала bisect good HEAD, потом bisect bad на старом теге. После нахождения коммита можно сразу push из detached HEAD. Dirty tree не мешает bisect start.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "bisect run: exit 125 значит bad, exit 1 значит skip. Для одного файла — git bisect -- path/to/file.js без log.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "bisect_definition",
+      "exampleType": "good",
+      "exampleText": "bisect — бинарный поиск first bad commit между known good и known bad; git сам выбирает midpoint.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "bisect_definition",
+      "exampleType": "good",
+      "exampleText": "помечаешь good/bad, git переключает на середину, пока не останется один коммит что сломал",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "bisect_definition",
+      "exampleType": "bad",
+      "exampleText": "bisect ищет баг по diff одного файла без переключения коммитов.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "binary_search_complexity",
+      "exampleType": "good",
+      "exampleText": "1000 коммитов ≈ 10 проверок, log2(N); линейный перебор — до 1000. Когда тест по 2 минуты — разница критична.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "binary_search_complexity",
+      "exampleType": "good",
+      "exampleText": "O(log N) в среднем, миллион коммитов ~20 шагов — вот зачем bisect на длинной истории",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "binary_search_complexity",
+      "exampleType": "bad",
+      "exampleText": "bisect всегда делит диапазон пополам по количеству коммитов, сложность O(N).",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "basic_workflow",
+      "exampleType": "good",
+      "exampleText": "bisect start → bisect bad (HEAD сломан) → bisect good v1.0 → на checkout тест → good/bad → reset.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "basic_workflow",
+      "exampleType": "good",
+      "exampleText": "сначала bad на текущем, потом good на старом теге, не наоборот",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "basic_workflow",
+      "exampleType": "bad",
+      "exampleText": "bisect good HEAD когда баг уже в HEAD — так быстрее найти bad commit.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "bisect_run_automation",
+      "exampleType": "good",
+      "exampleText": "bisect run ./test.sh: 0 good, non-zero bad, 125 skip если npm install падает на старом коммите.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "bisect_run_automation",
+      "exampleType": "good",
+      "exampleText": "express между тегами — bisect run node test/auth.test.js, git show на первом bad без ручного перебора 50 diff",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "bisect_run_automation",
+      "exampleType": "bad",
+      "exampleText": "bisect run: любой exit кроме 0 — skip; 125 помечает коммит bad.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use_bisect",
+      "exampleType": "good",
+      "exampleText": "Большой merge сломал prod — bisect от merge base до HEAD. 5 коммитов — git log -p быстрее. Стабильный падающий unit-test — bisect run.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_use_bisect",
+      "exampleType": "good",
+      "exampleText": "больше 30 коммитов от last good — bisect; на shared branch лучше локальная копия",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use_bisect",
+      "exampleType": "bad",
+      "exampleText": "bisect использовать всегда, даже для одного коммита вчера — log -p никогда не подходит.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Dirty tree — stash, bisect, reset, stash pop. Забыл reset — висишь в detached HEAD. Flaky ручной тест — bisect уедет не туда, нужен скрипт.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "rebase во время bisect — bisect log > session.log, потом bisect replay session.log",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "После bisect можно коммитить из detached HEAD — reset не нужен. Незакоммиченный debug в index.js не мешает checkout.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "internals_and_advanced",
+      "exampleType": "good",
+      "exampleText": "Состояние в refs/bisect и BISECT_LOG; merge deprioritized — visualize если подозреваю merge. Файл: git log --follow, потом good/bad границы.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "internals_and_advanced",
+      "exampleType": "good",
+      "exampleText": "midpoint не просто count/2 — DAG и bisect--helper; для функции git log -L",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "internals_and_advanced",
+      "exampleType": "bad",
+      "exampleText": "git bisect --follow file.js ищет bad commit только в этом файле автоматически.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "git-bisect",
+    "apiUrl": "https://api.itlead.org/api/questions/git-bisect",
+    "pageUrl": "https://itlead.org/interview-questions/git/git-bisect",
+    "difficulty": "SENIOR",
+    "titleEn": "What is git bisect?",
+    "categorySlug": "git",
+    "syncedAt": "2026-06-18T15:00:00.000Z"
+  }
+}

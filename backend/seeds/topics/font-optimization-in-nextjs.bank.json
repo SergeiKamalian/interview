@@ -1,0 +1,633 @@
+{
+  "topic": {
+    "code": "font_optimization_in_nextjs",
+    "name": "Оптимизация шрифтов (next/font) в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работает оптимизация шрифтов через `next/font` в Next.js и чем она лучше классического подключения Google Fonts?",
+    "shortAnswer": "`next/font` — встроенная система Next.js, которая на этапе сборки скачивает шрифты (включая Google Fonts), self-host'ит их как статические WOFF2, инлайнит `@font-face` в CSS и автоматически добавляет preload. Это убирает внешние запросы к fonts.googleapis.com и снижает CLS за счёт `size-adjust` и `font-display: swap`.",
+    "idealAnswer": "`next/font` — встроенная система оптимизации шрифтов Next.js: на `next build` шрифты скачиваются и self-host'ятся с вашего домена, без runtime-запросов к Google. Классический `<link href=\"fonts.googleapis.com\">` вызывает DNS lookup, загрузку CSS и файлов шрифта — браузер сначала рисует fallback другого размера, потом текст «прыгает» (CLS). `next/font` генерирует `@font-face` с `size-adjust` по вертикальным метрикам шрифта (ascent, descent, line-gap), чтобы fallback совпадал по размерам с кастомным, и добавляет `<link rel=\"preload\" as=\"font\">` в `<head>`. `className` вешает `font-family` напрямую на элемент; `variable` создаёт CSS-переменную вроде `--font-inter` для Tailwind или globals.css — обычно `variable` на `<html>`, `className` на `<body>`. `display: 'swap'` (рекомендуется для body) показывает fallback сразу и меняет на кастомный после загрузки; `block` скрывает текст до 3 секунд. Google Fonts: `import { Inter } from 'next/font/google'`. Локальные WOFF2: `next/font/local`, путь относительно файла определения (например `./fonts/MyFont.woff2` в `app/fonts/`), не от корня и не через `public/`. Variable fonts: `axes: ['wght']` — один WOFF2 на весь диапазон весов; без `axes` скачивается только указанный static weight. Важные опции: `subsets` (для кириллицы — `['latin', 'cyrillic']`, иначе глифы не синтезируются), `weight`, `preload` (default true), `adjustFontFallback` (fallback для расчёта size-adjust, на iOS может быть SF Pro вместо Arial). В `next dev` оптимизация частично отключена — полный эффект виден после production build. Работает и в App Router (`app/layout.tsx`), и в Pages Router (`_app.tsx`). Типичные ошибки: только `latin` для кириллицы, `display: 'block'` на body, `className` на `<html>` вместо `<body>`, неверный путь localFont, variable font без `axes`. Для Lighthouse 90+ и CLS < 0.1 миграция с `<link>` на `next/font` — прямой путь.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "javascript",
+      "css"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "next_font_definition",
+      "title": "Понимает что такое next/font",
+      "expected": "Кандидат объясняет: встроенная система Next.js для self-host шрифтов на build time, без внешних запросов в runtime; заменяет `<link>` на fonts.googleapis.com.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — определение и ценность self-host",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "next_font_definition",
+            "oftenConfusedWith": [
+              "traditional_vs_next_font",
+              "build_time_mechanism"
+            ],
+            "anchorTermsExpected": [
+              "next/font",
+              "self-host",
+              "build time",
+              "WOFF2",
+              "без внешних",
+              "fonts.googleapis"
+            ],
+            "anchorTermsWrongTopic": [
+              "next/font это CDN Google",
+              "шрифты грузятся только в dev",
+              "next/font только для Tailwind"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "next/font",
+              "self-host",
+              "build"
+            ],
+            "ask": "чем next/font отличается от обычного подключения Google Fonts через link в head"
+          }
+        ],
+        "mustConcepts": [
+          "next/font",
+          "next/font/google",
+          "self-host",
+          "самостоятельн",
+          "хост",
+          "build time",
+          "сборк",
+          "WOFF2",
+          "встроенн",
+          "оптимизац",
+          "шрифт",
+          "без внешних",
+          "runtime",
+          "fonts.googleapis",
+          "Google Fonts",
+          "статическ",
+          "домен"
+        ],
+        "falseClaims": [
+          "next/font оставляет runtime-запросы к Google Fonts",
+          "next/font работает только с локальными файлами, не с Google",
+          "next/font скачивает шрифты в браузере при каждом визите",
+          "next/font — это отдельный npm-пакет, не часть Next.js",
+          "next/font не нужен в production, достаточно link tag"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "traditional_vs_next_font",
+      "title": "Сравнивает link tag и next/font",
+      "expected": "Кандидат описывает проблемы `<link href=\"fonts.googleapis.com\">`: DNS, цепочка CSS+font, блокировка рендера, CLS при смене fallback; next/font убирает внешние запросы и прыжки текста.",
+      "score": 1.0,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "ключевой trade-off из TL;DR — CLS и Core Web Vitals",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "next_font_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "CLS",
+              "link",
+              "fonts.googleapis",
+              "fallback"
+            ],
+            "ask": "почему классический Google Fonts link вызывает layout shift"
+          }
+        ],
+        "mustConcepts": [
+          "link",
+          "fonts.googleapis",
+          "DNS",
+          "внешн",
+          "запрос",
+          "CLS",
+          "layout shift",
+          "зсув",
+          "fallback",
+          "прыжок",
+          "jump",
+          "Core Web Vitals",
+          "блокир",
+          "рендер",
+          "CSS файл",
+          "сеть",
+          "миграц"
+        ],
+        "falseClaims": [
+          "link tag на Google Fonts не влияет на CLS",
+          "next/font и link tag дают одинаковую производительность",
+          "CLS от шрифтов не влияет на Lighthouse",
+          "Google Fonts через link уже self-hosted",
+          "next/font ухудшает FCP из-за большего CSS"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "classname_vs_variable",
+      "title": "Различает className и variable",
+      "expected": "Кандидат объясняет: `className` — прямой `font-family` на элемент; `variable` — CSS custom property (`--font-inter`) для Tailwind/globals; `variable` на `<html>`, `className` на `<body>`.",
+      "score": 2.0,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "практический must-know для layout и Tailwind",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "classname_vs_variable",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "className",
+              "variable",
+              "--font",
+              "font-family",
+              "CSS перемен",
+              "html",
+              "body"
+            ],
+            "anchorTermsWrongTopic": [
+              "className и variable одно и то же",
+              "variable вешают только на body",
+              "className создаёт CSS variable"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "className",
+              "variable",
+              "Tailwind"
+            ],
+            "ask": "когда использовать variable для Tailwind, а когда достаточно className"
+          },
+          {
+            "match": [
+              "html",
+              "body",
+              "className"
+            ],
+            "ask": "куда вешать className и variable в RootLayout"
+          }
+        ],
+        "mustConcepts": [
+          "className",
+          "variable",
+          "font-family",
+          "CSS custom property",
+          "CSS перемен",
+          "--font",
+          "Tailwind",
+          "globals.css",
+          "html",
+          "body",
+          "layout.tsx",
+          "font-sans",
+          "var(--font",
+          "дизайн-систем",
+          "стек шрифт"
+        ],
+        "falseClaims": [
+          "className создаёт CSS-переменную вместо font-family",
+          "variable и className взаимозаменяемы без разницы",
+          "className нужно вешать на html для каскада на body",
+          "variable работает только с Google Fonts, не с localFont",
+          "Tailwind не может использовать next/font variable"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "font_display_and_size_adjust",
+      "title": "Понимает display swap и size-adjust",
+      "expected": "Кандидат объясняет: `display: 'swap'` показывает fallback сразу и меняет шрифт после загрузки; `size-adjust` масштабирует fallback по метрикам шрифта, чтобы CLS был ~0; знает почему `block` плох для body.",
+      "score": 2.0,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "механизм устранения CLS — центральная ценность next/font",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "swap",
+              "font-display",
+              "fallback"
+            ],
+            "ask": "что делает font-display swap и чем отличается от block"
+          },
+          {
+            "match": [
+              "size-adjust",
+              "ascent",
+              "descent",
+              "метрик"
+            ],
+            "ask": "как size-adjust предотвращает layout shift при swap"
+          }
+        ],
+        "mustConcepts": [
+          "display",
+          "swap",
+          "block",
+          "font-display",
+          "fallback",
+          "size-adjust",
+          "CLS",
+          "layout shift",
+          "ascent",
+          "descent",
+          "line-gap",
+          "метрик",
+          "вертикальн",
+          "масштаб",
+          "adjustFontFallback",
+          "Arial",
+          "невидим",
+          "3 секунд",
+          "swap period"
+        ],
+        "falseClaims": [
+          "display block рекомендуется для body text",
+          "size-adjust меняет цвет текста при swap",
+          "swap скрывает текст до загрузки шрифта",
+          "CLS от шрифтов next/font не устраняется size-adjust",
+          "font-display optional всегда лучше swap для UI"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "build_time_mechanism",
+      "title": "Знает механизм на этапе сборки",
+      "expected": "Кандидат описывает flow `next build`: fetch/конвертация в WOFF2, `@font-face` в CSS, preload в head, кэш как статика; знает что в dev оптимизация неполная.",
+      "score": 1.0,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый механизм из раздела How it works at build time",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "next build",
+              "preload",
+              "@font-face"
+            ],
+            "ask": "что именно Next.js делает со шрифтом при production build"
+          }
+        ],
+        "mustConcepts": [
+          "next build",
+          "сборк",
+          "WOFF2",
+          "@font-face",
+          "preload",
+          "rel=\"preload\"",
+          "head",
+          "CSS",
+          "глобальн",
+          "статическ",
+          "кэш",
+          "cache",
+          "waterfall",
+          "dev",
+          "production",
+          "output",
+          "конверт"
+        ],
+        "falseClaims": [
+          "next/font оптимизирует шрифты одинаково в dev и production",
+          "preload для шрифтов нужно добавлять вручную",
+          "@font-face генерируется только на клиенте в runtime",
+          "шрифты next/font не кэшируются как static assets",
+          "next build не скачивает Google Fonts, только local"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки next/font",
+      "expected": "Кандидат называет: неверный subset для кириллицы, `display: 'block'` на body, `className` на html, неверный путь localFont, variable font без `axes`; знает правильные fix.",
+      "score": 2.0,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "5 частых ошибок из ITLead Common mistakes",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "subsets",
+              "cyrillic",
+              "latin",
+              "квадрат"
+            ],
+            "ask": "почему кириллица не отображается при subsets: ['latin']"
+          },
+          {
+            "match": [
+              "localFont",
+              "path",
+              "app/fonts"
+            ],
+            "ask": "относительно чего резолвится путь в next/font/local"
+          },
+          {
+            "match": [
+              "axes",
+              "wght",
+              "variable font"
+            ],
+            "ask": "почему fontVariationSettings не работает без axes"
+          }
+        ],
+        "mustConcepts": [
+          "subsets",
+          "cyrillic",
+          "latin",
+          "глиф",
+          "квадрат",
+          "display block",
+          "className html",
+          "body",
+          "localFont",
+          "next/font/local",
+          "путь",
+          "относительн",
+          "app/fonts",
+          "public",
+          "axes",
+          "wght",
+          "variable font",
+          "fontVariationSettings",
+          "weight",
+          "статическ"
+        ],
+        "falseClaims": [
+          "отсутствующие глифы синтезируются в runtime если subset маленький",
+          "localFont src относительно корня проекта или public/",
+          "className на html — рекомендуемый паттерн Next.js",
+          "variable font работает с одним weight без axes",
+          "subsets можно не указывать — скачаются все языки автоматически"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "local_variable_fonts_usage",
+      "title": "Знает localFont, axes и когда использовать",
+      "expected": "Кандидат различает `next/font/google` vs `next/font/local`; multiple fonts через variables + Tailwind; variable font с `axes: ['wght']`; Pages vs App Router; миграция с link перед production.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "when to use и real-world — бонус middle",
+        "mustConcepts": [
+          "next/font/local",
+          "next/font/google",
+          "Tailwind config",
+          "fontFamily",
+          "multiple fonts",
+          "heading",
+          "mono",
+          "Pages Router",
+          "App Router",
+          "_app",
+          "layout.tsx",
+          "Lighthouse",
+          "миграц",
+          "link tag"
+        ],
+        "falseClaims": [
+          "next/font работает только в App Router",
+          "localFont нельзя использовать с несколькими weight в src array",
+          "несколько Google Fonts требуют отдельных link tags вместо next/font",
+          "axes нужен только для italic, не для weight"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "`next/font` на build скачивает Inter как WOFF2, инлайнит @font-face с size-adjust и preload — zero внешних запросов и CLS. `display: 'swap'` для body, `variable` на html для Tailwind, `className` на body. Для кириллицы subsets: ['latin', 'cyrillic'].",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Раньше был link на fonts.googleapis — текст прыгал при загрузке. Перешли на next/font/google: self-host, fallback подогнан size-adjust, Lighthouse CLS упал ниже 0.1. Локальный брендовый шрифт — next/font/local, файлы в app/fonts/, путь ./fonts/Brand.woff2 от layout.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Inter + Roboto Mono: оба с variable (--font-sans, --font-mono) на html, body с inter.className, в tailwind.config fontFamily через var(). JetBrains Mono variable — axes: ['wght'], один WOFF2 на все веса.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "next/font — это просто обёртка над link tag, шрифты всё равно грузятся с Google при каждом визите. CLS от шрифтов не связан с Core Web Vitals.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Вешаю inter.className на html — так правильнее для всей страницы. Для русского текста subsets не нужен, браузер дорисует глифы сам.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "localFont src: '../public/fonts/font.woff2' — путь от корня проекта. Variable font: weight '400' достаточно, axes не нужен, fontVariationSettings всё сделает.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "next_font_definition",
+      "exampleType": "good",
+      "exampleText": "next/font — встроенный модуль Next.js: на сборке self-host шрифты с вашего домена, без runtime запросов к Google.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "next_font_definition",
+      "exampleType": "good",
+      "exampleText": "ну next/font сам качает шрифт при build, кладёт woff2 в output, в проде никаких fonts.googleapis",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "next_font_definition",
+      "exampleType": "bad",
+      "exampleText": "next/font — отдельная CDN-библиотека, шрифты всегда тянутся с серверов Google в браузере.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "traditional_vs_next_font",
+      "exampleType": "good",
+      "exampleText": "link на google fonts — dns, css, font files, fallback другого размера → CLS. next/font self-host + size-adjust, прыжка нет.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "traditional_vs_next_font",
+      "exampleType": "good",
+      "exampleText": "старый способ блокирует рендер и даёт layout shift когда кастомный шрифт приезжает — next/font это фиксит для vitals",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "traditional_vs_next_font",
+      "exampleType": "bad",
+      "exampleText": "link tag и next/font одинаковы по CLS, разница только в синтаксисе import.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "classname_vs_variable",
+      "exampleType": "good",
+      "exampleText": "className — font-family на элемент; variable — --font-inter для Tailwind. html className={inter.variable}, body className={inter.className}.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "classname_vs_variable",
+      "exampleType": "good",
+      "exampleText": "variable нужен когда шрифты через дизайн-систему и tailwind font-sans, className — быстро повесить на body",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "classname_vs_variable",
+      "exampleType": "bad",
+      "exampleText": "className создаёт CSS variable, variable ставит font-family — можно менять местами.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "font_display_and_size_adjust",
+      "exampleType": "good",
+      "exampleText": "display swap — fallback сразу, потом замена; size-adjust по ascent/descent подгоняет fallback, swap без сдвига layout.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "font_display_and_size_adjust",
+      "exampleType": "good",
+      "exampleText": "block на body — текст невидим до 3 сек, для основного текста только swap. adjustFontFallback: 'Arial' если на iOS метрики SF Pro ломают расчёт",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "font_display_and_size_adjust",
+      "exampleType": "bad",
+      "exampleText": "swap скрывает текст пока шрифт не загрузится, size-adjust меняет font-weight при swap.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "build_time_mechanism",
+      "exampleType": "good",
+      "exampleText": "next build: fetch google font → woff2 в output, @font-face в css, preload as=font в head. В dev полной оптимизации нет.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "build_time_mechanism",
+      "exampleType": "good",
+      "exampleText": "в проде шрифт как статика с long cache, preload рано в waterfall — руками link preload не пишу",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "build_time_mechanism",
+      "exampleType": "bad",
+      "exampleText": "@font-face генерируется в браузере при hydration, preload надо добавлять в _document вручную.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "subsets: ['latin'] + кириллица = квадраты; fix cyrillic. localFont путь от файла layout, не public/. axes: ['wght'] для variable font.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "ошибка — className на html вместо body; display block на текст — секунды пустого экрана на медленной сети",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "если глифа нет в subset, браузер нарисует похожий из fallback — cyrillic можно не добавлять.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "local_variable_fonts_usage",
+      "exampleType": "good",
+      "exampleText": "Google — next/font/google; кастомный woff2 — localFont. Два шрифта: variables на html, tailwind fontFamily var(). Pages Router — _app.tsx тоже ок.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "local_variable_fonts_usage",
+      "exampleType": "good",
+      "exampleText": "перед продом мигрирую link tags на next/font — иначе cls бьёт lighthouse score",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "local_variable_fonts_usage",
+      "exampleType": "bad",
+      "exampleText": "next/font только App Router, в Pages нельзя; localFont только один файл weight без src array.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "font-optimization-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/font-optimization-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/font-optimization-in-nextjs",
+    "difficulty": "MIDDLE",
+    "titleEn": "Font optimization (next/font) in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

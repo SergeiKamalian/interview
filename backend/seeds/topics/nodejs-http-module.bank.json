@@ -1,0 +1,602 @@
+{
+  "topic": {
+    "code": "nodejs_http_module",
+    "name": "Модуль HTTP в Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работает модуль HTTP в Node.js?",
+    "shortAnswer": "Модуль `http` — встроенный в Node.js способ создавать HTTP-серверы и выполнять исходящие запросы без npm-зависимостей. `http.createServer()` принимает callback с `req` (читаемый поток `IncomingMessage`) и `res` (записываемый поток `ServerResponse`): сначала `res.writeHead()` для статуса и заголовков, затем `res.end()` для тела. Тело запроса приходит чанками — его собирают через события `data` и `end`.",
+    "idealAnswer": "Модуль `http` встроен в Node.js и позволяет поднимать HTTP-серверы и делать исходящие запросы без внешних пакетов. `http.createServer(callback)` под капотом возвращает `net.Server`; callback вызывается на каждый входящий запрос. `req` — это `IncomingMessage` (readable stream): `method`, `url`, `headers`; тело ещё не прочитано полностью — оно стримится, поэтому слушают `data` и `end`. `res` — `ServerResponse` (writable stream): `writeHead(status, headers)` пишет статусную строку и заголовки до любого `write()`, `end(body)` отправляет тело и закрывает ответ; без `res.end()` клиент зависает до таймаута. Для query-параметров `req.url` — сырой путь; надёжный парсинг через `new URL(req.url, 'http://' + req.headers.host)`, а не `split('/')`, который ломается на `?page=2`. POST-тело собирают вручную: `req.on('data', chunk => body += chunk)`, затем в `end` — `JSON.parse`. Лимита размера по умолчанию нет — в продакшне ограничивают в `data` и вызывают `req.destroy()` при превышении; также ставят `server.timeout`. На `req` нужен `error`-handler — иначе при обрыве клиента процесс может упасть. Исходящие запросы: `http.get(url, onResponse)` для GET; `http.request(options, onResponse)` для POST — `req.write(payload)`, обязательно `req.end()`, иначе запрос не уйдёт; callback в `request` — сокращение для события `response`. Ответ тоже читают потоком через `data`/`end`. `http` — HTTP/1.1 для dev и внутренних сервисов; `https` — TLS для продакшна; `http2` — мультиплексирование через `http2.createSecureServer`. Express, Fastify и Next.js custom server внутри вызывают `http.createServer()` — `app.listen(3000)` это `http.createServer(app).listen(3000)`. Типичные ошибки: забытый `res.end()`, `writeHead` после `write`, отсутствие лимита тела, парсинг URL через split, двойной `res.end()` → `Error: write after end`. Node однопоточен, но event loop асинхронно обслуживает много соединений — пока один запрос ждёт I/O, loop берёт другие. Паттерн reverse proxy: `req.pipe(proxyReq)` и `proxyRes.pipe(res)` без буферизации всего тела в памяти.",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "http_module_basics",
+      "title": "Понимает роль модуля http и createServer",
+      "expected": "Кандидат объясняет: встроенный модуль без npm; createServer возвращает net.Server; callback на каждый запрос; req — IncomingMessage (readable), res — ServerResponse (writable); event loop обслуживает много соединений в одном процессе.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — createServer, потоки req/res, event loop",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "createServer",
+              "IncomingMessage",
+              "ServerResponse",
+              "поток",
+              "stream"
+            ],
+            "ask": "что такое req и res в callback createServer и почему они потоки"
+          }
+        ],
+        "mustConcepts": [
+          "http",
+          "createServer",
+          "встроенн",
+          "без npm",
+          "IncomingMessage",
+          "ServerResponse",
+          "readable",
+          "writable",
+          "читаемый поток",
+          "записываемый поток",
+          "net.Server",
+          "callback",
+          "event loop",
+          "однопоточ",
+          "много соединен",
+          "require('http')"
+        ],
+        "falseClaims": [
+          "http модуль требует установки express",
+          "req и res — обычные объекты, не потоки",
+          "createServer создаёт отдельный процесс на каждый запрос",
+          "Node использует потоки ОС для каждого HTTP-запроса",
+          "IncomingMessage сразу содержит всё тело запроса"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "request_response_cycle",
+      "title": "Знает цикл запрос-ответ и res.writeHead/end",
+      "expected": "Кандидат описывает: TCP принимает соединение, парсятся заголовки, вызывается callback; writeHead — статус и headers до тела; end — отправка и закрытие; без end клиент ждёт до таймаута; writeHead только до первого write.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый механизм из quick example ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "writeHead",
+              "res.end",
+              "завис",
+              "таймаут"
+            ],
+            "ask": "что произойдёт если вызвать writeHead но забыть res.end"
+          }
+        ],
+        "mustConcepts": [
+          "writeHead",
+          "res.end",
+          "res.write",
+          "статус",
+          "заголовк",
+          "headers",
+          "закрыт",
+          "завис",
+          "таймаут",
+          "TCP",
+          "парсинг заголовк",
+          "Cannot set headers",
+          "после они отправлен",
+          "listen",
+          "порт"
+        ],
+        "falseClaims": [
+          "res.writeHead можно вызывать после res.write",
+          "res.end необязателен если уже вызван write",
+          "заголовки отправляются автоматически без writeHead",
+          "один createServer обрабатывает только один запрос за раз синхронно"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "reading_request",
+      "title": "Читает объект запроса и парсит URL",
+      "expected": "Кандидат называет req.method, req.url, req.headers; парсит query через new URL с host; не использует split по req.url при query string.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "req.method/url/headers и URL constructor из ITLead",
+        "confusionPairs": [
+          {
+            "checkpointKey": "reading_request",
+            "oftenConfusedWith": [
+              "post_body_streaming"
+            ],
+            "anchorTermsExpected": [
+              "req.method",
+              "req.url",
+              "req.headers",
+              "new URL",
+              "searchParams",
+              "pathname"
+            ],
+            "anchorTermsWrongTopic": [
+              "JSON.parse тела в method",
+              "req.body из коробки"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "req.method",
+          "req.url",
+          "req.headers",
+          "GET",
+          "POST",
+          "host",
+          "new URL",
+          "pathname",
+          "searchParams",
+          "query",
+          "сырой строк",
+          "split",
+          "query string",
+          "парсинг"
+        ],
+        "falseClaims": [
+          "req.url всегда без query string",
+          "split('/') надёжен для /users/42?format=json",
+          "req.body доступен сразу как в Express",
+          "headers.host не нужен для new URL"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "post_body_streaming",
+      "title": "Собирает тело POST из потока",
+      "expected": "Кандидат: тело приходит чанками; data собирает, end парсит; нет лимита по умолчанию; в продакшне cap в data + req.destroy; обработчик req.on('error').",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "стриминг тела и production guard — ключ middle",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "data",
+              "end",
+              "chunk",
+              "чанк"
+            ],
+            "ask": "как собрать JSON-тело POST без express.json"
+          },
+          {
+            "match": [
+              "лимит",
+              "destroy",
+              "413",
+              "гигабайт"
+            ],
+            "ask": "как защитить сервер от oversized body в raw http"
+          }
+        ],
+        "mustConcepts": [
+          "data",
+          "end",
+          "chunk",
+          "чанк",
+          "поток",
+          "stream",
+          "JSON.parse",
+          "body",
+          "тело",
+          "лимит",
+          "размер",
+          "req.destroy",
+          "413",
+          "Payload too large",
+          "req.on('error')",
+          "обрыв",
+          "disconnect",
+          "буферизац",
+          "память"
+        ],
+        "falseClaims": [
+          "тело POST доступно сразу в callback createServer",
+          "Node автоматически ограничивает размер тела",
+          "без error handler на req ничего страшного при disconnect",
+          "можно безопасно конкатенировать гигабайты в строку без лимита"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "outbound_requests",
+      "title": "Делает исходящие запросы через http.get/request",
+      "expected": "Кандидат: http.get для GET; http.request с options для POST; req.write + req.end обязательны; ответ читают через data/end на res; callback request = событие response.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "http.get и http.request из ITLead examples",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "http.get",
+              "http.request",
+              "req.end"
+            ],
+            "ask": "почему POST через http.request не уходит без req.end"
+          }
+        ],
+        "mustConcepts": [
+          "http.get",
+          "http.request",
+          "hostname",
+          "path",
+          "method",
+          "Content-Length",
+          "Buffer.byteLength",
+          "req.write",
+          "req.end",
+          "response",
+          "исходящ",
+          "outbound",
+          "data",
+          "end",
+          "JSON.parse"
+        ],
+        "falseClaims": [
+          "http.request отправляет запрос без req.end",
+          "http.get не требует чтения ответа потоком",
+          "callback в request получает req а не res",
+          "Content-Length необязателен для JSON POST"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки raw http",
+      "expected": "Кандидат называет: забытый res.end; writeHead после write; нет error на req; нет лимита тела; split url; двойной res.end → write after end; server.timeout для idle.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — частые production-баги",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "res.end",
+              "завис",
+              "curl"
+            ],
+            "ask": "почему curl зависает если забыть res.end"
+          },
+          {
+            "match": [
+              "write after end",
+              "дважды",
+              "двойн"
+            ],
+            "ask": "что будет при втором вызове res.end"
+          }
+        ],
+        "mustConcepts": [
+          "res.end",
+          "забыт",
+          "завис",
+          "writeHead",
+          "после write",
+          "Cannot set headers",
+          "req.on('error')",
+          "crash",
+          "лимит тела",
+          "req.destroy",
+          "split",
+          "query string",
+          "write after end",
+          "server.timeout",
+          "idle",
+          "413"
+        ],
+        "falseClaims": [
+          "можно вызывать res.end дважды без ошибки",
+          "writeHead после res.write работает нормально",
+          "клиентский disconnect не эмитит error на req",
+          "server.timeout не влияет на долгие соединения"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "http_express_protocols",
+      "title": "Сравнивает http, https, http2 и Express",
+      "expected": "Кандидат: Express оборачивает http.createServer; app.listen = http.createServer(app).listen; https для TLS в продакшне; http2 для multiplexing; raw http — ручной routing и body parsing.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "http vs Express и протоколы — связка middle+",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "http_module_basics",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "http_express_protocols",
+            "oftenConfusedWith": [
+              "http_module_basics"
+            ],
+            "anchorTermsExpected": [
+              "Express",
+              "createServer",
+              "https",
+              "http2",
+              "middleware",
+              "routing"
+            ],
+            "anchorTermsWrongTopic": [
+              "Express заменяет http модуль",
+              "http2 тот же API что http"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Express",
+              "app.listen",
+              "createServer"
+            ],
+            "ask": "что делает Express под капотом при app.listen"
+          },
+          {
+            "match": [
+              "https",
+              "http2",
+              "TLS",
+              "multiplexing"
+            ],
+            "ask": "когда выбрать https или http2 вместо http"
+          }
+        ],
+        "mustConcepts": [
+          "Express",
+          "Fastify",
+          "createServer",
+          "app.listen",
+          "middleware",
+          "routing",
+          "express.json",
+          "bodyParser",
+          "https",
+          "TLS",
+          "сертификат",
+          "http2",
+          "multiplexing",
+          "мультиплекс",
+          "HTTP/1.1",
+          "продакшн",
+          "ручной if/else",
+          "req.url"
+        ],
+        "falseClaims": [
+          "Express не использует http.createServer",
+          "http достаточен для публичного продакшна с пользователями",
+          "http2 использует тот же API что http.createServer без изменений",
+          "Express добавляет свой TCP-слой вместо http"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Модуль http встроен в Node: createServer даёт callback с req (IncomingMessage, readable) и res (ServerResponse, writable). writeHead для статуса, end закрывает ответ. Тело POST стримится — слушаю data/end, в продакшне лимит и req.destroy. Express внутри тот же createServer.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Поднимаю сервер на http.createServer, парсю путь через new URL(req.url, 'http://' + host), POST собираю чанками. Исходящий POST — http.request, write payload, обязательно end. Для прода — https с TLS, не голый http.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну http это низкий уровень — сам роутишь по method/url, тело руками из data. express.json делает то же но middleware. без res.end curl висит. event loop тащит кучу коннектов в одном процессе",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "req.body в raw http уже распарсен как в Express. res.writeHead можно вызвать после res.write. Node создаёт поток на каждый HTTP-запрос.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "http.request сам отправит POST без req.end если передать body в options. Для query params достаточно req.url.split('/')[2]. Express не использует модуль http.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Лимит тела встроен по умолчанию 1mb. При disconnect клиента req не эмитит error. res.end можно вызывать сколько угодно раз.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "http_module_basics",
+      "exampleType": "good",
+      "exampleText": "http.createServer — встроенный сервер; req IncomingMessage readable, res ServerResponse writable; под капотом net.Server и event loop на много соединений.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "http_module_basics",
+      "exampleType": "good",
+      "exampleText": "createServer без npm, callback на каждый запрос, req/res — стримы, не готовое тело сразу",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "http_module_basics",
+      "exampleType": "bad",
+      "exampleText": "createServer требует express и создаёт отдельный OS-thread на запрос.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "request_response_cycle",
+      "exampleType": "good",
+      "exampleText": "writeHead(200, headers) до тела, res.end(JSON) закрывает ответ; без end клиент ждёт таймаут.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "request_response_cycle",
+      "exampleType": "good",
+      "exampleText": "сначала заголовки writeHead, потом end — иначе curl зависнет навсегда",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "request_response_cycle",
+      "exampleType": "bad",
+      "exampleText": "res.write('ok') потом writeHead(200) — нормальный порядок в Node.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "reading_request",
+      "exampleType": "good",
+      "exampleText": "req.method, req.url, req.headers; new URL(req.url, base с host) для pathname и searchParams.get('page').",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "reading_request",
+      "exampleType": "good",
+      "exampleText": "url через new URL, не split — query string ломает split по слэшам",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "reading_request",
+      "exampleType": "bad",
+      "exampleText": "const id = req.url.split('/')[2] — надёжно для /users/42?format=json.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "post_body_streaming",
+      "exampleType": "good",
+      "exampleText": "POST: req.on('data', chunk => body += chunk), в end — JSON.parse; лимит 1MB с req.destroy и 413; req.on('error') на disconnect.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "post_body_streaming",
+      "exampleType": "good",
+      "exampleText": "тело чанками в data, парсишь в end, без лимита клиент может залить гигабайты в память",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "post_body_streaming",
+      "exampleType": "bad",
+      "exampleText": "В callback createServer тело POST уже в req.body как объект.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "outbound_requests",
+      "exampleType": "good",
+      "exampleText": "http.get для GET; http.request с hostname/path/method, req.write(payload), req.end(); ответ читаю data/end на res.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "outbound_requests",
+      "exampleType": "good",
+      "exampleText": "request без end не улетит, Content-Length через Buffer.byteLength для json",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "outbound_requests",
+      "exampleType": "bad",
+      "exampleText": "http.request сам отправит POST если передать body только в headers без write/end.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Типично: нет res.end — hang; writeHead после write — ошибка; нет req error handler — crash; нет body cap — DoS; двойной end — write after end.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "забыл end — curl висит, поставь server.timeout чтоб idle рубить",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Ошибки на req при disconnect игнорируются Node, процесс не падает.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "http_express_protocols",
+      "exampleType": "good",
+      "exampleText": "Express: app.listen → http.createServer(app).listen; routing и express.json поверх http. Продакшн — https + TLS; http2 если нужен multiplexing.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "http_express_protocols",
+      "exampleType": "good",
+      "exampleText": "express это обёртка над createServer, raw http — if по url сам, в проде https не http",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "http_express_protocols",
+      "exampleType": "bad",
+      "exampleText": "Express заменяет http модуль своим TCP-стеком, http2 — drop-in тот же createServer API.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-http-module",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-http-module",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-http-module",
+    "difficulty": "MIDDLE",
+    "titleEn": "How does the HTTP module work in Node.js?",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

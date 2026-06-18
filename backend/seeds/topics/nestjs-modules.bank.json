@@ -1,0 +1,521 @@
+{
+  "topic": {
+    "code": "nestjs_modules",
+    "name": "Модули в NestJS",
+    "skillCode": "nestjs",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Что такое модули в NestJS и как они работают?",
+    "shortAnswer": "Модуль NestJS — TypeScript-класс с декоратором `@Module()`, который группирует связанные контроллеры и провайдеры в scope для dependency injection. Провайдеры приватны по умолчанию — только перечисленные в `exports` становятся доступны другим модулям, которые импортируют этот модуль через `imports`.",
+    "idealAnswer": "Модуль — фундаментальный строительный блок NestJS: класс с `@Module()`, который объединяет контроллеры, провайдеры и подмодули в единый scope DI. У каждого приложения есть корневой `AppModule`; одна фича — один модуль (`UsersModule`, `OrdersModule`), а `AppModule` только импортирует их. Модули как контейнеры: `imports` — что нужно снаружи, `exports` — что отдаёшь наружу, `providers` — что регистрируется внутри scope. Провайдеры живут только в модуле, где объявлены; если `EmailsModule` нужен `UsersService`, он импортирует `UsersModule`, а `UsersModule` должен экспортировать `UsersService` — контракт явный и проверяется при старте, не в runtime. Типы модулей: feature — одна доменная область; shared — общие утилиты (`DatabaseService`, `LoggerService`) с `exports`; global (`@Global()`) — провайдеры app-wide без явного import, но скрывает зависимости; dynamic — `forRoot(options)` / `forRootAsync` возвращает `DynamicModule` с runtime-конфигом (`TypeOrmModule.forRoot`, `ConfigModule.forRoot`). При старте NestJS строит DAG из `imports`, рекурсивно разворачивает дерево, инстанцирует провайдеры через `reflect-metadata`; IoC сопоставляет токены `@Inject()` и падает с `UnknownInjectionToken` до первого запроса — ошибки wiring на boot, не в 3 ночи в проде. Типичные ошибки: забыть `exports` после переноса сервиса — `No provider for X`; циклические зависимости `UsersModule` ↔ `EmailsModule` — `forwardRef()`; 30–50 провайдеров в `AppModule` — нельзя тестировать изолированно; злоупотребление `global: true` — невидимая связность. В проде: `PrismaModule` shared, `TypeOrmModule.forRoot` в root + `forFeature` в feature-модулях, `@nestjs/passport` как `PassportModule`, `nest new` сразу раскладывает по feature-модулям. В тестах `TestingModule` с моками вместо реальных imports — граница модуля задаёт минимальный набор зависимостей.",
+    "maxScore": 10,
+    "skills": [
+      "nestjs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "module_definition",
+      "title": "Понимает что такое модуль NestJS",
+      "expected": "Кандидат объясняет: `@Module()` группирует controllers, providers, sub-modules; `AppModule` — корень; одна фича = один модуль; NestJS при старте сканирует граф и связывает DI без ручного `new`.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — ядро: @Module как строительный блок приложения",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "@Module",
+              "модуль",
+              "AppModule"
+            ],
+            "ask": "что делает `@Module({ controllers, providers, imports, exports })` и зачем нужен AppModule"
+          }
+        ],
+        "mustConcepts": [
+          "модуль",
+          "module",
+          "@Module",
+          "контроллер",
+          "controller",
+          "провайдер",
+          "provider",
+          "AppModule",
+          "корнев",
+          "root",
+          "DI",
+          "dependency injection",
+          "scope",
+          "скоп",
+          "группир",
+          "feature",
+          "фича",
+          "UsersModule",
+          "imports",
+          "exports",
+          "старт",
+          "boot"
+        ],
+        "falseClaims": [
+          "модуль — просто папка без влияния на DI",
+          "AppModule не обязателен в NestJS",
+          "провайдеры автоматически доступны всему приложению без exports",
+          "нужно вручную new UsersService() в контроллере"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "providers_vs_exports",
+      "title": "Различает providers и exports",
+      "expected": "Кандидат объясняет: `providers` регистрирует классы в DI-scope модуля; `exports` делает подмножество доступным импортёрам; импорт модуля без `exports` ничего не даёт — `No provider for X` при старте.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "providers vs exports — ключевой контракт junior, частая ошибка",
+        "confusionPairs": [
+          {
+            "checkpointKey": "providers_vs_exports",
+            "oftenConfusedWith": [
+              "module_definition"
+            ],
+            "anchorTermsExpected": [
+              "providers",
+              "exports",
+              "приват",
+              "импорт",
+              "No provider"
+            ],
+            "anchorTermsWrongTopic": [
+              "controller decorator",
+              "middleware",
+              "pipe transform"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "providers",
+              "exports",
+              "импорт"
+            ],
+            "ask": "EmailsModule импортирует UsersModule, но UsersService не инжектится — в чём причина"
+          }
+        ],
+        "mustConcepts": [
+          "providers",
+          "exports",
+          "регистр",
+          "приват",
+          "private",
+          "по умолчанию",
+          "доступн",
+          "импорт",
+          "imports",
+          "подмножеств",
+          "No provider",
+          "UnknownInjectionToken",
+          "контракт",
+          "UsersService",
+          "EmailsModule",
+          "scope",
+          "скоп",
+          "инжект",
+          "inject"
+        ],
+        "falseClaims": [
+          "imports автоматически экспортирует все providers",
+          "providers в exports не обязательны — достаточно imports",
+          "exports делает провайдер глобальным без @Global",
+          "импорт модуля даёт доступ ко всем его providers"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "module_types",
+      "title": "Знает типы модулей",
+      "expected": "Кандидат называет: feature (домен), shared (общие сервисы с exports), global (`@Global()` — app-wide, скрывает deps), dynamic (`DynamicModule`, `forRoot`/`forRootAsync`).",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Module types из ITLead — feature/shared/global/dynamic",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "global",
+              "@Global",
+              "DynamicModule"
+            ],
+            "ask": "когда использовать @Global() vs явный import + exports"
+          },
+          {
+            "match": [
+              "forRoot",
+              "TypeOrmModule",
+              "dynamic"
+            ],
+            "ask": "зачем TypeOrmModule.forRoot возвращает DynamicModule, а не просто класс"
+          }
+        ],
+        "mustConcepts": [
+          "feature",
+          "функциональн",
+          "shared",
+          "общ",
+          "global",
+          "@Global",
+          "dynamic",
+          "DynamicModule",
+          "forRoot",
+          "forRootAsync",
+          "TypeOrmModule",
+          "ConfigModule",
+          "DatabaseService",
+          "LoggerService",
+          "PrismaModule",
+          "runtime",
+          "конфиг",
+          "singleton",
+          "синглтон"
+        ],
+        "falseClaims": [
+          "@Global() заменяет необходимость exports",
+          "dynamic module — это отдельный фреймворк, не NestJS",
+          "shared module не нужен exports",
+          "forRoot нельзя вызывать в imports"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "module_graph_di",
+      "title": "Понимает граф модулей и DI при старте",
+      "expected": "Кандидат описывает: NestJS строит DAG из imports при boot; reflect-metadata для провайдеров; токены @Inject сопоставляются в scope; отсутствующий токен → UnknownInjectionToken до первого запроса.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "How module graph is built — базовый механизм junior",
+        "mustConcepts": [
+          "DAG",
+          "граф",
+          "graph",
+          "imports",
+          "рекурсив",
+          "reflect-metadata",
+          "метадан",
+          "IoC",
+          "контейнер",
+          "токен",
+          "token",
+          "@Inject",
+          "UnknownInjectionToken",
+          "старт",
+          "boot",
+          "startup",
+          "scope",
+          "разреш",
+          "resolve",
+          "wiring"
+        ],
+        "falseClaims": [
+          "NestJS резолвит зависимости на каждый HTTP-запрос с нуля",
+          "UnknownInjectionToken появляется только в runtime при первом запросе",
+          "граф модулей не проверяется при старте",
+          "@Inject работает без providers в module graph"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с модулями",
+      "expected": "Кандидат называет: забыть exports; циклические imports — forwardRef(); сваливать всё в AppModule; злоупотребление global: true; правильно — feature-модули, явный export/import.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes ITLead — самые частые junior-ошибки",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "exports",
+              "No provider",
+              "забыл"
+            ],
+            "ask": "UsersModule без exports — EmailsModule не видит UsersService, как исправить"
+          },
+          {
+            "match": [
+              "forwardRef",
+              "circular",
+              "циклич"
+            ],
+            "ask": "UsersModule и EmailsModule импортируют друг друга — что делать"
+          },
+          {
+            "match": [
+              "AppModule",
+              "global",
+              "30"
+            ],
+            "ask": "почему плохо держать 40 providers прямо в AppModule"
+          }
+        ],
+        "mustConcepts": [
+          "exports",
+          "забыл",
+          "No provider",
+          "циклич",
+          "circular",
+          "forwardRef",
+          "AppModule",
+          "дамп",
+          "30",
+          "50",
+          "провайдер",
+          "изолирован",
+          "тест",
+          "global: true",
+          "@Global",
+          "невидим",
+          "связност",
+          "явн",
+          "import",
+          "рефактор"
+        ],
+        "falseClaims": [
+          "достаточно imports без exports — Nest сам угадает providers",
+          "forwardRef() убирает циклическую зависимость навсегда без рефакторинга",
+          "AppModule должен объявлять все сервисы приложения",
+          "global: true — правильный fix для любого No provider"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "dynamic_testing",
+      "title": "Знает dynamic modules и TestingModule",
+      "expected": "Кандидат объясняет: DynamicModule с forRoot/forRootAsync и useFactory+inject; global в dynamic; TestingModule заменяет imports моками для unit-тестов изолированно.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Follow-up: forRootAsync, TestingModule — важный junior+паттерн",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "forRootAsync",
+              "useFactory",
+              "async"
+            ],
+            "ask": "как ConfigModule.forRootAsync ждёт async factory перед приёмом запросов"
+          },
+          {
+            "match": [
+              "TestingModule",
+              "mock",
+              "тест"
+            ],
+            "ask": "как протестировать UsersService без реального DatabaseModule"
+          }
+        ],
+        "mustConcepts": [
+          "DynamicModule",
+          "forRoot",
+          "forRootAsync",
+          "useFactory",
+          "inject",
+          "async",
+          "промис",
+          "promise",
+          "CONFIG_PATH",
+          "useValue",
+          "TestingModule",
+          "mock",
+          "мок",
+          "override",
+          "unit test",
+          "юнит",
+          "изолирован",
+          "границ",
+          "boundary",
+          "@nestjs/config"
+        ],
+        "falseClaims": [
+          "forRootAsync не ждёт async factory",
+          "TestingModule требует поднять всё приложение целиком",
+          "dynamic module нельзя сделать global",
+          "useFactory не поддерживает inject зависимостей"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Модуль — `@Module()` с controllers, providers, imports, exports. UsersService в providers UsersModule, в exports — чтобы AuthModule мог инжектить после imports. AppModule только импортирует feature-модули, не держит 40 сервисов в root.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну модуль как контейнер: providers внутри приватные, exports — что отдаёшь наружу. emails импортит users, но без exports usersService — no provider при старте. цикл users↔emails — forwardRef.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "DatabaseModule shared с exports DatabaseService; UsersModule imports DatabaseModule. ConfigModule.forRootAsync с useFactory ждёт env до boot. В тестах TestingModule + mock UsersRepository вместо реального PrismaModule.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Импорт UsersModule автоматически даёт доступ ко всем providers — exports не нужен. AppModule должен объявлять все сервисы, иначе Nest не найдёт их.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "No provider for UsersService — ставлю global: true на каждый модуль, явные imports не нужны. forwardRef заменяет exports.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Nest резолвит DI на каждый запрос заново; UnknownInjectionToken только когда пользователь дернул endpoint. DynamicModule — это не часть NestJS.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "module_definition",
+      "exampleType": "good",
+      "exampleText": "@Module группирует UsersController + UsersService; AppModule imports UsersModule; Nest при старте связывает DI без new UsersService().",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "module_definition",
+      "exampleType": "good",
+      "exampleText": "одна фича — users.module, orders.module; app.module только собирает imports",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "module_definition",
+      "exampleType": "bad",
+      "exampleText": "Модуль — просто файл в папке, @Module не влияет на DI и маршруты.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "providers_vs_exports",
+      "exampleType": "good",
+      "exampleText": "providers: [UsersService] — регистрация в scope; exports: [UsersService] — EmailsModule после imports может инжектить; без exports — No provider.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "providers_vs_exports",
+      "exampleType": "good",
+      "exampleText": "импорт модуля без exports ничего не даёт — только явный exports открывает провайдер",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "providers_vs_exports",
+      "exampleType": "bad",
+      "exampleText": "Достаточно imports UsersModule — все providers автоматически экспортируются наружу.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "module_types",
+      "exampleType": "good",
+      "exampleText": "Feature UsersModule; shared DatabaseModule с exports; @Global ConfigModule для app-wide config; TypeOrmModule.forRoot — dynamic с runtime credentials.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "module_types",
+      "exampleType": "good",
+      "exampleText": "prisma module shared, passport module feature — всё через стандартный imports/exports",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "module_types",
+      "exampleType": "bad",
+      "exampleText": "@Global заменяет exports — можно не импортировать ConfigModule нигде.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "module_graph_di",
+      "exampleType": "good",
+      "exampleText": "При boot Nest строит DAG imports, reflect-metadata для классов, @Inject('TOKEN') матчится к provider; нет токена — UnknownInjectionToken до первого HTTP.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "module_graph_di",
+      "exampleType": "good",
+      "exampleText": "ошибка wiring на старте, не в проде в 3 ночи — контейнер падает если deps не сходятся",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "module_graph_di",
+      "exampleType": "bad",
+      "exampleText": "DI резолвится лениво на каждый запрос, граф модулей не строится при старте.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Перенёс UsersService в UsersModule — добавил exports; Users↔Emails цикл — forwardRef(() => EmailsModule); не кладу 30 providers в AppModule.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "global true только для config/logger, доменные сервисы — явный export/import чтобы deps были видны",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "EmailsModule imports UsersModule — UsersService должен инжектиться даже без exports, Nest сам разберётся.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "dynamic_testing",
+      "exampleType": "good",
+      "exampleText": "ConfigModule.forRootAsync: useFactory async () => env, inject [ConfigService]; Nest ждёт promise. TestingModule.createTestingModule с overrideProvider mock Db.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "dynamic_testing",
+      "exampleType": "good",
+      "exampleText": "юнит usersService — testing module только с нужными моками, без всего app graph",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "dynamic_testing",
+      "exampleType": "bad",
+      "exampleText": "forRootAsync не поддерживает async factory; для теста поднимаю весь AppModule с реальной БД.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-modules",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-modules",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-modules",
+    "difficulty": "JUNIOR",
+    "titleEn": "What are modules in NestJS and how do they work?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

@@ -1,0 +1,495 @@
+{
+  "topic": {
+    "code": "dynamic_routes_in_nextjs",
+    "name": "Динамические маршруты в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Как работают динамические маршруты и динамические сегменты в Next.js?",
+    "shortAnswer": "Динамические маршруты в Next.js используют нотацию в квадратных скобках в именах файлов и папок, чтобы сопоставлять переменные сегменты URL. Один файл `app/blog/[slug]/page.tsx` обрабатывает неограниченное число путей — значение сегмента приходит в `params`. В App Router `params` — это Promise, его нужно всегда `await`.",
+    "idealAnswer": "Динамические маршруты позволяют создавать страницы для переменных URL-сегментов без отдельного файла на каждый путь. Файл `app/blog/[slug]/page.tsx` обрабатывает `/blog/anything`: сегмент URL попадает в `params` как строка — `/blog/hello` даёт `slug = \"hello\"`. Три основных паттерна: `[slug]` — ровно один сегмент (`/blog/hello` ✓, `/blog/a/b` ✗ 404); `[...slug]` — catch-all, один или более сегментов в массиве (`/docs/react/hooks` → `[\"react\", \"hooks\"]`, но `/docs` без сегментов — 404); `[[...slug]]` — optional catch-all, допускает ноль сегментов (`/shop` работает, `categories = undefined`). Несколько динамических папок можно вкладывать: `app/[locale]/blog/[slug]/page.tsx` → `{ locale, slug }`. В App Router (Next.js 13+) `params` — Promise, не plain object: `const { slug } = await params`, иначе `undefined`. По умолчанию динамические маршруты рендерятся по запросу; `generateStaticParams` предсобирает известные slug на build time (аналог `getStaticPaths` в Pages Router), неизвестные slug всё равно могут отрендериться на сервере. `export const dynamicParams = false` — явный 404 для slug вне списка. Next.js сканирует `app/` и маппит `[slug]` → regex `/([^/]+)`, `[...slug]` → `/(.*+)`. Статический маршрут всегда побеждает динамический: `app/blog/featured/page.tsx` важнее `app/blog/[slug]/page.tsx`. Типичные ошибки: деструктуризация `params` без `await`; `useRouter()` из `next/router` в App Router вместо `await params` в Server Component; `output: 'export'` без `generateStaticParams` — динамика ломается; все значения `params` — строки (`/users/42` → `\"42\"`, нужен `Number()`); у `[[...slug]]` на корне `slug = undefined` — нужен default `= []`. Для отсутствующих данных — `notFound()` из `next/navigation` + `not-found.tsx`. Когда использовать: фиксированные пути — статические файлы; UGC slug — `[slug]`; деревья документации — `[...slug]` или `[[...slug]]`; пагинация — `[page]/page.tsx`. Кеширование CMS: `fetch` с `next: { revalidate: 3600 }` или `tags` + `revalidateTag`.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "dynamic_routes_basics",
+      "title": "Понимает динамические маршруты и params",
+      "expected": "Кандидат объясняет: квадратные скобки в имени папки/файла задают динамический сегмент; один файл обрабатывает множество URL; значение сегмента доступно в `params` как строка.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — ядро: bracket notation и mapping URL → params",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "[slug]",
+              "params",
+              "динамическ"
+            ],
+            "ask": "как `app/blog/[slug]/page.tsx` обрабатывает `/blog/hello-world`"
+          }
+        ],
+        "mustConcepts": [
+          "динамическ",
+          "dynamic route",
+          "квадратн",
+          "скобк",
+          "bracket",
+          "[slug]",
+          "params",
+          "сегмент",
+          "URL",
+          "один файл",
+          "неограничен",
+          "строка",
+          "string",
+          "page.tsx",
+          "app/",
+          "переменн",
+          "mapping"
+        ],
+        "falseClaims": [
+          "нужен отдельный файл для каждого slug",
+          "params содержит числа без преобразования",
+          "динамический маршрут работает только в Pages Router",
+          "квадратные скобки — это query string"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "segment_patterns",
+      "title": "Различает [slug], [...slug] и [[...slug]]",
+      "expected": "Кандидат сравнивает: `[slug]` — один сегмент; `[...slug]` — catch-all, массив, минимум один сегмент; `[[...slug]]` — optional catch-all, ноль сегментов тоже матчится.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "три паттерна сегментов — ключевой junior-материал ITLead",
+        "confusionPairs": [
+          {
+            "checkpointKey": "segment_patterns",
+            "oftenConfusedWith": [
+              "dynamic_routes_basics"
+            ],
+            "anchorTermsExpected": [
+              "catch-all",
+              "optional",
+              "массив",
+              "один сегмент",
+              "404"
+            ],
+            "anchorTermsWrongTopic": [
+              "query string",
+              "middleware rewrite",
+              "route groups"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "[...slug]",
+              "[[...slug]]",
+              "catch-all"
+            ],
+            "ask": "чем `[...slug]` отличается от `[[...slug]]` на примере `/docs`"
+          }
+        ],
+        "mustConcepts": [
+          "[slug]",
+          "[...slug]",
+          "[[...slug]]",
+          "catch-all",
+          "optional catch-all",
+          "один сегмент",
+          "массив",
+          "array",
+          "404",
+          "ноль сегментов",
+          "undefined",
+          "вложен",
+          "nested",
+          "docs",
+          "документ",
+          "дерево",
+          "категор"
+        ],
+        "falseClaims": [
+          "[...slug] матчит ноль сегментов на корневом пути",
+          "[[...slug]] требует минимум один сегмент",
+          "[slug] принимает несколько уровней вложенности",
+          "catch-all всегда возвращает строку, не массив"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "await_params",
+      "title": "Знает что params — Promise и нужен await",
+      "expected": "Кандидат объясняет: в App Router `params` — Promise; деструктуризация без `await` даёт `undefined`; правильно — `const { slug } = await params` в async Server Component.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "самая частая ошибка после миграции на App Router — ITLead Common mistakes #1",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "dynamic_routes_basics",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "await params",
+              "Promise",
+              "undefined"
+            ],
+            "ask": "почему `const { slug } = params` даёт undefined в App Router"
+          },
+          {
+            "match": [
+              "useRouter",
+              "next/router"
+            ],
+            "ask": "чем App Router отличается от Pages Router для доступа к slug"
+          }
+        ],
+        "mustConcepts": [
+          "await",
+          "params",
+          "Promise",
+          "App Router",
+          "Server Component",
+          "async",
+          "undefined",
+          "деструктуриз",
+          "Next.js 13",
+          "Next.js 12",
+          "useRouter",
+          "next/router",
+          "next/navigation",
+          "Pages Router",
+          "query",
+          "миграц"
+        ],
+        "falseClaims": [
+          "params в App Router — обычный объект, await не нужен",
+          "useRouter().query — правильный способ в App Router Server Component",
+          "await params работает только в Client Component",
+          "params синхронный как в Pages Router getServerSideProps"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "generate_static_params",
+      "title": "Понимает generateStaticParams и SSG fallback",
+      "expected": "Кандидат объясняет: `generateStaticParams` предсобирает известные пути на build time; неизвестные slug могут рендериться на сервере; `dynamicParams = false` — 404 для slug вне списка; аналог `getStaticPaths`.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "generateStaticParams + dynamicParams — важный production-паттерн из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "generateStaticParams",
+              "build time",
+              "dynamicParams"
+            ],
+            "ask": "может ли slug вне списка generateStaticParams всё ещё открыться"
+          }
+        ],
+        "mustConcepts": [
+          "generateStaticParams",
+          "build time",
+          "билд",
+          "предсбор",
+          "static",
+          "SSG",
+          "getStaticPaths",
+          "Pages Router",
+          "dynamicParams",
+          "false",
+          "404",
+          "неизвестн",
+          "slug",
+          "server rendering",
+          "сервер",
+          "on demand",
+          "по запросу"
+        ],
+        "falseClaims": [
+          "generateStaticParams обязателен для любого динамического маршрута",
+          "slug вне списка всегда 404 даже при dynamicParams true",
+          "generateStaticParams заменяет fetch данных на странице",
+          "dynamicParams false — это default поведение Next.js"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки динамических маршрутов",
+      "expected": "Кандидат называет: params — строки (нужен Number); `output: 'export'` без generateStaticParams; `[[...slug]]` без default для undefined; static export ломает неизвестные пути.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes ITLead — params as strings, static export, optional catch-all crash",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "строк",
+              "Number",
+              "42"
+            ],
+            "ask": "что не так с `params.id + 1` для `/users/42`"
+          },
+          {
+            "match": [
+              "export",
+              "output",
+              "generateStaticParams"
+            ],
+            "ask": "почему `output: 'export'` ломает динамику без generateStaticParams"
+          }
+        ],
+        "mustConcepts": [
+          "строка",
+          "string",
+          "Number",
+          "конкатенац",
+          "421",
+          "output export",
+          "next.config",
+          "static export",
+          "generateStaticParams",
+          "undefined",
+          "default",
+          "= []",
+          "categories.length",
+          "crash",
+          "падени",
+          "optional catch-all",
+          "корнев",
+          "HTML файлы"
+        ],
+        "falseClaims": [
+          "params.id для /users/42 уже number 42",
+          "static export генерирует HTML для любых неизвестных slug автоматически",
+          "[[...slug]] на /shop всегда даёт пустой массив без default",
+          "params.id + 1 корректно даёт 43"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "not_found_resolving",
+      "title": "Знает notFound и приоритет статических маршрутов",
+      "expected": "Кандидат объясняет: `notFound()` из `next/navigation` + `not-found.tsx` для отсутствующих данных; статический маршрут побеждает динамический; можно вкладывать несколько динамических сегментов.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "notFound + static wins + nested segments — базовый junior follow-up",
+        "mustConcepts": [
+          "notFound",
+          "not-found.tsx",
+          "next/navigation",
+          "404",
+          "отсутств",
+          "данн",
+          "статическ",
+          "exact match",
+          "точн",
+          "побежда",
+          "featured",
+          "[year]",
+          "[month]",
+          "вложен",
+          "locale",
+          "приоритет"
+        ],
+        "falseClaims": [
+          "динамический [slug] всегда перехватывает /blog/featured",
+          "notFound() редиректит на главную автоматически",
+          "not-found.tsx не нужен — достаточно return null",
+          "нельзя комбинировать [locale] и [slug] в одном пути"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Динамический маршрут — `app/blog/[slug]/page.tsx`: один файл на все посты. `/blog/hello` → `const { slug } = await params`, slug = \"hello\". Для docs — `[[...slug]]`, на `/docs` slug = [], default `= []` чтобы не упасть.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну bracket в папке — и любой url матчится. params promise — всегда await. generateStaticParams собирает топ-20 постов на билде, остальные на сервере. нет поста — notFound().",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "[slug] — один кусок url; [...slug] — массив сегментов, /docs без хвоста 404; [[...slug]] — /shop тоже ок. params всё строки — Number(id). featured/page.tsx важнее [slug].",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для каждого поста создаю отдельный page.tsx. params синхронный объект — `const { slug } = params` в Server Component. /users/42 даёт id number 42.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В App Router slug беру через useRouter из next/router. output export работает с любыми динамическими путями без generateStaticParams.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "[...slug] на /docs отдаёт пустой массив — корень catch-all всегда матчится. [[...slug]] требует минимум один сегмент.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "dynamic_routes_basics",
+      "exampleType": "good",
+      "exampleText": "`app/blog/[slug]/page.tsx` — bracket notation; `/blog/my-post` → params.slug = \"my-post\"; один файл, unlimited URLs.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "dynamic_routes_basics",
+      "exampleType": "good",
+      "exampleText": "динамика — квадратные скобки в app/, сегмент url попадает в params строкой",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "dynamic_routes_basics",
+      "exampleType": "bad",
+      "exampleText": "Динамический маршрут — это query ?slug=hello в URL, не сегмент path.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "segment_patterns",
+      "exampleType": "good",
+      "exampleText": "[slug] — /blog/a ✓, /blog/a/b ✗; [...slug] — /docs/react/hooks → [\"react\",\"hooks\"], /docs ✗; [[...slug]] — /shop ✓ с undefined или [].",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "segment_patterns",
+      "exampleType": "good",
+      "exampleText": "доки nextra — [[...slug]], shop categories optional, blog post — просто [slug]",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "segment_patterns",
+      "exampleType": "bad",
+      "exampleText": "[slug] принимает /blog/2024/01/post как один slug со слешами внутри.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "await_params",
+      "exampleType": "good",
+      "exampleText": "App Router: `export default async function Page({ params }: { params: Promise<{ slug: string }> }) { const { slug } = await params; }`",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "await_params",
+      "exampleType": "good",
+      "exampleText": "без await params.slug undefined — типичная ошибка после апгрейда с next 12",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "await_params",
+      "exampleType": "bad",
+      "exampleText": "В Server Component App Router правильно: `import { useRouter } from 'next/router'; const slug = useRouter().query.slug`.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "generate_static_params",
+      "exampleType": "good",
+      "exampleText": "generateStaticParams возвращает [{ slug: 'post-1' }, ...] — билд /blog/post-1; новый slug вне списка всё равно SSR при dynamicParams true.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "generate_static_params",
+      "exampleType": "good",
+      "exampleText": "как getStaticPaths только чище — slice топ постов на билд, dynamicParams false если нужен жёсткий 404",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "generate_static_params",
+      "exampleType": "bad",
+      "exampleText": "Без generateStaticParams динамический маршрут вообще не работает в Next.js.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "`const id = Number((await params).id)` — params строки; `const { categories = [] } = await params` для [[...slug]] на корне.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "output export + динамика без generateStaticParams — 404, next не знает пути на билде",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "params.id + 1 для /users/42 даёт 43 — арифметика работает со строками params.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "not_found_resolving",
+      "exampleType": "good",
+      "exampleText": "getPost null → notFound() из next/navigation; рядом not-found.tsx. /blog/featured идёт в static page, не в [slug].",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "not_found_resolving",
+      "exampleType": "good",
+      "exampleText": "/blog/2024/01/post — app/blog/[year]/[month]/[slug], все params строки",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "not_found_resolving",
+      "exampleType": "bad",
+      "exampleText": "Если пост не найден — return null, Next сам покажет 404 без notFound().",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "dynamic-routes-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/dynamic-routes-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/dynamic-routes-in-nextjs",
+    "difficulty": "JUNIOR",
+    "titleEn": "Dynamic routes and dynamic segments in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

@@ -1,0 +1,563 @@
+{
+  "topic": {
+    "code": "singleton_pattern",
+    "name": "Паттерн Singleton",
+    "skillCode": "patterns",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое паттерн Singleton и как он работает?",
+    "shortAnswer": "Singleton — креационный паттерн, который гарантирует ровно один экземпляр класса и глобальную точку доступа к нему. Приватный конструктор блокирует `new`; `getInstance()` каждый раз возвращает тот же объект. Подходит для логгеров, конфигов и пулов соединений.",
+    "idealAnswer": "Singleton (синглтон) — креационный паттерн проектирования, который ограничивает класс одним экземпляром и предоставляет глобальную точку доступа. Метафора: Белый дом — одно здание, один президент, все обращаются по одному адресу. Обычный класс позволяет вызывать `new` сколько угодно и каждый раз получать новый объект. Singleton делает конструктор приватным (TypeScript) или бросает ошибку внутри него (plain JS) и направляет весь доступ через статический метод `getInstance()`. Первый вызов создаёт объект и сохраняет ссылку в статическом поле; все последующие возвращают ту же ссылку — без новых аллокаций и дубликатов. Механизм: `private static instance`, `private constructor()`, `static getInstance()` с проверкой `if (!instance)` или `??=`. Два вызова `getInstance()` дают `a === b === true`. Когда использовать: логгер (один поток логов на приложение), пул соединений с БД (ограниченные connections на весь код), конфиг приложения (загрузка один раз при старте), кеш (единое in-memory хранилище). Не использовать для stateless-утилит с чистыми функциями; если нужны моки в тестах — dependency injection вместо голого Singleton. Под капотом V8 хранит приватное статическое поле `#instance` как hidden property; `getInstance()` делает быстрый lookup статического поля, при `null` аллоцирует один раз. Важный нюанс Node.js: в cluster mode и worker threads каждый процесс/воркер имеет свой memory space — свой экземпляр Singleton. Это не shared state между процессами; для балансировки нужны IPC или Redis. Типичные ошибки: (1) публичный constructor — `new Config()` обходит `getInstance()` и создаёт другой объект; (2) тестовое загрязнение — Logger сохраняет состояние между тестами, нужен `resetInstance()` в `beforeEach` или DI; (3) `JSON.stringify(Singleton.getInstance())` падает из-за circular reference статического поля — добавить `toJSON()`. Реальные примеры: Winston logger, Express `app` (один на процесс), Redux store, React Context Provider как singleton для поддерева, Lodash как module-level singleton. Singleton vs глобальная переменная: глобальную может перезаписать кто угодно; Singleton контролирует lazy init и может нести методы и валидацию — оба создают скрытые зависимости. SOLID: нарушает SRP (класс управляет lifecycle и бизнес-логикой) и DIP (callers хардкодят `getInstance()`). Мокирование в Jest: `jest.spyOn(MyClass, 'getInstance').mockReturnValue(mockInstance)` или `resetInstance()`. Thread-safety в JS: в single-threaded event loop простой `if (!instance)` достаточен; с worker threads при async init возможна гонка — `??=` или guard-флаг. В микросервисах «один pool на всё приложение» ломается: каждый pod масштабируется отдельно и нужен свой pool (`pg-pool` per service).",
+    "maxScore": 10,
+    "skills": [
+      "patterns",
+      "javascript",
+      "typescript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "singleton_definition",
+      "title": "Понимает суть Singleton",
+      "expected": "Кандидат объясняет: креационный паттерн, ровно один экземпляр класса, глобальная точка доступа; отличает от обычного класса, где `new` создаёт новый объект каждый раз.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — один экземпляр и global access point",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "singleton_definition",
+            "oftenConfusedWith": [
+              "get_instance_mechanism",
+              "solid_global_variable"
+            ],
+            "anchorTermsExpected": [
+              "Singleton",
+              "синглтон",
+              "один экземпляр",
+              "глобальн",
+              "креационн",
+              "паттерн"
+            ],
+            "anchorTermsWrongTopic": [
+              "Singleton это static class",
+              "Singleton всегда shared между процессами",
+              "Singleton это DI контейнер"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Singleton",
+              "синглтон",
+              "один экземпляр"
+            ],
+            "ask": "чем Singleton отличается от обычного класса с многократным new"
+          }
+        ],
+        "mustConcepts": [
+          "Singleton",
+          "синглтон",
+          "креационн",
+          "паттерн",
+          "один экземпляр",
+          "единственн",
+          "глобальн",
+          "точка доступа",
+          "getInstance",
+          "shared resource",
+          "общий ресурс",
+          "уникальн",
+          "приложени",
+          "один объект",
+          "не дублир"
+        ],
+        "falseClaims": [
+          "Singleton позволяет создавать сколько угодно экземпляров через new",
+          "Singleton — это просто глобальная переменная без контроля создания",
+          "Singleton гарантирует один экземпляр на все процессы Node.js",
+          "Singleton нужен для любого класса-утилиты"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "get_instance_mechanism",
+      "title": "Знает механизм getInstance и private constructor",
+      "expected": "Кандидат описывает: приватный constructor блокирует `new` снаружи; статическое поле `instance`; первый `getInstance()` создаёт объект, последующие возвращают ту же ссылку; `a === b` true.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый механизм из quick example ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "private constructor",
+              "getInstance",
+              "static instance"
+            ],
+            "ask": "как private constructor и static getInstance гарантируют один объект"
+          }
+        ],
+        "mustConcepts": [
+          "private constructor",
+          "приватн конструктор",
+          "getInstance",
+          "static instance",
+          "статическ",
+          "поле instance",
+          "первый вызов",
+          "создаёт",
+          "возвращает",
+          "та же ссылка",
+          "a === b",
+          "блокирует new",
+          "lazy init",
+          "ленив"
+        ],
+        "falseClaims": [
+          "getInstance каждый раз вызывает new и создаёт новый объект",
+          "публичный constructor безопасен если есть getInstance",
+          "static instance не нужен — достаточно getInstance без поля",
+          "private constructor работает в plain JavaScript без throw"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда применять Singleton",
+      "expected": "Кандидат называет кейсы: logger, DB connection pool, app config, cache; знает когда пропустить — stateless utilities, когда нужны моки — DI.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use — таблица кейсов ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "singleton_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "mustConcepts": [
+          "logger",
+          "логер",
+          "connection pool",
+          "пул соедин",
+          "config",
+          "конфиг",
+          "cache",
+          "кеш",
+          "startup",
+          "старт",
+          "stateless",
+          "чистые функции",
+          "utility",
+          "утилит",
+          "dependency injection",
+          "DI",
+          "мок",
+          "Winston",
+          "Express app"
+        ],
+        "falseClaims": [
+          "Singleton нужен для любого класса с методами",
+          "stateless utility с pure functions требует Singleton",
+          "DI и Singleton взаимоисключающие и DI всегда хуже",
+          "кеш всегда должен быть Singleton даже в serverless"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "cluster_multiprocess",
+      "title": "Понимает ограничения в cluster и worker threads",
+      "expected": "Кандидат объясняет: каждый Node.js процесс/воркер имеет свой memory space и свой экземпляр Singleton; для shared state между процессами — Redis/IPC, не Singleton.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "частая production-ловушка из ITLead Common mistakes",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "cluster",
+              "worker",
+              "процесс",
+              "Redis"
+            ],
+            "ask": "почему Singleton не даёт один экземпляр при нескольких Node.js процессах"
+          },
+          {
+            "match": [
+              "load balancer",
+              "pod",
+              "microservice"
+            ],
+            "ask": "как Singleton ведёт себя при деплое за load balancer или в микросервисах"
+          }
+        ],
+        "mustConcepts": [
+          "cluster",
+          "worker threads",
+          "воркер",
+          "процесс",
+          "memory space",
+          "память",
+          "свой экземпляр",
+          "не shared",
+          "Redis",
+          "IPC",
+          "load balancer",
+          "балансиров",
+          "PID",
+          "pod",
+          "микросервис",
+          "pg-pool"
+        ],
+        "falseClaims": [
+          "Singleton автоматически синхронизируется между worker processes",
+          "один Singleton в Node.js покрывает весь кластер из 4 процессов",
+          "cluster mode переиспользует static instance между воркерами",
+          "Singleton заменяет Redis для cross-process state"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки Singleton",
+      "expected": "Кандидат называет: публичный constructor обходит gatekeeper; test pollution из-за shared state; JSON.stringify падает на circular reference — нужен toJSON().",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Config/Logger/JSON паттерны ошибок из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "testing_mocking",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "public constructor",
+              "new Config",
+              "обход"
+            ],
+            "ask": "как публичный constructor ломает гарантию одного экземпляра"
+          },
+          {
+            "match": [
+              "JSON.stringify",
+              "circular",
+              "toJSON"
+            ],
+            "ask": "почему сериализация Singleton падает и как исправить"
+          }
+        ],
+        "mustConcepts": [
+          "публичный constructor",
+          "public constructor",
+          "обход getInstance",
+          "new Config",
+          "разные объекты",
+          "throw",
+          "test pollution",
+          "загрязнен",
+          "между тестами",
+          "shared state",
+          "JSON.stringify",
+          "circular",
+          "циклич",
+          "toJSON",
+          "static instance"
+        ],
+        "falseClaims": [
+          "публичный constructor безопасен если документировать getInstance",
+          "JSON.stringify всегда работает с Singleton",
+          "test pollution не связана с Singleton",
+          "throw в constructor TypeScript заменяет private constructor в JS"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "testing_mocking",
+      "title": "Умеет тестировать и мокировать Singleton",
+      "expected": "Кандидат описывает: resetInstance() в beforeEach; jest.spyOn(getInstance).mockReturnValue; DI как альтернатива для mockable зависимостей.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Counter/Logger test examples и follow-up Q из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "resetInstance",
+              "beforeEach",
+              "jest.spyOn"
+            ],
+            "ask": "как изолировать Singleton между тестами и замокать getInstance"
+          }
+        ],
+        "mustConcepts": [
+          "resetInstance",
+          "beforeEach",
+          "jest.spyOn",
+          "mockReturnValue",
+          "getInstance",
+          "mock",
+          "мок",
+          "test isolation",
+          "изоляц",
+          "dependency injection",
+          "InversifyJS",
+          "Counter",
+          "Logger",
+          "getLogs",
+          "null"
+        ],
+        "falseClaims": [
+          "Singleton нельзя замокать в Jest",
+          "resetInstance нарушает паттерн и его никогда не добавляют",
+          "shared state в тестах — норма для Singleton",
+          "jest.spyOn работает только на instance methods, не на getInstance"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "solid_global_variable",
+      "title": "Отличает Singleton от global variable и знает SOLID-риски",
+      "expected": "Кандидат сравнивает с глобальной переменной (перезапись vs controlled creation); упоминает нарушение SRP и DIP; React Context / Redux как singleton-подобные кейсы.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up questions SOLID/global — бонус middle",
+        "mustConcepts": [
+          "глобальная переменная",
+          "global variable",
+          "перезапис",
+          "lazy init",
+          "SOLID",
+          "SRP",
+          "DIP",
+          "Single Responsibility",
+          "Dependency Inversion",
+          "скрытые зависимости",
+          "React Context",
+          "Provider",
+          "Redux store",
+          "thread-safe",
+          "??="
+        ],
+        "falseClaims": [
+          "Singleton и global variable полностью идентичны",
+          "Singleton не нарушает SOLID",
+          "React Context — это антипаттерн Singleton",
+          "thread-safety в JS требует synchronized blocks как в Java"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Singleton — креационный паттерн: private constructor + static getInstance(), всегда один объект. Для логгера и конфига ок, но в cluster mode каждый worker получит свой экземпляр — для shared state нужен Redis.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "AppConfig с private constructor: settings грузятся один раз, config1 === config2. В тестах делаю resetInstance в beforeEach, иначе Logger тащит логи из прошлого теста. Для mockable сервисов предпочитаю DI.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Express app — по сути singleton на процесс. React Context Provider — singleton для поддерева. Не путаю с global var: getInstance контролирует lazy init, но всё равно hidden dependency.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Singleton гарантирует один объект на все 8 worker processes в cluster — static instance общий для всех.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Constructor public — норм, главное документировать что надо getInstance. В тестах Singleton не мокается, это feature.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Singleton нужен для любой utility class. JSON.stringify singleton всегда работает. SOLID тут не при чём.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "singleton_definition",
+      "exampleType": "good",
+      "exampleText": "Singleton — один экземпляр класса, глобальный доступ через getInstance; креационный паттерн для уникальных ресурсов.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "singleton_definition",
+      "exampleType": "good",
+      "exampleText": "ну синглтон — один объект на всё приложение, не new каждый раз",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "singleton_definition",
+      "exampleType": "bad",
+      "exampleText": "Singleton — это когда все методы static, экземпляров не бывает вообще.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "get_instance_mechanism",
+      "exampleType": "good",
+      "exampleText": "private constructor блокирует new; static instance хранит ссылку; getInstance создаёт при первом вызове, дальше возвращает cached.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "get_instance_mechanism",
+      "exampleType": "good",
+      "exampleText": "const a = getInstance(); const b = getInstance(); a === b // true — механизм в двух строках",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "get_instance_mechanism",
+      "exampleType": "bad",
+      "exampleText": "getInstance каждый раз делает return new Singleton() — так проще и безопаснее.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Logger, DB pool, config, cache — shared state. Pure utility без состояния — Singleton не нужен; для тестов — DI.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "winston createLogger — один на transport config; lodash module singleton, но лучше импортировать отдельные функции",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Любой класс с методами должен быть Singleton — иначе memory leak.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "cluster_multiprocess",
+      "exampleType": "good",
+      "exampleText": "Cluster: worker 1 PID 1234, worker 2 PID 1235 — разные Singleton instances. Cross-process state — Redis, не static field.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "cluster_multiprocess",
+      "exampleType": "good",
+      "exampleText": "20 pods в k8s — у каждого свой pool; singleton внутри pod ok, но не «один pool на весь кластер»",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "cluster_multiprocess",
+      "exampleType": "bad",
+      "exampleText": "Node.js cluster автоматически шарит static instance между forked workers.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "new Config() при public constructor — другой объект чем getInstance(). JSON.stringify singleton — circular structure, нужен toJSON.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Logger.getLogs() после первого теста не пустой — test pollution от shared singleton state",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Public constructor ok — разработчики всё равно будут вызывать getInstance. Circular JSON — баг V8, не Singleton.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "testing_mocking",
+      "exampleType": "good",
+      "exampleText": "beforeEach(() => Counter.resetInstance()); jest.spyOn(Logger, 'getInstance').mockReturnValue(mockLogger).",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "testing_mocking",
+      "exampleType": "good",
+      "exampleText": "для mockable deps лучше inject logger в constructor чем голый getInstance везде",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "testing_mocking",
+      "exampleType": "bad",
+      "exampleText": "Singleton нельзя тестировать — поэтому всегда global variables вместо resetInstance.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "solid_global_variable",
+      "exampleType": "good",
+      "exampleText": "Global var — anyone overwrite; Singleton — lazy init once + methods. Оба hidden deps; нарушает SRP (lifecycle + job) и DIP (hardcoded getInstance).",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "solid_global_variable",
+      "exampleType": "good",
+      "exampleText": "React Context Provider — singleton для subtree; в single-thread JS if (!instance) достаточно, worker threads — ??= или flag",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "solid_global_variable",
+      "exampleType": "bad",
+      "exampleText": "Singleton полностью соответствует SOLID. Global variable лучше потому что проще мокать.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "singleton-pattern",
+    "apiUrl": "https://api.itlead.org/api/questions/singleton-pattern",
+    "pageUrl": "https://itlead.org/interview-questions/patterns/singleton-pattern",
+    "difficulty": "MIDDLE",
+    "titleEn": "Singleton pattern",
+    "categorySlug": "patterns",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

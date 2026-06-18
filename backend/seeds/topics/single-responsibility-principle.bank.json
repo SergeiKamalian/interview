@@ -1,0 +1,579 @@
+{
+  "topic": {
+    "code": "single_responsibility_principle",
+    "name": "Принцип единственной ответственности (SRP)",
+    "skillCode": "principles",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое принцип единственной ответственности (SRP) из SOLID и как его применять на практике?",
+    "shortAnswer": "Single Responsibility Principle (SRP) — у класса должна быть только одна причина для изменения. Разделяй по драйверу изменений: `User` хранит данные, `UserRepository` отвечает за БД, `EmailService` — за email. Сбой БД не должен заставлять править тот же файл, что и баг в email-логике. Главное: одна причина для изменений, а не один метод на класс.",
+    "idealAnswer": "Single Responsibility Principle (SRP) — буква S в SOLID: класс должен иметь только одну причину для изменения, то есть отвечать ровно за одну зону ответственности (concern). Аналогия: на кухне повар готовит, официант подаёт, посудомой моет — смешай роли, и изменение в одной ломает остальные. SRP делит код по тому, *почему* он меняется, а не по количеству методов. Правило: если сбой БД и сбой email-сервиса оба заставляют открыть один и тот же файл — SRP нарушен. Класс `User` с десятью геттерами для имени, email и адреса полностью соответствует SRP — меняется только при изменении правил данных пользователя. Добавление `save()` в `User` вводит вторую причину: смена схемы БД заставляет править файл с логикой данных. Правильное разделение: `User` — данные, `UserRepository.save()` — персистентность, `EmailService.send()` — отправка писем; после split сбой email не трогает `UserRepository`, тесты изолированы. Когда применять: класс перевалил ~50 строк и растёт — выносить по причине изменения; два независимых подразделения редактируют один класс — split по границе; тесты одного класса покрывают несвязанные сценарии — каждая группа тестов указывает на отдельный класс; git blame / git log показывает несвязанные причины коммитов в одном файле. SRP — правило дизайна на code review и рефакторинг, без runtime-магии; практический бонус: V8 лучше оптимизирует компактные классы, god class может давать megamorphic inline cache misses на hot path. Типичные ошибки: «мало методов = SRP» — три метода с `save()` уже две причины; god object «потом приберу» — скрытые зависимости, миграция БД ломает email-тест; TypeScript `interface UserService extends UserRepository, Emailer {}` выглядит чисто, но lint не поймает смешение concerns; over-splitting — SRP не означает один метод на класс, методы, меняющиеся вместе по одной причине, остаются вместе. Практика: Express — тонкий handler делегирует `UserValidator`, `UserRepository`, `WelcomeEmailService`; React — компонент только рендерит, fetch в hook, аналитика в `useTrack`; NestJS — `@Controller`, `@Injectable` service, repository разделены конвенцией; Prisma client отдельно от business service layer. Рефакторинг legacy: Strangler pattern — выносить одну ответственность за раз под feature flag, начинать с самых частых изменений по git log. Тест SRP: один test suite на класс; если для `User` мокают и БД, и email — класс делает слишком много. Trade-off в микросервисах: больше классов и wiring, зато независимый deploy и scale; мера — сталкиваются ли несвязанные изменения в одном файле.",
+    "maxScore": 10,
+    "skills": [
+      "principles",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "srp_definition",
+      "title": "Понимает определение SRP",
+      "expected": "Кандидат объясняет: класс имеет одну причину для изменения; каждый класс отвечает за одну зону (concern); S — буква SOLID; правило: сбой БД и сбой email не должны требовать правки одного файла.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — ядро: одна причина для изменения",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "SRP",
+              "одна причин",
+              "reason to change"
+            ],
+            "ask": "что значит «одна причина для изменения» на примере класса User с save() и sendEmail()"
+          }
+        ],
+        "mustConcepts": [
+          "SRP",
+          "Single Responsibility",
+          "SOLID",
+          "одна причин",
+          "reason to change",
+          "ответственност",
+          "concern",
+          "класс",
+          "изменен",
+          "драйвер измен",
+          "раздел",
+          "БД",
+          "email",
+          "один файл",
+          "две причин",
+          "зона ответствен"
+        ],
+        "falseClaims": [
+          "SRP означает один метод на класс",
+          "SRP запрещает несколько методов в одном классе",
+          "SRP — runtime-механизм фреймворка",
+          "SRP касается только backend-кода, не React-компонентов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "change_reason_not_methods",
+      "title": "Отличает причину изменения от числа методов",
+      "expected": "Кандидат объясняет: SRP про *почему* меняется класс, не про количество методов; User с 10 геттерами — OK; добавление save() — вторая причина (схема БД vs правила данных).",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Key difference ITLead — главное заблуждение на собесах",
+        "confusionPairs": [
+          {
+            "checkpointKey": "change_reason_not_methods",
+            "oftenConfusedWith": [
+              "srp_definition"
+            ],
+            "anchorTermsExpected": [
+              "причин",
+              "метод",
+              "геттер",
+              "save",
+              "схема БД"
+            ],
+            "anchorTermsWrongTopic": [
+              "DRY",
+              "один файл на проект",
+              "microservice"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "геттер",
+              "10 метод",
+              "save"
+            ],
+            "ask": "почему User с десятью геттерами соответствует SRP, а с save() — уже нет"
+          }
+        ],
+        "mustConcepts": [
+          "причин",
+          "метод",
+          "количеств",
+          "геттер",
+          "getter",
+          "save",
+          "схема БД",
+          "правила данных",
+          "данные пользов",
+          "вторая причин",
+          "не про метод",
+          "почему меня",
+          "change driver",
+          "address",
+          "email",
+          "name"
+        ],
+        "falseClaims": [
+          "класс с тремя методами всегда соответствует SRP",
+          "SRP требует не больше пяти методов",
+          "геттеры нарушают SRP, потому что их много",
+          "save() в User не нарушает SRP, если метод короткий"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "split_user_example",
+      "title": "Знает паттерн разделения User / Repository / Service",
+      "expected": "Кандидат описывает split: User — данные; UserRepository — db.insert/save; EmailService/WelcomeEmailService — mailer.send; после split сбой email не затрагивает repository, тесты изолированы.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Quick example ITLead — базовый рефакторинг",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "UserRepository",
+              "EmailService",
+              "split"
+            ],
+            "ask": "какие три класса получаются после split User с save() и sendEmail()"
+          }
+        ],
+        "mustConcepts": [
+          "User",
+          "UserRepository",
+          "EmailService",
+          "WelcomeEmailService",
+          "save",
+          "send",
+          "sendEmail",
+          "db.insert",
+          "mailer",
+          "данные",
+          "персист",
+          "изолир",
+          "тест",
+          "split",
+          "раздел",
+          "repository"
+        ],
+        "falseClaims": [
+          "после split User всё ещё должен вызывать save() внутри себя",
+          "EmailService должен знать про схему БД",
+          "UserRepository отправляет welcome email",
+          "split не улучшает изоляцию тестов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки SRP",
+      "expected": "Кандидат называет: «мало методов = SRP»; god object; TypeScript interface с mixed concerns (extends Repository + Emailer); over-splitting — nano-классы без пользы.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes ITLead — частые ловушки middle+",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "change_reason_not_methods",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "god object",
+              "god class",
+              "всё в одном"
+            ],
+            "ask": "как git log помогает найти god object, нарушающий SRP"
+          },
+          {
+            "match": [
+              "interface",
+              "extends",
+              "TypeScript"
+            ],
+            "ask": "почему interface UserService extends UserRepository, Emailer нарушает SRP"
+          },
+          {
+            "match": [
+              "over-split",
+              "nano",
+              "один метод"
+            ],
+            "ask": "когда over-splitting хуже, чем один класс с двумя связанными методами"
+          }
+        ],
+        "mustConcepts": [
+          "мало метод",
+          "god object",
+          "god class",
+          "interface",
+          "extends",
+          "UserRepository",
+          "Emailer",
+          "TypeScript",
+          "lint",
+          "over-split",
+          "nano",
+          "один метод",
+          "git log",
+          "git blame",
+          "потом приберу",
+          "скрыт",
+          "зависимост"
+        ],
+        "falseClaims": [
+          "три метода всегда означают соблюдение SRP",
+          "TypeScript lint автоматически ловит mixed concerns в interface",
+          "SRP требует один метод на класс",
+          "god object безопасен, пока команда маленькая"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_apply",
+      "title": "Знает когда применять SRP",
+      "expected": "Кандидат называет триггеры: класс >50 строк и растёт; два подразделения правят один класс; тест-suite покрывает несвязанные поведения; git blame показывает разные причины изменений.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "When to use ITLead — практические сигналы",
+        "mustConcepts": [
+          "50 строк",
+          "растёт",
+          "две команд",
+          "подраздел",
+          "API team",
+          "reporting",
+          "тест",
+          "несвязан",
+          "git blame",
+          "git log",
+          "причин",
+          "extract",
+          "границ",
+          "boundary",
+          "делает всё",
+          "change reason"
+        ],
+        "falseClaims": [
+          "SRP применяют только при 100+ строках",
+          "если класс маленький — SRP не нужен даже с двумя причинами",
+          "git history не помогает найти нарушение SRP",
+          "SRP применяют только на этапе greenfield, не в legacy"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "real_world_patterns",
+      "title": "Приводит практические примеры SRP",
+      "expected": "Кандидат называет: Express — thin handler + Validator/Repository/EmailService; React — render vs hook vs useTrack; NestJS Controller/Service/Repository; Prisma client отдельно от business layer.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Real-world usage ITLead — Express, React, NestJS, Prisma",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Express",
+              "handler",
+              "route"
+            ],
+            "ask": "как thin route handler в Express соблюдает SRP при POST /users"
+          },
+          {
+            "match": [
+              "React",
+              "hook",
+              "render"
+            ],
+            "ask": "где в React разделить рендер, fetch данных и аналитику по SRP"
+          }
+        ],
+        "mustConcepts": [
+          "Express",
+          "handler",
+          "UserValidator",
+          "WelcomeEmailService",
+          "React",
+          "компонент",
+          "render",
+          "hook",
+          "useTrack",
+          "аналит",
+          "NestJS",
+          "Controller",
+          "Injectable",
+          "repository",
+          "Prisma",
+          "service layer",
+          "делегир",
+          "thin"
+        ],
+        "falseClaims": [
+          "в React SRP означает один giant component на страницу",
+          "Express handler должен содержать SQL и email inline",
+          "NestJS нарушает SRP, потому что много декораторов",
+          "Prisma client и business logic должны жить в одном классе"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "refactoring_testing_tradeoffs",
+      "title": "Знает рефакторинг, тесты и trade-offs SRP",
+      "expected": "Кандидат упоминает: Strangler pattern — вынос по одной ответственности под feature flag; тест SRP — мок БД и email в одном suite = нарушение; microservices — больше файлов, но независимый deploy; V8 IC как side effect split.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Follow-up questions ITLead — strangler, tests, microservices",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Strangler",
+              "feature flag",
+              "legacy"
+            ],
+            "ask": "как рефакторить legacy god class без big bang rewrite"
+          },
+          {
+            "match": [
+              "mock",
+              "test suite",
+              "БД",
+              "email"
+            ],
+            "ask": "как по тестам понять, что класс нарушает SRP"
+          }
+        ],
+        "mustConcepts": [
+          "Strangler",
+          "feature flag",
+          "legacy",
+          "git log",
+          "частот",
+          "test suite",
+          "mock",
+          "БД",
+          "email",
+          "микросервис",
+          "deploy",
+          "scale",
+          "wiring",
+          "trade-off",
+          "V8",
+          "inline cache",
+          "megamorphic",
+          "code review",
+          "рефактор"
+        ],
+        "falseClaims": [
+          "legacy god class нужно переписать целиком за один PR",
+          "мок БД и email в тестах User — нормальный SRP",
+          "SRP в микросервисах всегда уменьшает число файлов",
+          "SRP имеет measurable runtime cost, split всегда замедляет код"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "SRP — одна причина для изменения класса. User хранит name/email; UserRepository.save() меняется при смене БД; EmailService.send() — при смене шаблонов писем. Сбой Postgres не заставляет трогать email-класс. Это не «один метод на класс»: десять геттеров в User — норма.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На POST /users Express handler только координирует: UserValidator.validate, UserRepository.save, WelcomeEmailService.send. В React компонент рендерит, useUsers — fetch, useTrack — аналитика. Legacy god class режу Strangler: сначала выношу repository под feature flag, смотрю git log где чаще правят.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну srp — класс меняется по одной причине. user с save и sendemail — две причины, split на repo и email service. тесты user мокают db и mailer — значит класс жирный",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "SRP — это когда в классе один метод. User с getName, getEmail и save из трёх методов полностью OK, потому что методов мало. TypeScript interface extends Repository и Emailer — удобно, SRP тут не при чём.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "SRP применяют только когда класс больше 500 строк. God object можно оставить — главное DRY. В React один компонент на всё приложение — правильный SRP.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Legacy класс с БД, email и PDF надо переписать за выходные целиком. Если в тестах User мокают postgres и nodemailer — это нормально для интеграционного теста, SRP не нарушен.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "srp_definition",
+      "exampleType": "good",
+      "exampleText": "SRP: класс меняется по одной причине — если и БД, и email ломают один файл, split обязателен.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "srp_definition",
+      "exampleType": "good",
+      "exampleText": "s в solid — одна зона ответственности. повар/официант/мойка — разные классы, разные причины правок",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "srp_definition",
+      "exampleType": "bad",
+      "exampleText": "SRP — runtime-фича NestJS, фреймворк сам делит классы на Controller и Service.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "change_reason_not_methods",
+      "exampleType": "good",
+      "exampleText": "User с 10 геттерами — одна причина (правила данных). save() добавляет причину «схема БД» — нарушение.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "change_reason_not_methods",
+      "exampleType": "good",
+      "exampleText": "srp не про счёт методов — три метода с save уже две причины изменения",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "change_reason_not_methods",
+      "exampleType": "bad",
+      "exampleText": "Если методов меньше пяти — SRP автоматически соблюдён, save() в User не проблема.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "split_user_example",
+      "exampleType": "good",
+      "exampleText": "BadUser.save + sendWelcome → User + UserRepository + WelcomeEmailService; outage email не трогает repository.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "split_user_example",
+      "exampleType": "good",
+      "exampleText": "user данные, repo insert, emailservice send — три файла, три причины правок",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "split_user_example",
+      "exampleType": "bad",
+      "exampleText": "После SRP User сам вызывает db.insert и mailer.send — repository только обёртка без смысла.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Ошибка: getName/getEmail/save — «мало методов». На деле save — вторая причина. God object: git log показывает DB и email коммиты в одном файле.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "interface UserService extends UserRepository, Emailer — lint молчит, но при смене БД правишь контракт email. over-split: getName и getEmail в разные классы — лишняя indirection",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "SRP требует один метод на класс — getName и getEmail должны быть в разных файлах всегда.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_apply",
+      "exampleType": "good",
+      "exampleText": "Класс 80 строк, API и reporting команды оба его правят — split по boundary. Тесты User мокают DB и SMTP — сигнал разделить.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_apply",
+      "exampleType": "good",
+      "exampleText": "git blame — две несвязанные причины коммитов, режу по change driver, не по числу строк",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_apply",
+      "exampleType": "bad",
+      "exampleText": "SRP ждут пока класс станет 1000 строк — до этого смешивать БД и email можно.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "real_world_patterns",
+      "exampleType": "good",
+      "exampleText": "Express POST /users: validate → repository.save → welcomeEmail.send. React: UI render, useUsers fetch, useTrack analytics. NestJS: controller/service/repo по конвенции.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "real_world_patterns",
+      "exampleType": "good",
+      "exampleText": "prisma queries в repository, бизнес-правила в service — не мешаю в одном классе",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "real_world_patterns",
+      "exampleType": "bad",
+      "exampleText": "SRP в Express — весь SQL и Nodemailer прямо в app.post callback, так проще читать.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "refactoring_testing_tradeoffs",
+      "exampleType": "good",
+      "exampleText": "Legacy: Strangler — выношу UserRepository под flag, git log показывает DB commits чаще email. Тест: один suite, два mock — класс fat.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "refactoring_testing_tradeoffs",
+      "exampleType": "good",
+      "exampleText": "microservices trade-off — больше wiring, зато сервисы деплоятся отдельно. v8 ic на god class может тормозить hot path",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "refactoring_testing_tradeoffs",
+      "exampleType": "bad",
+      "exampleText": "SRP legacy только big bang rewrite. Мок postgres и mailer в unit-тесте User — доказательство хорошего SRP.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "single-responsibility-principle",
+    "apiUrl": "https://api.itlead.org/api/questions/single-responsibility-principle",
+    "pageUrl": "https://itlead.org/interview-questions/principles/single-responsibility-principle",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is Single Responsibility Principle (SRP)?",
+    "categorySlug": "principles",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

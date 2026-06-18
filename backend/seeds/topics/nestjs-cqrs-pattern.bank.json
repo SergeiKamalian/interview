@@ -1,0 +1,623 @@
+{
+  "topic": {
+    "code": "nestjs_cqrs_pattern",
+    "name": "Паттерн CQRS в NestJS",
+    "skillCode": "nestjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое паттерн CQRS и как его реализовать в NestJS?",
+    "shortAnswer": "CQRS (Command Query Responsibility Segregation) разделяет операции записи (команды) и чтения (запросы), чтобы каждая сторона могла использовать разные модели и базы данных. В NestJS это реализуют через `@nestjs/cqrs`: `CommandBus.execute()` для записи, `QueryBus.execute()` для чтения и отдельные классы-обработчики. Ключевой момент: после записи команды публикуют доменные события, а запросы читают из проекций, построенных на этих событиях.",
+    "idealAnswer": "CQRS разделяет приложение на два пути: команды изменяют состояние, запросы только читают. Вместо одного сервиса с `create()` и `findOne()` появляются `CreateOrderHandler` (пишет в Postgres) и `GetOrderHandler` (читает из Redis или read-реплики). NestJS предоставляет пакет `@nestjs/cqrs` с `CommandBus`, `QueryBus`, `EventBus` и декораторами `@CommandHandler`, `@QueryHandler`, `@EventsHandler`. Контроллер знает только шины: `commandBus.execute(new CreateOrderCommand(...))` и `queryBus.execute(new GetOrderQuery(...))` — обработчик находится по классу команды/запроса через metadata при регистрации в DI. CqrsModule регистрирует шины как singleton; по умолчанию всё in-memory и in-process — для микросервисов нужен Redis/RabbitMQ transporter. CQS — правило уровня метода (функция либо меняет состояние, либо возвращает данные); CQRS — архитектурный паттерн с отдельными моделями, обработчиками и потенциально разными БД. Классический CRUD держит одну сущность и один репозиторий; CQRS позволяет write side валидировать инварианты в нормализованной таблице, а read side отдавать плоские денормализованные view для UI. После команды обработчик публикует `OrderCreatedEvent` через `eventBus.publish()`; `@EventsHandler` обновляет Redis-проекцию — без события read side видит «призрачные» устаревшие данные (eventual consistency, обычно миллисекунды, UI должен это учитывать). Когда использовать: чтений в 10+ раз больше записей, разные формы данных на read/write, event-driven архитектура, независимое масштабирование (1 write pod, много query pods). Не использовать: прототипы, internal tools, <10k RPD, команда без DDD-опыта — boilerplate handlers/buses/events утроит число файлов без выгоды. Типичные ошибки: один DTO на команды и запросы; забытый `eventBus.publish()` после save; in-memory bus в распределённой системе; отсутствие валидации в command handler. Каждый handler обязан быть в `providers` модуля — иначе runtime «no handler found for [ClassName]». Примеры: MedusaJS (Postgres write, Elasticsearch read), EventStoreDB + проекции, Uber-like (Kafka command, Cassandra query). Между bounded context — не join, а проекция через доменные события в query store своего контекста. В шардированной системе shard key (`tenantId`, `userId`) в metadata команды, consistent hashing или Kafka partitions.",
+    "maxScore": 10,
+    "skills": [
+      "nestjs",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "cqrs_definition",
+      "title": "Понимает суть CQRS",
+      "expected": "Кандидат объясняет: CQRS разделяет команды (запись, мутация состояния) и запросы (только чтение); каждая сторона может иметь свою модель и хранилище; масштабирование read и write независимо.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — разделение command/query path из ITLead TL;DR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "cqrs_definition",
+            "oftenConfusedWith": [
+              "cqs_vs_cqrs",
+              "buses_and_handlers"
+            ],
+            "anchorTermsExpected": [
+              "CQRS",
+              "коман",
+              "запрос",
+              "запись",
+              "чтени",
+              "раздел",
+              "модел",
+              "масштаб"
+            ],
+            "anchorTermsWrongTopic": [
+              "CQRS это только NestJS",
+              "один сервис достаточно",
+              "CQRS заменяет REST"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "CQRS",
+              "коман",
+              "запрос"
+            ],
+            "ask": "чем command path отличается от query path и зачем их разделять"
+          }
+        ],
+        "mustConcepts": [
+          "CQRS",
+          "Command Query Responsibility Segregation",
+          "коман",
+          "запрос",
+          "запись",
+          "чтени",
+          "мутац",
+          "состоян",
+          "раздел",
+          "отдельн",
+          "модел",
+          "хранилищ",
+          "масштаб",
+          "независим",
+          "write",
+          "read"
+        ],
+        "falseClaims": [
+          "CQRS — это просто разные методы в одном сервисе",
+          "CQRS требует только одну базу данных",
+          "запросы могут менять состояние в CQRS",
+          "CQRS и CRUD дают одинаковую архитектуру",
+          "разделение read/write не влияет на масштабирование"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "buses_and_handlers",
+      "title": "Знает CommandBus, QueryBus и handlers",
+      "expected": "Кандидат описывает: контроллер вызывает `commandBus.execute()` / `queryBus.execute()`; `@CommandHandler` / `@QueryHandler` связывают класс команды/запроса с обработчиком; контроллер не знает handlers напрямую.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "механизм NestJS CQRS — buses и routing по классу",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "cqrs_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "buses_and_handlers",
+            "oftenConfusedWith": [
+              "nestjs_module_setup"
+            ],
+            "anchorTermsExpected": [
+              "CommandBus",
+              "QueryBus",
+              "execute",
+              "CommandHandler",
+              "QueryHandler",
+              "контроллер"
+            ],
+            "anchorTermsWrongTopic": [
+              "контроллер вызывает handler напрямую",
+              "QueryBus пишет в БД"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "CommandBus",
+              "QueryBus",
+              "execute"
+            ],
+            "ask": "как контроллер отправляет команду и как bus находит handler"
+          }
+        ],
+        "mustConcepts": [
+          "CommandBus",
+          "QueryBus",
+          "execute",
+          "CommandHandler",
+          "QueryHandler",
+          "ICommandHandler",
+          "IQueryHandler",
+          "контроллер",
+          "класс команды",
+          "класс запроса",
+          "обработчик",
+          "routing",
+          "metadata",
+          "Reflect",
+          "registration",
+          "write path",
+          "read path"
+        ],
+        "falseClaims": [
+          "контроллер должен инжектить каждый handler напрямую",
+          "CommandBus используется для чтения из кеша",
+          "QueryBus изменяет состояние в БД",
+          "handler выбирается по строковому имени метода",
+          "execute принимает plain object без класса команды"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "cqs_vs_cqrs",
+      "title": "Отличает CQS от CQRS",
+      "expected": "Кандидат объясняет: CQS — правило уровня метода (либо mutate, либо return data); CQRS — архитектура с отдельными моделями, handlers и потенциально разными БД.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "частая путаница из ITLead follow-up questions",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "CQS",
+              "CQRS",
+              "метод",
+              "архитектур"
+            ],
+            "ask": "чем CQS отличается от CQRS — метод vs архитектура"
+          }
+        ],
+        "mustConcepts": [
+          "CQS",
+          "Command Query Separation",
+          "CQRS",
+          "метод",
+          "функц",
+          "архитектур",
+          "модел",
+          "handler",
+          "база данных",
+          "уровень",
+          "mutate",
+          "return data",
+          "раздел"
+        ],
+        "falseClaims": [
+          "CQS и CQRS — синонимы",
+          "CQRS — это только правило для одной функции",
+          "CQS требует отдельные базы данных",
+          "CQRS не связан с разделением моделей"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "events_and_projections",
+      "title": "Понимает EventBus и read-проекции",
+      "expected": "Кандидат описывает: после команды `eventBus.publish()` доменного события; `@EventsHandler` обновляет Redis/read model; eventual consistency между write и read; без события query возвращает устаревшие данные.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "мост между write и read — ключ senior темы",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "EventBus",
+              "publish",
+              "EventsHandler"
+            ],
+            "ask": "как read side узнаёт о записи команды и что такое проекция"
+          },
+          {
+            "match": [
+              "eventual consistency",
+              "задержк",
+              "Redis",
+              "проекц"
+            ],
+            "ask": "как обрабатывать eventual consistency в UI после команды"
+          }
+        ],
+        "mustConcepts": [
+          "EventBus",
+          "publish",
+          "EventsHandler",
+          "IEventHandler",
+          "доменн",
+          "событи",
+          "OrderCreatedEvent",
+          "проекц",
+          "read model",
+          "read-модел",
+          "Redis",
+          "eventual consistency",
+          "задержк",
+          "write side",
+          "read side",
+          "обновл",
+          "призрачн",
+          "устарев"
+        ],
+        "falseClaims": [
+          "read side сразу видит запись без событий",
+          "EventBus не нужен если есть QueryBus",
+          "проекция обновляется синхронно в той же транзакции всегда",
+          "можно читать write DB напрямую и это полноценный CQRS",
+          "eventual consistency означает потерю данных"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "nestjs_module_setup",
+      "title": "Знает настройку CqrsModule и providers",
+      "expected": "Кандидат описывает: `imports: [CqrsModule]`, все handlers в `providers`; без регистрации handler runtime ошибка «no handler found»; default in-memory bus не пересекает process boundaries.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "module wiring и типичная runtime ошибка из ITLead advanced example",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "CqrsModule",
+              "providers",
+              "handler"
+            ],
+            "ask": "что будет если handler не добавить в providers модуля"
+          },
+          {
+            "match": [
+              "in-memory",
+              "микросервис",
+              "Redis",
+              "RabbitMQ"
+            ],
+            "ask": "почему default CqrsModule не подходит для распределённой системы"
+          }
+        ],
+        "mustConcepts": [
+          "CqrsModule",
+          "@nestjs/cqrs",
+          "providers",
+          "imports",
+          "CommandHandlers",
+          "QueryHandlers",
+          "EventHandlers",
+          "no handler found",
+          "runtime",
+          "DI",
+          "singleton",
+          "in-memory",
+          "in-process",
+          "transporter",
+          "Redis",
+          "RabbitMQ",
+          "микросервис"
+        ],
+        "falseClaims": [
+          "handlers регистрируются автоматически без providers",
+          "CqrsModule по умолчанию маршрутизирует команды между сервисами",
+          "достаточно импортировать CqrsModule без listing handlers",
+          "EventBus и CommandBus — разные процессы по умолчанию"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда CQRS уместен",
+      "expected": "Кандидат называет: read >> write (10x+), разные формы данных, event-driven, независимое масштабирование; не использовать для прототипов, low traffic, без DDD-опыта.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use / skip из ITLead comparison table",
+        "mustConcepts": [
+          "10x",
+          "read",
+          "write",
+          "масштаб",
+          "e-commerce",
+          "листинг",
+          "заказ",
+          "event-driven",
+          "прототип",
+          "low traffic",
+          "10k",
+          "DDD",
+          "boilerplate",
+          "сложност",
+          "независим",
+          "pod",
+          "денормализ"
+        ],
+        "falseClaims": [
+          "CQRS нужен для любого NestJS приложения",
+          "при малой нагрузке CQRS всегда выгоднее CRUD",
+          "CQRS убирает необходимость в кешировании",
+          "прототипу обязательно нужен CommandBus"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки CQRS в NestJS",
+      "expected": "Кандидат называет: один DTO на command и query; забытый eventBus.publish после save; in-memory bus в microservices; отсутствие валидации в command handler; join между bounded contexts вместо проекций.",
+      "score": 2,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — phantom data, DTO coupling",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "DTO",
+              "OrderDto",
+              "общий класс"
+            ],
+            "ask": "почему нельзя один DTO на CreateOrderCommand и OrderSummaryView"
+          },
+          {
+            "match": [
+              "publish",
+              "забыл",
+              "phantom",
+              "призрач"
+            ],
+            "ask": "почему после save заказ есть в Postgres, а query из Redis пустой"
+          },
+          {
+            "match": [
+              "bounded context",
+              "join",
+              "проекц"
+            ],
+            "ask": "как делать запросы между bounded contexts без cross-join"
+          }
+        ],
+        "mustConcepts": [
+          "DTO",
+          "общий класс",
+          "CreateOrderCommand",
+          "OrderSummaryView",
+          "eventBus.publish",
+          "забыл",
+          "призрачн",
+          "phantom",
+          "in-memory",
+          "микросервис",
+          "валидац",
+          "BadRequestException",
+          "userId",
+          "bounded context",
+          "join",
+          "проекц",
+          "denormalized"
+        ],
+        "falseClaims": [
+          "один DTO на read и write — нормальная практика CQRS",
+          "eventBus.publish опционален если есть QueryBus",
+          "in-memory bus работает между микросервисами из коробки",
+          "можно save command без валидации — БД сама отфильтрует",
+          "cross-context SQL join — правильный способ CQRS"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "CQRS разделяет write и read: POST идёт через commandBus.execute(new CreateOrderCommand(...)) в handler, который пишет в Postgres и публикует OrderCreatedEvent; GET через queryBus.execute(new GetOrderQuery(...)) читает из Redis-проекции. Контроллер знает только шины, не handlers.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На маркетплейсе листинги читают 100x чаще чем создание заказа — отдельные query pods с Redis, один write pod с Postgres. CQS — метод либо меняет, либо возвращает; CQRS — отдельные модели и handlers. Без eventBus.publish после save query видит stale data.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "OrdersModule: imports CqrsModule, providers [...CommandHandlers, ...QueryHandlers, ...EventHandlers]. CreateOrderHandler validate userId, save, publish event. OrderCreatedHandler обновляет user:orders в Redis. GetUserOrdersHandler читает JSON из Redis.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "CQRS в NestJS — это просто разнести create и findOne по разным методам одного OrdersService с одним репозиторием. EventBus не нужен, QueryBus сам синхронизирует кеш.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Использую один OrderDto и для POST и для GET — total там же. In-memory CqrsModule шлёт команды между микросервисами автоматически. CQS и CQRS — одно и то же.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "CQRS нужен всем CRUD приложениям с первого дня. Handler можно не регистрировать в providers — Nest найдёт по декоратору. Валидацию делаю только в controller, handler сразу repo.save(command).",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "cqrs_definition",
+      "exampleType": "good",
+      "exampleText": "CQRS — команды меняют состояние, запросы только читают; write и read могут иметь разные модели и БД, масштабируются отдельно.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "cqrs_definition",
+      "exampleType": "good",
+      "exampleText": "ну cqrs — кухня пишет заказ в postgres, зал читает меню из redis, стороны независимы",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "cqrs_definition",
+      "exampleType": "bad",
+      "exampleText": "CQRS — это когда create и findOne в одном сервисе, но с разными именами методов.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "buses_and_handlers",
+      "exampleType": "good",
+      "exampleText": "Controller: commandBus.execute(new CreateOrderCommand(userId, items)) → @CommandHandler(CreateOrderCommand) → execute(). Query path аналогично через QueryBus и @QueryHandler.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "buses_and_handlers",
+      "exampleType": "good",
+      "exampleText": "контроллер не инжектит handlers — только buses, bus матчит класс команды с handler по metadata",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "buses_and_handlers",
+      "exampleType": "bad",
+      "exampleText": "В контроллере инжекчу CreateOrderHandler и GetOrderHandler напрямую — CommandBus не нужен.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "cqs_vs_cqrs",
+      "exampleType": "good",
+      "exampleText": "CQS — правило одной функции: либо side effect, либо return. CQRS — архитектура: отдельные command/query models, handlers, возможно разные БД.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "cqs_vs_cqrs",
+      "exampleType": "good",
+      "exampleText": "cqs на уровне метода, cqrs на уровне системы с buses и проекциями",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "cqs_vs_cqrs",
+      "exampleType": "bad",
+      "exampleText": "CQS требует CommandBus и EventBus так же как CQRS — это один паттерн.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "events_and_projections",
+      "exampleType": "good",
+      "exampleText": "CreateOrderHandler save → eventBus.publish(OrderCreatedEvent) → OrderCreatedHandler пишет в Redis user:orders. GetUserOrdersQuery читает оттуда; без publish — phantom stale data.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "events_and_projections",
+      "exampleType": "good",
+      "exampleText": "eventual consistency: после POST UI может секунду показать старый список — проекция догоняет через EventsHandler",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "events_and_projections",
+      "exampleType": "bad",
+      "exampleText": "QueryBus после execute команды автоматически инвалидирует Redis — publish не нужен.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "nestjs_module_setup",
+      "exampleType": "good",
+      "exampleText": "providers: [...CommandHandlers, ...QueryHandlers, ...EventHandlers] — иначе no handler found at runtime. Default bus in-process only.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "nestjs_module_setup",
+      "exampleType": "good",
+      "exampleText": "imports CqrsModule, для микросервисов — redis/rabbit transporter, не голый in-memory",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "nestjs_module_setup",
+      "exampleType": "bad",
+      "exampleText": "Достаточно @CommandHandler на классе — в providers добавлять handler не обязательно.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "E-commerce catalog read 100x > order write — CQRS с Redis read pods. Internal admin 500 RPD — plain service, CQRS overkill.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "event-driven с проекциями — да; прототип без ddd — начни с crud",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Любой NestJS проект должен стартовать с CQRS и EventStore с day one.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Отдельно CreateOrderCommand (userId, items) и OrderSummaryView (id, total, status). После save обязательно publish. Validate userId в handler до repo.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "между bounded context — не join, а domain event в свой query store; in-memory bus в двух сервисах — команда не дойдёт",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "OrderDto с total для и POST и GET — CQRS так и задуман. Save без publish ок, query читает write DB напрямую всегда.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-cqrs-pattern",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-cqrs-pattern",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-cqrs-pattern",
+    "difficulty": "SENIOR",
+    "titleEn": "What is CQRS pattern and how to implement it in NestJS?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

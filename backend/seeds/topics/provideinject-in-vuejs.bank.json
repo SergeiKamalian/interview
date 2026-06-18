@@ -1,0 +1,625 @@
+{
+  "topic": {
+    "code": "provideinject_in_vuejs",
+    "name": "Provide/inject в Vue.js",
+    "skillCode": "vue",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работают provide и inject в Vue.js и когда их использовать вместо props?",
+    "shortAnswer": "provide и inject — пара API для передачи данных от предка к любому потомку без prop drilling через промежуточные компоненты. Предок вызывает provide(key, value), потомок — inject(key, default). Важно передавать ref, а не .value, иначе реактивность теряется.",
+    "idealAnswer": "provide/inject — механизм Vue для передачи данных от родительского компонента к любому потомку без явной цепочки props через промежуточные уровни. Аналогия: общий шкафчик — родитель кладёт (provide), любой потомок забирает по ключу (inject), промежуточные компоненты не участвуют. Props требуют, чтобы каждый уровень объявлял и пробрасывал prop; при пяти уровнях вложенности пять компонентов таскают данные, которые им не нужны. provide/inject обрезает цепочку: родитель объявляет один раз, потомок на любой глубине inject напрямую. Реактивность работает: если provide ref, потомок получает тот же ref-объект, не копию — изменения видны всем подписчикам. Пример: const user = ref({ name: 'Alice' }); provide('currentUser', user); в DeepChild: const user = inject('currentUser', ref({ name: 'Guest' })). Внутри Vue хранит provide-цепочку на экземпляре компонента. inject(key) поднимается вверх по дереву и берёт значение у ближайшего предка с этим ключом; если два предка provide один key — побеждает ближайший (override в поддереве, например вложенная тема). Без match — undefined или второй аргумент default. App-level: app.provide('apiUrl', url) в main.js — доступно всем компонентам; так Vue Router и Vuetify отдают контекст без импортов в каждый файл. Symbol-ключи и InjectionKey<T> в TypeScript исключают коллизии строк и дают типизацию inject. Когда использовать: provide/inject — тема, auth, locale, config, feature flags, shared API client; props — прямой parent-child, 1–2 уровня, явный traceable flow; Pinia — app-wide state с devtools, time-travel, сложные мутации. Типичные ошибки: provide('count', count.value) вместо provide('count', count) — статический snapshot без реактивности; прямая мутация inject('config').value без явной update-функции — неясное владение; inject('user') без default → TypeError при отсутствии provide; ожидание копии ref — все потомки делят один объект; циклические re-provide цепочки. Паттерн: provide state + provide updateFn. Реальное применение: Vue Router (useRoute), Vuetify theme, Vee-Validate form context, Pinia внутри. Multi-level theme: каждая theme boundary provide свой key — потомки inject от ближайшего предка.",
+    "maxScore": 10,
+    "skills": [
+      "vue",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "provide_inject_definition",
+      "title": "Понимает provide/inject",
+      "expected": "Кандидат объясняет: provide/inject передаёт данные от предка к любому потомку без prop drilling; provide(key, value) у предка, inject(key, default) у потомка.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — механизм без промежуточных props",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "provide_inject_definition",
+            "oftenConfusedWith": [
+              "props_vs_provide_inject",
+              "internal_resolution"
+            ],
+            "anchorTermsExpected": [
+              "provide",
+              "inject",
+              "предок",
+              "потомок",
+              "prop drilling",
+              "без промежуточ"
+            ],
+            "anchorTermsWrongTopic": [
+              "provide это Pinia store",
+              "inject только для router",
+              "provide заменяет emit"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "provide",
+              "inject",
+              "descendant"
+            ],
+            "ask": "как provide/inject обходит промежуточные компоненты по сравнению с props"
+          }
+        ],
+        "mustConcepts": [
+          "provide",
+          "inject",
+          "предок",
+          "потомок",
+          "нащадок",
+          "descendant",
+          "prop drilling",
+          "проброс",
+          "промежуточн",
+          "ключ",
+          "key",
+          "default",
+          "дефолт",
+          "родитель",
+          "parent",
+          "child",
+          "без props",
+          "любой уровень",
+          "глубин"
+        ],
+        "falseClaims": [
+          "provide/inject работает только между прямым parent и child",
+          "inject автоматически создаёт reactive copy",
+          "provide/inject заменяет все props в приложении",
+          "provide доступен только в Options API",
+          "inject без provide всегда бросает ошибку"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "props_vs_provide_inject",
+      "title": "Отличает provide/inject от props",
+      "expected": "Кандидат сравнивает: props — явная цепочка, каждый уровень declare и forward; provide/inject — родитель один раз, потомок inject напрямую, промежуточные компоненты чистые.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевое отличие от props — обрезание цепочки",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "provide_inject_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "props_vs_provide_inject",
+            "oftenConfusedWith": [
+              "when_to_use"
+            ],
+            "anchorTermsExpected": [
+              "props",
+              "цепочка",
+              "forward",
+              "проброс",
+              "промежуточн",
+              "traceable"
+            ],
+            "anchorTermsWrongTopic": [
+              "props всегда лучше",
+              "provide/inject для одного уровня"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "props",
+          "provide",
+          "inject",
+          "цепочка",
+          "chain",
+          "forward",
+          "проброс",
+          "промежуточн",
+          "declare",
+          "объявл",
+          "explicit",
+          "явн",
+          "parent-child",
+          "direct",
+          "прямой",
+          "skip",
+          "обреза",
+          "clean"
+        ],
+        "falseClaims": [
+          "props и provide/inject решают одну задачу одинаково",
+          "provide/inject не нужен если есть props",
+          "props можно пробрасывать без объявления на каждом уровне",
+          "provide/inject делает data flow более traceable чем props"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "reactivity_ref_provide",
+      "title": "Provide ref, а не .value",
+      "expected": "Кандидат объясняет: provide ref-объект, не count.value; потомок получает тот же ref, изменения реактивны; provide snapshot — статическое число без обновлений.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "mistake #1 из ITLead — потеря реактивности",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ref",
+              ".value",
+              "reactive",
+              "реактив"
+            ],
+            "ask": "почему provide('count', count.value) ломает реактивность у потомка"
+          },
+          {
+            "match": [
+              "same ref",
+              "shared",
+              "один объект"
+            ],
+            "ask": "что получает потомок — копию или тот же ref"
+          }
+        ],
+        "mustConcepts": [
+          "ref",
+          ".value",
+          "provide",
+          "inject",
+          "реактив",
+          "reactive",
+          "snapshot",
+          "снимок",
+          "static",
+          "статич",
+          "same object",
+          "тот же",
+          "shared ref",
+          "общий",
+          "mutations",
+          "изменен",
+          "count.value",
+          "не копия"
+        ],
+        "falseClaims": [
+          "можно safely provide count.value для reactive count",
+          "inject всегда клонирует ref",
+          "provide ref и provide .value дают одинаковую реактивность",
+          "потомок получает deep copy ref при inject",
+          "реактивность inject работает без ref на provide"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "internal_resolution",
+      "title": "Знает разрешение inject по дереву",
+      "expected": "Кандидат описывает: Vue идёт вверх по дереву; ближайший provide побеждает; override в поддереве; без match — undefined или default.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "closest ancestor wins — follow-up из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "closest",
+              "ближайш",
+              "ancestor",
+              "предок"
+            ],
+            "ask": "что если два предка provide один и тот же key"
+          },
+          {
+            "match": [
+              "override",
+              "theme",
+              "поддерев",
+              "modal"
+            ],
+            "ask": "как переопределить тему во вложенном поддереве"
+          }
+        ],
+        "mustConcepts": [
+          "walk up",
+          "вверх",
+          "дерев",
+          "tree",
+          "ancestor",
+          "предок",
+          "closest",
+          "ближайш",
+          "override",
+          "переопредел",
+          "поддерев",
+          "subtree",
+          "undefined",
+          "default",
+          "дефолт",
+          "second argument",
+          "второй аргумент",
+          "provide chain",
+          "цепочк"
+        ],
+        "falseClaims": [
+          "inject берёт значение у самого дальнего предка",
+          "два provide одного key merge значения",
+          "inject без provide всегда throw",
+          "потомок видит provide дедушки через ближайшего родителя с тем же key"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Выбирает provide/inject vs props vs Pinia",
+      "expected": "Кандидат называет: provide/inject — theme, auth, locale, config, API client в поддереве; props — direct parent-child 1–2 уровня; Pinia — global state, devtools, сложные мутации.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "decision rule из TL;DR ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Pinia",
+              "provide",
+              "props"
+            ],
+            "ask": "когда Pinia вместо provide/inject"
+          }
+        ],
+        "mustConcepts": [
+          "theme",
+          "тема",
+          "auth",
+          "авторизац",
+          "locale",
+          "локаль",
+          "config",
+          "конфиг",
+          "feature flags",
+          "API client",
+          "props",
+          "parent-child",
+          "Pinia",
+          "devtools",
+          "global",
+          "глобальн",
+          "subtree",
+          "поддерев",
+          "singleton"
+        ],
+        "falseClaims": [
+          "Pinia и provide/inject взаимозаменяемы без trade-off",
+          "provide/inject лучше Pinia для всего app state",
+          "props подходят для auth context на 10 уровней",
+          "provide/inject scoped globally как Pinia store"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "app_level_symbols_typescript",
+      "title": "App-level provide и Symbol/InjectionKey",
+      "expected": "Кандидат упоминает app.provide в createApp; Symbol keys против коллизий; InjectionKey<T> для типизации inject в TypeScript.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "app.provide + Symbol keys из ITLead",
+        "mustConcepts": [
+          "app.provide",
+          "createApp",
+          "main.js",
+          "application level",
+          "уровень прилож",
+          "Symbol",
+          "InjectionKey",
+          "TypeScript",
+          "типизац",
+          "collision",
+          "коллиз",
+          "string key",
+          "строков",
+          "Vue Router",
+          "Vuetify",
+          "useRoute"
+        ],
+        "falseClaims": [
+          "provide работает только внутри SFC setup",
+          "string keys безопаснее Symbol",
+          "InjectionKey не влияет на тип inject",
+          "app.provide недоступен в Vue 3"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки provide/inject",
+      "expected": "Кандидат называет: provide .value; inject без default; прямая мутация без updateFn; ожидание изоляции ref; циклические re-provide; паттерн provide data + updateConfig.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "default",
+              "undefined",
+              "TypeError"
+            ],
+            "ask": "что будет если inject('user') без provide и без default"
+          },
+          {
+            "match": [
+              "updateConfig",
+              "updateFn",
+              "mutation",
+              "мутац"
+            ],
+            "ask": "как безопасно менять injected config из потомка"
+          },
+          {
+            "match": [
+              "shared",
+              "Child A",
+              "Child B",
+              "один ref"
+            ],
+            "ask": "почему два sibling inject одного count видят одно значение"
+          }
+        ],
+        "mustConcepts": [
+          "default value",
+          "дефолт",
+          "undefined",
+          "TypeError",
+          "mutate",
+          "мутац",
+          "updateConfig",
+          "updateFn",
+          "update function",
+          "shared ref",
+          "общий ref",
+          "isolation",
+          "изоляц",
+          "circular",
+          "циклич",
+          "re-provide",
+          "Guest",
+          "ownership",
+          "владел",
+          "traceable"
+        ],
+        "falseClaims": [
+          "inject всегда возвращает deep copy для изоляции",
+          "можно безопасно mutating inject config без update function",
+          "default в inject не нужен если parent всегда есть",
+          "sibling inject получают разные ref от одного provide",
+          "re-provide injected data всегда безопасен"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "provide/inject — родитель provide('user', userRef), потомок на любой глубине inject('user', defaultRef). Передаю ref, не .value — иначе snapshot без реактивности. Для auth и theme на app level — app.provide; для local context в поддереве — provide в ThemeProvider.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Props на пять уровней — пять компонентов таскают user, хотя нужен только лист. provide один раз, DeepButton inject('theme') и toggleTheme без prop drilling. Pinia беру когда нужен global store с devtools, не для локальной темы в ветке.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Symbol + InjectionKey<User> — inject(UserKey) типизирован. Два предка с одним key — побеждает ближайший, в modal могу override theme. inject('user', ref({ name: 'Guest' })) — без default упадёт TypeError.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "provide('count', count.value) — правильный паттерн, потомок всё равно reactive. inject без default безопасен, Vue создаст пустой ref.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "provide/inject заменяет Pinia для всего состояния приложения. inject берёт значение у root, игнорируя ближайшего parent.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Два sibling inject('count') получают разные копии ref — изменение в Child A не видно в Child B. Можно напрямую config.value.apiUrl = 'new' без update function — это best practice.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "provide_inject_definition",
+      "exampleType": "good",
+      "exampleText": "provide('currentUser', userRef) в App — inject('currentUser') в DeepChild на 10 уровнях, промежуточные компоненты не знают про user.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "provide_inject_definition",
+      "exampleType": "good",
+      "exampleText": "ну provide кладёт в шкафчик, inject забирает по ключу — prop drilling не нужен",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "provide_inject_definition",
+      "exampleType": "bad",
+      "exampleText": "provide/inject работает только между прямым parent и immediate child, глубже нужны props.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "props_vs_provide_inject",
+      "exampleType": "good",
+      "exampleText": "Props: каждый Layout, Sidebar, Panel должен declare user и forward. provide/inject: App provide once, Leaf inject — промежуточные чистые.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "props_vs_provide_inject",
+      "exampleType": "good",
+      "exampleText": "для одного уровня parent→child оставляю props — явный flow; для theme/auth через 6 уровней — provide/inject",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "props_vs_provide_inject",
+      "exampleType": "bad",
+      "exampleText": "provide/inject делает data flow более traceable чем props, поэтому всегда лучше.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "reactivity_ref_provide",
+      "exampleType": "good",
+      "exampleText": "provide('count', count) — ref object; inject получает тот же ref, count.value++ виден всем потомкам.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "reactivity_ref_provide",
+      "exampleType": "good",
+      "exampleText": "provide('count', count.value) — потомок получит 0 как number, дальнейшие increment не дойдут — классическая ошибка",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "reactivity_ref_provide",
+      "exampleType": "bad",
+      "exampleText": "Без разницы provide ref или ref.value — inject всё равно reactive.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "internal_resolution",
+      "exampleType": "good",
+      "exampleText": "inject идёт вверх по дереву; ModalTheme provide('theme', dark) перекрывает App light theme для потомков modal.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "internal_resolution",
+      "exampleType": "good",
+      "exampleText": "два ancestor с key 'locale' — ближайший wins, grandparent не виден",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "internal_resolution",
+      "exampleType": "bad",
+      "exampleText": "inject merge значения от всех предков с одинаковым key.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Auth context + logout fn — app.provide; форма parent→field один уровень — props; корзина и user profile app-wide — Pinia с devtools.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "feature flags и api client в поддереве admin — provide/inject; не тащу Pinia ради локального config",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Pinia устарел, provide/inject для всего global state включая shopping cart.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "app_level_symbols_typescript",
+      "exampleType": "good",
+      "exampleText": "createApp(App).provide('apiUrl', url) — как Vue Router отдаёт route. ThemeKey = Symbol + InjectionKey<Ref<Theme>> для типобезопасного inject.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "app_level_symbols_typescript",
+      "exampleType": "good",
+      "exampleText": "string key 'theme' может конфlict между lib — Symbol из keys.ts импортирую в parent и child",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "app_level_symbols_typescript",
+      "exampleType": "bad",
+      "exampleText": "provide только внутри component setup, app.provide не существует в Vue 3.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "provide config + provide updateConfig(fn) — потомок вызывает updateConfig('apiUrl', url), не мутирует inject напрямую. inject('user', ref({ name: 'Guest' })) — safe default.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Child A и B inject один count ref — count.value++ в A видно в B, это shared reference не баг",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "inject('user') без default ок — Vue вернёт пустой reactive user object автоматически.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "provideinject-in-vuejs",
+    "apiUrl": "https://api.itlead.org/api/questions/provideinject-in-vuejs",
+    "pageUrl": "https://itlead.org/interview-questions/vue/provideinject-in-vuejs",
+    "difficulty": "MIDDLE",
+    "titleEn": "Provide/inject in Vue.js",
+    "categorySlug": "vue",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

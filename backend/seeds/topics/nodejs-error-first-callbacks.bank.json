@@ -1,0 +1,468 @@
+{
+  "topic": {
+    "code": "nodejs_error_first_callbacks",
+    "name": "Error-first callback в Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Что такое паттерн error-first callback в Node.js?",
+    "shortAnswer": "Error-first callback — конвенция Node.js: асинхронные функции передают в callback первым аргументом `null` или объект `Error`, а результат — вторым. Пример: `fs.readFile(path, (err, data) => { if (err) return; })`. Всегда проверяй `err` перед использованием `data` и делай `return` после обработки ошибки.",
+    "idealAnswer": "Error-first callback — конвенция Node.js, где async-функции всегда передают ошибку первым аргументом callback, а данные — вторым, только если ошибки нет. Сигнатура: `callback(err, data)`. При успехе `err === null`, `data` содержит результат; при ошибке `err` — объект `Error`, `data` — `undefined`. Всегда проверяй `if (err)` перед работой с `data` и делай `return` после обработки ошибки — пропущенный `return` — самый частый баг: код продолжает выполнение с `data === undefined`. В синхронном коде ошибки ловят через throw/try-catch; в async callback выполняется позже, в другом тике event loop, и исходный try-catch уже завершён — поэтому ошибку передают явно первым аргументом. Паттерн используют `fs.readFile`/`fs.writeFile`, `mysql`, `pg`, Express error middleware `(err, req, res, next)`. Внутри Node.js libuv завершает I/O и передаёт C-код ошибки (например `UV_ENOENT`) в V8, event loop вызывает callback с `Error` или `null` — но сам порядок аргументов это конвенция, runtime не принуждает. Типичные ошибки: забытый `return` после `if (err)` — логируется `undefined`; перепутанный порядок в своей функции `cb(row, err)` вместо `cb(err, row)`; try-catch вокруг вызова с callback — не ловит throw внутри callback. Для нового кода на Node 10+ предпочитают `fs.promises` и async/await; legacy оборачивают через `util.promisify(fs.readFile)`. Несколько результатов передают одним объектом: `cb(null, { user, token })`. В цепочках nested callbacks каждый шаг делает `if (err) return cb(err)` — от этого ушли к Promises и async/await.",
+    "maxScore": 10,
+    "skills": ["nodejs"]
+  },
+  "checkpoints": [
+    {
+      "key": "error_first_definition",
+      "title": "Понимает error-first callback",
+      "expected": "Кандидат объясняет: конвенция Node.js — callback получает ошибку первым аргументом, результат вторым; сигнатура `callback(err, data)`.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — ядро темы, сигнатура callback(err, data)",
+        "probeConceptGroups": [
+          {
+            "match": ["error-first", "callback", "err", "data"],
+            "ask": "что означает error-first и как выглядит сигнатура callback"
+          }
+        ],
+        "mustConcepts": [
+          "error-first",
+          "callback",
+          "конвенц",
+          "Node.js",
+          "err",
+          "data",
+          "перв",
+          "аргумент",
+          "втор",
+          "результат",
+          "async",
+          "асинхрон",
+          "fs.readFile",
+          "callback(err, data)",
+          "stdlib",
+          "стандарт"
+        ],
+        "falseClaims": [
+          "error-first — это встроенное принуждение runtime Node.js",
+          "callback всегда получает только один аргумент",
+          "ошибка передаётся вторым аргументом в Node.js",
+          "error-first работает только для fs, не для БД",
+          "callback и Promise — одна и та же конвенция аргументов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "success_vs_error_args",
+      "title": "Различает успех и ошибку в аргументах",
+      "expected": "Кандидат объясняет: при успехе `err === null`, `data` — результат; при ошибке `err` — объект `Error`, `data` — `undefined`.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Key point ITLead — null vs Error и undefined data",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "error_first_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "success_vs_error_args",
+            "oftenConfusedWith": ["error_first_definition"],
+            "anchorTermsExpected": [
+              "null",
+              "Error",
+              "undefined",
+              "успех",
+              "ошибк"
+            ],
+            "anchorTermsWrongTopic": [
+              "err всегда truthy",
+              "data содержит ошибку",
+              "при ошибке err === undefined"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["null", "Error", "undefined"],
+            "ask": "что приходит в err и data когда файл не найден vs когда прочитан успешно"
+          }
+        ],
+        "mustConcepts": [
+          "null",
+          "Error",
+          "undefined",
+          "успех",
+          "ошибк",
+          "err === null",
+          "ENOENT",
+          "объект Error",
+          "результат",
+          "data",
+          "файл не найден",
+          "message",
+          "truthy",
+          "falsy"
+        ],
+        "falseClaims": [
+          "при успехе err — пустая строка, не null",
+          "при ошибке data содержит описание ошибки",
+          "err и data всегда заполнены одновременно",
+          "null в err означает ошибку",
+          "при ENOENT data всё равно содержит содержимое файла"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "check_err_and_return",
+      "title": "Проверяет err и делает return",
+      "expected": "Кандидат объясняет: всегда `if (err)` перед использованием `data`; после обработки ошибки — `return`, иначе код продолжит с `undefined`.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Quick example ITLead — #1 bug без return",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": ["if (err)", "return", "undefined"],
+            "ask": "что произойдёт если залогировать err но не сделать return"
+          },
+          {
+            "match": ["propagate", "cb(err)", "переда"],
+            "ask": "как пробросить ошибку выше через cb(err) в обёртке"
+          }
+        ],
+        "mustConcepts": [
+          "if (err)",
+          "return",
+          "провер",
+          "перед data",
+          "undefined",
+          "продолж",
+          "fall through",
+          "cb(err)",
+          "cb(null, result)",
+          "propagate",
+          "проброс",
+          "console.error",
+          "ранний выход",
+          "early return"
+        ],
+        "falseClaims": [
+          "достаточно console.error(err) без return",
+          "if (err) автоматически останавливает callback",
+          "можно безопасно использовать data после ошибки",
+          "return после err не обязателен в Node.js",
+          "cb(err) и cb(null, err) эквивалентны"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "why_error_first_async",
+      "title": "Понимает почему ошибка первой в async",
+      "expected": "Кандидат объясняет: callback выполняется позже в event loop; исходный try-catch уже завершён; throw в callback не поймается снаружи — ошибку передают явно.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Why error comes first — async vs sync из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": ["event loop", "try-catch", "throw"],
+            "ask": "почему try-catch вокруг fs.readFile не ловит throw внутри callback"
+          },
+          {
+            "match": ["libuv", "UV_ENOENT", "V8"],
+            "ask": "как libuv передаёт код ошибки в callback (опционально)"
+          }
+        ],
+        "mustConcepts": [
+          "event loop",
+          "try-catch",
+          "throw",
+          "асинхрон",
+          "позже",
+          "стек",
+          "call stack",
+          "синхрон",
+          "явно",
+          "вручную",
+          "crash",
+          "процесс",
+          "libuv",
+          "I/O",
+          "тик",
+          "turn"
+        ],
+        "falseClaims": [
+          "try-catch вокруг fs.readFile ловит все ошибки callback",
+          "Node.js бросает исключения для async I/O как в sync коде",
+          "error-first нужен только для красоты API",
+          "throw в callback безопасно перехватывается внешним try-catch",
+          "event loop автоматически превращает throw в err аргумент"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с callbacks",
+      "expected": "Кандидат называет: забытый `return` после err; перепутанный порядок `cb(row, err)`; try-catch вокруг async-вызова; правильно — return, `cb(err, row)`, обработка внутри callback.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — 3 паттерна из ITLead с кодом",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": ["return", "console.error", "undefined"],
+            "ask": "покажи wrong vs right обработку err в fs.readFile"
+          },
+          {
+            "match": ["cb(row, err)", "swap", "перепут"],
+            "ask": "что сломается если в getUser передать cb(row, err) вместо cb(err, row)"
+          }
+        ],
+        "mustConcepts": [
+          "return",
+          "забыт",
+          "перепут",
+          "swap",
+          "cb(row, err)",
+          "cb(err, row)",
+          "try-catch",
+          "внутри callback",
+          "undefined в БД",
+          "silent",
+          "тих",
+          "corrupt",
+          "production",
+          "getUser",
+          "db.query"
+        ],
+        "falseClaims": [
+          "перепутать err и data в cb безопасно — caller сам разберётся",
+          "try-catch вокруг fs.readFile ловит throw из callback",
+          "без return Node.js сам не зайдёт в блок с data",
+          "console.error(err) эквивалентен return после ошибки",
+          "можно проверять data вместо err — это надёжнее"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "promisify_and_modern",
+      "title": "Знает promisify и когда использовать",
+      "expected": "Кандидат упоминает: fs/mysql/pg следуют error-first; новый код — fs.promises/async-await; legacy — `util.promisify`; несколько результатов — объект `cb(null, { user, token })`; Express `(err, req, res, next)`.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "When to use + follow-up promisify из ITLead",
+        "mustConcepts": [
+          "util.promisify",
+          "fs.promises",
+          "async/await",
+          "Promise",
+          "mysql",
+          "pg",
+          "Express",
+          "error middleware",
+          "err, req, res, next",
+          "legacy",
+          "новый код",
+          "Node 10",
+          "waterfall",
+          "async library",
+          "объект",
+          "cb(null, {"
+        ],
+        "falseClaims": [
+          "error-first callbacks — единственный способ async в Node.js",
+          "util.promisify меняет порядок аргументов на (data, err)",
+          "fs.promises не следует error-first внутри",
+          "Express error middleware не связан с error-first",
+          "async/await делает error-first ненужным даже в legacy libs без обёртки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Error-first callback — конвенция Node.js: `callback(err, data)`. При успехе err null, data — результат; при ошибке err — Error, data undefined. Всегда `if (err) { ...; return; }` перед работой с data. В async callback try-catch снаружи не поможет — ошибку передают явно. Для нового кода — fs.promises и async/await, legacy — util.promisify.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну это как курьер — сначала говорит была ли проблема (err), потом отдаёт посылку (data). fs.readFile: if (err) return, иначе парсим content. без return после err залогируешь undefined в прод базу. pg и mysql так же — (err, rows). новый код на promises, старый mysql driver — error-first",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "readConfig оборачивает fs.readFile: if (err) return cb(err); cb(null, JSON.parse(content)). Caller тоже if (err) return. Express error handler — (err, req, res, next), прямое продолжение конвенции. Несколько значений: cb(null, { user, token }).",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Error-first — runtime Node.js сам бросает err первым аргументом принудительно. При ошибке data содержит stack trace. try-catch вокруг fs.readFile ловит все ошибки внутри callback.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "if (err) console.error(err) — достаточно, return не нужен, Node остановит callback сам. В своей функции можно cb(result, err) — caller разберётся.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Error-first устарел, fs.readFile больше не использует callbacks. util.promisify возвращает (err, data) как callback. Express middleware не связан с этой конвенцией.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "error_first_definition",
+      "exampleType": "good",
+      "exampleText": "Error-first — callback(err, data): ошибка первым аргументом, результат вторым; конвенция stdlib Node.js для fs, mysql, pg.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "error_first_definition",
+      "exampleType": "good",
+      "exampleText": "это договорённость node — сначала err потом data в любом async callback, fs.readFile так работает с v0.1.90",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "error_first_definition",
+      "exampleType": "bad",
+      "exampleText": "Error-first — когда callback получает data первым, а err вторым, если что-то пошло не так.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "success_vs_error_args",
+      "exampleType": "good",
+      "exampleText": "Файл прочитан: err null, content — строка. ENOENT: err — Error с message, content undefined. Никогда не трогаю data пока err truthy.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "success_vs_error_args",
+      "exampleType": "good",
+      "exampleText": "успех — err === null и data есть; фейл — err объект Error, data undefined, не наоборот",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "success_vs_error_args",
+      "exampleType": "bad",
+      "exampleText": "При ошибке err undefined, а data содержит объект Error — так Node передаёт failure.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "check_err_and_return",
+      "exampleType": "good",
+      "exampleText": "if (err) { console.error(err.message); return; } console.log(data) — return критичен, иначе data undefined попадёт в логику ниже.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "check_err_and_return",
+      "exampleType": "good",
+      "exampleText": "в обёртке if (err) return cb(err); cb(null, parsed) — проброс наверх, caller сам решит что делать",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "check_err_and_return",
+      "exampleType": "bad",
+      "exampleText": "if (err) console.error(err) без return — нормально, console.error останавливает выполнение callback.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "why_error_first_async",
+      "exampleType": "good",
+      "exampleText": "Callback в другом тике event loop — внешний try-catch уже мёртв. throw внутри callback упадёт в процесс. Error-first заставляет обработать err вручную каждый раз.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "why_error_first_async",
+      "exampleType": "good",
+      "exampleText": "sync — throw и catch на стеке; async callback позже — стек ушёл, поэтому err первым аргументом, не exception",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "why_error_first_async",
+      "exampleType": "bad",
+      "exampleText": "try { fs.readFile(..., () => { throw new Error('boom'); }); } catch(e) {} — так ловят async ошибки в Node.js.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Wrong: if (err) console.error(err); console.log(data) — data undefined. Right: if (err) { console.error(err); return; }. Wrong getUser: cb(row, err) — все callers сломаны.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "видел баг — err залогировали но без return, в postgres улетело undefined в колонку. ещё классика — cb(data, err) в своей обёртке",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "try-catch вокруг fs.readFile ловит throw из callback — это стандартный паттерн обработки async ошибок.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "promisify_and_modern",
+      "exampleType": "good",
+      "exampleText": "Legacy: util.promisify(fs.readFile) → .then/.catch или await. Новый код: fs.promises.readFile. mysql/pg — error-first; Express (err, req, res, next). Несколько результатов: cb(null, { user, token }).",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "promisify_and_modern",
+      "exampleType": "good",
+      "exampleText": "старый express route с pg nested callbacks — каждый шаг if (err) return res.status(500). новый — async/await + try/catch один на весь handler",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "promisify_and_modern",
+      "exampleType": "bad",
+      "exampleText": "util.promisify сохраняет callback(err, data) сигнатуру при вызове — нужно вручную передавать err первым в .then().",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-error-first-callbacks",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-error-first-callbacks",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-error-first-callbacks",
+    "difficulty": "JUNIOR",
+    "titleEn": "What is error-first callback pattern?",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T14:30:00.000Z"
+  }
+}

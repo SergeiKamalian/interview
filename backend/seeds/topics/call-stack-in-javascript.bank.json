@@ -1,0 +1,567 @@
+{
+  "topic": {
+    "code": "call_stack_javascript",
+    "name": "Call stack в JavaScript",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое call stack в JavaScript и как он работает?",
+    "shortAnswer": "Call stack (стек вызовов) — структура данных, по которой движок отслеживает, какая функция сейчас выполняется и куда вернуться после return. Работает по LIFO: push при вызове, pop при return. В JavaScript один call stack — одновременно выполняется только один синхронный участок кода.",
+    "idealAnswer": "Call stack — структура данных LIFO (Last In, First Out): при вызове функции движок push-ит stack frame, при return — pop. Движок всегда выполняет то, что на вершине стека. Каждый frame хранит локальные переменные, привязку `this` и адрес возврата — поэтому глубокая рекурсия без базового случая переполняет стек и бросает `RangeError: Maximum call stack size exceeded` (V8 обычно ~10–12k frames). У JavaScript один call stack — архитектурное решение для предсказуемости (нет гонок потоков), но тяжёлый синхронный цикл блокирует UI и таймеры, пока стек не освободится. Event loop следит за стеком: когда он пуст, сначала полностью дренируется очередь microtasks (Promise), затем одна macrotask (setTimeout, события) push-ится на стек. Даже `setTimeout(fn, 0)` ждёт, пока текущий синхронный код не завершится — «0 ms» не значит «прямо сейчас». Async-колбеки `.then` и код после `await` выполняются уже после того, как вызывающая функция снята со стека — через microtask queue. При ошибке stack trace показывает цепочку вызовов: снизу вверх — порядок вызовов, сверху — место падения. `async/await`: код до первого `await` идёт на стеке; на `await` функция приостанавливается, frame снимается; после resolve Promise возобновление — новый frame как microtask. CPU-heavy работу выносят в Web Worker или дробят через `setTimeout`/`requestAnimationFrame`. В DevTools панель Call Stack показывает живой стек при отладке; в Node.js можно увеличить лимит `--stack-size`, в браузере — нет.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "call_stack_definition",
+      "title": "Понимает назначение call stack",
+      "expected": "Кандидат объясняет: call stack отслеживает текущую выполняемую функцию и точку возврата; LIFO; один стек в JavaScript — одновременно один синхронный поток выполнения.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — что такое стек и зачем",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "call stack",
+              "стек",
+              "LIFO"
+            ],
+            "ask": "что хранит call stack и почему принцип LIFO"
+          }
+        ],
+        "mustConcepts": [
+          "call stack",
+          "стек вызов",
+          "стек",
+          "LIFO",
+          "Last In First Out",
+          "последн",
+          "перв",
+          "текущ",
+          "функц",
+          "return",
+          "возврат",
+          "один стек",
+          "одновременно",
+          "синхрон",
+          "отслеж",
+          "выполня"
+        ],
+        "falseClaims": [
+          "в JavaScript несколько call stack на вкладку",
+          "call stack хранит только имена функций без контекста",
+          "call stack работает по FIFO",
+          "call stack не связан с порядком выполнения функций"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "lifo_push_pop",
+      "title": "Знает push/pop при вызове и return",
+      "expected": "Кандидат описывает: вызов функции — push frame на стек; return — pop; пример вложенных вызовов `[main] → [main, greet] → [main] → []`.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "механизм push/pop — базовый flow из ITLead example",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "call_stack_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "push",
+              "pop",
+              "greet",
+              "run"
+            ],
+            "ask": "как меняется стек при `run()` → `greet()` → return из greet"
+          }
+        ],
+        "mustConcepts": [
+          "push",
+          "pop",
+          "добав",
+          "сним",
+          "frame",
+          "фрейм",
+          "вызов",
+          "return",
+          "возврат",
+          "вершин",
+          "вложен",
+          "main",
+          "greet",
+          "порядок",
+          "сначала",
+          "последн"
+        ],
+        "falseClaims": [
+          "return не снимает frame со стека",
+          "вызов функции не добавляет frame",
+          "стек не меняется при вложенных вызовах",
+          "pop происходит до return из функции"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "stack_frames",
+      "title": "Понимает содержимое stack frame",
+      "expected": "Кандидат объясняет: frame — не просто указатель; локальные переменные, `this`, адрес возврата; frame освобождается только при return; глубокая рекурсия ест память.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "stack frame из ITLead Theory",
+        "mustConcepts": [
+          "stack frame",
+          "фрейм",
+          "локальн",
+          "перемен",
+          "this",
+          "адрес возврат",
+          "return address",
+          "arguments",
+          "памят",
+          "освобожд",
+          "рекурс",
+          "глубок"
+        ],
+        "falseClaims": [
+          "stack frame хранит только имя функции",
+          "frame освобождается сразу после объявления переменной",
+          "рекурсия не расходует память на frames",
+          "this не входит в stack frame"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "stack_overflow",
+      "title": "Знает stack overflow и RangeError",
+      "expected": "Кандидат объясняет: бесконечная рекурсия без base case переполняет стек → `RangeError: Maximum call stack size exceeded`; fix — базовый случай или итерация/trampolining.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "типичная ошибка рекурсии из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "RangeError",
+              "рекурс",
+              "base case",
+              "базов"
+            ],
+            "ask": "почему `countdown(n)` без `if (n < 0) return` падает и как исправить"
+          }
+        ],
+        "mustConcepts": [
+          "stack overflow",
+          "переполн",
+          "RangeError",
+          "Maximum call stack",
+          "рекурс",
+          "base case",
+          "базов",
+          "услов",
+          "бесконеч",
+          "V8",
+          "10000",
+          "12000",
+          "итерат",
+          "trampolin"
+        ],
+        "falseClaims": [
+          "бесконечная рекурсия завершится без ошибки",
+          "RangeError возникает только в браузере, не в Node",
+          "stack overflow лечится только перезапуском вкладки без изменения кода",
+          "base case не нужен для рекурсии"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "single_threaded_blocking",
+      "title": "Понимает однопоточность и блокировку стека",
+      "expected": "Кандидат объясняет: один call stack — нет race conditions; длинный синхронный цикл/while блокирует UI, клики и таймеры; CPU-heavy — Web Worker или chunking.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "single-threaded + blocking из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "while",
+              "блок",
+              "UI",
+              "Web Worker"
+            ],
+            "ask": "почему busy-wait на 3 секунды замораживает вкладку"
+          }
+        ],
+        "mustConcepts": [
+          "однопоток",
+          "single-thread",
+          "один стек",
+          "блок",
+          "замороз",
+          "UI",
+          "main thread",
+          "while",
+          "цикл",
+          "синхрон",
+          "race condition",
+          "гонк",
+          "Web Worker",
+          "chunk",
+          "requestAnimationFrame"
+        ],
+        "falseClaims": [
+          "JavaScript многопоточный на уровне call stack",
+          "длинный for не блокирует event loop пока стек занят",
+          "Web Worker делят один call stack с main thread",
+          "race conditions типичны в обычном JS без Worker"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "event_loop_and_stack",
+      "title": "Связывает call stack с event loop",
+      "expected": "Кандидат объясняет: event loop push-ит задачи когда стек пуст; microtasks (Promise) до macrotask; setTimeout(0) после текущего синхронного кода; async/await снимает frame на await.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "связка stack ↔ event loop — ключ middle JS",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "event_loop_and_stack",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "event loop",
+              "пустой стек",
+              "microtask",
+              "macrotask",
+              "setTimeout",
+              "Promise"
+            ],
+            "anchorTermsWrongTopic": [
+              "Web Worker имеет тот же call stack",
+              "setTimeout 0 выполняется до console.log синхронно"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "setTimeout",
+              "start",
+              "end",
+              "timeout"
+            ],
+            "ask": "почему при setTimeout(..., 0) сначала `end`, потом `timeout`"
+          },
+          {
+            "match": [
+              "await",
+              "microtask",
+              "приостанов"
+            ],
+            "ask": "что происходит со стеком на `await fetch` внутри async function"
+          },
+          {
+            "match": [
+              "пустой",
+              "microtask",
+              "macrotask"
+            ],
+            "ask": "что event loop делает когда call stack пуст"
+          }
+        ],
+        "mustConcepts": [
+          "event loop",
+          "пустой стек",
+          "очеред",
+          "microtask",
+          "macrotask",
+          "task queue",
+          "setTimeout",
+          "Promise",
+          "then",
+          "await",
+          "async",
+          "колбек",
+          "после стек",
+          "синхрон",
+          "drain",
+          "очередь микрозадач"
+        ],
+        "falseClaims": [
+          "setTimeout(fn, 0) выполняется до конца текущего синхронного кода на том же стеке",
+          "Promise.then колбек идёт на стек сразу при регистрации",
+          "event loop push-ит задачи пока стек не пуст",
+          "await не снимает функцию со стека"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные заблуждения про стек",
+      "expected": "Кандидат называет: async-колбеки не в текущем стеке; setTimeout(0) ≠ немедленно; blocking sync loop; stack trace читать снизу вверх (вызовы), ошибка сверху.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes + stack trace из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "stack trace",
+              "trace",
+              "снизу",
+              "вверх"
+            ],
+            "ask": "как читать stack trace при `a() → b() → c()` и throw в c"
+          },
+          {
+            "match": [
+              "fetch",
+              "then",
+              "after fetch"
+            ],
+            "ask": "почему `inside then` печатается после `after fetch`"
+          }
+        ],
+        "mustConcepts": [
+          "stack trace",
+          "тrace",
+          "снизу вверх",
+          "bottom",
+          "top",
+          "ошибк",
+          "вызов",
+          "fetch",
+          "then",
+          "после fetch",
+          "не текущ",
+          "стек",
+          "setTimeout 0",
+          "не сразу",
+          "blocking",
+          "busy-wait"
+        ],
+        "falseClaims": [
+          "stack trace читают только первую строку сверху для порядка вызовов",
+          "async колбек `.then` выполняется внутри того же stack frame что fetchData",
+          "setTimeout 0 означает выполнение в тот же tick на стеке",
+          "нижняя строка trace — место где упала ошибка"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Call stack — LIFO: при вызове push frame, при return pop. Один стек — синхронный код идёт последовательно. Когда стек пуст, event loop кладёт microtasks, потом macrotask. Бесконечная рекурсия без base case → RangeError.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "run() push-ит frame, внутри greet() ещё один — стек [run, greet]. greet return → [run]. Длинный while держит стек занятым, клики не обрабатываются. setTimeout(..., 0) ждёт пока синхронщина не кончится — поэтому сначала end, потом timeout.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На await fetch frame снимается, стек свободен для другого кода. После resolve — microtask и новый frame для строк после await. Stack trace: снизу a, сверху c где throw — читаю всю цепочку, не только первую строку.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Call stack — это очередь FIFO, в JavaScript их несколько на вкладку. setTimeout(fn, 0) всегда выполняется раньше следующей строки синхронного кода.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Рекурсия без base case просто медленная, но не падает. Promise.then выполняется прямо внутри fetchData на том же стеке до return.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Stack trace читаю только верхнюю строку — там откуда начался вызов. Busy-wait while не блокирует event loop, таймеры всё равно срабатывают.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "call_stack_definition",
+      "exampleType": "good",
+      "exampleText": "Call stack отслеживает текущую функцию и return address, LIFO, один стек на контекст выполнения.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "call_stack_definition",
+      "exampleType": "good",
+      "exampleText": "ну стек вызовов — кто сейчас выполняется, последний зашёл первый вышел, одновременно одна синхронная цепочка",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "call_stack_definition",
+      "exampleType": "bad",
+      "exampleText": "Call stack — это heap где лежат объекты, не связан с функциями.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "lifo_push_pop",
+      "exampleType": "good",
+      "exampleText": "main() → calculate() → add(): стек [main,calculate,add], add return → [main,calculate], main return → [].",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "lifo_push_pop",
+      "exampleType": "good",
+      "exampleText": "каждый вызов push, каждый return pop — greet внутри run: [run,greet] потом снова [run]",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "lifo_push_pop",
+      "exampleType": "bad",
+      "exampleText": "При вызове функции frame удаляется со стека, при return добавляется.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "stack_frames",
+      "exampleType": "good",
+      "exampleText": "Frame хранит locals, this и куда вернуться — пока функция не return, frame занимает память.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "stack_frames",
+      "exampleType": "good",
+      "exampleText": "глубокая рекурсия — много frames, каждый со своими локальными переменными",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "stack_frames",
+      "exampleType": "bad",
+      "exampleText": "Stack frame — только указатель на функцию, переменные в heap и не связаны со стеком.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "stack_overflow",
+      "exampleType": "good",
+      "exampleText": "countdown без `if (n < 0) return` — RangeError: Maximum call stack size exceeded, frames копятся бесконечно.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "stack_overflow",
+      "exampleType": "good",
+      "exampleText": "базовый случай в рекурсии или переписать итеративно — иначе V8 упрётся в лимит ~10k frames",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "stack_overflow",
+      "exampleType": "bad",
+      "exampleText": "Stack overflow в JS просто warning в консоли, выполнение продолжается.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "single_threaded_blocking",
+      "exampleType": "good",
+      "exampleText": "while на 3 секунды держит call stack — event loop не push-ит клики и repaint, UI frozen.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "single_threaded_blocking",
+      "exampleType": "good",
+      "exampleText": "один стек — нет locks и race, но тяжёлую CPU задачу лучше в Web Worker",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "single_threaded_blocking",
+      "exampleType": "bad",
+      "exampleText": "JavaScript параллельно выполняет несколько функций на разных call stack в одной вкладке.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "event_loop_and_stack",
+      "exampleType": "good",
+      "exampleText": "console.log start/end синхронно на стеке; setTimeout callback в macrotask queue — timeout после end когда стек пуст.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "event_loop_and_stack",
+      "exampleType": "good",
+      "exampleText": "на await fetch getUserData снимается со стека, другой код работает; после resolve — microtask и продолжение",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "event_loop_and_stack",
+      "exampleType": "bad",
+      "exampleText": "Event loop добавляет setTimeout callback на стек посреди выполнения console.log.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "fetch().then — inside then после того как fetchData уже pop; trace: a снизу, c сверху где Error.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "setTimeout 0 — не мгновенно, а после опустошения стека; не путаю с microtask Promise",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Читаю stack trace сверху вниз для порядка вызовов — верхняя строка это точка входа main.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "call-stack-in-javascript",
+    "apiUrl": "https://api.itlead.org/api/questions/call-stack-in-javascript",
+    "pageUrl": "https://itlead.org/interview-questions/javascript/call-stack-in-javascript",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is the call stack in JavaScript?",
+    "categorySlug": "javascript",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

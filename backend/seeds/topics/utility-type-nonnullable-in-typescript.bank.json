@@ -1,0 +1,463 @@
+{
+  "topic": {
+    "code": "utility_type_nonnullable_typescript",
+    "name": "Утилитарный тип NonNullable в TypeScript",
+    "skillCode": "typescript",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Что делает утилитарный тип NonNullable<T> в TypeScript и когда его правильно использовать?",
+    "shortAnswer": "`NonNullable<T>` исключает `null` и `undefined` из типа `T`, оставляя только реально возможные значения. Работает только на этапе компиляции — в runtime ничего не проверяет; всегда сочетай с фактической проверкой на null перед использованием суженного типа.",
+    "idealAnswer": "`NonNullable<T>` — встроенный utility type TypeScript, который убирает `null` и `undefined` из union-типа `T`. Реализация: `type NonNullable<T> = T extends null | undefined ? never : T`. TypeScript распределяет (distributes) conditional type по каждому члену union: `string` остаётся, `null` и `undefined` становятся `never` и выпадают из union. Результат семантически идентичен `Exclude<T, null | undefined>`, но имя `NonNullable` явно сигнализирует намерение «гарантирую отсутствие nullability». Использовать после runtime-проверки (`if (!data) return;`), а не вместо неё: следующая функция может принять `NonNullable<typeof data>`. Типичные кейсы: извлечение `string` из `User[\"email\"]` где `email?: string`; фильтрация массива `(User | null)[]` с type predicate `(u): u is NonNullable<typeof u> => u != null`; после auth-middleware `NonNullable<Request[\"user\"]>` в Express. NonNullable снимает только верхнеуровневый `null`/`undefined` — вложенные null внутри объектов сохраняются: `NonNullable<{ prop: string | null } | null>` даёт `{ prop: string | null }`. Для глубокого очищения нужен рекурсивный mapped type или Zod. NonNullable не заменяет runtime guard: `const safe: NonNullable<typeof user> = user!` компилируется, но упадёт при null. На типах без nullability (`NonNullable<string>`) — бессмысленный шум. С branded types бренд сохраняется. Всё стирается при emit — zero runtime cost.",
+    "maxScore": 10,
+    "skills": [
+      "typescript",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "nonnullable_definition",
+      "title": "Понимает назначение NonNullable<T>",
+      "expected": "Кандидат объясняет: `NonNullable<T>` исключает `null` и `undefined` из union-типа `T`, оставляя только реальные значения; работает на compile time, в JS не остаётся.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — исключение null и undefined из T",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "NonNullable",
+              "null",
+              "undefined",
+              "исключ"
+            ],
+            "ask": "что получится из `NonNullable<string | null | undefined>`"
+          }
+        ],
+        "mustConcepts": [
+          "NonNullable",
+          "null",
+          "undefined",
+          "union",
+          "исключ",
+          "убира",
+          "compile time",
+          "компил",
+          "utility type",
+          "утилит",
+          "тип",
+          "never",
+          "выпада",
+          "zero runtime",
+          "стира"
+        ],
+        "falseClaims": [
+          "NonNullable проверяет null в runtime",
+          "NonNullable добавляет проверки в сгенерированный JavaScript",
+          "NonNullable меняет значение переменной при компиляции",
+          "NonNullable работает только с объектами, не с примитивами"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "implementation_mechanism",
+      "title": "Знает реализацию и механизм distribution",
+      "expected": "Кандидат называет реализацию `T extends null | undefined ? never : T`; объясняет distribution по членам union и что `never` выпадает из результата.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "реализация и conditional distribution — ключ из TL;DR ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "nonnullable_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "extends",
+              "never",
+              "distribution",
+              "распредел"
+            ],
+            "ask": "напиши реализацию NonNullable и объясни почему null становится never"
+          }
+        ],
+        "mustConcepts": [
+          "extends",
+          "null",
+          "undefined",
+          "never",
+          "conditional",
+          "условн",
+          "distribution",
+          "распредел",
+          "union",
+          "член",
+          "T extends",
+          "выпада",
+          "string оста",
+          "реализац",
+          "type NonNullable"
+        ],
+        "falseClaims": [
+          "NonNullable реализован через Omit или Pick",
+          "distribution не применяется к union в NonNullable",
+          "never остаётся в финальном union-типе",
+          "NonNullable использует runtime typeof"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Знает когда применять NonNullable",
+      "expected": "Кандидат называет: после null guard, для optional-свойств интерфейса, post-validation API; не оборачивать исходные определения типов и не использовать вместо guard.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use — post-check сторона из ITLead",
+        "mustConcepts": [
+          "guard",
+          "проверк",
+          "if (!",
+          "return",
+          "optional",
+          "необяз",
+          "User[\"email\"]",
+          "post-check",
+          "после",
+          "не вместо",
+          "API",
+          "валидац",
+          "middleware",
+          "typeof data"
+        ],
+        "falseClaims": [
+          "NonNullable заменяет if (!user) return",
+          "нужно оборачивать все props в NonNullable в определении интерфейса",
+          "NonNullable гарантирует значение без runtime-проверки",
+          "NonNullable нужен для типов без null и undefined"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "vs_exclude",
+      "title": "Отличает NonNullable от Exclude",
+      "expected": "Кандидат объясняет: для union результат идентичен `Exclude<T, null | undefined>`; разница в намерении — NonNullable явно про nullability, Exclude — generic subtraction.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Key difference from Exclude — intent из ITLead",
+        "mustConcepts": [
+          "Exclude",
+          "NonNullable",
+          "идентич",
+          "одинаков",
+          "намерен",
+          "intent",
+          "nullability",
+          "null",
+          "undefined",
+          "subtraction",
+          "вычит",
+          "code review",
+          "семант"
+        ],
+        "falseClaims": [
+          "NonNullable и Exclude всегда дают разные результаты",
+          "Exclude нельзя использовать для удаления null",
+          "NonNullable работает быстрее Exclude в runtime",
+          "Exclude удаляет только null, но не undefined"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с NonNullable",
+      "expected": "Кандидат называет: ожидание глубокого удаления null; подмена runtime guard type assertion; бессмысленное применение к типам без null; NonNullable — только compile time.",
+      "score": 2.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — shallow vs deep, runtime trap",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "nonnullable_definition",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "вложен",
+              "inner",
+              "deep",
+              "prop: string | null"
+            ],
+            "ask": "убирает ли NonNullable null из вложенных полей объекта"
+          },
+          {
+            "match": [
+              "user!",
+              "runtime",
+              "guard"
+            ],
+            "ask": "безопасно ли `const safe: NonNullable<typeof user> = user!` без проверки"
+          }
+        ],
+        "mustConcepts": [
+          "вложен",
+          "top-level",
+          "верхнеур",
+          "inner null",
+          "DeepNonNullable",
+          "Zod",
+          "runtime",
+          "guard",
+          "user!",
+          "assertion",
+          "compile",
+          "type-only",
+          "только тип",
+          "Pointless",
+          "string",
+          "бессмысл",
+          "shallow"
+        ],
+        "falseClaims": [
+          "NonNullable рекурсивно убирает null из всех вложенных полей",
+          "NonNullable гарантирует non-null значение в runtime",
+          "NonNullable<string> — ошибка компилятора",
+          "filter(Boolean) автоматически сужает тип без type predicate"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "practical_patterns",
+      "title": "Применяет практические паттерны NonNullable",
+      "expected": "Кандидат приводит: `NonNullable<User[\"email\"]>` для optional props; type predicate в filter `(u): u is NonNullable<typeof u> => u != null`; может упомянуть React Query, Express req.user или branded types.",
+      "score": 2.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Examples ITLead — optional props и array filter с type predicate",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "filter",
+              "type predicate",
+              "u is"
+            ],
+            "ask": "как сузить `(User | null)[]` до `User[]` после filter"
+          },
+          {
+            "match": [
+              "User[\"email\"]",
+              "optional",
+              "phone"
+            ],
+            "ask": "как получить string из `email?: string` для функции без optional chaining"
+          }
+        ],
+        "mustConcepts": [
+          "User[\"email\"]",
+          "optional",
+          "indexed access",
+          "filter",
+          "type predicate",
+          "u is NonNullable",
+          "u != null",
+          "User[]",
+          "React Query",
+          "Express",
+          "req.user",
+          "branded",
+          "brand",
+          "API response",
+          "validUsers"
+        ],
+        "falseClaims": [
+          "filter(Boolean) достаточно для сужения типа без predicate",
+          "NonNullable<User[\"email\"]> даёт string | undefined",
+          "type predicate не нужен если массив уже без null в runtime",
+          "NonNullable ломает branded types"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "NonNullable<T> убирает null и undefined из union на compile time: `NonNullable<string | null | undefined>` → `string`. Реализация `T extends null | undefined ? never : T` с distribution. Использую после `if (!data) return` — дальше `NonNullable<typeof data>`. Не заменяет guard и не чистит вложенные null.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "После React Query `if (!data) return null` передаю в child `NonNullable<typeof data>`. Email из `User[\"email\"]` — `NonNullable<User[\"email\"]>` даёт string. Массив с null фильтрую с `(u): u is NonNullable<typeof u> => u != null`.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "NonNullable и Exclude<T, null | undefined> дают один результат, но NonNullable читается как «точно не null». Branded UserId после NonNullable бренд сохраняет. В runtime типов нет — только пара с if-check.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "NonNullable проверяет null в runtime и выбрасывает ошибку если значение null. Можно писать `const safe: NonNullable<typeof user> = user!` без guard — TypeScript гарантирует безопасность.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "NonNullable<{ prop: string | null } | null> рекурсивно делает все поля non-null. filter(Boolean) на `(User|null)[]` автоматически даёт User[] без type predicate.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "NonNullable и Exclude<T, null> — разные типы, Exclude не убирает undefined. NonNullable<string> — ошибка компилятора. Лучше оборачивать все props интерфейса в NonNullable сразу.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "nonnullable_definition",
+      "exampleType": "good",
+      "exampleText": "NonNullable<MaybeUser> где MaybeUser = User | null | undefined → User. Только compile time, null и undefined выпадают из union.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "nonnullable_definition",
+      "exampleType": "good",
+      "exampleText": "ну nonnullable — фильтр типов, null и undefined выкидывает, в js ничего не остаётся",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "nonnullable_definition",
+      "exampleType": "bad",
+      "exampleText": "NonNullable добавляет runtime-проверку на null при каждом обращении к переменной.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "implementation_mechanism",
+      "exampleType": "good",
+      "exampleText": "type NonNullable<T> = T extends null | undefined ? never : T. string extends null|undefined — false, остаётся; null → never, выпадает из union.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "implementation_mechanism",
+      "exampleType": "good",
+      "exampleText": "conditional распределяется по union — каждый член проверяется отдельно, never исчезает из результата",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "implementation_mechanism",
+      "exampleType": "bad",
+      "exampleText": "NonNullable реализован как Omit<T, 'null'> и работает через keyof без conditional types.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "if (!data) return; дальше функция принимает NonNullable<typeof data>. Не оборачиваю исходный prop — | null пишу явно в интерфейсе.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "post-validation API handler — после проверки body передаю NonNullable<typeof req.body> в сервис",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "NonNullable заменяет if (!user) return — guard не нужен если тип NonNullable.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "vs_exclude",
+      "exampleType": "good",
+      "exampleText": "Exclude<T, null | undefined> и NonNullable<T> — один результат для union. NonNullable — когда цель именно убрать nullability, Exclude — generic вычитание.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "vs_exclude",
+      "exampleType": "good",
+      "exampleText": "в code review NonNullable сразу видно что гарантирую non-null после проверки",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "vs_exclude",
+      "exampleType": "bad",
+      "exampleText": "Exclude и NonNullable дают разные типы — Exclude оставляет undefined, NonNullable — нет.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "NonNullable<{ prop: string | null } | null> → { prop: string | null }, inner null остался. Для deep — DeepNonNullable или Zod.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "user! + NonNullable<typeof user> компилируется, но null в runtime упадёт — нужен настоящий guard перед сужением",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "NonNullable рекурсивно чистит все nullable поля объекта. NonNullable<string> — compile error.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "practical_patterns",
+      "exampleType": "good",
+      "exampleText": "type RequiredEmail = NonNullable<User[\"email\"]>; // string. sendConfirmation(email: RequiredEmail) без ?. в теле.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "practical_patterns",
+      "exampleType": "good",
+      "exampleText": "users.filter((u): u is NonNullable<typeof u> => u != null) — validUsers: User[], без predicate TS оставит nullable union",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "practical_patterns",
+      "exampleType": "bad",
+      "exampleText": "filter(Boolean) на массиве с null достаточно — TypeScript сам выведет User[] без type predicate.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "utility-type-nonnullable-in-typescript",
+    "apiUrl": "https://api.itlead.org/api/questions/utility-type-nonnullable-in-typescript",
+    "pageUrl": "https://itlead.org/interview-questions/typescript/utility-type-nonnullable-in-typescript",
+    "difficulty": "JUNIOR",
+    "titleEn": "Utility type nonnullable in TypeScript",
+    "categorySlug": "typescript",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

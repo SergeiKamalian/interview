@@ -1,0 +1,558 @@
+{
+  "topic": {
+    "code": "nodejs_event_emitter",
+    "name": "EventEmitter в Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое EventEmitter в Node.js и как с ним работать?",
+    "shortAnswer": "EventEmitter — встроенный класс из модуля `events`, основа event-driven архитектуры Node.js: объект эмитит именованные события через `emit()`, а слушатели регистрируются через `on()` (постоянно) или `once()` (один раз). `emit` синхронный — все listeners выполняются по порядку регистрации до возврата из вызова; событие `'error'` без listener приводит к падению процесса.",
+    "idealAnswer": "EventEmitter — класс из модуля `events`, реализующий паттерн observer: объект публикует именованные события, подписчики регистрируют callback-функции. `emitter.on('order', handler)` — постоянный listener, срабатывает при каждом `emit('order', data)`; `emitter.once('alert', handler)` — одноразовый, удаляется после первого вызова. `emit(eventName, ...args)` вызывает все listeners синхронно в порядке регистрации и не возвращает управление, пока последний listener не завершится — медленный listener блокирует следующие события. Внутри listeners хранятся в `_events`: ключ — имя события, значение — массив функций. Типичный production-паттерн — наследование: `class Database extends EventEmitter { connect() { this.emit('connected', { host }) } }` — класс отвечает за логику, потребители решают, что делать с событиями. Событие `'error'` особое: если `emit('error', err)` без listener — необработанное исключение и crash процесса; всегда нужен `on('error', ...)`. Streams (`fs.ReadStream`, `net.Socket`), `http.Server`, объект `process` — всё это EventEmitter с событиями `'data'`, `'end'`, `'request'`, `'exit'`. EventEmitter — in-process pub-sub; для межпроцессного или распределённого обмена — Redis Pub/Sub, Kafka, BullMQ. Типичные ошибки: считать `emit` асинхронным; `off('greet', () => {})` с новой стрелочной функцией не снимает listener — нужна та же ссылка; больше 10 listeners на одно событие — warning о возможной утечке (`setMaxListeners`). Для тяжёлой работы внутри listener — `process.nextTick()` или worker thread, не блокировать emit.",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "emitter_definition",
+      "title": "Понимает EventEmitter и observer pattern",
+      "expected": "Кандидат объясняет: EventEmitter из модуля `events`, observer/pub-sub внутри процесса; объект эмитит именованные события, listeners реагируют независимо и decoupled.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — определение и роль в event-driven Node.js",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "EventEmitter",
+              "observer",
+              "events"
+            ],
+            "ask": "зачем EventEmitter в Node.js и чем он отличается от прямого вызова функций"
+          }
+        ],
+        "mustConcepts": [
+          "EventEmitter",
+          "events",
+          "модуль",
+          "observer",
+          "наблюдат",
+          "pub-sub",
+          "именован",
+          "событи",
+          "listener",
+          "слушат",
+          "emit",
+          "decoupl",
+          "развяз",
+          "event-driven",
+          "событийн",
+          "архитектур"
+        ],
+        "falseClaims": [
+          "EventEmitter это внешняя npm-библиотека",
+          "EventEmitter работает только в браузере",
+          "EventEmitter заменяет Express middleware",
+          "без EventEmitter Node.js не может читать файлы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "on_once_emit_api",
+      "title": "Знает on, once и emit",
+      "expected": "Кандидат объясняет: `on` — persistent listener на каждый emit; `once` — auto-remove после первого вызова; `emit(name, ...args)` передаёт аргументы всем listeners.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "базовый API из quick example ITLead",
+        "confusionPairs": [
+          {
+            "checkpointKey": "on_once_emit_api",
+            "oftenConfusedWith": [
+              "emit_synchronous"
+            ],
+            "anchorTermsExpected": [
+              "on",
+              "once",
+              "emit",
+              "persistent",
+              "один раз",
+              "аргумент"
+            ],
+            "anchorTermsWrongTopic": [
+              "once срабатывает дважды",
+              "on удаляется после первого emit"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "on",
+              "once"
+            ],
+            "ask": "чем on отличается от once и когда использовать once"
+          }
+        ],
+        "mustConcepts": [
+          "on",
+          "once",
+          "emit",
+          "listener",
+          "слушат",
+          "persistent",
+          "постоян",
+          "один раз",
+          "удал",
+          "перв",
+          "аргумент",
+          "порядок регистрац",
+          "order",
+          "alert",
+          "кажд"
+        ],
+        "falseClaims": [
+          "once срабатывает при каждом emit как on",
+          "on автоматически удаляет listener после первого вызова",
+          "emit не передаёт аргументы в callback",
+          "once и addListener — разные механизмы без связи"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "emit_synchronous",
+      "title": "Понимает синхронность emit",
+      "expected": "Кандидат объясняет: emit синхронный — listeners вызываются до return; порядок — по регистрации; блокирующий listener задерживает следующие emit; offload через nextTick/worker.",
+      "score": 2.0,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевой interview trap — emit не async",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "on_once_emit_api",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "синхрон",
+              "sync",
+              "блокир"
+            ],
+            "ask": "что произойдёт если listener делает тяжёлый цикл — когда выполнится следующий emit"
+          },
+          {
+            "match": [
+              "_events",
+              "массив",
+              "порядок"
+            ],
+            "ask": "в каком порядке вызываются listeners при одном emit"
+          }
+        ],
+        "mustConcepts": [
+          "синхрон",
+          "sync",
+          "до return",
+          "до возврат",
+          "порядок регистрац",
+          "registration order",
+          "call stack",
+          "стек",
+          "блокир",
+          "heavy",
+          "nextTick",
+          "worker",
+          "_events",
+          "массив функц",
+          "очеред",
+          "не async"
+        ],
+        "falseClaims": [
+          "emit асинхронный и listeners идут в microtask queue",
+          "emit возвращается до выполнения listeners",
+          "порядок listeners случайный",
+          "emit внутри setTimeout делает listeners async относительно основного потока"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "error_event_special",
+      "title": "Знает особую обработку события error",
+      "expected": "Кандидат объясняет: emit('error') без listener → uncaught exception и crash; всегда нужен on('error'); throw в listener propagates up stack.",
+      "score": 2.0,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "common mistake #1 из ITLead — crash без error listener",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "error",
+              "crash",
+              "listener"
+            ],
+            "ask": "что случится с процессом при emit('error', new Error()) без on('error')"
+          }
+        ],
+        "mustConcepts": [
+          "error",
+          "особ",
+          "special",
+          "uncaught",
+          "crash",
+          "паден",
+          "процесс",
+          "listener",
+          "on('error'",
+          "обработ",
+          "throw",
+          "stack",
+          "необработ",
+          "staging",
+          "прототип"
+        ],
+        "falseClaims": [
+          "error обрабатывается как обычное событие без listener",
+          "emit error без listener просто игнорируется",
+          "error listener необязателен в production",
+          "throw в listener всегда ловится EventEmitter автоматически"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "extend_emitter_class",
+      "title": "Знает паттерн extends EventEmitter",
+      "expected": "Кандидат описывает: class Database extends EventEmitter; emit из методов класса; потребители подписываются через on; separation of concerns.",
+      "score": 1.0,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "custom class pattern из ITLead production example",
+        "mustConcepts": [
+          "extends",
+          "наслед",
+          "class",
+          "Database",
+          "connected",
+          "data",
+          "this.emit",
+          "connect",
+          "query",
+          "раздел",
+          "логик",
+          "потребител",
+          "db.on",
+          "production",
+          "FileWatcher"
+        ],
+        "falseClaims": [
+          "EventEmitter нельзя наследовать в ES6 class",
+          "extends EventEmitter ломает streams",
+          "emit можно вызывать только снаружи класса не из методов",
+          "наследование EventEmitter запрещено в Node.js документации"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "when_to_use_scope",
+      "title": "Понимает когда EventEmitter уместен",
+      "expected": "Кандидат называет: in-process pub-sub (login → email + analytics); streams/http/process уже EventEmitter; для distributed — Redis/Kafka/BullMQ, не EventEmitter.",
+      "score": 1.0,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use таблица ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Redis",
+              "Kafka",
+              "distributed"
+            ],
+            "ask": "когда EventEmitter недостаточен и нужна message queue"
+          }
+        ],
+        "mustConcepts": [
+          "in-process",
+          "внутри процесс",
+          "login",
+          "email",
+          "analytics",
+          "stream",
+          "ReadStream",
+          "http.Server",
+          "request",
+          "process",
+          "Redis",
+          "Kafka",
+          "BullMQ",
+          "distributed",
+          "межпроцесс",
+          "Socket.io",
+          "webpack"
+        ],
+        "falseClaims": [
+          "EventEmitter заменяет Redis Pub/Sub между серверами",
+          "streams не используют EventEmitter",
+          "EventEmitter только для отладки не для production",
+          "http.Server не эмитит события"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки EventEmitter",
+      "expected": "Кандидат называет: off с новой arrow ref не снимает listener; max 10 listeners warning; eventNames/listenerCount для leak detection; store handler reference.",
+      "score": 1.0,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "off/maxListeners/memory leak из ITLead common mistakes",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "off",
+              "removeListener",
+              "ссылк"
+            ],
+            "ask": "почему ee.off('greet', () => {}) не удаляет listener"
+          },
+          {
+            "match": [
+              "setMaxListeners",
+              "10",
+              "listenerCount"
+            ],
+            "ask": "откуда warning про max listeners и как проверить утечку"
+          }
+        ],
+        "mustConcepts": [
+          "off",
+          "removeListener",
+          "ссылк",
+          "reference",
+          "arrow",
+          "стрелоч",
+          "handler",
+          "setMaxListeners",
+          "getMaxListeners",
+          "10",
+          "warning",
+          "утеч",
+          "leak",
+          "eventNames",
+          "listenerCount",
+          "цикл",
+          "loop"
+        ],
+        "falseClaims": [
+          "off всегда удаляет listener по имени события без ссылки на функцию",
+          "max listeners warning можно игнорировать всегда",
+          "новая arrow function — та же ссылка что при on",
+          "EventEmitter не даёт способа посчитать listeners"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "EventEmitter из `events` — observer внутри процесса: `on` регистрирует listener, `emit` синхронно вызывает всех по порядку. `once` для одноразовых шагов. Обязательно `on('error')`, иначе crash. Streams и http.Server уже наследуют EventEmitter.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На логине делаю bus.emit('login', user) — один listener шлёт welcome email, второй пишет в analytics, код логина не знает про них. Между микросервисами — Redis, не EventEmitter. Database extends EventEmitter: connect эмитит connected, снаружи db.on('data', rows => ...).",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "emit sync — если в listener тяжёлый цикл, следующий emit ждёт. off снимает только ту же функцию: const h = () => {}; on(h); off(h). Больше 10 listeners — warning, setMaxListeners или ищу утечку через listenerCount.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "EventEmitter — это async очередь, emit кладёт callbacks в setImmediate и сразу return. error без listener просто теряется.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "once и on одно и то же. Для distributed систем EventEmitter лучше Kafka потому что быстрее.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "ee.off('greet', () => console.log('hi')) удаляет listener — главное указать то же имя события. max listeners warning значит Node сломан.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "emitter_definition",
+      "exampleType": "good",
+      "exampleText": "EventEmitter — класс из events, observer pattern: emit именованных событий, listeners decoupled внутри одного process.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "emitter_definition",
+      "exampleType": "good",
+      "exampleText": "ну это как колокол на кухне — звонишь order ready, реагируют только подписанные повара, логика развязана",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "emitter_definition",
+      "exampleType": "bad",
+      "exampleText": "EventEmitter — npm пакет для WebSocket между серверами, встроенного класса в Node нет.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "on_once_emit_api",
+      "exampleType": "good",
+      "exampleText": "on('order', fn) — fn на каждый emit order; once('alert', fn) — только первый alert, потом listener снят.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "on_once_emit_api",
+      "exampleType": "good",
+      "exampleText": "emit('login', { id, email }) — оба on('login') получат тот же объект, порядок как регистрировали",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "on_once_emit_api",
+      "exampleType": "bad",
+      "exampleText": "once срабатывает три раза если emit три раза — once это просто alias для on.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "emit_synchronous",
+      "exampleType": "good",
+      "exampleText": "emit heavy потом light — light ждёт пока heavy listener закончит цикл, потому что emit синхронный.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "emit_synchronous",
+      "exampleType": "good",
+      "exampleText": "тяжёлую работу в listener выношу в process.nextTick или worker, не блокирую emit",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "emit_synchronous",
+      "exampleType": "bad",
+      "exampleText": "emit асинхронный — listeners выполняются после return через microtask queue event loop.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "error_event_special",
+      "exampleType": "good",
+      "exampleText": "ee.emit('error', new Error('boom')) без on('error') — uncaught exception, процесс падает; всегда вешаю error handler.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "error_event_special",
+      "exampleType": "good",
+      "exampleText": "на staging чаще всего забывают error listener в прототипе — потом неожиданный exit",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "error_event_special",
+      "exampleType": "bad",
+      "exampleText": "error — обычное событие, без listener emit просто no-op как для других имён.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "extend_emitter_class",
+      "exampleType": "good",
+      "exampleText": "class FileWatcher extends EventEmitter { watch() { this.emit('change', { path }) } } — callers решают hot reload или parse config.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "extend_emitter_class",
+      "exampleType": "good",
+      "exampleText": "Database extends EventEmitter: connect/query эмитят connected/data, бизнес-логика отделена от side effects",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "extend_emitter_class",
+      "exampleType": "bad",
+      "exampleText": "extends EventEmitter deprecated — нужно только composition через new EventEmitter() внутри без наследования.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "when_to_use_scope",
+      "exampleType": "good",
+      "exampleText": "login → email + analytics через bus.on в одном процессе; между серверами BullMQ/Redis, не EventEmitter.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "when_to_use_scope",
+      "exampleType": "good",
+      "exampleText": "fs.ReadStream уже EventEmitter — data/end/error из коробки; process.on('SIGTERM') тоже",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "when_to_use_scope",
+      "exampleType": "bad",
+      "exampleText": "EventEmitter шлёт события между двумя Node процессами на разных машинах без дополнительных библиотек.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "const handler = () => log('hi'); on('greet', handler); off('greet', handler) — работает; off с новой arrow — нет.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "listenerCount('login') и eventNames() для отладки утечки; setMaxListeners(20) только если реально нужно больше 10",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "off удаляет все listeners на событие по имени без передачи функции — достаточно off('greet').",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-event-emitter",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-event-emitter",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-event-emitter",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is eventemitter in Node.js?",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

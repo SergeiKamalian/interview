@@ -1,0 +1,668 @@
+{
+  "topic": {
+    "code": "nodejs_design_patterns",
+    "name": "Паттерны проектирования в Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Какие паттерны проектирования чаще всего встречаются в Node.js и как они связаны с event loop и асинхронностью?",
+    "shortAnswer": "В Node.js шесть основных паттернов: Module (замыкание через `module.exports`), Singleton (кеш `require()`), Observer/PubSub (`EventEmitter`), Middleware (цепочка `next()`), Factory (динамическое создание объектов) и Promise Chain (`async/await`). Ключевая особенность: `require()` кеширует exports в `Module._cache`, поэтому общий state — singleton по умолчанию без дополнительного кода.",
+    "idealAnswer": "Паттерны проектирования в Node.js — переиспользуемые решения, адаптированные под event loop, non-blocking I/O и кеширование модулей. Шесть самых частых в production: Module, Singleton, Observer/PubSub, Middleware, Factory и Promise Chain. Отличие от Java/C#: вместо иерархий классов и blocking constructors — `require()` cache, `EventEmitter` и `async/await`. Module pattern — дефолт для каждого файла: приватное состояние через closure, публичный API через `module.exports`. Node кеширует результат первого `require()` в `Module._cache` (C++ hash table) — все последующие импорты получают тот же объект; это бесплатный singleton без класса с `getInstance()`. Singleton уместен для DB connection, logger, config — `module.exports = new MyService()` достаточно. Observer/PubSub через `EventEmitter`: producer вызывает `emit`, consumers подписываются через `on`/`once` — decoupling для order processing, WebSockets, user events; правило: если больше 3 компонентов взаимодействуют — PubSub вместо прямых вызовов. EventEmitter in-process; Redis PubSub — распределённый обмен между процессами/серверами. Middleware — цепочка функций `(req, res, next) => { ...; next(); }` — ментальная модель Express pipelines (auth, logging, rate limiting); ошибки передаются через `next(err)`. Factory создаёт новый экземпляр при каждом вызове: `createDB(config) => new DatabaseAdapter(config)` — для DB adapters, plugins, config-driven types; если функция всегда возвращает один объект — это singleton, не factory. Promise Chain / async iterators — последовательные async шаги в API pipelines. Внутренности: `EventEmitter` использует libuv epoll/kqueue; Express Router рекурсивно вызывает `next()` между шагами, отдавая управление event loop. Типичные ошибки: мутация shared module state между тестами/импортами (нужна factory-функция для изоляции); забытые `removeListener` → memory leak (warning при >10 listeners); singleton в PM2 cluster — per-process, не per-cluster (IPC или Redis); middleware без `next(e)` при throw; factory, который тайно возвращает тот же instance. Реальные примеры: Express middleware, Socket.io PubSub, Winston singleton logger, Mongoose factory models, Redis singleton + PubSub. Удаление из `require.cache` перезапускает модуль — hot-reload и путаница в тестах.",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "patterns_overview",
+      "title": "Называет шесть основных паттернов Node.js",
+      "expected": "Кандидат перечисляет Module, Singleton, Observer/PubSub, Middleware, Factory, Promise Chain и связывает их с async/event loop архитектурой Node.js.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — карта паттернов для senior",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Module",
+              "Singleton",
+              "Observer",
+              "Middleware",
+              "Factory",
+              "Promise"
+            ],
+            "ask": "назови шесть паттернов и для чего каждый в Node.js"
+          }
+        ],
+        "mustConcepts": [
+          "Module",
+          "Singleton",
+          "Observer",
+          "PubSub",
+          "Middleware",
+          "Factory",
+          "Promise Chain",
+          "event loop",
+          "async",
+          "асинхрон",
+          "non-blocking",
+          "паттерн",
+          "шесть",
+          "переиспольз",
+          "production"
+        ],
+        "falseClaims": [
+          "в Node.js нет классических паттернов проектирования",
+          "Singleton в Node всегда требует class с getInstance",
+          "Middleware — это только Express, не паттерн",
+          "Promise Chain не относится к паттернам Node.js"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "module_singleton_cache",
+      "title": "Понимает Module pattern и кеш require()",
+      "expected": "Кандидат объясняет: closure + `module.exports` инкапсулирует state; первый `require()` выполняет файл и кеширует exports в `Module._cache`; все импорты получают один объект — singleton per process без класса.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевое отличие Node от OOP — Module._cache",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "module_singleton_cache",
+            "oftenConfusedWith": [
+              "factory_pattern",
+              "patterns_overview"
+            ],
+            "anchorTermsExpected": [
+              "module.exports",
+              "require",
+              "Module._cache",
+              "closure",
+              "singleton",
+              "кеш"
+            ],
+            "anchorTermsWrongTopic": [
+              "getInstance обязателен",
+              "каждый require новый объект",
+              "singleton работает в cluster автоматически"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "require",
+              "cache",
+              "Module._cache"
+            ],
+            "ask": "как кеш модулей делает каждый export singleton-like"
+          },
+          {
+            "match": [
+              "closure",
+              "module.exports",
+              "private"
+            ],
+            "ask": "как Module pattern скрывает приватное состояние через closure"
+          }
+        ],
+        "mustConcepts": [
+          "module.exports",
+          "require",
+          "Module._cache",
+          "кеш",
+          "closure",
+          "замыкан",
+          "приват",
+          "incapsul",
+          "singleton",
+          "один объект",
+          "per process",
+          "первый require",
+          "count",
+          "undefined снаружи",
+          "Winston",
+          "logger"
+        ],
+        "falseClaims": [
+          "каждый require() создаёт новый экземпляр модуля",
+          "singleton в Node обязательно через class с private constructor",
+          "Module._cache можно игнорировать — модули всегда re-execute",
+          "module.exports и exports — разные кеши"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "observer_pubsub",
+      "title": "Понимает Observer/PubSub через EventEmitter",
+      "expected": "Кандидат объясняет decoupling через `emit`/`on`: producer не знает consumers; EventEmitter in-process; Redis PubSub — между процессами; правило >3 компонентов → PubSub.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Observer — основа event-driven Node и Socket.io",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "patterns_overview",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "observer_pubsub",
+            "oftenConfusedWith": [
+              "middleware_chain"
+            ],
+            "anchorTermsExpected": [
+              "EventEmitter",
+              "emit",
+              "on",
+              "PubSub",
+              "decouple",
+              "orderPlaced"
+            ],
+            "anchorTermsWrongTopic": [
+              "EventEmitter это Redis",
+              "PubSub всегда distributed",
+              "emit асинхронный по умолчанию между процессами"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "EventEmitter",
+              "emit",
+              "on"
+            ],
+            "ask": "чем EventEmitter PubSub отличается от Redis PubSub"
+          }
+        ],
+        "mustConcepts": [
+          "EventEmitter",
+          "Observer",
+          "PubSub",
+          "emit",
+          "on",
+          "once",
+          "listener",
+          "decouple",
+          "развяз",
+          "producer",
+          "consumer",
+          "orderPlaced",
+          "Socket.io",
+          "in-memory",
+          "in-process",
+          "Redis PubSub",
+          "распредел"
+        ],
+        "falseClaims": [
+          "EventEmitter работает между PM2 workers без IPC",
+          "Redis PubSub и EventEmitter — одно и то же",
+          "Observer требует прямых вызовов между сервисами",
+          "emit автоматически удаляет все listeners"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "middleware_chain",
+      "title": "Понимает Middleware и цепочку next()",
+      "expected": "Кандидат описывает цепочку `(req, res, next)`: каждый шаг решает продолжить или остановить; ошибки через `next(e)`; Express auth/logging/rate limiting как пример Chain of Responsibility.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый механизм Express pipelines из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "next",
+              "middleware",
+              "Express"
+            ],
+            "ask": "как middleware останавливает цепочку и как передать ошибку"
+          }
+        ],
+        "mustConcepts": [
+          "middleware",
+          "next",
+          "цепоч",
+          "chain",
+          "Express",
+          "req",
+          "res",
+          "auth",
+          "logging",
+          "rate limiting",
+          "next(e)",
+          "error handler",
+          "401",
+          "останов",
+          "Chain of Responsibility",
+          "Router"
+        ],
+        "falseClaims": [
+          "middleware всегда async и не блокирует цепочку при throw без next(e)",
+          "next() необязателен — цепочка продолжится сама",
+          "middleware работает только синхронно без await",
+          "ошибка в middleware автоматически попадает в error handler без next(e)"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "factory_pattern",
+      "title": "Отличает Factory от Singleton",
+      "expected": "Кандидат объясняет: factory возвращает новый экземпляр на каждый вызов (`createDB(config)`); если всегда один объект — это singleton; Mongoose `model()` как factory для dynamic types.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "частая путаница factory vs singleton из Common mistakes",
+        "confusionPairs": [
+          {
+            "checkpointKey": "factory_pattern",
+            "oftenConfusedWith": [
+              "module_singleton_cache"
+            ],
+            "anchorTermsExpected": [
+              "factory",
+              "новый экземпляр",
+              "createDB",
+              "Mongoose",
+              "config"
+            ],
+            "anchorTermsWrongTopic": [
+              "getDB всегда factory",
+              "factory и singleton одно и то же",
+              "mongoose.model singleton"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "Factory",
+          "новый экземпляр",
+          "createDB",
+          "getDB",
+          "DatabaseAdapter",
+          "config",
+          "Mongoose",
+          "model",
+          "plugin",
+          "dynamic",
+          "динамич",
+          "singleton с extra steps",
+          "каждый вызов"
+        ],
+        "falseClaims": [
+          "factory может возвращать один и тот же объект — это норма",
+          "getDB = () => db — это factory",
+          "Factory требует class hierarchy как в Java",
+          "Mongoose model — singleton, не factory"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "node_vs_oop",
+      "title": "Объясняет отличие паттернов Node от OOP",
+      "expected": "Кандидат сравнивает: GoF через constructors vs `require()` cache, EventEmitter вместо bus library, async/await вместо threading; class-based singleton избыточен.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Why Node.js patterns look different — senior контекст",
+        "mustConcepts": [
+          "GoF",
+          "constructor",
+          "class hierarchy",
+          "require cache",
+          "EventEmitter",
+          "async/await",
+          "thread",
+          "blocking",
+          "boilerplate",
+          "getInstance",
+          "module.exports = new",
+          "разные одежды",
+          "адапт"
+        ],
+        "falseClaims": [
+          "Node.js полностью повторяет GoF как Java",
+          "без class-based singleton нельзя шарить logger",
+          "EventEmitter заменяет все async паттерны",
+          "async/await убирает необходимость Promise Chain"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки паттернов в Node",
+      "expected": "Кандидат называет: shared mutable module state между импортами; забытые EventEmitter listeners → leak; singleton не работает cross-cluster; middleware без next(e); factory возвращает singleton.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — production traps senior",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "module_singleton_cache",
+            "floorFraction": 0.4
+          },
+          {
+            "checkpointKey": "factory_pattern",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "listener",
+              "removeListener",
+              "memory leak"
+            ],
+            "ask": "почему забытые EventEmitter listeners вызывают memory leak"
+          },
+          {
+            "match": [
+              "cluster",
+              "PM2",
+              "per-process"
+            ],
+            "ask": "почему singleton ломается в PM2 cluster mode"
+          },
+          {
+            "match": [
+              "require.cache",
+              "hot-reload",
+              "тест"
+            ],
+            "ask": "что происходит при удалении модуля из require.cache"
+          }
+        ],
+        "mustConcepts": [
+          "shared state",
+          "мутац",
+          "изоляц",
+          "factory function",
+          "removeListener",
+          "memory leak",
+          "10 listeners",
+          "warning",
+          "cluster",
+          "PM2",
+          "per-process",
+          "IPC",
+          "Redis",
+          "next(e)",
+          "parseBody",
+          "require.cache",
+          "hot-reload",
+          "тест"
+        ],
+        "falseClaims": [
+          "singleton автоматически shared между PM2 workers",
+          "listener warning при 10+ — можно игнорировать",
+          "удаление из require.cache не влияет на singleton",
+          "throw в middleware без try/catch безопасен в Express"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use_realworld",
+      "title": "Выбирает паттерн и знает реальные библиотеки",
+      "expected": "Кандидат сопоставляет задачу и паттерн: encapsulate → Module; one global resource → Singleton; decouple events → PubSub; HTTP pipeline → Middleware; dynamic types → Factory; async steps → Promise Chain; примеры Express, Winston, Socket.io, Mongoose, Redis.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "when to use table + real-world — бонус senior",
+        "mustConcepts": [
+          "encapsulate",
+          "global resource",
+          "decouple",
+          "HTTP pipeline",
+          "dynamic types",
+          "async steps",
+          "Express",
+          "Winston",
+          "Socket.io",
+          "Mongoose",
+          "Redis",
+          "3 компонент",
+          "PubSub вместо прямых"
+        ],
+        "falseClaims": [
+          "Middleware нужен только для REST API",
+          "Winston создаёт новый logger на каждый require",
+          "для любого взаимодействия достаточно прямых вызовов",
+          "Promise Chain устарел после async/await и не используется"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Шесть паттернов: Module через closure и module.exports, Singleton бесплатно из require cache, Observer на EventEmitter, Middleware с next(), Factory для новых инстансов, Promise Chain для async pipeline. В PM2 cluster singleton per-process — для shared state нужен Redis или IPC.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Логер — module.exports = winston.createLogger(), один объект на процесс. OrderService extends EventEmitter — placeOrder emit orderPlaced, email/inventory/analytics подписаны отдельно. Express: logRequest → authenticate → handler; без токена 401, цепочка стоп. Factory: createDB(config) каждый раз new DatabaseAdapter.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "require кеширует counter.js — c1 === c2, count общий. Class singleton с getInstance избыточен. EventEmitter in-process; между воркерами — Redis PubSub. Middleware ошибки только через next(e). Больше трёх сервисов на событие — PubSub, не прямые вызовы.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В Node.js нет паттернов — только callback hell. Singleton всегда через static getInstance и private constructor, require cache не влияет.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Factory — это когда функция возвращает один и тот же db объект. EventEmitter шарит listeners между PM2 workers автоматически. В middleware можно throw без next — Express сам поймает.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Module pattern — это ES modules import export, closure не нужен. Middleware и Observer — одно и то же, оба через next(). Redis PubSub работает только inside одного файла.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "patterns_overview",
+      "exampleType": "good",
+      "exampleText": "Module, Singleton, Observer/PubSub, Middleware, Factory, Promise Chain — шесть базовых паттернов Node под event loop и async I/O.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "patterns_overview",
+      "exampleType": "good",
+      "exampleText": "ну основные — модуль, синглтон через require, eventemitter pubsub, express middleware, factory и promise chain для async",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "patterns_overview",
+      "exampleType": "bad",
+      "exampleText": "В Node только callback pattern и больше ничего из design patterns не применимо.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "module_singleton_cache",
+      "exampleType": "good",
+      "exampleText": "counter.js: let count в closure, exports inc/get; первый require кеширует в Module._cache — все импорты один объект, count приватный снаружи.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "module_singleton_cache",
+      "exampleType": "good",
+      "exampleText": "module.exports = logger — winston один на весь процесс, второй require тот же инстанс, без getInstance",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "module_singleton_cache",
+      "exampleType": "bad",
+      "exampleText": "Каждый require('./counter') заново выполняет файл и создаёт новый count — кеша нет.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "observer_pubsub",
+      "exampleType": "good",
+      "exampleText": "OrderService emit orderPlaced — email, inventory, analytics on независимо; добавить Slack handler без изменения placeOrder.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "observer_pubsub",
+      "exampleType": "good",
+      "exampleText": "EventEmitter только в одном процессе; redis pubsub если нужно между серверами или pm2 workers",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "observer_pubsub",
+      "exampleType": "bad",
+      "exampleText": "EventEmitter.emit автоматически доставляет событие во все PM2 workers без cluster IPC.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "middleware_chain",
+      "exampleType": "good",
+      "exampleText": "logRequest next → authenticate: bad token res 401 без handler; good token req.user next → route. parseBody throw — catch next(e).",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "middleware_chain",
+      "exampleType": "good",
+      "exampleText": "middleware — функции с next, цепочка как в express, auth/logging/rate limit",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "middleware_chain",
+      "exampleType": "bad",
+      "exampleText": "Если забыть next() в middleware — Express всё равно вызовет следующий handler через 5 секунд.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "factory_pattern",
+      "exampleType": "good",
+      "exampleText": "createDB(config) => new DatabaseAdapter(config) — новый инстанс каждый вызов; getDB = () => db — это singleton disguised as factory.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "factory_pattern",
+      "exampleType": "good",
+      "exampleText": "mongoose.model('User', schema) — factory конструктора по конфигу схемы",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "factory_pattern",
+      "exampleType": "bad",
+      "exampleText": "Factory и Singleton — синонимы, главное чтобы функция что-то возвращала.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "node_vs_oop",
+      "exampleType": "good",
+      "exampleText": "В Java Singleton через private constructor; в Node module.exports = instance и require cache — тот же эффект без boilerplate.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "node_vs_oop",
+      "exampleType": "good",
+      "exampleText": "goF под threading, node — event loop, eventemitter и async await вместо class hierarchies",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "node_vs_oop",
+      "exampleType": "bad",
+      "exampleText": "Node.js паттерны идентичны C# — нужны те же abstract factory и visitor на каждый файл.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Shared cache в module.exports — тесты видят state друг друга; для изоляции export factory () => ({ cache: {} }). Listeners: removeListener на close. Cluster: свой Module._cache на worker.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "delete require.cache[key] — следующий require пересоздаст модуль, singleton слетит; в тестах частая ловушка",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Warning max listeners 10 — просто шум, можно не снимать handlers. Singleton в cluster mode один на все workers.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "when_to_use_realworld",
+      "exampleType": "good",
+      "exampleText": "Private state — Module; DB pool/logger — Singleton; order events — PubSub Socket.io; HTTP — Express middleware; plugins — Factory; API steps — async/await chain.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "when_to_use_realworld",
+      "exampleType": "good",
+      "exampleText": "если больше 3 компонентов дергают друг друга — pubsub, winston singleton, express middleware в проде везде",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "when_to_use_realworld",
+      "exampleType": "bad",
+      "exampleText": "Winston на каждый require создаёт новый transport — это нормальный singleton pattern.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-design-patterns",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-design-patterns",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-design-patterns",
+    "difficulty": "SENIOR",
+    "titleEn": "What are the most common design patterns in Node.js?",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

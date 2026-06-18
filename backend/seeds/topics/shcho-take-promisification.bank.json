@@ -1,0 +1,479 @@
+{
+  "topic": {
+    "code": "shcho_take_promisification",
+    "name": "Promisification в Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Что такое promisification в Node.js и зачем она нужна?",
+    "shortAnswer": "Promisification — преобразование callback-based функции в функцию, возвращающую Promise, чтобы использовать async/await вместо вложенных колбеков. `util.promisify` автоматически обрабатывает стандартный Node.js паттерн `(err, value)`.",
+    "idealAnswer": "Promisification — обёртка над функцией с колбек-стилем, которая возвращает Promise вместо последнего аргумента-колбека. Вместо `(err, result) => {}` и callback hell получаешь `.then()` / `.catch()` или `async/await` с одним `try/catch`. Стандартный Node.js паттерн: последний аргумент — `(err, value)`, где err — ошибка или null, value — результат. `util.promisify` (Node.js v8+) создаёт обёртку: внутри `new Promise`, вызывает оригинал с сгенерированным колбеком, при err вызывает `reject(err)`, иначе `resolve(value)`. Проверяет символ `util.promisify.custom` — если задан, использует кастомную логику. Когда применять: встроенные legacy API (`fs.readFile`, `crypto`, `dns`), сторонние библиотеки на колбеках, легаси-код который нельзя переписать — оборачиваешь один раз на границе модуля. Не нужно, если API уже возвращает Promise. Типичные ошибки: promisify функций без error-first стиля (`util.promisify(setTimeout)` — TypeError, нужен `new Promise(resolve => setTimeout(resolve, ms))`); потеря `this` у методов класса — fix: `util.promisify(db.read.bind(db))`; несколько значений в колбеке (`dns.lookup` → resolve массив `[address, family]`, нужна деструктуризация). Не promisify стримы — promisify резолвит один раз, игнорирует backpressure, возможны утечки памяти; для стримов — `stream.pipeline` или async iterators. Синхронную функцию promisify можно, но смысла нет — лишний overhead. Разница с ручным `new Promise`: `util.promisify` короче и надёжнее для стандартного `(err, value)`; ручная обёртка даёт полный контроль. Практика: Express с `util.promisify(fs.readFile)`, AWS SDK v2 `util.promisify(s3.getObject)`, MongoDB callback driver. Callback hell vs promisified: последовательное чтение двух файлов — плоский код сверху вниз вместо пирамиды вложенности.",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "promisification_definition",
+      "title": "Понимает суть promisification",
+      "expected": "Кандидат объясняет: callback-based функция оборачивается в Promise; вместо `(err, result) => {}` — async/await или `.then/.catch`; error-first паттерн Node.js `(err, value)` последним аргументом.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — callback → Promise, error-first",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "promisification",
+              "Promise",
+              "callback"
+            ],
+            "ask": "чем promisified функция отличается от оригинальной с колбеком"
+          },
+          {
+            "match": [
+              "err",
+              "error-first",
+              "value"
+            ],
+            "ask": "какой формат колбека ожидает стандартный Node.js API"
+          }
+        ],
+        "mustConcepts": [
+          "promisification",
+          "Promise",
+          "колбек",
+          "callback",
+          "async/await",
+          "then",
+          "catch",
+          "err",
+          "error-first",
+          "value",
+          "result",
+          "обёрт",
+          "wrap",
+          "вложен",
+          "callback hell",
+          "последн",
+          "аргумент",
+          "resolve",
+          "reject"
+        ],
+        "falseClaims": [
+          "promisification меняет синхронную функцию на асинхронную принципиально",
+          "любой колбек можно promisify без проверки сигнатуры",
+          "promisification и Promise.all — одно и то же",
+          "после promisify колбек всё ещё обязателен при вызове"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "util_promisify_usage",
+      "title": "Знает util.promisify и async/await",
+      "expected": "Кандидат показывает: `const readFile = util.promisify(fs.readFile); const data = await readFile('file.txt', 'utf8');` — один try/catch вместо if (err) в колбеке.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "quick example из ITLead — util.promisify + await",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "promisification_definition",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "util.promisify",
+              "readFile",
+              "fs"
+            ],
+            "ask": "как promisify fs.readFile и прочитать файл через await"
+          }
+        ],
+        "mustConcepts": [
+          "util.promisify",
+          "util",
+          "promisify",
+          "fs.readFile",
+          "readFile",
+          "await",
+          "async",
+          "try/catch",
+          "require",
+          "utf8",
+          "обёрт",
+          "const readFile",
+          "один try",
+          "if (err)"
+        ],
+        "falseClaims": [
+          "util.promisify нужно вызывать при каждом чтении файла",
+          "promisified функция всё ещё принимает колбек последним аргументом",
+          "util.promisify работает только с fs, не с crypto или dns",
+          "await можно использовать без async function над promisified вызовом"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда применять promisification",
+      "expected": "Кандидат называет: legacy Node API (fs, crypto, dns), сторонние библиотеки на колбеках, легаси на границе модуля; пропускать если API уже возвращает Promise.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use из ITLead — практический выбор",
+        "mustConcepts": [
+          "fs",
+          "crypto",
+          "dns",
+          "legacy",
+          "легаси",
+          "сторонн",
+          "библиотек",
+          "колбек",
+          "границ",
+          "модул",
+          "уже Promise",
+          "пропуск",
+          "не нужно",
+          "async/await",
+          "Express",
+          "AWS SDK"
+        ],
+        "falseClaims": [
+          "promisify нужен для всех Node.js функций включая уже async",
+          "современный fs/promises требует ручного util.promisify",
+          "promisification заменяет переписывание легаси на async/await внутри",
+          "Promise-based API всё равно лучше дополнительно promisify"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки promisification",
+      "expected": "Кандидат называет: promisify не error-first функций (setTimeout); потеря this у методов класса — bind; несколько значений в колбеке → массив; стримы — не promisify, использовать pipeline.",
+      "score": 2.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — частые production-баги",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "setTimeout",
+              "error-first",
+              "TypeError"
+            ],
+            "ask": "почему util.promisify(setTimeout) падает и что делать вместо"
+          },
+          {
+            "match": [
+              "this",
+              "bind",
+              "метод",
+              "класс"
+            ],
+            "ask": "как promisify метод класса без потери this"
+          },
+          {
+            "match": [
+              "dns.lookup",
+              "массив",
+              "address",
+              "family"
+            ],
+            "ask": "что вернёт promisified dns.lookup и как получить address отдельно"
+          },
+          {
+            "match": [
+              "stream",
+              "pipeline",
+              "backpressure"
+            ],
+            "ask": "почему promisify плохо подходит для стримов"
+          }
+        ],
+        "mustConcepts": [
+          "setTimeout",
+          "error-first",
+          "TypeError",
+          "this",
+          "bind",
+          "метод",
+          "класс",
+          "db.read",
+          "dns.lookup",
+          "массив",
+          "address",
+          "family",
+          "деструктур",
+          "несколько знач",
+          "stream",
+          "pipeline",
+          "backpressure",
+          "утечк",
+          "памят",
+          "new Promise"
+        ],
+        "falseClaims": [
+          "util.promisify(setTimeout) работает как sleep на 1 секунду",
+          "this сохраняется автоматически при promisify метода объекта",
+          "dns.lookup promisify возвращает только address, не массив",
+          "promisify стрима безопасен если дождаться end event",
+          "bind не нужен если promisify arrow function метода"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "util_promisify_internals",
+      "title": "Понимает как работает util.promisify",
+      "expected": "Кандидат объясняет: проверка util.promisify.custom; иначе последний аргумент — (err, value) колбек; внутри new Promise, resolve(value) или reject(err); Node.js v8+.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "How it works internally — механизм обёртки",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "promisify.custom",
+              "символ",
+              "custom"
+            ],
+            "ask": "зачем нужен util.promisify.custom и когда он используется"
+          }
+        ],
+        "mustConcepts": [
+          "new Promise",
+          "resolve",
+          "reject",
+          "колбек",
+          "сгенерир",
+          "последн",
+          "аргумент",
+          "err",
+          "value",
+          "promisify.custom",
+          "символ",
+          "custom",
+          "обёрт",
+          "оригинал",
+          "v8",
+          "Node.js 8"
+        ],
+        "falseClaims": [
+          "util.promisify синхронно возвращает результат без Promise",
+          "promisify.custom игнорируется если задан на функции",
+          "util.promisify всегда resolve только первое значение после err даже для одного аргумента",
+          "внутри promisify колбек вызывается до создания Promise"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "util_vs_manual",
+      "title": "Отличает util.promisify от ручной обёртки",
+      "expected": "Кандидат сравнивает: util.promisify — автомат для (err, value), меньше багов; ручной new Promise — полный контроль; синхронную promisify бессмысленно; для нестандартных колбеков — ручная обёртка.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Follow-up questions — util vs manual, sync, streams recap",
+        "mustConcepts": [
+          "util.promisify",
+          "new Promise",
+          "ручн",
+          "manual",
+          "контрол",
+          "автомат",
+          "стандарт",
+          "err value",
+          "синхрон",
+          "overhead",
+          "нестандарт",
+          "колбек",
+          "короче",
+          "меньше баг"
+        ],
+        "falseClaims": [
+          "ручная обёртка всегда предпочтительнее util.promisify",
+          "util.promisify работает с любыми сигнатурами колбеков автоматически",
+          "promisify синхронной функции даёт реальную асинхронность",
+          "util.promisify и bluebird.promisify в Node 18+ идентичны по поведению для всех API"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Promisification — оборачиваешь callback API в Promise: `const readFile = util.promisify(fs.readFile)`, дальше `await readFile('data.txt')` и один try/catch. Для legacy fs/crypto/dns — да; если уже Promise — не нужно. Ошибки: setTimeout не error-first, метод класса — bind, dns.lookup даёт массив.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В Express promisify fs.readFile один раз на модуль, в роуте await два файла подряд — плоский код вместо пирамиды колбеков. db.read promisify только с bind(db), иначе this undefined в проде.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "util.promisify внутри создаёт Promise, передаёт (err, val) колбек оригиналу, resolve/reject по результату. Стримы — pipeline, не promisify.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Promisification — это Promise.all для колбеков. util.promisify(setTimeout) — нормальный способ sleep. this у методов сохраняется сам.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Любую функцию promisify, включая уже async. dns.lookup после promisify возвращает строку address, не массив. Стримы promisify и ждёшь end — backpressure не проблема.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Promisify нужен даже для fs.promises.readFile. Синхронную функцию promisify обязательно для единообразия кода.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "promisification_definition",
+      "exampleType": "good",
+      "exampleText": "Callback `(err, data) =>` заменяется на Promise: promisified функция возвращает Promise, ошибка через reject или throw в async/await.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "promisification_definition",
+      "exampleType": "good",
+      "exampleText": "ну promisification — из колбеков делаешь promise, чтобы await вместо вложенности if err",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "promisification_definition",
+      "exampleType": "bad",
+      "exampleText": "Promisification добавляет колбек последним аргументом к Promise-based API.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "util_promisify_usage",
+      "exampleType": "good",
+      "exampleText": "const readFile = util.promisify(fs.readFile); try { const data = await readFile('file.txt', 'utf8'); } catch (err) { ... }",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "util_promisify_usage",
+      "exampleType": "good",
+      "exampleText": "один раз promisify readFile, потом await везде — не надо каждый раз if (err) в колбеке",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "util_promisify_usage",
+      "exampleType": "bad",
+      "exampleText": "После promisify fs.readFile всё равно вызываю с колбеком третьим аргументом — так надёжнее.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Старый AWS SDK v2 s3.getObject — promisify на границе модуля. fs/promises или fetch уже Promise — promisify не трогаю.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "легаси mongo driver на колбеках — promisify findOne, внутренности не переписываю",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Любой async/await код в Node обязательно начинаю с promisify всех require.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "util.promisify(setTimeout) — TypeError; sleep: new Promise(r => setTimeout(r, 1000)). Класс DB: util.promisify(db.read.bind(db)).",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "lookup('example.com') даёт [address, family] — деструктурирую. Стрим readFile promisify — плохо, беру pipeline или fs.promises.",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Promisify db.read без bind — this всё равно db внутри метода. dns.lookup promisify возвращает только IP строкой.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "util_promisify_internals",
+      "exampleType": "good",
+      "exampleText": "promisify возвращает функцию, которая создаёт Promise, подставляет (err, val) колбек последним аргументом оригиналу, err → reject, иначе resolve.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "util_promisify_internals",
+      "exampleType": "good",
+      "exampleText": "если на функции есть promisify.custom — util берёт его, иначе стандартный err-first wrapper",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "util_promisify_internals",
+      "exampleType": "bad",
+      "exampleText": "util.promisify магически превращает любой колбек в Promise без проверки err первым аргументом.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "util_vs_manual",
+      "exampleType": "good",
+      "exampleText": "Для fs.readFile — util.promisify достаточно. Нестандартный колбек без err — пишу new Promise сам. Синхронную promisify не имеет смысла.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "util_vs_manual",
+      "exampleType": "good",
+      "exampleText": "util короче и меньше багов для (err, value); ручной wrapper если сигнатура не node-style",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "util_vs_manual",
+      "exampleType": "bad",
+      "exampleText": "Всегда new Promise вручную — util.promisify deprecated и баговый.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "shcho-take-promisification",
+    "apiUrl": "https://api.itlead.org/api/questions/shcho-take-promisification",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/shcho-take-promisification",
+    "difficulty": "JUNIOR",
+    "titleEn": "What is promisification?",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

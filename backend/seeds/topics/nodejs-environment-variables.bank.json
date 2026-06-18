@@ -1,0 +1,497 @@
+{
+  "topic": {
+    "code": "nodejs_environment_variables",
+    "name": "Переменные окружения в Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Как работать с переменными окружения в Node.js?",
+    "shortAnswer": "Переменные окружения в Node.js читаются через `process.env` — обычный JS-объект, заполняемый при старте процесса. Все значения — строки, поэтому числа и булевы типы нужно парсить явно. Для локальной разработки подключают `dotenv` первой строкой entry-файла и никогда не коммитят `.env` в git.",
+    "idealAnswer": "Переменные окружения — пары ключ-значение, доступные процессу Node.js при запуске; позволяют конфигурировать приложение без хардкода секретов, портов и URL БД в исходниках. Node.js читает их из ОС через C++ bindings к `getenv()` и копирует в `process.env` до загрузки main-модуля — это снимок (snapshot): изменения `process.env` в рантайме не видны родительской shell, и наоборот. `process.env.KEY` всегда возвращает строку или `undefined`. Строка `'false'` truthy, `'0'` тоже truthy — для булевых значений сравнивайте `=== 'true'`, для чисел — `parseInt(..., 10)`. Локально vars кладут в `.env` в корне проекта и загружают `require('dotenv').config()` **первой строкой** entry-файла (app.js/index.js), до любых `require('./db')` и т.п. `.env`, `.env.local` добавляют в `.gitignore` до первого коммита. Можно разделить файлы: `.env`, `.env.development`, `.env.production` и загружать dotenv.config с path вида .env.development / .env.production по NODE_ENV. С Node 20.6+ базовая загрузка без пакета: `node --env-file=.env server.js`. Установка: inline `PORT=4000 node server.js`, `export PORT=4000` в сессии, Windows `set`/`$env:`, в npm scripts — `cross-env NODE_ENV=production node server.js`. Для обязательных vars без дефолта — валидация при старте (Zod/Joi): `envSchema.parse(process.env)` и `process.exit(1)` с понятным сообщением, а не краш на первом запросе к БД. Fallback для PORT: `parseInt(process.env.PORT || '3000', 10)`, не `app.listen(process.env.PORT)` — иначе `undefined` и TypeError. Типичные ошибки: `if (process.env.DEBUG)` при значении `'false'`; dotenv после модулей, которые уже читают `DATABASE_URL`; коммит `.env` в публичный репозиторий; мутация `process.env` для worker threads — воркеры получают snapshot при создании, передавайте конфиг через `workerData` или `cluster.fork({ env: {...} })`. Повторный `dotenv.config()` по умолчанию не перезаписывает уже установленные vars (override: true — опционально). Лимит env на Linux ~1MB суммарно — большие конфиги в файлы или secrets manager. Практика: Express `app.listen(process.env.PORT || 3000)` на Heroku/Render; NestJS `ConfigModule.forRoot()`; Docker `ENV` или `--env-file`; GitHub Actions `env:` и repository secrets.",
+    "maxScore": 10,
+    "skills": ["nodejs"]
+  },
+  "checkpoints": [
+    {
+      "key": "process_env_basics",
+      "title": "Понимает process.env и тип строк",
+      "expected": "Кандидат объясняет: `process.env` — объект со snapshot env vars при старте; все значения строки; `'false'` и `'0'` truthy; чтение через `process.env.KEY`.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — ядро: process.env и string-only semantics",
+        "probeConceptGroups": [
+          {
+            "match": ["process.env", "строк", "string"],
+            "ask": "почему `if (process.env.DEBUG)` срабатывает когда DEBUG='false'"
+          }
+        ],
+        "mustConcepts": [
+          "process.env",
+          "переменн",
+          "окружен",
+          "environment",
+          "строк",
+          "string",
+          "snapshot",
+          "снимок",
+          "старт",
+          "startup",
+          "getenv",
+          "undefined",
+          "truthy",
+          "false",
+          "ключ-значен",
+          "KEY",
+          "рантайм",
+          "ОС",
+          "не число",
+          "не boolean"
+        ],
+        "falseClaims": [
+          "process.env автоматически приводит '3000' к числу",
+          "строка 'false' в process.env falsy",
+          "process.env обновляется когда другой процесс меняет env в ОС",
+          "изменения process.env в Node видны родительской shell",
+          "process.env хранит типы number и boolean нативно"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "dotenv_and_env_files",
+      "title": "Знает dotenv и .env файлы",
+      "expected": "Кандидат: `require('dotenv').config()` первой строкой entry-файла; `.env` в gitignore; несколько env-файлов по NODE_ENV; Node 20.6+ `node --env-file=.env`.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "dotenv first line + .gitignore — главный практический паттерн ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "process_env_basics",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "dotenv_and_env_files",
+            "oftenConfusedWith": ["common_mistakes"],
+            "anchorTermsExpected": [
+              "dotenv",
+              "config",
+              "первая строка",
+              "first line",
+              ".env",
+              "gitignore"
+            ],
+            "anchorTermsWrongTopic": [
+              "dotenv после require db",
+              ".env коммитим в git",
+              "dotenv обязателен в production на Heroku"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["dotenv", "config", "первая"],
+            "ask": "почему dotenv.config() должен быть до require('./db')"
+          },
+          {
+            "match": ["--env-file", "Node 20", "20.6"],
+            "ask": "когда можно обойтись без пакета dotenv"
+          }
+        ],
+        "mustConcepts": [
+          "dotenv",
+          "config",
+          ".env",
+          "первая строка",
+          "first line",
+          "entry",
+          "app.js",
+          "index.js",
+          "gitignore",
+          "не коммит",
+          "секрет",
+          "DATABASE_URL",
+          "NODE_ENV",
+          "development",
+          "production",
+          ".env.local",
+          "--env-file",
+          "Node 20.6",
+          "override"
+        ],
+        "falseClaims": [
+          "dotenv.config() можно вызывать в любом месте после всех require",
+          ".env безопасно хранить в публичном git",
+          "dotenv автоматически парсит числа и boolean",
+          "Node.js всегда читает .env без dotenv и без --env-file",
+          "второй dotenv.config() всегда перезаписывает все vars"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "type_parsing_and_fallbacks",
+      "title": "Парсит типы и задаёт fallback",
+      "expected": "Кандидат: `parseInt(process.env.PORT || '3000', 10)` для чисел; `process.env.DEBUG === 'true'` для boolean; fallback для vars с разумным дефолтом; early exit для обязательных без дефолта.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Quick example ITLead — parseInt и === 'true'",
+        "probeConceptGroups": [
+          {
+            "match": ["parseInt", "PORT", "fallback"],
+            "ask": "что будет если вызвать app.listen(process.env.PORT) без PORT в локалке"
+          }
+        ],
+        "mustConcepts": [
+          "parseInt",
+          "Number",
+          "=== 'true'",
+          "=== \"true\"",
+          "boolean",
+          "булев",
+          "fallback",
+          "дефолт",
+          "default",
+          "3000",
+          "PORT",
+          "DEBUG",
+          "||",
+          "process.exit",
+          "обязательн",
+          "DATABASE_URL",
+          "TypeError",
+          "undefined",
+          "явн",
+          "преобраз"
+        ],
+        "falseClaims": [
+          "if (process.env.DEBUG) корректно выключает debug при DEBUG=false",
+          "parseInt без radix безопасен для любых строк",
+          "process.env.PORT уже number на Heroku",
+          "fallback не нужен — undefined listen сам подставит 3000",
+          "Boolean(process.env.FLAG) корректно парсит 'false'"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "setting_variables",
+      "title": "Знает способы установки переменных",
+      "expected": "Кандидат называет: inline `PORT=4000 node app.js`, export в shell, Windows set/PowerShell, cross-env в npm scripts для кроссплатформенности.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Setting variables блок ITLead — terminal и npm scripts",
+        "mustConcepts": [
+          "export",
+          "inline",
+          "PORT=4000",
+          "node server.js",
+          "Windows",
+          "set",
+          "PowerShell",
+          "$env:",
+          "cross-env",
+          "npm scripts",
+          "scripts",
+          "NODE_ENV",
+          "production",
+          "сессия",
+          "shell",
+          "терминал",
+          "кроссплатформ"
+        ],
+        "falseClaims": [
+          "PORT=4000 node app.js сохраняет PORT для всех следующих команд в shell",
+          "npm scripts на Windows всегда понимают синтаксис export без cross-env",
+          "переменные из .env автоматически попадают в npm scripts без dotenv",
+          "set PORT в cmd работает как export в bash навсегда",
+          "cross-env нужен только на Linux"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "startup_validation",
+      "title": "Валидирует env при старте",
+      "expected": "Кандидат: Zod/Joi schema.parse(process.env) при запуске; падение с понятной ошибкой если DATABASE_URL/JWT_SECRET отсутствуют; не откладывать проверку до первого запроса.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Validating env vars at startup — fail-fast паттерн из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": ["zod", "joi", "schema", "parse"],
+            "ask": "зачем валидировать env один раз при старте, а не при каждом запросе"
+          }
+        ],
+        "mustConcepts": [
+          "zod",
+          "joi",
+          "schema",
+          "parse",
+          "валидац",
+          "startup",
+          "старт",
+          "fail-fast",
+          "process.exit",
+          "DATABASE_URL",
+          "JWT_SECRET",
+          "min(32)",
+          "url",
+          "enum",
+          "development",
+          "production",
+          "test",
+          "отсутств",
+          "обязательн",
+          "рано"
+        ],
+        "falseClaims": [
+          "достаточно читать process.env.KEY и надеяться что она есть",
+          "валидация env замедляет каждый HTTP-запрос",
+          "Zod автоматически загружает .env без dotenv",
+          "missing DATABASE_URL безопасно обрабатывается на первом SQL-запросе",
+          "startup validation нужна только в development"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с env",
+      "expected": "Кандидат называет: dotenv после других require; commit .env; 'false' как boolean; нет fallback PORT; process.env не propagates в worker threads/cluster — workerData или env option.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes ITLead — критичные pitfalls для junior",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "dotenv_and_env_files",
+            "floorFraction": 0.4
+          },
+          {
+            "checkpointKey": "type_parsing_and_fallbacks",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["worker", "workerData", "thread"],
+            "ask": "почему process.env.TEST='value' в main не виден в worker thread"
+          },
+          {
+            "match": ["cluster", "fork", "snapshot"],
+            "ask": "как передать PORT воркеру после cluster.fork если process.env уже изменили"
+          }
+        ],
+        "mustConcepts": [
+          "gitignore",
+          "коммит",
+          ".env",
+          "утечк",
+          "leak",
+          "dotenv",
+          "поздно",
+          "require db",
+          "undefined",
+          "false",
+          "truthy",
+          "fallback",
+          "worker threads",
+          "workerData",
+          "cluster.fork",
+          "snapshot",
+          "снимок",
+          "не propagat",
+          "не доходит",
+          "override",
+          "1MB",
+          "secrets manager"
+        ],
+        "falseClaims": [
+          "изменение process.env в main thread сразу видно running worker threads",
+          "cluster worker видит обновления process.env после fork",
+          "коммит .env в public repo безопасен если repo маленький",
+          "dotenv после db.js — нормальный порядок если db lazy init",
+          "env vars не имеют ограничений по размеру на Linux"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "process.env — snapshot строк при старте. dotenv.config() первой строкой index.js, .env в gitignore. PORT: parseInt(process.env.PORT || '3000', 10). DEBUG: === 'true'. DATABASE_URL без дефолта — Zod parse при старте и process.exit(1). На Heroku PORT уже в env, dotenv только локально.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну env vars через process.env, всё строки. dotenv грузим до всего остального, .env не пушим. if (process.env.DEBUG === 'true') — не просто if DEBUG. в npm scripts cross-env NODE_ENV=production. Node 20 можно node --env-file=.env",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Express: require('dotenv').config() первым, потом express. PORT fallback 3000. JWT_SECRET min 32 через zod — упадём при старте, не на login route. worker threads — config через workerData, не мутируем process.env и ждём propagation.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "process.env.DEBUG уже boolean, if (process.env.DEBUG) выключает логи при DEBUG=false. dotenv можно после require('./db'). .env коммитим — так проще деплоить.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "app.listen(process.env.PORT) — Node сам подставит 3000 если PORT нет. process.env обновляется live из shell пока процесс работает. worker thread сразу видит process.env.TEST после присвоения в main.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Zod parse на каждый запрос — так надёжнее. dotenv.config() дважды всегда перезаписывает production vars из .env. cross-env нужен только на macOS.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "process_env_basics",
+      "exampleType": "good",
+      "exampleText": "process.env populated at startup — все значения строки. 'false' truthy, поэтому boolean только через === 'true'.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "process_env_basics",
+      "exampleType": "good",
+      "exampleText": "это снимок env с момента старта node, не live sync с shell. KEY всегда string или undefined",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "process_env_basics",
+      "exampleType": "bad",
+      "exampleText": "process.env.PORT возвращает number на Heroku, parseInt не нужен.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "dotenv_and_env_files",
+      "exampleType": "good",
+      "exampleText": "require('dotenv').config() — первая строка server.js, до require('./db'). .env и .env.local в .gitignore.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "dotenv_and_env_files",
+      "exampleType": "good",
+      "exampleText": "локально dotenv, на prod vars из Docker/K8s/Heroku. Node 20.6: node --env-file=.env без npm пакета",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "dotenv_and_env_files",
+      "exampleType": "bad",
+      "exampleText": "db.js require'ится первым — dotenv потом всё равно подхватит DATABASE_URL retroactively.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "type_parsing_and_fallbacks",
+      "exampleType": "good",
+      "exampleText": "const port = parseInt(process.env.PORT || '3000', 10); const debug = process.env.DEBUG === 'true';",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "type_parsing_and_fallbacks",
+      "exampleType": "good",
+      "exampleText": "если DATABASE_URL нет — console.error и process.exit(1) при старте, не ждём первого query",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "type_parsing_and_fallbacks",
+      "exampleType": "bad",
+      "exampleText": "if (process.env.DEBUG) { enableLogging(); } — DEBUG='false' корректно выключит логи.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "setting_variables",
+      "exampleType": "good",
+      "exampleText": "Linux: PORT=4000 node app.js (одна команда) или export PORT=4000. npm: cross-env NODE_ENV=production node server.js.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "setting_variables",
+      "exampleType": "good",
+      "exampleText": "на windows в scripts только cross-env, иначе export не работает в cmd",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "setting_variables",
+      "exampleType": "bad",
+      "exampleText": "PORT=4000 node app.js навсегда меняет PORT в текущем терминале для всех следующих команд.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "startup_validation",
+      "exampleType": "good",
+      "exampleText": "const env = z.object({ DATABASE_URL: z.string().url(), JWT_SECRET: z.string().min(32) }).parse(process.env) — один раз при boot.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "startup_validation",
+      "exampleType": "good",
+      "exampleText": "импортируем validated env модуль везде — знаем что типы и required fields уже проверены",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "startup_validation",
+      "exampleType": "bad",
+      "exampleText": "DATABASE_URL проверяю только когда пользователь первый раз бьёт в API — startup validation лишняя.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "ошибки: dotenv после db, commit .env, if(DEBUG) с 'false', нет PORT fallback. worker: new Worker('./w.js', { workerData: { test: 'value' } }).",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "видел PR где dotenv ниже db — DATABASE_URL undefined. .env в public repo — секреты утекли. cluster.fork({ env: { PORT: '4001' } }) если меняем после fork",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "process.env.TEST='value' в main сразу виден в уже запущенном Worker — snapshot только при создании это миф.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-environment-variables",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-environment-variables",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-environment-variables",
+    "difficulty": "JUNIOR",
+    "titleEn": "How to work with environment variables in Node.js?",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T20:00:00.000Z"
+  }
+}

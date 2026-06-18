@@ -1,0 +1,630 @@
+{
+  "topic": {
+    "code": "nestjs_websocket_gateways",
+    "name": "WebSocket Gateways в NestJS",
+    "skillCode": "nestjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как реализовать WebSocket Gateways в NestJS?",
+    "shortAnswer": "WebSocket Gateway в NestJS — класс с декоратором `@WebSocketGateway()`, который поднимает Socket.IO-сервер на указанном namespace и обрабатывает события в реальном времени. Регистрируют его как provider (не controller), подписываются на события через `@SubscribeMessage()`, рассылают через `@WebSocketServer()`. Gateway и HTTP-контроллеры делят один порт: WebSocket идёт через Upgrade, persistent-соединения живут отдельно от stateless REST.",
+    "idealAnswer": "Gateway — класс с `@WebSocketGateway({ namespace: '/chat', cors: {...} })`, который создаёт endpoint Socket.IO для двусторонней коммуникации в реальном времени. В отличие от HTTP-контроллеров, gateway монтирует Socket.IO-сервер на namespace и держит persistent TCP-соединения; контроллеры обрабатывают stateless request-response через Express/Fastify. Пакеты: `@nestjs/websockets`, `@nestjs/platform-socket.io`, `socket.io`. Регистрация в `@Module({ providers: [ChatGateway] })` — не в controllers. Ключевые декораторы: `@WebSocketServer() server: Server` — инстанс Socket.IO; `@SubscribeMessage('eventName')` — обработчик входящих событий; `@MessageBody()`, `@ConnectedSocket()` — параметры handler. Lifecycle: `OnGatewayConnection` / `OnGatewayDisconnect` — `handleConnection(client)` и `handleDisconnect(client)` срабатывают автоматически; без `handleDisconnect` in-memory Map с пользователями течёт. HTTP и WebSocket на одном порту: общий `http.Server`; Socket.IO перехватывает HTTP Upgrade до Express/Fastify routing, Engine.IO держит TCP открытым; обычные HTTP-запросы идут через middleware как раньше. Клиент: `io('http://localhost:3000/chat')` — namespace должен совпадать с `@WebSocketGateway()`, иначе connected в логах, но handlers не срабатывают. Rooms vs namespaces: namespace — логическое разделение сервера на одном порту (отдельные обработчики); rooms — динамические группы клиентов внутри namespace (`client.join(room)`, `server.to(room).emit()`). При reconnect Socket.IO не восстанавливает room membership — re-join в `handleConnection` по Redis/БД. Когда gateway: typing indicators, presence, chat, live dashboards, >10 events/sec на пользователя. Когда HTTP: история чата, профиль, stateless CRUD без realtime. Аутентификация: JWT в `handshake.auth.token` на клиенте; в `handleConnection` verify → `client.data.user`; при ошибке `client.emit('error')` + `client.disconnect()` до любого handler; per-method — `@UseGuards(WsAuthGuard)` с `context.switchToWs().getClient()`. Broadcast без проверки `client.data.user` — любой может слать всем. Emit из сервиса: inject gateway → `gateway.server.to(room).emit()` или shared EventEmitter. Масштабирование: один процесс держит socket state в памяти; два pod/instance без Redis adapter — `server.to(room).emit()` достигает только локальных клиентов; `@socket.io/redis-adapter` + `app.useWebSocketAdapter(createAdapter(pub, sub))` синхронизирует broadcast через pub/sub. Sticky sessions (Nginx hash по socket.id, Socket.IO v4.7+ `sticky: true`) — отдельная проблема handshake при load balancer; Redis adapter не заменяет sticky. Типичные ошибки: `io('http://localhost:3000')` без namespace; broadcast без auth; нет handleDisconnect; `cors: '*'` в prod (CSWSH); несколько инстансов без Redis adapter — broadcast молча теряется для клиентов на других pod.",
+    "maxScore": 10,
+    "skills": [
+      "nestjs",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "gateway_definition",
+      "title": "Понимает WebSocket Gateway",
+      "expected": "Кандидат объясняет: класс с `@WebSocketGateway()` поднимает Socket.IO на namespace; регистрируется как provider, не controller; `@SubscribeMessage` для событий, `@WebSocketServer` для broadcast.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — gateway как Socket.IO endpoint из ITLead TL;DR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "gateway_definition",
+            "oftenConfusedWith": [
+              "gateway_vs_controller"
+            ],
+            "anchorTermsExpected": [
+              "@WebSocketGateway",
+              "namespace",
+              "provider",
+              "@SubscribeMessage",
+              "Socket.IO"
+            ],
+            "anchorTermsWrongTopic": [
+              "gateway это HTTP controller",
+              "регистрация в controllers"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "@WebSocketGateway",
+              "gateway",
+              "namespace"
+            ],
+            "ask": "чем gateway отличается от обычного NestJS controller и как его регистрируют"
+          }
+        ],
+        "mustConcepts": [
+          "@WebSocketGateway",
+          "WebSocketGateway",
+          "gateway",
+          "namespace",
+          "Socket.IO",
+          "provider",
+          "не controller",
+          "@SubscribeMessage",
+          "@WebSocketServer",
+          "real-time",
+          "real time",
+          "двусторон",
+          "событ",
+          "broadcast",
+          "providers",
+          "AppModule"
+        ],
+        "falseClaims": [
+          "gateway регистрируют в controllers как REST",
+          "gateway это обёртка над HTTP fetch",
+          "@WebSocketGateway заменяет Socket.IO на чистый ws",
+          "gateway работает только на отдельном порту от HTTP",
+          "без namespace gateway не нужен — достаточно controller"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "gateway_vs_controller",
+      "title": "Отличает gateway от HTTP controller",
+      "expected": "Кандидат сравнивает: controllers — stateless REST через Express/Fastify; gateway — persistent Socket.IO, Upgrade на том же http.Server; live updates — gateway, one-off fetch — HTTP.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевое различие persistent vs request-response из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "gateway_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "gateway_vs_controller",
+            "oftenConfusedWith": [
+              "gateway_definition"
+            ],
+            "anchorTermsExpected": [
+              "persistent",
+              "stateless",
+              "Upgrade",
+              "HTTP",
+              "REST",
+              "Socket.IO"
+            ],
+            "anchorTermsWrongTopic": [
+              "gateway заменяет все controllers",
+              "WebSocket это обычный GET запрос"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Upgrade",
+              "один порт",
+              "same port"
+            ],
+            "ask": "как HTTP и WebSocket работают на одном порту в NestJS"
+          },
+          {
+            "match": [
+              "chat",
+              "presence",
+              "polling",
+              "REST"
+            ],
+            "ask": "когда выбрать gateway вместо HTTP polling"
+          }
+        ],
+        "mustConcepts": [
+          "controller",
+          "контроллер",
+          "stateless",
+          "request-response",
+          "REST",
+          "persistent",
+          "постоянн",
+          "соединен",
+          "Upgrade",
+          "http.Server",
+          "Express",
+          "Fastify",
+          "Engine.IO",
+          "live",
+          "real-time",
+          "polling",
+          "история чата",
+          "профиль",
+          "typing",
+          "presence"
+        ],
+        "falseClaims": [
+          "gateway и controller используют один и тот же роутинг Express для каждого события",
+          "WebSocket требует отдельный порт от HTTP в NestJS",
+          "для chat всегда достаточно REST без gateway",
+          "Upgrade header обрабатывает только Fastify без Socket.IO"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "decorators_lifecycle",
+      "title": "Знает декораторы и lifecycle hooks",
+      "expected": "Кандидат описывает `@WebSocketServer`, `@SubscribeMessage`, `@MessageBody`, `@ConnectedSocket`; `handleConnection`/`handleDisconnect` через OnGatewayConnection/OnGatewayDisconnect; acknowledgment через return из handler.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый API из ITLead quick example",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "handleConnection",
+              "handleDisconnect",
+              "OnGatewayConnection"
+            ],
+            "ask": "когда срабатывают handleConnection и handleDisconnect"
+          }
+        ],
+        "mustConcepts": [
+          "@WebSocketServer",
+          "@SubscribeMessage",
+          "@MessageBody",
+          "@ConnectedSocket",
+          "handleConnection",
+          "handleDisconnect",
+          "OnGatewayConnection",
+          "OnGatewayDisconnect",
+          "Server",
+          "Socket",
+          "acknowledgment",
+          "подтвержден",
+          "return",
+          "client.id",
+          "emit"
+        ],
+        "falseClaims": [
+          "handleConnection нужно вручную вызывать из controller",
+          "@SubscribeMessage работает только на HTTP POST",
+          "return из @SubscribeMessage handler не отправляет ответ клиенту",
+          "@WebSocketServer создаёт новый Server на каждый запрос"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "rooms_namespaces",
+      "title": "Различает rooms и namespaces",
+      "expected": "Кандидат объясняет: namespace — логический сервер на одном порту; rooms — группы внутри namespace с join/leave; `server.to(room).emit()`; при reconnect rooms не восстанавливаются автоматически.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "rooms/namespaces — частый follow-up из ITLead interview questions",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "room",
+              "namespace",
+              "join"
+            ],
+            "ask": "чем room отличается от namespace и как отправить сообщение только в комнату"
+          },
+          {
+            "match": [
+              "reconnect",
+              "переподключ",
+              "membership"
+            ],
+            "ask": "что происходит с room membership при reconnect клиента"
+          }
+        ],
+        "mustConcepts": [
+          "namespace",
+          "room",
+          "rooms",
+          "client.join",
+          "server.to",
+          "emit",
+          "логическ",
+          "разделен",
+          "групп",
+          "динамическ",
+          "join",
+          "leave",
+          "reconnect",
+          "переподключ",
+          "membership",
+          "не восстанавли",
+          "Redis",
+          "user ID"
+        ],
+        "falseClaims": [
+          "room и namespace — одно и то же",
+          "namespace изолирует event handlers друг от друга как отдельные процессы",
+          "Socket.IO автоматически восстанавливает rooms после reconnect",
+          "server.emit без to(room) шлёт только в текущую room"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "ws_authentication",
+      "title": "Знает аутентификацию WebSocket",
+      "expected": "Кандидат описывает JWT в handshake.auth; verify в handleConnection → client.data.user; disconnect при ошибке; @UseGuards(WsAuthGuard) с switchToWs().getClient(); проверка sender перед broadcast.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "auth pattern — критичный middle production паттерн из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "handshake",
+              "JWT",
+              "auth"
+            ],
+            "ask": "как передать и проверить JWT при WebSocket handshake в NestJS"
+          },
+          {
+            "match": [
+              "WsAuthGuard",
+              "UseGuards",
+              "switchToWs"
+            ],
+            "ask": "как защитить отдельный @SubscribeMessage handler guard'ом"
+          }
+        ],
+        "mustConcepts": [
+          "JWT",
+          "handshake",
+          "handshake.auth",
+          "token",
+          "handleConnection",
+          "client.data",
+          "client.data.user",
+          "disconnect",
+          "verify",
+          "WsAuthGuard",
+          "UseGuards",
+          "CanActivate",
+          "switchToWs",
+          "getClient",
+          "ExecutionContext",
+          "auth",
+          "аутентификац",
+          "broadcast",
+          "проверк отправит"
+        ],
+        "falseClaims": [
+          "WebSocket auth через Authorization Bearer header работает так же как REST без handshake.auth",
+          "можно безопасно broadcast без проверки client.data.user",
+          "handleConnection необязателен — JWT проверяют только в HTTP middleware",
+          "disconnect после failed auth не нужен — handlers сами отфильтруют",
+          "AuthGuard('jwt') из REST работает на WebSocket без изменений"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки gateway",
+      "expected": "Кандидат называет: неверный namespace на клиенте; broadcast без auth; отсутствие handleDisconnect и утечка Map; cors: '*' в prod; несколько инстансов без Redis adapter.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "namespace",
+              "io(",
+              "connected"
+            ],
+            "ask": "почему клиент connected но handlers не срабатывают"
+          },
+          {
+            "match": [
+              "handleDisconnect",
+              "Map",
+              "memory",
+              "утечк"
+            ],
+            "ask": "как handleConnection без handleDisconnect приводит к утечке памяти"
+          },
+          {
+            "match": [
+              "cors",
+              "CSWSH",
+              "production"
+            ],
+            "ask": "почему cors: '*' опасен для WebSocket в production"
+          }
+        ],
+        "mustConcepts": [
+          "namespace",
+          "неправильн",
+          "connected",
+          "handlers не",
+          "broadcast",
+          "без проверк",
+          "handleDisconnect",
+          "Map",
+          "утечк",
+          "memory",
+          "памят",
+          "cors",
+          "CSWSH",
+          "production",
+          "origin",
+          "credentials",
+          "несколько инстанс",
+          "Kubernetes",
+          "PM2",
+          "Redis adapter",
+          "broadcast теря",
+          "ghost"
+        ],
+        "falseClaims": [
+          "io без namespace подключается к тому же gateway что /chat",
+          "cors: '*' безопасен для WebSocket в production",
+          "handleDisconnect опционален если Map маленькая",
+          "несколько pod без adapter всё равно синхронизируют broadcast автоматически",
+          "connected в логах гарантирует что namespace правильный"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "redis_scaling",
+      "title": "Понимает масштабирование с Redis adapter",
+      "expected": "Кандидат объясняет: in-memory socket state на процесс; без adapter broadcast локален; Redis adapter pub/sub синхронизирует emit между инстансами; sticky sessions — отдельная проблема handshake.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "scaling — бонус middle, первый деплой в K8s",
+        "mustConcepts": [
+          "Redis adapter",
+          "redis-adapter",
+          "pub/sub",
+          "инстанс",
+          "pod",
+          "in-memory",
+          "масштаб",
+          "broadcast",
+          "useWebSocketAdapter",
+          "createAdapter",
+          "sticky",
+          "load balancer",
+          "handshake"
+        ],
+        "falseClaims": [
+          "Redis adapter заменяет необходимость sticky sessions для handshake",
+          "один NestJS процесс автоматически шарит sockets между pod",
+          "без Redis adapter broadcast всё равно доходит до всех клиентов кластера",
+          "Redis adapter нужен только в dev а не в production"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Gateway — класс с @WebSocketGateway({ namespace: '/chat' }), provider в AppModule. @SubscribeMessage('message') + @WebSocketServer для emit. JWT в handshake.auth, verify в handleConnection → client.data.user, иначе disconnect. Несколько pod — @socket.io/redis-adapter.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Чат: gateway на /chat, client.join(room), server.to(room).emit. История — HTTP GET. Typing/presence — gateway. Клиент io('http://host/chat') — namespace совпадает. handleDisconnect чистит Map пользователей.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "HTTP и WS на одном порту через Upgrade. Controllers — REST, gateway — persistent Socket.IO. WsAuthGuard на joinRoom. cors origin whitelist в prod, не '*'.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Gateway регистрирую в controllers. Клиент io('localhost:3000') без /chat — connected но события не идут, это баг Socket.IO. Broadcast всем без auth — норм для internal.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Room и namespace одно и то же. После reconnect Socket.IO сам вернёт в комнаты. Два pod без Redis — broadcast всё равно глобальный.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "AuthGuard('jwt') из REST на @SubscribeMessage работает из коробки. handleConnection не нужен — JWT проверит Nginx. cors: '*' в prod ок для WebSocket.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "gateway_definition",
+      "exampleType": "good",
+      "exampleText": "@WebSocketGateway({ namespace: '/chat' }) — Socket.IO endpoint; providers: [ChatGateway], не controllers; @SubscribeMessage + @WebSocketServer.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "gateway_definition",
+      "exampleType": "good",
+      "exampleText": "ну gateway как provider, слушает socket события, server.emit рассылает всем на namespace",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "gateway_definition",
+      "exampleType": "bad",
+      "exampleText": "WebSocketGateway — это HTTP controller с @Get для long polling.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "gateway_vs_controller",
+      "exampleType": "good",
+      "exampleText": "Controller — stateless REST; gateway — persistent Socket.IO на том же http.Server через Upgrade. Live chat — gateway, загрузка истории — HTTP.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "gateway_vs_controller",
+      "exampleType": "good",
+      "exampleText": "typing indicators и presence — gateway; профиль пользователя fetch — обычный GET controller",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "gateway_vs_controller",
+      "exampleType": "bad",
+      "exampleText": "WebSocket в NestJS всегда на отдельном порту 3001, HTTP на 3000.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "decorators_lifecycle",
+      "exampleType": "good",
+      "exampleText": "OnGatewayConnection: handleConnection логирует client.id; @SubscribeMessage('joinRoom') return { event, data } — ack отправителю.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "decorators_lifecycle",
+      "exampleType": "good",
+      "exampleText": "handleDisconnect автоматически на disconnect — не надо вручную из controller",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "decorators_lifecycle",
+      "exampleType": "bad",
+      "exampleText": "@ConnectedSocket только для HTTP — в WebSocket использую @Req() из Express.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "rooms_namespaces",
+      "exampleType": "good",
+      "exampleText": "namespace /chat — отдельный logical server; client.join('room-1'); server.to('room-1').emit('message', data) — только участникам комнаты.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "rooms_namespaces",
+      "exampleType": "good",
+      "exampleText": "после reconnect re-join rooms из Redis по userId — Socket.IO сам не восстановит",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "rooms_namespaces",
+      "exampleType": "bad",
+      "exampleText": "namespace и room — синонимы, join(room) создаёт новый namespace.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "ws_authentication",
+      "exampleType": "good",
+      "exampleText": "handleConnection: token = client.handshake.auth.token → verify → client.data.user; catch → emit error + disconnect. @UseGuards(WsAuthGuard) на sensitive handlers.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "ws_authentication",
+      "exampleType": "good",
+      "exampleText": "перед server.emit проверяю client.data.user — иначе аноним шлёт всем",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "ws_authentication",
+      "exampleType": "bad",
+      "exampleText": "JWT кладу в query string URL ws:// — безопаснее чем handshake.auth.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Ошибки: io без /chat namespace; Map без handleDisconnect; cors * в prod; 2 pod без redis adapter — broadcast только локально.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "connected в логах но handlers молчат — почти всегда неверный namespace на клиенте",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "handleDisconnect не нужен — socket.id уникален навсегда, Map сам очистится при GC.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "redis_scaling",
+      "exampleType": "good",
+      "exampleText": "createAdapter(pubClient, subClient) + app.useWebSocketAdapter — server.to(room).emit доходит до клиентов на всех pod через Redis pub/sub.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "redis_scaling",
+      "exampleType": "good",
+      "exampleText": "sticky sessions для handshake отдельно от redis adapter — adapter синхронизирует emit, не маршрут upgrade",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "redis_scaling",
+      "exampleType": "bad",
+      "exampleText": "PM2 cluster mode сам шарит socket state между worker'ами без adapter.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-websocket-gateways",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-websocket-gateways",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-websocket-gateways",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to implement WebSocket Gateways in NestJS?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T18:30:00.000Z"
+  }
+}

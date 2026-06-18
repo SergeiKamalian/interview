@@ -1,0 +1,780 @@
+{
+  "topic": {
+    "code": "nodejs_child_processes",
+    "name": "Дочерние процессы в Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое дочерние процессы (child processes) в Node.js и когда их использовать?",
+    "shortAnswer": "Модуль `child_process` позволяет Node.js создавать отдельные процессы ОС для shell-команд, внешних программ и CPU-heavy задач, не блокируя event loop. `exec()` — простые команды с небольшим выводом; `spawn()` — потоковая обработка больших данных; `fork()` — IPC между двумя Node.js-процессами.",
+    "idealAnswer": "Child processes (модуль child_process) создают отдельные процессы ОС с собственной памятью, CPU и event loop — главный Node-процесс остаётся свободным для I/O. Четыре метода: exec() — shell-команды с полной буферизацией stdout/stderr (до maxBuffer ~1MB по умолчанию), callback после завершения; execFile() — прямой запуск бинарника/скрипта без shell, безопаснее при пользовательском вводе; spawn() — streaming через stdin/stdout/stderr, данные приходят по мере генерации, без лимита размера; fork() — spawn Node.js-файла + IPC-канал (Unix domain sockets / named pipes) для child.send() и process.on('message'). Ключевое различие: exec/execFile буферизуют весь вывод до callback; spawn/fork стримят. Правило выбора: большие или потоковые данные → spawn(); простые shell one-liner → exec(); два Node-процесса с messaging → fork(); пользовательский ввод в аргументах → execFile вместо exec. В отличие от worker threads, child process имеет изолированную память и свой V8 (~30MB overhead vs ~2MB у worker thread); объекты через send() сериализуются JSON, не шарятся по ссылке. Внутри: spawn вызывает fork() на Unix или CreateProcess() на Windows; parent получает три pipe на stdin/stdout/stderr. Типичные ошибки: exec() для файлов >1MB (ERR_CHILD_PROCESS_STDIO_MAXBUFFER); игнор error/exit events; shell injection через exec(`grep ${userId}`) — fix execFile с массивом аргументов; предположение что fork() шарит память; orphan processes без child.kill() на process exit. Реальность: Cluster module (fork на ядро), Jest/Mocha (изоляция test suite), Webpack/Vite (компиляция в child), npm/yarn spawn для scripts, Piscina — fork pool. Timeout: { timeout: 5000 }; detached daemon: { detached: true } + unref(). Senior: worker pool на fork — restart crashed child, task timeout, memory leak restart after N tasks, correlation ID для IPC ordering.",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "child_process_definition",
+      "title": "Понимает назначение child processes",
+      "expected": "Кандидат объясняет: child_process создаёт отдельные OS-процессы; своя память, CPU и event loop; главный процесс не блокируется; shell-команды, внешние программы, CPU-heavy work.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — отдельные workers вне single-threaded event loop",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "child_process_definition",
+            "oftenConfusedWith": [
+              "four_methods_comparison",
+              "vs_worker_threads"
+            ],
+            "anchorTermsExpected": [
+              "child_process",
+              "OS process",
+              "event loop",
+              "отдельн",
+              "память",
+              "spawn"
+            ],
+            "anchorTermsWrongTopic": [
+              "child process это worker thread",
+              "child process блокирует event loop",
+              "child process делит V8 heap с parent"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "child_process",
+              "spawn",
+              "event loop"
+            ],
+            "ask": "зачем spawn если Node уже асинхронный и не блокирует I/O"
+          }
+        ],
+        "mustConcepts": [
+          "child_process",
+          "child process",
+          "дочерн",
+          "OS process",
+          "процесс ОС",
+          "event loop",
+          "не блокир",
+          "отдельн памят",
+          "своя память",
+          "CPU",
+          "shell",
+          "команд",
+          "spawn",
+          "exec",
+          "fork",
+          "внешн",
+          "программ",
+          "главн процесс",
+          "main process"
+        ],
+        "falseClaims": [
+          "child process выполняется в том же V8 heap что и parent",
+          "child process блокирует event loop пока работает",
+          "child_process нужен только для shell на Windows",
+          "child process и worker thread — одно и то же",
+          "spawn синхронно ждёт завершения команды на main thread"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "four_methods_comparison",
+      "title": "Различает exec, execFile, spawn и fork",
+      "expected": "Кандидат сравнивает четыре метода: exec — shell + буфер; execFile — без shell + буфер; spawn — streaming без shell; fork — Node.js + IPC; знает таблицу shell/buffering/IPC.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "comparison table ITLead — центральная senior тема",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "child_process_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "four_methods_comparison",
+            "oftenConfusedWith": [
+              "buffering_streaming_split",
+              "spawn_vs_fork_ipc"
+            ],
+            "anchorTermsExpected": [
+              "exec",
+              "execFile",
+              "spawn",
+              "fork",
+              "shell",
+              "buffer",
+              "stream",
+              "IPC"
+            ],
+            "anchorTermsWrongTopic": [
+              "exec и spawn одинаково буферизуют",
+              "fork запускает любой бинарник с IPC",
+              "execFile использует shell для pipes"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "exec",
+              "spawn",
+              "buffer"
+            ],
+            "ask": "чем exec отличается от spawn по выводу и shell"
+          },
+          {
+            "match": [
+              "execFile",
+              "exec",
+              "shell"
+            ],
+            "ask": "почему execFile безопаснее exec при пользовательском вводе"
+          }
+        ],
+        "mustConcepts": [
+          "exec",
+          "execFile",
+          "spawn",
+          "fork",
+          "shell",
+          "оболонк",
+          "buffer",
+          "буфер",
+          "streaming",
+          "поток",
+          "IPC",
+          "send",
+          "message",
+          "callback",
+          "stdout",
+          "stderr",
+          "stdin",
+          "maxBuffer",
+          "без shell",
+          "массив аргумент"
+        ],
+        "falseClaims": [
+          "exec и spawn одинаково обрабатывают вывод",
+          "execFile запускает команды через /bin/sh",
+          "fork() работает с любым executable не только Node.js",
+          "spawn всегда использует shell как exec",
+          "exec поддерживает неограниченный размер stdout"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use_methods",
+      "title": "Знает когда какой метод выбрать",
+      "expected": "Кандидат называет: exec — git status, npm list, pipes в shell; execFile — бинарники, Python, user input; spawn — ffmpeg, большие логи, build tools; fork — CPU compute, worker pool, Node-to-Node messaging.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "When to use блок ITLead — decision rules",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ffmpeg",
+              "spawn",
+              "large"
+            ],
+            "ask": "почему ffmpeg конвертацию лучше через spawn а не exec"
+          },
+          {
+            "match": [
+              "fork",
+              "Cluster",
+              "CPU"
+            ],
+            "ask": "когда fork вместо spawn для CPU-heavy Node.js кода"
+          }
+        ],
+        "mustConcepts": [
+          "git status",
+          "npm list",
+          "one-liner",
+          "pipe",
+          "redirect",
+          "ffmpeg",
+          "log",
+          "build",
+          "webpack",
+          "vite",
+          "Python",
+          "бинарник",
+          "user input",
+          "пользователь",
+          "CPU-heavy",
+          "worker pool",
+          "Cluster",
+          "real-time",
+          "большой вывод",
+          "small output"
+        ],
+        "falseClaims": [
+          "exec подходит для streaming гигабайт логов",
+          "fork нужен для запуска bash скриптов",
+          "spawn лучше exec для npm list с маленьким выводом всегда",
+          "execFile не поддерживает аргументы массивом",
+          "fork заменяет spawn для shell pipes"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "buffering_streaming_split",
+      "title": "Понимает буферизацию exec vs streaming spawn",
+      "expected": "Кандидат объясняет: exec/execFile собирают весь stdout/stderr в память до callback; maxBuffer 1MB по умолчанию; spawn/fork стримят через data events; ERR_CHILD_PROCESS_STDIO_MAXBUFFER.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Key split из TL;DR — частая production ошибка",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "maxBuffer",
+              "1MB",
+              "MAXBUFFER"
+            ],
+            "ask": "что случится с exec('cat huge-file.txt') и как исправить"
+          },
+          {
+            "match": [
+              "pipe",
+              "stream",
+              "data"
+            ],
+            "ask": "как spawn держит event loop свободным при гигабайтах логов"
+          }
+        ],
+        "mustConcepts": [
+          "buffer",
+          "буфер",
+          "streaming",
+          "поток",
+          "maxBuffer",
+          "1MB",
+          "MAXBUFFER",
+          "callback",
+          "data event",
+          "stdout.on",
+          "pipe",
+          "memory",
+          "памят",
+          "huge file",
+          "большой файл",
+          "close",
+          "exit code",
+          "collect",
+          "собира"
+        ],
+        "falseClaims": [
+          "exec стримит stdout по мере генерации",
+          "maxBuffer нельзя изменить в exec options",
+          "spawn загружает весь вывод в память перед close",
+          "ERR_CHILD_PROCESS_STDIO_MAXBUFFER только на Windows",
+          "увеличить maxBuffer всегда лучше чем перейти на spawn"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "internal_mechanism",
+      "title": "Знает внутреннее устройство child process",
+      "expected": "Кандидат описывает: fork()/CreateProcess(); три pipe stdin/stdout/stderr; fork() добавляет IPC channel; каждый child — свой V8 instance; send() сериализует JSON, не shared reference.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "How it works internally из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "IPC",
+              "send",
+              "serialize"
+            ],
+            "ask": "почему изменение объекта в child не видно в parent после send"
+          },
+          {
+            "match": [
+              "V8",
+              "30MB",
+              "overhead"
+            ],
+            "ask": "сколько overhead у fork по сравнению с worker thread"
+          }
+        ],
+        "mustConcepts": [
+          "fork",
+          "CreateProcess",
+          "pipe",
+          "stdin",
+          "stdout",
+          "stderr",
+          "file descriptor",
+          "IPC channel",
+          "Unix domain socket",
+          "named pipe",
+          "V8 instance",
+          "свой V8",
+          "JSON.stringify",
+          "serialize",
+          "сериализ",
+          "копия",
+          "не ссылка",
+          "send",
+          "message",
+          "30MB",
+          "overhead"
+        ],
+        "falseClaims": [
+          "child.send передаёт объект по ссылке в shared memory",
+          "spawn автоматически открывает IPC как fork",
+          "child process использует V8 parent process",
+          "IPC работает между spawn('bash') и parent через send",
+          "изменения в child.send объект видны в parent без message back"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "vs_worker_threads",
+      "title": "Отличает child process от worker threads",
+      "expected": "Кандидат сравнивает: child — отдельный OS process, изолированная память, ~30MB, IPC/pipes; worker threads — один process, SharedArrayBuffer ~2MB; оба дают parallelism на ядрах; child для изоляции и external exe.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Key difference и follow-up performance — senior вопрос",
+        "confusionPairs": [
+          {
+            "checkpointKey": "vs_worker_threads",
+            "oftenConfusedWith": [
+              "child_process_definition",
+              "internal_mechanism"
+            ],
+            "anchorTermsExpected": [
+              "worker thread",
+              "process",
+              "SharedArrayBuffer",
+              "30MB",
+              "2MB",
+              "изоляц"
+            ],
+            "anchorTermsWrongTopic": [
+              "child process делит heap с parent",
+              "worker threads запускают shell команды",
+              "fork и Worker одинаковый overhead"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "worker thread",
+              "fork",
+              "SharedArrayBuffer"
+            ],
+            "ask": "когда fork а когда worker_threads для CPU задачи в Node"
+          },
+          {
+            "match": [
+              "30MB",
+              "2MB",
+              "overhead"
+            ],
+            "ask": "почему fork pool тяжелее worker pool по памяти"
+          }
+        ],
+        "mustConcepts": [
+          "worker thread",
+          "worker_threads",
+          "child process",
+          "отдельн process",
+          "один process",
+          "SharedArrayBuffer",
+          "изоляц",
+          "изолирован",
+          "память",
+          "V8 heap",
+          "30MB",
+          "2MB",
+          "overhead",
+          "IPC",
+          "MessagePort",
+          "parallelism",
+          "ядр",
+          "CPU cores",
+          "crash isolation",
+          "external executable"
+        ],
+        "falseClaims": [
+          "worker threads и child process имеют одинаковую изоляцию памяти",
+          "fork дешевле worker thread по памяти",
+          "SharedArrayBuffer работает между child processes через fork",
+          "worker threads могут запускать произвольный shell binary",
+          "child process всегда быстрее worker threads для IPC"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки child_process",
+      "expected": "Кандидат называет: exec для большого вывода; игнор error/exit; shell injection в exec; предположение shared memory в fork; orphan processes; fix: spawn+pipe, execFile, handlers, child.kill on exit.",
+      "score": 2,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — 5 production-ловушек",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "buffering_streaming_split",
+            "floorFraction": 0.4
+          },
+          {
+            "checkpointKey": "four_methods_comparison",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "shell injection",
+              "execFile",
+              "grep"
+            ],
+            "ask": "почему exec(`grep ${userId}`) опасен и как исправить"
+          },
+          {
+            "match": [
+              "error",
+              "exit",
+              "orphan"
+            ],
+            "ask": "что если не слушать error и exit у spawn child"
+          },
+          {
+            "match": [
+              "detached",
+              "unref",
+              "kill"
+            ],
+            "ask": "как не оставить orphan process после падения parent"
+          }
+        ],
+        "mustConcepts": [
+          "maxBuffer",
+          "huge file",
+          "ERR_CHILD_PROCESS_STDIO_MAXBUFFER",
+          "error event",
+          "exit event",
+          "shell injection",
+          "метасимвол",
+          "execFile",
+          "массив аргумент",
+          "shared memory",
+          "send",
+          "копия",
+          "orphan",
+          "осирот",
+          "child.kill",
+          "process.on exit",
+          "detached",
+          "unref",
+          "timeout",
+          "grep"
+        ],
+        "falseClaims": [
+          "exec безопасен с пользовательским вводом в template string",
+          "достаточно только stdout.on('data') без error/exit",
+          "fork() шарит объект по ссылке между parent и child",
+          "child всегда завершится когда parent упадёт",
+          "maxBuffer 10MB решает проблему streaming навсегда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "spawn_vs_fork_ipc",
+      "title": "Различает spawn и fork, знает IPC-паттерны",
+      "expected": "Кандидат объясняет: spawn — любой OS process, streaming I/O, без send(); fork — только Node.js файл + IPC; correlation ID для request/response; timeout и worker pool edge cases.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Follow-up spawn vs fork и senior worker pool — бонус",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "spawn",
+              "fork",
+              "send"
+            ],
+            "ask": "можно ли child.send() процессу запущенному через spawn('python')"
+          },
+          {
+            "match": [
+              "correlation",
+              "message id",
+              "pending"
+            ],
+            "ask": "зачем id в IPC сообщениях при параллельных calculate()"
+          }
+        ],
+        "mustConcepts": [
+          "spawn",
+          "fork",
+          "send",
+          "on message",
+          "IPC",
+          "Node.js file",
+          "Python",
+          "shell",
+          "correlation id",
+          "message id",
+          "pending map",
+          "timeout",
+          "worker pool",
+          "Piscina",
+          "restart",
+          "requeue",
+          "detached",
+          "unref",
+          "daemon"
+        ],
+        "falseClaims": [
+          "spawn('node', ['worker.js']) даёт IPC как fork()",
+          "send() работает с любым child_process независимо от метода",
+          "два параллельных IPC запроса без id всегда сопоставятся правильно",
+          "detached child автоматически kill при exit parent",
+          "Piscina использует worker_threads а не fork"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "child_process выносит shell и CPU в отдельный OS process — event loop свободен. npm list через exec — вывод маленький, callback ок. cat 2GB лога — spawn + pipe в файл, не exec. CPU sum массива — fork worker.js, send/receive через IPC с correlation id.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На проде exec читал метаданные бинарников — файлы >1MB падали с MAXBUFFER. Перешли на spawn с pipe, ten minutes fix. grep по userId — только execFile с массивом, не exec template. Cluster fork на ядро, Jest изолирует suite в fork.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "spawn('grep', ['ERROR', log]) → stdout pipe в WriteStream — память не растёт. fork для worker pool как Piscina: restart упавшего child, timeout kill, correlation id в pending Map. vs worker threads: fork ~30MB изоляция, workers ~2MB SharedArrayBuffer.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "child_process и worker threads одно и то же — оба шарят память через postMessage. exec('cat huge.txt') стримит вывод, maxBuffer не нужен.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "exec(`grep ${userId} passwd`) безопасен — shell экранирует сам. fork() передаёт объект по ссылке, child меняет count и parent видит сразу.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Достаточно child.stdout.on('data') — error и exit не нужны. spawn('node', ['w.js']) даёт send() как fork(). Child всегда умрёт с parent без kill.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "child_process_definition",
+      "exampleType": "good",
+      "exampleText": "child_process модуль — отдельные OS processes со своей памятью и event loop; main thread принимает HTTP пока child гоняет ffmpeg.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "child_process_definition",
+      "exampleType": "good",
+      "exampleText": "ну дочерние процессы — как отдельные воркеры, главный node не блокируется на shell и тяжёлых задачах",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "child_process_definition",
+      "exampleType": "bad",
+      "exampleText": "Child process работает в том же V8 heap и блокирует event loop синхронно до exit code.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "four_methods_comparison",
+      "exampleType": "good",
+      "exampleText": "exec — shell + full buffer callback; execFile — binary без shell; spawn — streams; fork — Node file + IPC send/message.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "four_methods_comparison",
+      "exampleType": "good",
+      "exampleText": "таблица: exec shell да, spawn shell нет, fork IPC да, execFile безопаснее exec при user input",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "four_methods_comparison",
+      "exampleType": "bad",
+      "exampleText": "execFile и exec оба парсят shell metacharacters одинаково. fork запускает bash с IPC.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "when_to_use_methods",
+      "exampleType": "good",
+      "exampleText": "git status → exec; grep с userId → execFile; ffmpeg/logs → spawn; CPU worker pool Node → fork.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "when_to_use_methods",
+      "exampleType": "good",
+      "exampleText": "npm run build внутри yarn — spawn скрипта; cluster module — fork на каждое ядро для HTTP",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "when_to_use_methods",
+      "exampleType": "bad",
+      "exampleText": "Для streaming 10GB лога лучше exec с maxBuffer 100MB чем spawn.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "buffering_streaming_split",
+      "exampleType": "good",
+      "exampleText": "exec буферизует до 1MB default — huge-file → ERR_CHILD_PROCESS_STDIO_MAXBUFFER; spawn stdout.on('data') стримит без лимита.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "buffering_streaming_split",
+      "exampleType": "good",
+      "exampleText": "grep.stdout.pipe(writeStream) — гигабайты логов, event loop жив, память не взрывается",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "buffering_streaming_split",
+      "exampleType": "bad",
+      "exampleText": "exec стримит stdout по data events как spawn — разницы нет.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "internal_mechanism",
+      "exampleType": "good",
+      "exampleText": "spawn → OS fork/CreateProcess, три pipe; fork добавляет IPC socket; child.send сериализует JSON — child получает копию.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "internal_mechanism",
+      "exampleType": "good",
+      "exampleText": "каждый fork child — свой V8 ~30MB; send не shared reference",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "internal_mechanism",
+      "exampleType": "bad",
+      "exampleText": "IPC send передаёт ссылку на объект в shared heap parent и child.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "vs_worker_threads",
+      "exampleType": "good",
+      "exampleText": "fork — отдельный process ~30MB, crash изолирован; worker_threads — 2MB, SharedArrayBuffer, один process.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "vs_worker_threads",
+      "exampleType": "good",
+      "exampleText": "external Go binary — spawn/execFile; shared memory между потоками — только worker threads",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "vs_worker_threads",
+      "exampleType": "bad",
+      "exampleText": "Child process дешевле worker thread по памяти и делит V8 heap.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "exec cat huge → MAXBUFFER; fix spawn+pipe. exec(`grep ${id}`) injection → execFile('grep', [id, file]). process.on('exit', () => child.kill()).",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "без error handler spawn упал незаметно; fork send объект — изменения в child parent не видит, только message back",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Shell injection невозможен в exec если userId число. Orphan child сам завершится при crash parent.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "spawn_vs_fork_ipc",
+      "exampleType": "good",
+      "exampleText": "spawn('python', ['script.py']) — нет send(); fork('./worker.js') — IPC. pending Map + id для двух параллельных calculate().",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "spawn_vs_fork_ipc",
+      "exampleType": "good",
+      "exampleText": "detached true + unref — daemon живёт после parent; timeout 5000 в spawn options или manual kill",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "spawn_vs_fork_ipc",
+      "exampleType": "bad",
+      "exampleText": "spawn('node', ['w.js']) даёт process.send как fork без разницы.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-child-processes",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-child-processes",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-child-processes",
+    "difficulty": "SENIOR",
+    "titleEn": "What are child processes in Node.js?",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

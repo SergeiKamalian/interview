@@ -1,0 +1,606 @@
+{
+  "topic": {
+    "code": "utility_type_omit_typescript",
+    "name": "Утилитарный тип Omit в TypeScript",
+    "skillCode": "typescript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое утилитарный тип Omit в TypeScript и когда его использовать вместо Pick?",
+    "shortAnswer": "`Omit<T, K>` — утилитарный тип TypeScript, который создаёт новый тип, удаляя ключи `K` из типа `T`. Используй `Omit`, когда нужна большая часть полей типа, но несколько нужно исключить — например, убрать password перед отправкой API-ответа.",
+    "idealAnswer": "`Omit<T, K>` — утилитарный тип, который берёт тип `T` и возвращает его копию без ключей, перечисленных в `K`. Аналогия: форма, где указанные поля зачёркнуты — всё остальное остаётся. Главное отличие от `Pick`: `Omit` вычитает ключи из полного типа; `Pick` строит новый тип, выбирая только названные ключи. Правило выбора: если исключений меньше, чем оставляемых полей — `Omit`; если нужна маленькая подмножина — `Pick`. Нулевая стоимость в runtime: стирается при компиляции в JavaScript. Работает только на ключах верхнего уровня; пути вроде `\"address.zip\"` не имеют эффекта. TypeScript разворачивает `Omit<T, K>` через `Pick` и `Exclude`: `type Omit<T, K extends keyof any> = Pick<T, Exclude<keyof T, K>>`. Для `Omit<User, \"password\">`: `keyof User` → `Exclude<..., \"password\">` → `Pick<User, оставшиеся ключи>`. `Omit` сохраняет индексные сигнатуры `[key: string]: unknown`. Типичные ошибки: omit несуществующего ключа — компилируется без ошибки, тип не меняется; ожидание удаления вложенных ключей — `Omit` поверхностный; `Omit` на union без дистрибуции по членам; повторное добавление ключа через `extends`; путаница с `Exclude<keyof T, K>` (union имён ключей vs объектный тип). Когда использовать: API-ответ без чувствительных полей, props React-компонента без внутренних callback, DTO из entity БД, тип формы создания записи. `Omit` + `Partial` покрывает CRUD: `CreateProductDTO = Omit<Product, \"id\" | \"createdAt\">`, `UpdateProductDTO = Partial<Omit<Product, \"id\">>`. Реальные кейсы: `Omit<ComponentProps<'input'>, 'ref'>` в forwardRef, `Omit<z.infer<typeof schema>, 'password'>`, Prisma payload без passwordHash, tRPC input без internalToken. Самостоятельная реализация: `{ [P in keyof T as P extends K ? never : P]: T[P] }` — mapped type с `as` фильтрует ключи. С intersection `A & B` дистрибутивно: `Omit<A & B, K>` ≈ `Omit<A, K> & Omit<B, K>`.",
+    "maxScore": 10,
+    "skills": [
+      "typescript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "omit_definition",
+      "title": "Понимает суть Omit",
+      "expected": "Кандидат объясняет: `Omit<T, K>` создаёт тип без указанных ключей `K`, остальные свойства `T` сохраняются; нулевая стоимость в runtime; работает только на ключах верхнего уровня.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "TL;DR ITLead — ядро middle-темы",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Omit",
+              "удал",
+              "ключ",
+              "password"
+            ],
+            "ask": "что получится от `Omit<User, \"password\">` и почему это удобно для публичного API"
+          }
+        ],
+        "mustConcepts": [
+          "Omit",
+          "утилитарн",
+          "удал",
+          "ключ",
+          "свойств",
+          "тип",
+          "T",
+          "K",
+          "остальн",
+          "сохран",
+          "password",
+          "PublicUser",
+          "верхн",
+          "уровн",
+          "shallow",
+          "поверхност",
+          "runtime",
+          "стира",
+          "компиляц",
+          "без эффекта",
+          "nested"
+        ],
+        "falseClaims": [
+          "Omit работает в runtime и удаляет поля из объекта",
+          "Omit удаляет вложенные ключи вроде address.zip",
+          "Omit добавляет новые поля в тип",
+          "Omit меняет типы оставшихся свойств"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "omit_vs_pick",
+      "title": "Отличает Omit от Pick",
+      "expected": "Кандидат сравнивает: `Pick` выбирает только названные ключи; `Omit` стартует от полного типа и убирает перечисленные; правило: исключений меньше — Omit, нужна малая подмножина — Pick; оба могут дать структурно идентичный результат.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Key difference — главный контраст из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "omit_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "omit_vs_pick",
+            "oftenConfusedWith": [
+              "omit_vs_exclude"
+            ],
+            "anchorTermsExpected": [
+              "Omit",
+              "Pick",
+              "вычит",
+              "выбира",
+              "подмножин",
+              "исключ"
+            ],
+            "anchorTermsWrongTopic": [
+              "Omit и Pick всегда разные типы",
+              "Pick удаляет ключи"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Pick",
+              "Omit",
+              "10 свойств",
+              "9"
+            ],
+            "ask": "у типа 10 полей, нужны 9 — Omit или Pick и почему"
+          }
+        ],
+        "mustConcepts": [
+          "Pick",
+          "Omit",
+          "выбира",
+          "удал",
+          "исключ",
+          "подмножин",
+          "полн",
+          "тип",
+          "правило",
+          "меньше",
+          "большинств",
+          "структурн",
+          "идентич",
+          "намерен",
+          "intent",
+          "call site",
+          "createdAt",
+          "password"
+        ],
+        "falseClaims": [
+          "Pick и Omit всегда дают разные типы",
+          "Omit выбирает только названные ключи как Pick",
+          "Pick стартует от полного типа и вычитает ключи",
+          "правило выбора не важно — результат одинаковый по смыслу"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "compiler_internals",
+      "title": "Знает как компилятор разворачивает Omit",
+      "expected": "Кандидат описывает: `Omit<T, K> = Pick<T, Exclude<keyof T, K>>`; шаги keyof → Exclude → Pick; нулевая стоимость в runtime; сохраняет индексные сигнатуры.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "внутреннее определение Pick+Exclude из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Pick",
+              "Exclude",
+              "keyof"
+            ],
+            "ask": "как TypeScript разворачивает Omit через Pick и Exclude по шагам"
+          },
+          {
+            "match": [
+              "index signature",
+              "индексн",
+              "[key: string]"
+            ],
+            "ask": "сохраняет ли Omit индексную сигнатуру после удаления конкретного ключа"
+          }
+        ],
+        "mustConcepts": [
+          "Pick",
+          "Exclude",
+          "keyof",
+          "keyof T",
+          "union",
+          "ключ",
+          "встроен",
+          "определен",
+          "разворач",
+          "шаг",
+          "runtime",
+          "стира",
+          "компиляц",
+          "индексн",
+          "сигнатур",
+          "[key: string]",
+          "сохран",
+          "mapped"
+        ],
+        "falseClaims": [
+          "Omit генерирует runtime-код для удаления полей",
+          "Omit не связан с Pick и Exclude",
+          "индексные сигнатуры удаляются вместе с ключом",
+          "keyof возвращает объектный тип а не union строк"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Знает когда использовать Omit",
+      "expected": "Кандидат называет: API без чувствительных полей, props без внутренних callback, DTO из entity, форма создания без id/timestamps; Omit+Partial для CRUD.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use из ITLead",
+        "mustConcepts": [
+          "API",
+          "чувствительн",
+          "password",
+          "DTO",
+          "entity",
+          "React",
+          "props",
+          "callback",
+          "форм",
+          "создан",
+          "id",
+          "createdAt",
+          "updatedAt",
+          "Partial",
+          "CRUD",
+          "CreateProduct",
+          "UpdateProduct",
+          "серверн",
+          "internalId"
+        ],
+        "falseClaims": [
+          "Omit нужен только для password",
+          "Omit заменяет Partial для PATCH",
+          "DTO всегда лучше писать вручную без Omit",
+          "Omit нельзя комбинировать с Partial"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с Omit",
+      "expected": "Кандидат называет: omit несуществующего ключа без ошибки; ожидание удаления вложенных ключей; Omit на union без дистрибуции; повторное добавление ключа через extends; путаница Omit vs Exclude.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — частая production-путаница middle",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "omit_vs_exclude",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "несуществ",
+              "nonExistent",
+              "игнор"
+            ],
+            "ask": "что произойдёт при Omit<User, \"nonExistent\">"
+          },
+          {
+            "match": [
+              "address.zip",
+              "вложен",
+              "nested",
+              "shallow"
+            ],
+            "ask": "удалит ли Omit вложенное поле address.zip"
+          },
+          {
+            "match": [
+              "union",
+              "extends",
+              "password"
+            ],
+            "ask": "можно ли вернуть password через extends PublicUser и почему это компилируется"
+          }
+        ],
+        "mustConcepts": [
+          "несуществ",
+          "игнор",
+          "без ошибк",
+          "вложен",
+          "nested",
+          "address.zip",
+          "shallow",
+          "поверхност",
+          "union",
+          "дистриб",
+          "extends",
+          "password",
+          "структурн",
+          "типизац",
+          "Exclude",
+          "путан",
+          "рекурсив",
+          "утилит"
+        ],
+        "falseClaims": [
+          "Omit<User, \"foo\"> выдаст ошибку если foo нет в User",
+          "Omit удаляет вложенные поля по dot-нотации",
+          "Omit автоматически дистрибутируется по union-членам",
+          "extends PublicUser не позволит добавить password обратно",
+          "Omit и Exclude дают одинаковый результат — объектный тип"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "omit_vs_exclude",
+      "title": "Отличает Omit от Exclude",
+      "expected": "Кандидат объясняет: `Exclude<keyof T, K>` возвращает union имён оставшихся ключей; `Omit<T, K>` возвращает готовый объектный тип без удалённых свойств.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "частая путаница из Common mistakes #5",
+        "confusionPairs": [
+          {
+            "checkpointKey": "omit_vs_exclude",
+            "oftenConfusedWith": [
+              "compiler_internals"
+            ],
+            "anchorTermsExpected": [
+              "Exclude",
+              "Omit",
+              "union",
+              "имён",
+              "объектн"
+            ],
+            "anchorTermsWrongTopic": [
+              "Exclude возвращает объектный тип",
+              "Omit возвращает union строк"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "Exclude",
+          "Omit",
+          "keyof",
+          "union",
+          "имён",
+          "ключ",
+          "строк",
+          "объектн",
+          "тип",
+          "свойств",
+          "разные",
+          "сценари",
+          "Pick",
+          "промежуточ"
+        ],
+        "falseClaims": [
+          "Exclude и Omit взаимозаменяемы",
+          "Exclude возвращает объектный тип с полями",
+          "Omit возвращает только union имён ключей",
+          "Exclude применяется напрямую к значениям объекта"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "real_world_usage",
+      "title": "Знает реальные паттерны Omit",
+      "expected": "Кандидат упоминает: forwardRef с Omit props без ref, Zod infer без password, Prisma payload, tRPC input, деструктуризация с rest; может описать custom Omit через mapped type.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Real-world usage и follow-up из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "forwardRef",
+              "ref",
+              "InputHTMLAttributes"
+            ],
+            "ask": "зачем Omit ref из props в forwardRef-обёртке"
+          },
+          {
+            "match": [
+              "mapped",
+              "never",
+              "as P extends K"
+            ],
+            "ask": "как реализовать Omit с нуля через mapped type"
+          }
+        ],
+        "mustConcepts": [
+          "forwardRef",
+          "ref",
+          "InputHTMLAttributes",
+          "ComponentProps",
+          "Zod",
+          "infer",
+          "Prisma",
+          "tRPC",
+          "Express",
+          "middleware",
+          "деструктуриз",
+          "rest",
+          "spread",
+          "mapped",
+          "never",
+          "as",
+          "intersection",
+          "A & B",
+          "границ",
+          "API"
+        ],
+        "falseClaims": [
+          "Omit нужен только в React forwardRef",
+          "custom Omit требует runtime helper",
+          "Omit на intersection A & B не дистрибутивен",
+          "деструктуризация rest не связана с типом Omit"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "`Omit<User, \"password\">` даёт публичный тип без пароля — TypeScript проверяет, что в API-ответе нет password. Это противоположность Pick: Omit вычитает из полного типа, Pick выбирает подмножину. Внутри `Pick<T, Exclude<keyof T, K>>`, в JS ничего не остаётся.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для CRUD: `CreateProductDTO = Omit<Product, \"id\" | \"createdAt\" | \"updatedAt\">`, PATCH — `Partial<Omit<Product, \"id\">>`. В forwardRef делаю `Omit<InputHTMLAttributes<HTMLInputElement>, \"ref\">` чтобы ref управлял forwardRef. Несуществующий ключ в K — тихо игнорируется, без ошибки.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну omit — убрать пару полей из типа. pick — когда нужно 2-3 поля из десяти. exclude — union ключей, omit — готовый объект. address.zip не сработает, только верхний уровень",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Omit удаляет поля в runtime при сериализации JSON. Omit<User, \"address.zip\"> уберёт zip из вложенного address.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Omit<User, \"nonExistent\"> — compile error. Exclude и Omit дают один объектный тип. extends PublicUser не позволит вернуть password.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Всегда Pick, Omit устарел. Omit на union string | { id: string } автоматически уберёт secret из объекта.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "omit_definition",
+      "exampleType": "good",
+      "exampleText": "Omit<T, K> — тип T без ключей K; остальные свойства и их типы сохраняются; только top-level keys.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "omit_definition",
+      "exampleType": "good",
+      "exampleText": "типа public user без password — omit вычёл одно поле, всё остальное как в User",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "omit_definition",
+      "exampleType": "bad",
+      "exampleText": "Omit работает в runtime и физически удаляет ключи из объекта при присваивании.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "omit_vs_pick",
+      "exampleType": "good",
+      "exampleText": "10 полей, нужны 9 — Omit<User, \"password\"> проще чем перечислять 9 в Pick. Pick — когда нужны 2-3 поля.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "omit_vs_pick",
+      "exampleType": "good",
+      "exampleText": "Pick id|name|email и Omit password|createdAt могут дать один тип — выбираю что читабельнее на call site",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "omit_vs_pick",
+      "exampleType": "bad",
+      "exampleText": "Pick удаляет неназванные ключи, Omit добавляет новые поля в тип.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "compiler_internals",
+      "exampleType": "good",
+      "exampleText": "Omit = Pick<T, Exclude<keyof T, K>>: сначала union ключей, исключить K, потом Pick. Полностью erased в JS.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "compiler_internals",
+      "exampleType": "good",
+      "exampleText": "индексная [key: string]: unknown остаётся после omit конкретного foo",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "compiler_internals",
+      "exampleType": "bad",
+      "exampleText": "Omit компилируется в runtime delete для каждого ключа из K.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "API response: Omit<User, \"password\" | \"internalId\">. POST body: Omit<Entity, \"id\" | \"createdAt\">. React: Omit<Props, \"onInternalClick\">.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "crud dto из одного Product — omit для create, partial+omit для patch",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Omit только для password, для остальных DTO всегда руками писать interface.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Omit<User, \"ghost\"> — без ошибки, тип = User. address.zip не удалит zip — shallow only.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "interface Admin extends Omit<User,\"password\"> { password: string } — компилируется, structural typing. Union — omit на каждый member отдельно",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Omit на union автоматически убирает secret из object-члена. Omit<User,\"foo\"> падает если foo нет.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "omit_vs_exclude",
+      "exampleType": "good",
+      "exampleText": "Exclude<keyof User, \"password\"> — union \"id\"|\"name\"|\"email\". Omit<User,\"password\"> — объектный тип с этими полями.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "omit_vs_exclude",
+      "exampleType": "good",
+      "exampleText": "exclude — имена ключей строкой, omit — готовый тип для функции return",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "omit_vs_exclude",
+      "exampleType": "bad",
+      "exampleText": "Exclude<User, \"password\"> и Omit<User, \"password\"> — синонимы, оба объект.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "real_world_usage",
+      "exampleType": "good",
+      "exampleText": "forwardRef: Omit<InputHTMLAttributes<HTMLInputElement>, \"ref\"> + label. Zod: Omit<z.infer<typeof user>, \"password\">.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "real_world_usage",
+      "exampleType": "good",
+      "exampleText": "свой omit: { [P in keyof T as P extends K ? never : P]: T[P] }. const { password, ...rest } + Omit тип",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "real_world_usage",
+      "exampleType": "bad",
+      "exampleText": "Omit используется только в React 18 typings, в backend DTO бесполезен.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "utility-type-omit-in-typescript",
+    "apiUrl": "https://api.itlead.org/api/questions/utility-type-omit-in-typescript",
+    "pageUrl": "https://itlead.org/interview-questions/typescript/utility-type-omit-in-typescript",
+    "difficulty": "MIDDLE",
+    "titleEn": "Utility type omit in TypeScript",
+    "categorySlug": "typescript",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

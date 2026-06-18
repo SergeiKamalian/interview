@@ -1,0 +1,576 @@
+{
+  "topic": {
+    "code": "how_uselayouteffect_works_react_how_does_it_differ_from_useeffect",
+    "name": "useLayoutEffect в React и отличие от useEffect",
+    "skillCode": "react",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работает useLayoutEffect в React и чем он отличается от useEffect?",
+    "shortAnswer": "useLayoutEffect выполняется синхронно сразу после commit-мутаций DOM, но до paint браузера — блокирует отрисовку до завершения колбека. useEffect ставится в пассивную очередь и срабатывает асинхронно после paint. Правило: читать или менять DOM до того, как пользователь увидит экран — useLayoutEffect; fetch, подписки, аналитика, таймеры — useEffect.",
+    "idealAnswer": "useLayoutEffect и useEffect имеют одинаковую сигнатуру (колбек + зависимости + cleanup), но различаются моментом запуска в commit phase React. useLayoutEffect срабатывает синхронно в commitLayoutEffects с приоритетом ImmediateSchedulerPriority — после мутаций DOM, но до requestAnimationFrame и paint. useEffect попадает в commitPassiveMountEffects и планируется через scheduleCallback с NormalSchedulerPriority — браузер сначала рисует, потом React обрабатывает пассивные эффекты. Поэтому getBoundingClientRect и правки стилей в useLayoutEffect отражают актуальный committed DOM без мерцания; в useEffect пользователь может увидеть промежуточное состояние (tooltip в {0,0}, потом прыжок). Когда useLayoutEffect: измерение размеров, scroll position, позиционирование tooltip/dropdown/popover, исправление layout до первого пикселя. Когда useEffect: data fetching, subscriptions, analytics, timers — не нужен pre-paint доступ к DOM, блокировка paint только вредит. SSR: useLayoutEffect на сервере — no-op + dev warning; useEffect выполняется нормально (только в браузере после hydration для DOM API). React 18: useLayoutEffect остаётся immediate priority и может блокировать concurrent transitions из useTransition; useEffect — passive/deferred. Strict Mode в dev: оба double-invoke (mount → effect → cleanup → remount). Порядок при re-render: layout cleanup → layout effect → passive cleanup → passive effect; layout всегда перед passive. Типичные ошибки: fetch в useLayoutEffect (async всё равно, но задерживает первый paint); document.title без guard при SSR; нестабильные зависимости (новый объект каждый render) → плотный infinite loop; gsap/анимации на каждый кадр в layout effect блокируют rAF. useInsertionEffect (React 18+) — до DOM-мутаций, для CSS-in-JS injection, layout читать нельзя. Реальные кейсы: Floating UI, Framer Motion layout, React Window row heights, TanStack Table column resize — useLayoutEffect; UserProfile fetch — useEffect.",
+    "maxScore": 10,
+    "skills": [
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "timing_difference",
+      "title": "Понимает разницу во времени запуска",
+      "expected": "Кандидат объясняет: useLayoutEffect — синхронно post-commit, pre-paint, блокирует paint; useEffect — асинхронно post-paint; одинаковая сигнатура, разница только в timing.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — pre-paint vs post-paint, блокировка отрисовки",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "paint",
+              "pre-paint",
+              "post-paint",
+              "синхрон",
+              "асинхрон"
+            ],
+            "ask": "в какой момент относительно paint браузера срабатывает useEffect и useLayoutEffect"
+          }
+        ],
+        "mustConcepts": [
+          "useLayoutEffect",
+          "useEffect",
+          "paint",
+          "отрисов",
+          "pre-paint",
+          "post-paint",
+          "до paint",
+          "после paint",
+          "синхрон",
+          "асинхрон",
+          "блокир",
+          "commit",
+          "DOM",
+          "мутац",
+          "timing",
+          "тайминг",
+          "сигнатур",
+          "cleanup"
+        ],
+        "falseClaims": [
+          "useEffect и useLayoutEffect запускаются в одно и то же время",
+          "useLayoutEffect выполняется после paint как useEffect",
+          "useEffect блокирует paint браузера",
+          "useLayoutEffect не блокирует отрисовку до завершения колбека"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use_which",
+      "title": "Знает когда useLayoutEffect, когда useEffect",
+      "expected": "Кандидат называет: DOM-измерения, scroll, tooltip/popover без мерцания → useLayoutEffect; fetch, подписки, analytics, timers → useEffect; правило — layout только если нужно до paint.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевое правило выбора из ITLead When to use",
+        "confusionPairs": [
+          {
+            "checkpointKey": "when_to_use_which",
+            "oftenConfusedWith": [
+              "timing_difference"
+            ],
+            "anchorTermsExpected": [
+              "getBoundingClientRect",
+              "fetch",
+              "tooltip",
+              "подписк",
+              "мерцан"
+            ],
+            "anchorTermsWrongTopic": [
+              "всё в useLayoutEffect",
+              "fetch в useLayoutEffect"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "fetch",
+              "getBoundingClientRect",
+              "tooltip"
+            ],
+            "ask": "куда положить fetch пользователя и куда — позиционирование tooltip до первого paint"
+          }
+        ],
+        "mustConcepts": [
+          "DOM-измер",
+          "getBoundingClientRect",
+          "scroll",
+          "scroll position",
+          "tooltip",
+          "dropdown",
+          "popover",
+          "мерцан",
+          "flicker",
+          "стрибок",
+          "fetch",
+          "подписк",
+          "analytics",
+          "таймер",
+          "API",
+          "layout",
+          "стил",
+          "до paint",
+          "первый пиксел"
+        ],
+        "falseClaims": [
+          "fetch данных нужно делать в useLayoutEffect",
+          "useLayoutEffect — дефолтный хук для любых side effects",
+          "DOM-измерения безопасно делать в useEffect без мерцания",
+          "подписки и analytics лучше в useLayoutEffect"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "commit_scheduler_internal",
+      "title": "Знает commitLayoutEffects и планировщик React",
+      "expected": "Кандидат описывает: useLayoutEffect в commitLayoutEffects с ImmediateSchedulerPriority, синхронно до rAF; useEffect в commitPassiveMountEffects через NormalSchedulerPriority, после paint.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "внутренний механизм из ITLead How React schedules",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "commitLayoutEffects",
+              "ImmediateSchedulerPriority",
+              "passive"
+            ],
+            "ask": "где в commit phase React запускает layout effect и passive effect"
+          }
+        ],
+        "mustConcepts": [
+          "commitLayoutEffects",
+          "commitPassiveMountEffects",
+          "ImmediateSchedulerPriority",
+          "NormalSchedulerPriority",
+          "Scheduler",
+          "планировщ",
+          "requestAnimationFrame",
+          "rAF",
+          "пассив",
+          "passive",
+          "fiber",
+          "синхрон",
+          "очеред",
+          "scheduleCallback",
+          "commit phase",
+          "приоритет"
+        ],
+        "falseClaims": [
+          "useLayoutEffect планируется через NormalSchedulerPriority после paint",
+          "useEffect выполняется в commitLayoutEffects синхронно",
+          "оба хука в одной пассивной очереди post-paint",
+          "requestAnimationFrame всегда выполняется до useLayoutEffect"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "flicker_dom_measurements",
+      "title": "Понимает мерцание и DOM-измерения",
+      "expected": "Кандидат объясняет: tooltip/TruncatedLabel в useEffect даёт видимый прыжок; useLayoutEffect читает rect/scrollWidth до paint; пример red→blue из quick demo — layout pre-paint, effect post-paint.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "канонические примеры tooltip и overflow из ITLead Examples",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "when_to_use_which",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "tooltip",
+              "getBoundingClientRect",
+              "position"
+            ],
+            "ask": "почему tooltip сначала в {0,0} при useEffect и как useLayoutEffect убирает мерцание"
+          },
+          {
+            "match": [
+              "scrollWidth",
+              "clientWidth",
+              "overflow"
+            ],
+            "ask": "как определить переполнение текста до первого paint"
+          }
+        ],
+        "mustConcepts": [
+          "мерцан",
+          "flicker",
+          "стрибок",
+          "прыжок",
+          "jump",
+          "getBoundingClientRect",
+          "scrollWidth",
+          "clientWidth",
+          "tooltip",
+          "popover",
+          "position",
+          "координат",
+          "Floating UI",
+          "TruncatedLabel",
+          "title",
+          "overflow",
+          "до paint",
+          "useRef",
+          "ref"
+        ],
+        "falseClaims": [
+          "tooltip position в useEffect не вызывает видимого snap",
+          "getBoundingClientRect в useEffect всегда отражает committed DOM без прыжка",
+          "пользователь не видит промежуточное состояние при layout-правках в useEffect",
+          "useLayoutEffect и useEffect дают одинаковый визуальный результат при позиционировании"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки useLayoutEffect",
+      "expected": "Кандидат называет: fetch в layout (блокирует paint без пользы); SSR warning без DOM; нестабильные deps → infinite loop; gsap/анимации в layout блокируют rAF; тяжёлая работа замедляет UI.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — fetch, SSR, deps, animations",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "fetch",
+              "useLayoutEffect",
+              "paint"
+            ],
+            "ask": "почему fetch в useLayoutEffect не ускоряет загрузку, но задерживает paint"
+          },
+          {
+            "match": [
+              "useMemo",
+              "зависимост",
+              "infinite"
+            ],
+            "ask": "почему style={{ color: 'red' }} в deps layout effect даёт tight loop"
+          },
+          {
+            "match": [
+              "gsap",
+              "requestAnimationFrame",
+              "анимац"
+            ],
+            "ask": "почему gsap.to в useLayoutEffect на каждый value вызывает frame drops"
+          }
+        ],
+        "mustConcepts": [
+          "fetch",
+          "SSR",
+          "warning",
+          "typeof window",
+          "guard",
+          "Next.js",
+          "Remix",
+          "infinite loop",
+          "зависимост",
+          "useMemo",
+          "объект",
+          "reference",
+          "gsap",
+          "requestAnimationFrame",
+          "анимац",
+          "DevTools",
+          "Performance",
+          "blocking",
+          "тяжел",
+          "document.title"
+        ],
+        "falseClaims": [
+          "fetch в useLayoutEffect быстрее чем в useEffect",
+          "useLayoutEffect безопасен на сервере без warning",
+          "нестабильные зависимости безопасны только в useEffect",
+          "gsap в useLayoutEffect не блокирует requestAnimationFrame"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "effect_order_cleanup",
+      "title": "Знает порядок выполнения и cleanup",
+      "expected": "Кандидат описывает: mount — layout effect, потом passive; re-render — layout cleanup → layout effect → passive cleanup → passive effect; layout всегда перед passive.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up execution order из ITLead Interview questions",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "cleanup",
+              "порядок",
+              "re-render"
+            ],
+            "ask": "точный порядок layout и passive effect с cleanup при повторном рендере"
+          }
+        ],
+        "mustConcepts": [
+          "cleanup",
+          "очистк",
+          "mount",
+          "re-render",
+          "layout cleanup",
+          "passive cleanup",
+          "layout effect",
+          "passive effect",
+          "порядок",
+          "сначала layout",
+          "потом passive",
+          "Strict Mode",
+          "дважды",
+          "dev",
+          "remount"
+        ],
+        "falseClaims": [
+          "passive effect всегда выполняется перед layout effect",
+          "cleanup у useEffect синхронный как у useLayoutEffect",
+          "при re-render сначала passive cleanup, потом layout cleanup",
+          "Strict Mode в production тоже double-invoke layout effect"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "react18_concurrent_insertion",
+      "title": "Знает React 18 concurrent и useInsertionEffect",
+      "expected": "Кандидат упоминает: useLayoutEffect immediate priority блокирует useTransition; useInsertionEffect — до DOM-мутаций для CSS-in-JS; Framer Motion, React Window — реальные кейсы layout effect.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "senior follow-up и real-world — бонус для middle",
+        "mustConcepts": [
+          "useTransition",
+          "concurrent",
+          "immediate priority",
+          "useInsertionEffect",
+          "CSS-in-JS",
+          "Framer Motion",
+          "React Window",
+          "TanStack Table",
+          "React Spring",
+          "блокир",
+          "transition",
+          "до мутац"
+        ],
+        "falseClaims": [
+          "useLayoutEffect в React 18 стал асинхронным и не блокирует transitions",
+          "useInsertionEffect читает layout как useLayoutEffect",
+          "useTransition отменяет синхронность layout effect"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "useLayoutEffect — синхронно после commit DOM, до paint: getBoundingClientRect, tooltip position, scrollWidth. useEffect — после paint: fetch, subscriptions, analytics. На SSR layout — no-op + warning; effect безопасен. React 18: layout блокирует transitions, passive — deferred.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Tooltip: useLayoutEffect читает trigger и tooltip rect, setPosition до paint — без snap в 0,0. UserProfile fetch в useEffect с cancelled flag. Не кладу fetch в layout — paint блокируется зря. style deps стабилизирую useMemo.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "commitLayoutEffects + ImmediateSchedulerPriority — layout до rAF. Passive queue post-paint. Re-render: layout cleanup → layout → passive cleanup → passive. Floating UI и Framer Motion layout — типичный useLayoutEffect.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "useEffect и useLayoutEffect — одно и то же по timing. Fetch и tooltip position лучше в useLayoutEffect — так быстрее и без разницы для paint.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "useLayoutEffect на Next.js сервере измеряет DOM как в браузере. gsap.to в layout на каждый frame — норм, rAF не страдает.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "React 18 сделал useLayoutEffect passive — transitions не блокируются. useInsertionEffect — для чтения getBoundingClientRect до paint.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "timing_difference",
+      "exampleType": "good",
+      "exampleText": "useLayoutEffect — sync, post-commit, pre-paint, блокирует paint. useEffect — async, post-paint, не блокирует.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "timing_difference",
+      "exampleType": "good",
+      "exampleText": "ну layout до того как браузер нарисовал, effect после — поэтому красный в layout юзер не увидит, синий из effect уже на экране",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "timing_difference",
+      "exampleType": "bad",
+      "exampleText": "Оба хука post-paint, useLayoutEffect просто с более высоким приоритетом в той же очереди.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "when_to_use_which",
+      "exampleType": "good",
+      "exampleText": "Измерение высоты строки, scroll position, tooltip coords — useLayoutEffect. Fetch /api/users, setInterval, analytics — useEffect.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "when_to_use_which",
+      "exampleType": "good",
+      "exampleText": "правило: если надо прочитать или поменять DOM до первого пикселя — layout, всё остальное effect",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "when_to_use_which",
+      "exampleType": "bad",
+      "exampleText": "Любые side effects по умолчанию в useLayoutEffect — так надёжнее. Fetch в layout ускоряет API.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "commit_scheduler_internal",
+      "exampleType": "good",
+      "exampleText": "commitLayoutEffects + ImmediateSchedulerPriority — синхронный цикл до rAF. useEffect в commitPassiveMountEffects через scheduleCallback NormalSchedulerPriority.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "commit_scheduler_internal",
+      "exampleType": "good",
+      "exampleText": "layout в commit phase синхронно, passive очередь после paint — браузер рисует раньше effect",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "commit_scheduler_internal",
+      "exampleType": "bad",
+      "exampleText": "React планирует useLayoutEffect и useEffect в одной passive queue post-paint.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "flicker_dom_measurements",
+      "exampleType": "good",
+      "exampleText": "Tooltip: triggerRect + tooltipRect в useLayoutEffect, setPosition до paint — Floating UI так же. useEffect дал бы flash в 0,0.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "flicker_dom_measurements",
+      "exampleType": "good",
+      "exampleText": "TruncatedLabel: scrollWidth > clientWidth в layout — title сразу, без кадра без tooltip hint",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "flicker_dom_measurements",
+      "exampleType": "bad",
+      "exampleText": "Позиционирование popover в useEffect без мерцания — пользователь не заметит snap на каждом render.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "fetch('/api/data') в useLayoutEffect — async всё равно, но первый paint задержан. SSR: document.title в layout — warning; useEffect или typeof window guard.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "style={{ color: 'red' }} в deps layout — infinite loop; useMemo стабилизирует. gsap.to в layout на value — frame drops, лучше useEffect.",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "fetch в useLayoutEffect ускоряет сеть. Нестабильные deps безопасны — React сам дедуплицирует объекты.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "effect_order_cleanup",
+      "exampleType": "good",
+      "exampleText": "Mount: layout effect → passive effect. Re-render: layout cleanup → layout → passive cleanup → passive. Strict Mode dev — double invoke.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "effect_order_cleanup",
+      "exampleType": "good",
+      "exampleText": "layout cleanup синхронный перед следующим layout, passive cleanup async перед passive effect",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "effect_order_cleanup",
+      "exampleType": "bad",
+      "exampleText": "При re-render сначала passive effect, потом layout — порядок не важен.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "react18_concurrent_insertion",
+      "exampleType": "good",
+      "exampleText": "useLayoutEffect ImmediateSchedulerPriority блокирует useTransition. useInsertionEffect — до DOM mutations для styled-components, layout не читает.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "react18_concurrent_insertion",
+      "exampleType": "good",
+      "exampleText": "React Window row heights, TanStack Table resize — layout effect; тяжёлый sync в layout тормозит transition UI",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "react18_concurrent_insertion",
+      "exampleType": "bad",
+      "exampleText": "useTransition делает useLayoutEffect deferred как useEffect. useInsertionEffect — замена useLayoutEffect для tooltip.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "how-uselayouteffect-works-in-react-and-how-does-it-differ-from-useeffect",
+    "apiUrl": "https://api.itlead.org/api/questions/how-uselayouteffect-works-in-react-and-how-does-it-differ-from-useeffect",
+    "pageUrl": "https://itlead.org/interview-questions/react/how-uselayouteffect-works-in-react-and-how-does-it-differ-from-useeffect",
+    "difficulty": "MIDDLE",
+    "titleEn": "How useLayoutEffect works in React and how does it differ from useEffect?",
+    "categorySlug": "react",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

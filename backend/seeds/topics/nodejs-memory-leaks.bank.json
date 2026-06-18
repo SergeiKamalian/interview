@@ -1,0 +1,694 @@
+{
+  "topic": {
+    "code": "nodejs_memory_leaks",
+    "name": "Витоки памяти в Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как обнаружить и предотвратить утечки памяти в Node.js?",
+    "shortAnswer": "Утечка памяти в Node.js — когда объекты остаются в live reference после того, как они больше не нужны, и V8 GC не может их собрать; heap растёт до OOM. Следите за `process.memoryUsage()` — стабильный рост heapUsed при постоянной нагрузке сигнализирует об утечке. Ключевое: ограничивайте кеши (`lru-cache`), удаляйте event listeners при `close`/`disconnect`, очищайте таймеры через `clearInterval`.",
+    "idealAnswer": "Утечка памяти в Node.js возникает, когда объекты остаются доступными через live root (глобальная переменная, активное замыкание, pending timer callback) после окончания срока полезной жизни — V8 не может их собрать. Heap usage растёт стабильно, процесс падает с OOM. V8 использует generational GC: короткоживущие объекты в young generation (Scavenge), долгоживущие продвигаются в old generation (mark-sweep-compact). Утечка — когда объект попадает в old gen через retained root и остаётся там. `heapUsed` в `process.memoryUsage()` отражает занятость old gen; рост на часах без изменения трафика — сигнал утечки. Четыре частые причины: (1) необграниченные глобальные кеши — plain object/Map без лимита растёт на каждый уникальный ключ; (2) неудалённые event listeners — listener в обработчике запроса без `removeListener` на `close`; (3) замыкания, удерживающие большие объекты — closure держит весь scope, даже если нужен `.length`; (4) таймеры без `clearInterval` — callback и все переменные scope живут вечно. Диагностика: шаг 1 — логировать `process.memoryUsage()` каждые 10 с, рост 30+ минут под нагрузкой; шаг 2 — `node --inspect` + Chrome DevTools heap snapshots, Comparison view, dominators; шаг 3 — `npx clinic heapprofiler` / `clinic doctor`. В production — Prometheus `nodejs_heap_size_used_bytes`, алерт на 80% от `--max-old-space-size`. Типичные ошибки: «GC сам почистит» — GC не собирает объекты с live references, CPU растёт до 10x; `--max-old-space-size=4096` только откладывает OOM; WeakMap с примитивным ключом — TypeError; замыкания в hot loop захватывают весь массив вместо одного элемента. Профилактика: bounded LRU/TTL кеш (`lru-cache`, `node-cache`); `req.on('close', () => emitter.removeListener(...))` для SSE/WebSocket; `socket.removeAllListeners` на disconnect; `process.removeListener` для cluster workers; PM2 `--heap-dump-on-oom`. `heapUsed` — JS heap V8; `rss` — вся память процесса от ОС (native buffers, C++); рост rss при стабильном heapUsed — утечка в native/Buffer. WeakMap — ключи только объекты, запись исчезает при GC ключа; WeakRef (Node 14+) — слабая ссылка на один объект, `.deref()` перед использованием. Для WebSocket с 10k соединений — shard state в N WeakMaps по `clientId % N`, ключ — socket object, GC при disconnect без O(n) cleanup loop.",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "memory_leak_definition",
+      "title": "Понимает суть утечки памяти в Node.js",
+      "expected": "Кандидат объясняет: утечка — объект остаётся в live reference после окончания срока полезной жизни; V8 GC не может освободить память; heap растёт до OOM crash.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — retained reference блокирует GC",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "memory_leak_definition",
+            "oftenConfusedWith": [
+              "v8_gc_retained_roots"
+            ],
+            "anchorTermsExpected": [
+              "утечк",
+              "live reference",
+              "GC",
+              "heap",
+              "OOM",
+              "не освобожда"
+            ],
+            "anchorTermsWrongTopic": [
+              "утечка это просто большой heap",
+              "GC всегда собирает неиспользуемые объекты"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "утечк",
+              "memory leak",
+              "OOM"
+            ],
+            "ask": "что такое утечка памяти в Node.js и почему процесс падает с OOM"
+          }
+        ],
+        "mustConcepts": [
+          "утечк",
+          "memory leak",
+          "live reference",
+          "жив",
+          "ссылк",
+          "GC",
+          "garbage collector",
+          "сборщ",
+          "heap",
+          "OOM",
+          "out-of-memory",
+          "не освобожда",
+          "растёт",
+          "краш",
+          "V8",
+          "объект",
+          "недостижим"
+        ],
+        "falseClaims": [
+          "утечка памяти — это когда heap просто большой при нормальной нагрузке",
+          "GC всегда освобождает объекты без live references автоматически при утечке",
+          "OOM случается только из-за слишком маленького лимита heap, не из-за утечки",
+          "утечка в Node.js невозможна из-за GC",
+          "утечка и высокое потребление памяти при пиковой нагрузке — одно и то же"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "v8_gc_retained_roots",
+      "title": "Связывает утечки с V8 GC и retained roots",
+      "expected": "Кандидат описывает generational GC (young/old gen), retained root (global, closure, timer), продвижение в old generation; `heapUsed` растёт при утечке.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "механизм V8 — roots, old gen, mark-sweep",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "memory_leak_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "v8_gc_retained_roots",
+            "oftenConfusedWith": [
+              "memory_leak_definition",
+              "four_common_causes"
+            ],
+            "anchorTermsExpected": [
+              "retained root",
+              "old generation",
+              "heapUsed",
+              "mark-sweep",
+              "young generation"
+            ],
+            "anchorTermsWrongTopic": [
+              "Scavenge собирает все утечки",
+              "roots только globals"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "generational",
+              "old gen",
+              "young gen",
+              "Scavenge"
+            ],
+            "ask": "как generational GC V8 связан с утечками в old generation"
+          },
+          {
+            "match": [
+              "root",
+              "global",
+              "closure",
+              "timer"
+            ],
+            "ask": "какие retained roots держат объект живым и блокируют GC"
+          }
+        ],
+        "mustConcepts": [
+          "V8",
+          "generational",
+          "поколен",
+          "young generation",
+          "old generation",
+          "Scavenge",
+          "mark-sweep",
+          "retained root",
+          "корн",
+          "global",
+          "глобальн",
+          "closure",
+          "замыкан",
+          "timer",
+          "heapUsed",
+          "old gen",
+          "продвижен",
+          "недостижим"
+        ],
+        "falseClaims": [
+          "Scavenge в young generation собирает все утечки автоматически",
+          "retained root — только global variable, замыкания не считаются",
+          "heapUsed не отражает утечки в old generation",
+          "mark-sweep-compact работает только на young generation",
+          "утечка возможна только через global variables"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "four_common_causes",
+      "title": "Называет четыре частые причины утечек",
+      "expected": "Кандидат перечисляет: необграниченные кеши, неудалённые event listeners, замыкания с большими объектами, таймеры без clearInterval; может привести примеры из Express/SSE.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "четыре паттерна из ITLead — основа диагностики",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "prevention_patterns",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "кеш",
+              "cache",
+              "Map",
+              "global"
+            ],
+            "ask": "как необграниченный кеш приводит к утечке на 10k уникальных ключей"
+          },
+          {
+            "match": [
+              "listener",
+              "removeListener",
+              "event"
+            ],
+            "ask": "почему listener в обработчике запроса без cleanup — утечка"
+          },
+          {
+            "match": [
+              "setInterval",
+              "clearInterval",
+              "timer"
+            ],
+            "ask": "когда setInterval — утечка, а когда нормально"
+          }
+        ],
+        "mustConcepts": [
+          "кеш",
+          "cache",
+          "необгранич",
+          "unbounded",
+          "Map",
+          "global",
+          "event listener",
+          "removeListener",
+          "close",
+          "disconnect",
+          "closure",
+          "замыкан",
+          "scope",
+          "setInterval",
+          "clearInterval",
+          "timer",
+          "SSE",
+          "WebSocket",
+          "Express"
+        ],
+        "falseClaims": [
+          "Node.js предупреждает при 11 listeners до того как утечка началась",
+          "setInterval на уровне приложения всегда утечка",
+          "замыкание удерживает только те переменные, которые явно использует callback",
+          "plain object как кеш безопасен если ключей мало",
+          "removeListener не нужен если процесс перезапускается каждый час"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "detection_methods",
+      "title": "Знает методы обнаружения утечек",
+      "expected": "Кандидат описывает: мониторинг `process.memoryUsage()` во времени, heap snapshots через `--inspect` + Chrome DevTools Comparison, clinic.js heapprofiler/doctor; production alerts на 80% heap.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "практическая диагностика — senior must-have",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "memoryUsage",
+              "heapUsed",
+              "монитор"
+            ],
+            "ask": "как по логам process.memoryUsage понять что это утечка, а не нормальный рост"
+          },
+          {
+            "match": [
+              "inspect",
+              "heap snapshot",
+              "Chrome DevTools",
+              "Comparison"
+            ],
+            "ask": "как найти источник утечки через heap snapshots в production без downtime"
+          },
+          {
+            "match": [
+              "clinic",
+              "heapprofiler",
+              "doctor"
+            ],
+            "ask": "чем clinic.js помогает по сравнению с ручными snapshots"
+          }
+        ],
+        "mustConcepts": [
+          "process.memoryUsage",
+          "heapUsed",
+          "heapTotal",
+          "rss",
+          "монитор",
+          "рост",
+          "30 минут",
+          "inspect",
+          "heap snapshot",
+          "Chrome DevTools",
+          "Comparison",
+          "dominator",
+          "clinic",
+          "heapprofiler",
+          "doctor",
+          "Prometheus",
+          "Datadog",
+          "80%",
+          "max-old-space-size",
+          "SSH tunnel",
+          "load test"
+        ],
+        "falseClaims": [
+          "достаточно одного snapshot чтобы найти утечку",
+          "clinic.js требует остановки сервера",
+          "process.memoryUsage() показывает только native memory",
+          "heap snapshots нельзя снять в production",
+          "рост heapUsed на 5 минут всегда означает утечку"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные заблуждения и ловушки",
+      "expected": "Кандидат называет: «GC сам почистит», `--max-old-space-size` как «фикс», WeakMap с примитивным ключом, замыкания в hot loop захватывают весь массив.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes из ITLead — ловушки на собесе",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "prevention_patterns",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "max-old-space-size",
+              "4096",
+              "лимит"
+            ],
+            "ask": "почему увеличение max-old-space-size не решает утечку"
+          },
+          {
+            "match": [
+              "WeakMap",
+              "примитив",
+              "object key"
+            ],
+            "ask": "почему WeakMap с строковым ключом не работает"
+          }
+        ],
+        "mustConcepts": [
+          "GC сам",
+          "live reference",
+          "CPU",
+          "10x",
+          "max-old-space-size",
+          "откладыва",
+          "не решение",
+          "WeakMap",
+          "примитив",
+          "object key",
+          "TypeError",
+          "hot loop",
+          "closure",
+          "массив",
+          "захват",
+          "arr[i]",
+          "item"
+        ],
+        "falseClaims": [
+          "GC сам почистит объекты с live references если подождать",
+          "max-old-space-size=4096 решает утечку навсегда",
+          "WeakMap принимает строковые ключи как обычный Map",
+          "замыкание в цикле захватывает только arr[i], не весь arr",
+          "увеличение heap лимита снижает CPU при утечке"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "prevention_patterns",
+      "title": "Знает паттерны предотвращения и исправления",
+      "expected": "Кандидат называет: bounded LRU/TTL кеш, removeListener на close/disconnect, clearInterval, lru-cache/node-cache, Socket.io cleanup, PM2 heap-dump-on-oom.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "fix rule — bound, remove, monitor",
+        "mustConcepts": [
+          "lru-cache",
+          "LRU",
+          "TTL",
+          "node-cache",
+          "max",
+          "ttl",
+          "removeListener",
+          "removeAllListeners",
+          "close",
+          "disconnect",
+          "clearInterval",
+          "bound",
+          "огранич",
+          "Socket.io",
+          "cluster",
+          "PM2",
+          "heap-dump-on-oom",
+          "checkperiod"
+        ],
+        "falseClaims": [
+          "global cache без лимита нормален если TTL в комментарии",
+          "removeAllListeners безопасен для shared emitter без side effects",
+          "TTL кеш не нужен если RAM сервера большой",
+          "clearInterval не нужен для app-global interval",
+          "WeakMap заменяет bounded cache для всех случаев"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "heapUsed_vs_rss",
+      "title": "Различает heapUsed и rss",
+      "expected": "Кандидат объясняет: heapUsed — JS heap V8; rss — вся память процесса от ОС (native buffers, C++, stack); рост rss при стабильном heapUsed — native/Buffer утечка.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "follow-up из ITLead — диагностика вне JS heap",
+        "mustConcepts": [
+          "heapUsed",
+          "rss",
+          "Resident Set Size",
+          "V8",
+          "JS heap",
+          "native",
+          "Buffer",
+          "C++",
+          "стек",
+          "ОС",
+          "стабильн heapUsed",
+          "native module"
+        ],
+        "falseClaims": [
+          "heapUsed и rss всегда растут синхронно",
+          "rss — это только JS heap",
+          "утечка Buffer видна только в heapUsed",
+          "rss не важен для диагностики Node.js"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "weakref_weakmap_caching",
+      "title": "Понимает WeakMap и WeakRef для кеширования",
+      "expected": "Кандидат объясняет: WeakMap — ключи только объекты, запись исчезает при GC ключа; WeakRef — слабая ссылка, `.deref()` перед использованием; shard WeakMaps для WebSocket state.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "senior follow-up — WeakRef vs WeakMap, WebSocket sharding",
+        "mustConcepts": [
+          "WeakMap",
+          "WeakRef",
+          "deref",
+          "object key",
+          "GC",
+          "автомат",
+          "исчеза",
+          "кеш",
+          "socket",
+          "shard",
+          "clientId",
+          "WebSocket",
+          "без cleanup loop"
+        ],
+        "falseClaims": [
+          "WeakMap заменяет LRU для строковых ключей",
+          "WeakRef держит объект живым навсегда",
+          "WeakMap.entries() возвращает все ключи для итерации",
+          "WeakRef не нужен deref перед использованием"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Утечка — объект остаётся в live reference, V8 не собирает, heapUsed растёт до OOM. Частые причины: global cache без лимита, listener на каждый SSE-запрос без removeListener на close, setInterval per-connection. Диагностика: лог memoryUsage 30+ минут, два heap snapshot через --inspect + Comparison, clinic heapprofiler. Фикс: lru-cache с max и ttl, req.on('close', () => bus.removeListener(...)), clearInterval.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На проде heap 150MB → 2GB за 72 часа без роста трафика — классическая утечка. Сначала process.memoryUsage каждые 10 сек, потом SSH tunnel к --inspect, два snapshot с интервалом 10 мин под нагрузкой. В Comparison смотрю конструкторы с большим retained size. Обычно это listeners на eventBus или global userCache. Bounded NodeCache stdTTL 300, removeListener на close.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "V8 generational GC: утечка когда объект в old gen через root — global, closure или timer. max-old-space-size только откладывает краш. WeakMap — только object keys. heapUsed — JS heap, rss — вся память процесса; rss растёт при стабильном heapUsed — смотрю native Buffer.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Утечки в Node.js невозможны — GC всё собирает. Если OOM — просто увеличиваю --max-old-space-size до 8GB и проблема решена.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "WeakMap с ключом user-123 отлично кеширует пользователей. setInterval на каждый WebSocket — нормально, GC сам почистит callback когда клиент отключится.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для диагностики достаточно одного heap snapshot. heapUsed и rss — одно и то же. Listener на process.on('data') в route handler не нужно удалять — Node сам ограничивает до 11.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "memory_leak_definition",
+      "exampleType": "good",
+      "exampleText": "Утечка — объект живёт через retained root после того как должен был умереть; GC не может собрать, heap растёт, OOM.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "memory_leak_definition",
+      "exampleType": "good",
+      "exampleText": "ну утечка — память копится, ссылки не отпускаются, в итоге процесс падает с out of memory",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "memory_leak_definition",
+      "exampleType": "bad",
+      "exampleText": "Утечка памяти — это когда сервер просто мало RAM, GC тут ни при чём.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "v8_gc_retained_roots",
+      "exampleType": "good",
+      "exampleText": "V8 mark-sweep в old gen; утечка когда global или closure держит объект как live root — Scavenge young gen не поможет.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "v8_gc_retained_roots",
+      "exampleType": "good",
+      "exampleText": "объект попал в old generation через root и сидит там — heapUsed ползёт вверх часами",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "v8_gc_retained_roots",
+      "exampleType": "bad",
+      "exampleText": "Retained root — только window и document, в Node.js roots не бывает.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "four_common_causes",
+      "exampleType": "good",
+      "exampleText": "Четыре классики: global Map-cache без max, listener в GET /events без cleanup, closure с 10MB массивом когда нужен length, setInterval без clearInterval.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "four_common_causes",
+      "exampleType": "good",
+      "exampleText": "на sse каждый клиент вешает listener на eventBus — без req.on close утечка, предупреждение на 11 уже поздно",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "four_common_causes",
+      "exampleType": "bad",
+      "exampleText": "Единственная причина утечек — бесконечный while(true) на главном потоке.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "detection_methods",
+      "exampleType": "good",
+      "exampleText": "Лог heapUsed/rss каждые 10с; рост 30+ мин при стабильном RPS — сигнал. node --inspect, два snapshot, Comparison в DevTools. clinic doctor для автоматического отчёта.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "detection_methods",
+      "exampleType": "good",
+      "exampleText": "в проде prometheus nodejs_heap_size_used_bytes, алерт 80% max-old-space-size; для root cause — inspect через ssh tunnel, snapshots до и после нагрузки",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "detection_methods",
+      "exampleType": "bad",
+      "exampleText": "Утечку видно по одному console.log memoryUsage сразу после старта сервера.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "«GC сам почистит» — нет, live refs блокируют; max-old-space-size откладывает OOM на часы, не лечит; WeakMap.set('id', data) — TypeError.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "в цикле 1M раз () => arr[i] — все замыкания держат arr; правильно for (const item of arr) () => console.log(item)",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "При утечке GC запускается реже и CPU падает — можно подождать.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "prevention_patterns",
+      "exampleType": "good",
+      "exampleText": "lru-cache max 500 ttl 300000; req.on('close', () => eventBus.removeListener('update', send)); socket.removeAllListeners на disconnect; PM2 --heap-dump-on-oom.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "prevention_patterns",
+      "exampleType": "good",
+      "exampleText": "node-cache stdTTL 300 checkperiod 60 — heap ~50MB вместо 500MB на 10k users",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "prevention_patterns",
+      "exampleType": "bad",
+      "exampleText": "Достаточно global.userCache = {} — главное быстро отдавать данные, лимит не нужен.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "heapUsed_vs_rss",
+      "exampleType": "good",
+      "exampleText": "heapUsed — V8 JS heap; rss — вся память процесса включая native buffers. rss растёт, heapUsed flat — ищу Buffer/native module leak.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "heapUsed_vs_rss",
+      "exampleType": "good",
+      "exampleText": "rss это resident set size от ос, heapUsed только то что v8 считает js объектами",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "heapUsed_vs_rss",
+      "exampleType": "bad",
+      "exampleText": "heapUsed всегда равен rss в Node.js, разницы нет.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "weakref_weakmap_caching",
+      "exampleType": "good",
+      "exampleText": "WeakMap: ключ socket object — при disconnect GC убирает запись. WeakRef.deref() проверяю перед использованием. 10k WebSocket — shard по clientId % 10 WeakMaps.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "weakref_weakmap_caching",
+      "exampleType": "good",
+      "exampleText": "weakmap для метаданных на объекте юзера — когда юзер gc-ится, кеш сам пропадает, без ручного delete",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "weakref_weakmap_caching",
+      "exampleType": "bad",
+      "exampleText": "WeakMap.set('user-123', data) — стандартный паттерн кеширования по ID.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-memory-leaks",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-memory-leaks",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-memory-leaks",
+    "difficulty": "SENIOR",
+    "titleEn": "How to detect and prevent memory leaks in Node.js?",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T18:30:00.000Z"
+  }
+}

@@ -1,0 +1,584 @@
+{
+  "topic": {
+    "code": "scope_in_javascript_types_and_working_principles",
+    "name": "Область видимости в JavaScript: типы и принципы",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое область видимости (scope) в JavaScript, какие типы scope существуют и как работают var, let и const?",
+    "shortAnswer": "Scope — часть кода, где переменная существует и доступна для чтения и записи. Три типа: global (весь код), function (внутри функции), block (внутри `{}`). `let` и `const` — block-scoped; `var` — function-scoped и игнорирует блоки. JavaScript использует лексическую область видимости: движок определяет scope по месту написания кода, а поиск переменной идёт вверх по цепочке scope до global или ReferenceError.",
+    "idealAnswer": "Scope (область видимости) — регион кода, где переменная или функция существует и к ней можно обратиться. Движок разрешает scope на этапе компиляции, не в runtime — это лексическая (lexical) область видимости. Три типа: global (весь код приложения, например `process.env.NODE_ENV`), function (внутри одной функции — изолированная логика handler/utility), block (внутри `{}` — for, if, try/catch). Вложенные scope читают переменные родительских, но родитель не видит дочерние. Цепочка scope: при lookup движок начинает с текущего scope и поднимается к global, пока не найдёт binding или не бросит ReferenceError. V8 создаёт LexicalEnvironment для каждого scope при компиляции; объекты связаны outer-ссылкой — lookup идёт по этим ссылкам. `var` привязывается к ближайшей function scope (или global) и полностью игнорирует блоки — `if { var x }` утекает наружу. `let` и `const` привязываются к ближайшему блоку. У `let`/`const` есть Temporal Dead Zone (TDZ): переменная в scope с начала блока, но доступ до строки объявления бросает ReferenceError — в отличие от `var`, где `typeof a` до объявления вернёт `undefined`. Типичные ошибки: `for (var i...)` + setTimeout печатает 3,3,3 — одно binding на все итерации; `let` создаёт новое binding на каждую итерацию → 0,1,2. Shadowing (внутренний `const user` перекрывает внешний) — валидно, но усложняет чтение. Top-level `var x` в браузере добавляет свойство в `window`; top-level `let x` — нет. Практика: `const`/`let` в минимально возможном блоке, `var` избегать. Реальный код: React `useEffect` замыкает scope компонента; Node `require` оборачивает модуль в функцию со своим scope для `exports`; Express handlers замыкают `app` из module scope.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "scope_definition",
+      "title": "Понимает определение scope",
+      "expected": "Кандидат объясняет: scope — регион кода, где переменная доступна; движок определяет scope лексически при компиляции; вложенные scope видят внешние, но не наоборот.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — что такое scope и лексическое определение",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "scope",
+              "область видим",
+              "лексическ"
+            ],
+            "ask": "чем scope отличается от runtime-контекста вызова и когда движок его определяет"
+          }
+        ],
+        "mustConcepts": [
+          "scope",
+          "область видим",
+          "доступ",
+          "переменн",
+          "лексическ",
+          "lexical",
+          "компиляц",
+          "регион кода",
+          "существует",
+          "читать",
+          "запис",
+          "вложен",
+          "родител",
+          "дочерн",
+          "не наоборот",
+          "ReferenceError"
+        ],
+        "falseClaims": [
+          "scope определяется местом вызова функции, а не местом написания",
+          "scope — это только global и function, блоков не существует",
+          "родительский scope может читать переменные дочернего блока",
+          "scope разрешается только в runtime при каждом обращении к переменной"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "scope_types",
+      "title": "Знает три типа scope",
+      "expected": "Кандидат называет global, function и block scope; приводит пример: globalVar вне функций, outerVar внутри function, blockVar внутри `{}`; объясняет, что blockVar недоступен после выхода из блока.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовая классификация из TL;DR ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "scope_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "mustConcepts": [
+          "global",
+          "глобальн",
+          "function",
+          "функц",
+          "block",
+          "блок",
+          "три типа",
+          "globalVar",
+          "outerVar",
+          "blockVar",
+          "if",
+          "for",
+          "try/catch",
+          "ReferenceError",
+          "весь код",
+          "внутри функции",
+          "внутри {}"
+        ],
+        "falseClaims": [
+          "в JavaScript только global и local scope",
+          "block scope появился только в ES5",
+          "const создаёт function scope как var",
+          "переменная в if автоматически глобальная"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "lexical_scope_chain",
+      "title": "Понимает цепочку scope и lookup",
+      "expected": "Кандидат объясняет: lookup начинается в текущем scope и идёт вверх к global; lexical scoping — scope по месту написания кода; может упомянуть LexicalEnvironment и outer-ссылку в V8.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "scope chain — ключевой механизм для closures и debugging",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "цепоч",
+              "chain",
+              "lookup",
+              "поиск"
+            ],
+            "ask": "как движок ищет переменную topic внутри announce внутри describe"
+          },
+          {
+            "match": [
+              "LexicalEnvironment",
+              "V8",
+              "outer"
+            ],
+            "ask": "как V8 связывает scope при компиляции"
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "lexical_scope_chain",
+            "oftenConfusedWith": [
+              "scope_definition"
+            ],
+            "anchorTermsExpected": [
+              "цепоч",
+              "lookup",
+              "вверх",
+              "global",
+              "лексическ"
+            ],
+            "anchorTermsWrongTopic": [
+              "call stack",
+              "prototype chain",
+              "event bubbling"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "цепоч",
+          "chain",
+          "lookup",
+          "поиск",
+          "вверх",
+          "global",
+          "лексическ",
+          "LexicalEnvironment",
+          "outer",
+          "ссылк",
+          "текущ",
+          "родител",
+          "announce",
+          "describe",
+          "изнутри наружу",
+          "V8"
+        ],
+        "falseClaims": [
+          "lookup идёт от global внутрь к текущему scope",
+          "scope chain — это prototype chain",
+          "переменная ищется только в текущем scope без подъёма",
+          "лексический scope зависит от того, откуда вызвали функцию"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "var_let_const",
+      "title": "Отличает var, let и const по scope",
+      "expected": "Кандидат объясняет: var — function scope, игнорирует блоки; let/const — block scope; var из if утекает наружу; top-level var в браузере — свойство window, top-level let — нет.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "var vs let/const — центральная тема middle JS интервью",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "var",
+              "let",
+              "const",
+              "block"
+            ],
+            "ask": "что выведет console.log(x) после if с var x = 5 внутри блока"
+          },
+          {
+            "match": [
+              "window",
+              "top-level",
+              "глобальн"
+            ],
+            "ask": "добавляет ли top-level let x свойство в window в браузере"
+          }
+        ],
+        "mustConcepts": [
+          "var",
+          "let",
+          "const",
+          "function scope",
+          "block scope",
+          "блок",
+          "игнорир",
+          "утека",
+          "if",
+          "window",
+          "top-level",
+          "глобальн",
+          "свойство",
+          "ближайш",
+          "функц",
+          "блоков"
+        ],
+        "falseClaims": [
+          "var уважает границы if и for как let",
+          "let на верхнем уровне всегда добавляет свойство в window",
+          "const и let имеют function scope",
+          "var и let ведут себя одинаково внутри блока if"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "tdz",
+      "title": "Понимает Temporal Dead Zone",
+      "expected": "Кандидат объясняет: TDZ — период от входа let/const в scope до строки объявления; доступ до объявления — ReferenceError; typeof до var вернёт undefined, до let — ReferenceError.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TDZ — частый подвох на middle+ интервью",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "TDZ",
+              "Temporal Dead Zone",
+              "typeof"
+            ],
+            "ask": "что выведет console.log(typeof b) до let b = 2 и чем это отличается от var"
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "tdz",
+            "oftenConfusedWith": [
+              "var_let_const"
+            ],
+            "anchorTermsExpected": [
+              "TDZ",
+              "ReferenceError",
+              "до объявлен",
+              "typeof"
+            ],
+            "anchorTermsWrongTopic": [
+              "hoisting не существует для let",
+              "let не поднимается"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "TDZ",
+          "Temporal Dead Zone",
+          "мертв",
+          "зона",
+          "ReferenceError",
+          "до объявлен",
+          "начало блока",
+          "typeof",
+          "undefined",
+          "let",
+          "const",
+          "var",
+          "инициализац",
+          "поднят",
+          "доступ"
+        ],
+        "falseClaims": [
+          "typeof всегда безопасен до объявления любой переменной",
+          "let и const не поднимаются вообще",
+          "TDZ относится к var",
+          "в TDZ переменная равна undefined как у var"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки scope",
+      "expected": "Кандидат называет: var в цикле + setTimeout → 3,3,3 (одно binding); let → 0,1,2; var утекает из if; shadowing inner user перекрывает outer без ошибки, но усложняет код.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "var loop и shadowing — классика ITLead Common mistakes",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "setTimeout",
+              "for",
+              "var",
+              "let"
+            ],
+            "ask": "почему for var i с setTimeout печатает 3 три раза, а for let j — 0,1,2"
+          },
+          {
+            "match": [
+              "shadow",
+              "перекры",
+              "user"
+            ],
+            "ask": "что такое shadowing и почему inner const user не меняет outer user"
+          }
+        ],
+        "mustConcepts": [
+          "var",
+          "let",
+          "цикл",
+          "for",
+          "setTimeout",
+          "3 3 3",
+          "0 1 2",
+          "binding",
+          "привяз",
+          "итерац",
+          "замыкан",
+          "утека",
+          "if",
+          "shadow",
+          "перекры",
+          "user",
+          "Alice",
+          "Bob"
+        ],
+        "falseClaims": [
+          "for let создаёт одно binding на весь цикл как var",
+          "shadowing inner переменной меняет outer binding",
+          "var в if недоступен снаружи блока",
+          "setTimeout в var-цикле печатает 0,1,2 по умолчанию"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда какой scope использовать",
+      "expected": "Кандидат называет: global — app-wide константы; function — изоляция handler/utility; block — ограничить переменную for/if/try; правило — let/const в минимальном блоке, var избегать.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "when to use из ITLead — практическое правило минимального scope",
+        "mustConcepts": [
+          "global",
+          "function",
+          "block",
+          "констант",
+          "изолир",
+          "handler",
+          "for",
+          "if",
+          "try/catch",
+          "минимальн",
+          "блок",
+          "var избег",
+          "утечк",
+          "code review"
+        ],
+        "falseClaims": [
+          "global scope предпочтителен для большинства переменных",
+          "var безопаснее let в циклах",
+          "чем шире scope, тем лучше для производительности"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Scope — где переменная доступна. Три типа: global, function, block. JS — lexical scope: определяется местом написания. Lookup идёт вверх по цепочке. var — function scope, let/const — block. var в for + setTimeout даёт 3,3,3; let — 0,1,2. TDZ: typeof до let — ReferenceError, до var — undefined.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В React useEffect замыкает users из scope компонента — при смене users новый effect. В Node каждый require — свой scope для exports. На практике const в минимальном блоке: for (let i...) вместо var, иначе все колбеки делят одну i.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "announce читает detail локально, topic из parent function, language из global — lookup изнутри наружу. if { var x } → x снаружи 5; if { let y } → ReferenceError. Top-level let не попадает в window, var — да.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Scope определяется местом вызова функции. var и let одинаково ведут себя в if. typeof безопасен до любого объявления. for var i с setTimeout печатает 0,1,2.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Block scope не существует в JavaScript — только global. TDZ относится к var. Родительский scope видит переменные из вложенного if.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Scope chain — это prototype chain. Лучше объявлять всё в global для скорости V8. Shadowing inner user перезаписывает outer user навсегда.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "scope_definition",
+      "exampleType": "good",
+      "exampleText": "Scope — регион, где переменная существует и доступна; лексический — определяется при компиляции по месту написания, не по вызову.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "scope_definition",
+      "exampleType": "good",
+      "exampleText": "ну scope — где var/let видны; внутренний блок видит внешние, снаружи blockVar уже ReferenceError",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "scope_definition",
+      "exampleType": "bad",
+      "exampleText": "Scope — runtime-контекст: куда передали this, туда и scope переменных.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "scope_types",
+      "exampleType": "good",
+      "exampleText": "Global — globalVar вне функций; function — outerVar внутри outer(); block — blockVar только в if { }.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "scope_types",
+      "exampleType": "good",
+      "exampleText": "три типа: global весь файл, function внутри fn, block в for/if/try — после блока blockVar пропадает",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "scope_types",
+      "exampleType": "bad",
+      "exampleText": "В JS только global и local — block scope это синтаксический сахар без реального эффекта.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "lexical_scope_chain",
+      "exampleType": "good",
+      "exampleText": "Lookup: текущий scope → parent function → global. announce берёт detail локально, topic из describe, language из global.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "lexical_scope_chain",
+      "exampleType": "good",
+      "exampleText": "V8 строит LexicalEnvironment с outer-ссылкой — поиск идёт по цепочке, не по call stack",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "lexical_scope_chain",
+      "exampleType": "bad",
+      "exampleText": "Переменная ищется только в текущей функции; global не участвует. Scope chain = prototype chain.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "var_let_const",
+      "exampleType": "good",
+      "exampleText": "var — function scope, if { var x=5 } → x снаружи 5. let/const — block scope, y снаружи ReferenceError. Top-level var → window.x, top-level let — нет.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "var_let_const",
+      "exampleType": "good",
+      "exampleText": "var игнорит блоки полностью, let/const привязаны к ближайшему {} — поэтому в циклах и if всегда let",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "var_let_const",
+      "exampleType": "bad",
+      "exampleText": "var и let одинаково остаются внутри if — снаружи обе недоступны.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "tdz",
+      "exampleType": "good",
+      "exampleText": "console.log(typeof a) до var a — undefined; до let b — ReferenceError (TDZ). Переменная в scope с начала блока, но недоступна до строки объявления.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "tdz",
+      "exampleType": "good",
+      "exampleText": "TDZ у let/const: между входом в блок и let x = 1 любой доступ — ReferenceError, не undefined",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "tdz",
+      "exampleType": "bad",
+      "exampleText": "typeof всегда вернёт undefined до объявления let. TDZ — это когда const можно переприсвоить.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "for (var i...) setTimeout → 3,3,3: одно i на все колбеки. for (let j...) → 0,1,2: новое binding на итерацию.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "shadowing: outer user Alice, inner const user Bob — greet печатает Bob, снаружи всё ещё Alice; лучше переименовать inner",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "for let i тоже печатает 3 три раза — let не создаёт binding на итерацию. var в if не виден снаружи.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "NODE_ENV — global; логика route handler — function scope; счётчик цикла — block let i; чем уже scope, тем меньше сюрпризов на review.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "const/let в минимальном блоке, var не трогаю — legacy only",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Все переменные лучше в global — так V8 быстрее и проще дебажить.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "scope-in-javascript-types-and-working-principles",
+    "apiUrl": "https://api.itlead.org/api/questions/scope-in-javascript-types-and-working-principles",
+    "pageUrl": "https://itlead.org/interview-questions/javascript/scope-in-javascript-types-and-working-principles",
+    "difficulty": "MIDDLE",
+    "titleEn": "scope in JavaScript: types and working principles",
+    "categorySlug": "javascript",
+    "syncedAt": "2026-06-18T15:00:00.000Z"
+  }
+}

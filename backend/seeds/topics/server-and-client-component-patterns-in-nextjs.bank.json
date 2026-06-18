@@ -1,0 +1,628 @@
+{
+  "topic": {
+    "code": "server_and_client_component_patterns_in_nextjs",
+    "name": "Паттерны Server и Client Components в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как правильно выбирать и компоновать Server Components и Client Components в Next.js App Router?",
+    "shortAnswer": "Паттерны Server/Client Components определяют, какие части Next.js-приложения рендерятся на сервере, а какие гидратируются в браузере. По умолчанию — Server Components; `'use client'` добавляют только на интерактивные «листья» дерева, где нужны hooks, обработчики или browser API.",
+    "idealAnswer": "Server Components рендерятся на Node.js, отдают HTML и не добавляют JS в bundle клиента. Client Components (с `'use client'`) гидратируются в браузере и обрабатывают state, события и browser API. Главное правило: default — Server; `'use client'` только там, где нужна интерактивность. Push client to leaves: страница блога — Server Component с fetch из БД; ShareButton с onClick — отдельный Client leaf, а не `'use client'` на всей странице. Pattern children: Client Component может принимать Server Component как children, если передать его из Server parent — Accordion (client) оборачивает ServerContent (server). Client Component не может импортировать Server Component напрямую — Next.js выбросит ошибку. Pattern fetch on server, interact on client: ProductsPage делает await getProducts() на сервере, ProductGrid (client) фильтрует in-memory через useState — без лишних round-trip. Props через RSC boundary должны быть serializable: строки, числа, plain objects, arrays; функции нельзя — для мутаций Server Actions (`'use server'` + form action). Pattern Context Providers: ThemeProvider/QueryClientProvider — отдельный client файл providers.tsx; RootLayout (server) оборачивает children через <Providers> — дети остаются Server Components. Типичные ошибки: fetch в useEffect в Client когда Server parent мог бы передать props (double fetch, FOUC); `'use client'` в root layout — весь app гидратируется; передача onClick={() => ...} с Server на Client — runtime error; localStorage/window в Server Component — TypeError на Vercel. RSC payload — бинарный поток вместе с HTML: props и ссылки для reconciler, чтобы гидратировать client subtrees без повторного fetch. Server Actions vs API routes: Server Actions работают через form/event без обязательного fetch и поддерживают progressive enhancement; API routes — отдельные HTTP endpoints. Real-world: Vercel Dashboard (server data + client toggles), Shadcn/UI (client shells + server content), NextAuth (auth() на server, avatar dropdown — client).",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "server_client_basics",
+      "title": "Понимает Server vs Client Components",
+      "expected": "Кандидат объясняет: Server Components рендерятся на сервере без JS в bundle; Client Components с `'use client'` гидратируются в браузере; по умолчанию — Server.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — split rendering между Node и browser",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "server_client_basics",
+            "oftenConfusedWith": [
+              "when_to_use_each",
+              "push_client_to_leaves"
+            ],
+            "anchorTermsExpected": [
+              "Server Component",
+              "Client Component",
+              "use client",
+              "гидрат",
+              "zero JS",
+              "по умолчанию"
+            ],
+            "anchorTermsWrongTopic": [
+              "Pages Router getServerSideProps",
+              "SSR это то же что RSC",
+              "Client Component не нужен для hooks"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Server Component",
+              "Client Component",
+              "use client"
+            ],
+            "ask": "чем Server Component отличается от Client по bundle и месту выполнения"
+          }
+        ],
+        "mustConcepts": [
+          "Server Component",
+          "Client Component",
+          "use client",
+          "'use client'",
+          "сервер",
+          "браузер",
+          "гидрат",
+          "hydration",
+          "zero JS",
+          "без JS",
+          "bundle",
+          "бандл",
+          "по умолчанию",
+          "default",
+          "Node.js",
+          "HTML",
+          "App Router"
+        ],
+        "falseClaims": [
+          "Server Components гидратируются в браузере как SSR",
+          "Client Components по умолчанию в App Router",
+          "Server Components отправляют свой JS в browser bundle",
+          "'use client' опционален для useState"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use_each",
+      "title": "Выбирает Server или Client по задаче",
+      "expected": "Кандидат называет: fetch/БД/secrets — Server; hooks, onClick, localStorage/window — Client; минимизация JS bundle — Server.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "decision table из ITLead — главный практический навык",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "server_client_basics",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useState",
+              "useEffect",
+              "onClick",
+              "hooks"
+            ],
+            "ask": "нужен ли useState/onClick — Server или Client и почему"
+          },
+          {
+            "match": [
+              "fetch",
+              "БД",
+              "database",
+              "secret",
+              "env"
+            ],
+            "ask": "где безопасно читать API key и делать await db.query"
+          }
+        ],
+        "mustConcepts": [
+          "fetch",
+          "БД",
+          "database",
+          "db",
+          "secret",
+          "секрет",
+          "env",
+          "SEO",
+          "useState",
+          "useEffect",
+          "hooks",
+          "хук",
+          "onClick",
+          "onChange",
+          "обработчик",
+          "localStorage",
+          "window",
+          "document",
+          "browser API",
+          "минимиз",
+          "bundle",
+          "static",
+          "статик"
+        ],
+        "falseClaims": [
+          "useState работает в Server Component",
+          "localStorage доступен на сервере",
+          "fetch в Client Component всегда лучше для начальных данных страницы",
+          "event handlers можно в Server Component"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "push_client_to_leaves",
+      "title": "Применяет push client to leaves",
+      "expected": "Кандидат объясняет: `'use client'` на минимальный интерактивный leaf (ShareButton), а не на всю страницу; иначе bundle bloat и потеря server HTML для SEO.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Pattern 1 — ключевая оптимизация bundle и Lighthouse",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "leaf",
+              "лист",
+              "ShareButton",
+              "вниз",
+              "push"
+            ],
+            "ask": "почему ShareButton отдельный client file, а BlogPost page — server"
+          }
+        ],
+        "mustConcepts": [
+          "push",
+          "leaf",
+          "лист",
+          "вниз",
+          "дерев",
+          "ShareButton",
+          "BlogPost",
+          "страниц",
+          "минимальн",
+          "маленьк",
+          "bundle bloat",
+          "разду",
+          "Lighthouse",
+          "SEO",
+          "server HTML",
+          "useEffect fetch",
+          "статик"
+        ],
+        "falseClaims": [
+          "'use client' на page.tsx — нормальная практика для одной кнопки",
+          "client на всей странице не влияет на bundle size",
+          "ShareButton требует client на родительском article",
+          "push to leaves увеличивает количество network requests"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "children_composition",
+      "title": "Компонует Server через children Client",
+      "expected": "Кандидат объясняет: Client принимает Server как children из Server parent; прямой import Server в Client — ошибка; сервер рендерит children до client boundary.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Pattern 2 + interview Q про import vs children",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "children_composition",
+            "oftenConfusedWith": [
+              "push_client_to_leaves"
+            ],
+            "anchorTermsExpected": [
+              "children",
+              "import",
+              "Server parent",
+              "не импорт",
+              "RSC boundary"
+            ],
+            "anchorTermsWrongTopic": [
+              "можно import Server в Client",
+              "children всегда client"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "children",
+              "import",
+              "Accordion",
+              "ServerContent"
+            ],
+            "ask": "почему ServerContent передают как children, а не import внутри Accordion"
+          },
+          {
+            "match": [
+              "RSC payload",
+              "сериализ",
+              "opaque"
+            ],
+            "ask": "что получает Client Component при children — функцию или уже отрендеренный вывод"
+          }
+        ],
+        "mustConcepts": [
+          "children",
+          "React.ReactNode",
+          "import",
+          "импорт",
+          "не может",
+          "ошибка",
+          "Server parent",
+          "серверн родит",
+          "Accordion",
+          "ServerContent",
+          "RSC boundary",
+          "межа",
+          "opaque",
+          "непрозрач",
+          "Shadcn",
+          "slot",
+          "отрендер",
+          "до client"
+        ],
+        "falseClaims": [
+          "Client Component может import Server Component",
+          "children из Client parent остаются Server Components",
+          "import Server в Client работает если обернуть в Suspense",
+          "children pattern не нужен — достаточно props с JSX"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "fetch_server_interact_client",
+      "title": "Fetch на сервере, интерактив на клиенте",
+      "expected": "Кандидат описывает: await getProducts() в Server page → props в ProductGrid (client) для filter/sort; props serializable; функции не пересекают boundary — Server Actions.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Pattern 3 — типичный data + UI split",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "serializable",
+              "сериализ",
+              "props",
+              "function"
+            ],
+            "ask": "можно ли передать onClick callback с Server на Client — почему нет"
+          }
+        ],
+        "mustConcepts": [
+          "fetch",
+          "getProducts",
+          "ProductGrid",
+          "filter",
+          "фильтр",
+          "useState",
+          "props",
+          "serializable",
+          "сериализ",
+          "plain object",
+          "array",
+          "string",
+          "number",
+          "function",
+          "функц",
+          "нельзя",
+          "Server Action",
+          "use server",
+          "round-trip",
+          "in-memory"
+        ],
+        "falseClaims": [
+          "можно передать функцию как prop через RSC boundary",
+          "Client Component должен сам fetch начальные данные страницы",
+          "Server Actions заменяют serializable props",
+          "любой prop type проходит через RSC boundary"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "context_providers_pattern",
+      "title": "Выносит Context Providers в client файл",
+      "expected": "Кандидат объясняет: ThemeProvider/QueryClient — отдельный `'use client'` providers.tsx; RootLayout (server) оборачивает children; дети layout остаются Server Components.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Pattern 4 — стандарт layout architecture",
+        "mustConcepts": [
+          "Context",
+          "Provider",
+          "ThemeProvider",
+          "QueryClient",
+          "providers.tsx",
+          "RootLayout",
+          "layout",
+          "server",
+          "client file",
+          "отдельн",
+          "children",
+          "остают",
+          "Server Component",
+          "next-themes",
+          "TanStack",
+          "React Query"
+        ],
+        "falseClaims": [
+          "Context работает в Server Components",
+          "RootLayout должен быть Client для ThemeProvider",
+          "Providers делает все children Client Components",
+          "можно импортировать createContext в Server file"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки композиции",
+      "expected": "Кандидат называет: fetch в Client useEffect вместо Server props; `'use client'` в root layout; function prop через boundary; browser API в Server; Server Actions для мутаций.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes блок ITLead — production pitfalls",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "fetch_server_interact_client",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useEffect",
+              "fetch",
+              "PostList",
+              "FOUC",
+              "мерцан"
+            ],
+            "ask": "почему PostList с useEffect fetch хуже Server parent + props"
+          },
+          {
+            "match": [
+              "layout",
+              "use client",
+              "root"
+            ],
+            "ask": "что ломает 'use client' в app/layout.tsx"
+          }
+        ],
+        "mustConcepts": [
+          "useEffect",
+          "fetch",
+          "double fetch",
+          "FOUC",
+          "мерцан",
+          "root layout",
+          "use client",
+          "весь app",
+          "function prop",
+          "onClick",
+          "runtime error",
+          "localStorage",
+          "window",
+          "TypeError",
+          "Server Action",
+          "use server",
+          "form action",
+          "progressive enhancement",
+          "API route"
+        ],
+        "falseClaims": [
+          "useEffect fetch в Client — лучший паттерн для SSR страницы",
+          "'use client' в layout не влияет на детей",
+          "localStorage работает в Server Component на Vercel",
+          "Server Actions и API routes полностью взаимозаменяемы без trade-off"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Страница блога — async Server Component: getPost(slug) на сервере, HTML для SEO. ShareButton — отдельный `'use client'` leaf с navigator.share. Accordion (client) получает ServerContent как children из page.tsx. Props через boundary только serializable.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ProductsPage: await getProducts() на сервере один раз. ProductGrid client фильтрует in-memory — без лишнего fetch. Providers в providers.tsx с ThemeProvider; layout server оборачивает children. Удаление поста — Server Action в form action, работает без JS.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Default server everywhere. Client только где hooks/onClick/localStorage. Не тащу `'use client'` на page — только на кнопку лайка. Server parent передаёт список posts props, не даю PostList самому fetch в useEffect.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Ставлю `'use client'` на layout.tsx — так проще с ThemeProvider. PostList сам fetch в useEffect — норм для SSR. Передаю onClick={() => log()} с server page в client button.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Client Component импортирует Server Component напрямую — работает если обернуть в Suspense. localStorage в Server Component для темы — React сам разберётся на Vercel.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Server и Client Components одинаково попадают в browser bundle. Push to leaves не нужен — одна `'use client'` на page покрывает всё.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "server_client_basics",
+      "exampleType": "good",
+      "exampleText": "Server Component — рендер на Node, zero JS в bundle. Client с `'use client'` — гидратация, hooks, events. Default — server.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "server_client_basics",
+      "exampleType": "good",
+      "exampleText": "серверный компонент отдаёт html без js, клиентский — только там где кнопки и state",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "server_client_basics",
+      "exampleType": "bad",
+      "exampleText": "Server Components скачиваются в браузер и гидратируются как обычный React.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "when_to_use_each",
+      "exampleType": "good",
+      "exampleText": "БД и secrets — Server с await db.query. useState, onClick, localStorage — Client. SEO-контент — Server без лишнего JS.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "when_to_use_each",
+      "exampleType": "good",
+      "exampleText": "форму с onChange — client, список постов из api — server fetch",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "when_to_use_each",
+      "exampleType": "bad",
+      "exampleText": "useState в Server Component — ок, React 19 это поддерживает на сервере.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "push_client_to_leaves",
+      "exampleType": "good",
+      "exampleText": "BlogPost page server: title/content HTML. ShareButton — единственный client leaf с onClick — bundle минимален, Lighthouse не падает.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "push_client_to_leaves",
+      "exampleType": "good",
+      "exampleText": "не ставлю use client на всю статью — только на кнопку share внизу дерева",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "push_client_to_leaves",
+      "exampleType": "bad",
+      "exampleText": "'use client' на page.tsx проще — один файл, useEffect fetch posts, SEO не важен.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "children_composition",
+      "exampleType": "good",
+      "exampleText": "Accordion client принимает children из Server page — ServerContent уже в RSC payload. Import Server внутри Accordion — ошибка Next.js.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "children_composition",
+      "exampleType": "good",
+      "exampleText": "shadcn dialog client, контент slot передаю children с server page — не импортирую server module в client file",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "children_composition",
+      "exampleType": "bad",
+      "exampleText": "В Client Accordion делаю import ServerContent — так удобнее, Next.js скомпилирует.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "fetch_server_interact_client",
+      "exampleType": "good",
+      "exampleText": "ProductsPage await getProducts() → ProductGrid client filter через useState. Props — plain objects, без функций. Delete — Server Action в form.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "fetch_server_interact_client",
+      "exampleType": "good",
+      "exampleText": "данные один раз на сервере, клиент только сортирует массив в памяти — без второго fetch",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "fetch_server_interact_client",
+      "exampleType": "bad",
+      "exampleText": "Передаю handleClick функцию с Server page в Client — serializable не проблема для React.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "context_providers_pattern",
+      "exampleType": "good",
+      "exampleText": "providers.tsx `'use client'` с ThemeProvider + QueryClient. layout.tsx server: <Providers>{children}</Providers> — pages остаются server.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "context_providers_pattern",
+      "exampleType": "good",
+      "exampleText": "контекст только в client shell, layout server, children не становятся client автоматически",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "context_providers_pattern",
+      "exampleType": "bad",
+      "exampleText": "RootLayout должен быть client — иначе ThemeProvider не работает.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "PostList с useEffect fetch — плохо: FOUC и лишний bundle. Server page fetch + props. Не `'use client'` на layout. localStorage только в client.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "мутации через Server Action use server + form action, не тащу callback с server на client",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "useEffect fetch для initial data — best practice в App Router. Server Actions заменяют serializable props полностью.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "server-and-client-component-patterns-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/server-and-client-component-patterns-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/server-and-client-component-patterns-in-nextjs",
+    "difficulty": "MIDDLE",
+    "titleEn": "Server and client component patterns in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

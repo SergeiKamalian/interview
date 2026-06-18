@@ -1,0 +1,448 @@
+{
+  "topic": {
+    "code": "environment_variables_in_nextjs",
+    "name": "Переменные окружения в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Как работают переменные окружения в Next.js и чем отличаются серверные от публичных?",
+    "shortAnswer": "Next.js загружает переменные из `.env`-файлов и делит их по префиксу: без префикса — только сервер (`DATABASE_URL` в браузере `undefined`); с `NEXT_PUBLIC_` — доступны клиенту и встраиваются в бандл на этапе `next build`, а не в рантайме.",
+    "idealAnswer": "Переменные окружения в Next.js — конфигурационные значения из `.env`-файлов, разделённые на server-only и client-exposed одним правилом именования: префикс `NEXT_PUBLIC_` делает переменную доступной браузеру. Без префикса переменная загружается на сервере через Node.js dotenv и никогда не попадает в webpack-бандл; в Client Component `process.env.DATABASE_URL` вернёт `undefined`. Server Component и API routes видят все переменные. Публичные переменные проходят через webpack DefinePlugin: `process.env.NEXT_PUBLIC_API_URL` заменяется на литеральную строку при `next build` — изменение в `.env.production` без rebuild не обновит значение в браузере. Порядок загрузки (от высшего к низшему): `.env.local` > `.env.[mode]` (`.env.development`, `.env.production`) > `.env`. `.env.local` git-ignored — для локальных секретов и персональных override. Динамический доступ `process.env[key]` на клиенте для `NEXT_PUBLIC_` не работает — только прямое обращение `process.env.NEXT_PUBLIC_VAR`. Когда что использовать: DB URL, API keys, JWT secrets — без префикса; analytics ID, публичные endpoints, Stripe publishable key — `NEXT_PUBLIC_`. Типичные ошибки: читать серверную переменную в `'use client'` компоненте; коммитить `.env.local`; ожидать обновления `NEXT_PUBLIC_` без rebuild; динамический `process.env[variableName]`. Правильный паттерн для секретов: читать в Server Component / Server Action и передавать клиенту только нужные данные через props, не raw secret. Для TypeScript — `env.d.ts` с расширением `NodeJS.ProcessEnv`. На Vercel Edge Runtime dotenv не читает файлы с диска — переменные задаются в dashboard платформы. Server-only vars без префикса читаются в runtime (ISR revalidation), `NEXT_PUBLIC_` — только build-time value.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "server_client_split",
+      "title": "Понимает разделение server/client",
+      "expected": "Кандидат объясняет: без префикса — server-only, в браузере undefined; с NEXT_PUBLIC_ — доступны клиенту; Server Component видит обе, Client Component — только NEXT_PUBLIC_.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — naming convention и split",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "NEXT_PUBLIC_",
+              "server-only",
+              "undefined"
+            ],
+            "ask": "что вернёт process.env.DATABASE_URL в Client Component и почему"
+          }
+        ],
+        "mustConcepts": [
+          "NEXT_PUBLIC_",
+          "префикс",
+          "server-only",
+          "только сервер",
+          "undefined",
+          "браузер",
+          "Client Component",
+          "Server Component",
+          "use client",
+          "process.env",
+          "DATABASE_URL",
+          "dotenv",
+          "серверн",
+          "клиент",
+          "публичн",
+          "без префикса",
+          "разделени"
+        ],
+        "falseClaims": [
+          "все process.env доступны в браузере",
+          "NEXT_PUBLIC_ нужен для серверных секретов",
+          "Server Component не видит NEXT_PUBLIC_ переменные",
+          "префикс NEXT_PUBLIC_ скрывает переменную от клиента"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "build_time_inlining",
+      "title": "Знает build-time inlining NEXT_PUBLIC_",
+      "expected": "Кандидат объясняет: NEXT_PUBLIC_ встраиваются в бандл при next build через DefinePlugin; смена значения без rebuild не обновит клиент; server-only vars читаются в runtime.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевой нюанс junior+ — build vs runtime",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "next build",
+              "rebuild",
+              "build time"
+            ],
+            "ask": "почему изменение NEXT_PUBLIC_ в .env.production не видно после next dev без rebuild"
+          }
+        ],
+        "mustConcepts": [
+          "next build",
+          "build time",
+          "время сборки",
+          "DefinePlugin",
+          "webpack",
+          "inline",
+          "встраив",
+          "литерал",
+          "rebuild",
+          "пересбор",
+          "runtime",
+          "рантайм",
+          "next dev",
+          "старое значение",
+          "ISR",
+          "revalidation",
+          "server-only runtime"
+        ],
+        "falseClaims": [
+          "NEXT_PUBLIC_ обновляются в runtime без rebuild",
+          "изменение .env.local сразу меняет клиентский бандл в production",
+          "server-only переменные тоже inline в бандл",
+          "next dev всегда подхватывает новое NEXT_PUBLIC_ без перезапуска сборки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "env_files_priority",
+      "title": "Знает порядок .env файлов",
+      "expected": "Кандидат называет порядок: .env.local > .env.[mode] > .env; .env.local git-ignored для локальных секретов; .env.example для команды.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовая конвенция файлов из ITLead TL;DR",
+        "mustConcepts": [
+          ".env.local",
+          ".env.development",
+          ".env.production",
+          ".env.test",
+          ".env",
+          "приоритет",
+          "override",
+          "перекры",
+          "git-ignored",
+          "gitignore",
+          "локальн",
+          "секрет",
+          ".env.example",
+          "mode",
+          "development",
+          "production"
+        ],
+        "falseClaims": [
+          ".env всегда перекрывает .env.local",
+          ".env.local нужно коммитить в git",
+          "порядок файлов не важен — последний импорт wins всегда",
+          ".env.production используется в next dev"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "define_plugin_dynamic",
+      "title": "Понимает статическую подстановку DefinePlugin",
+      "expected": "Кандидат объясняет: process.env.NEXT_PUBLIC_X работает; process.env[key] на клиенте undefined — DefinePlugin заменяет только литеральные обращения.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "частая production-ошибка из ITLead Common mistakes",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "process.env[",
+              "динамич",
+              "undefined"
+            ],
+            "ask": "почему process.env[variableName] возвращает undefined для NEXT_PUBLIC_ на клиенте"
+          }
+        ],
+        "mustConcepts": [
+          "DefinePlugin",
+          "webpack",
+          "литерал",
+          "literal",
+          "статическ",
+          "подстанов",
+          "process.env.NEXT_PUBLIC",
+          "process.env[",
+          "динамич",
+          "undefined",
+          "property access",
+          "обращени",
+          "ключ",
+          "variableName",
+          "прямое",
+          "браузер"
+        ],
+        "falseClaims": [
+          "process.env[key] работает для NEXT_PUBLIC_ на клиенте",
+          "DefinePlugin подставляет runtime lookup",
+          "можно собрать имя переменной динамически и прочитать NEXT_PUBLIC_",
+          "Object.keys(process.env) даёт все NEXT_PUBLIC_ в браузере"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с env",
+      "expected": "Кандидат называет: серверная переменная в use client; коммит .env.local; ожидание rebuild-free update NEXT_PUBLIC_; передача raw secret в props; fix — Server Component + props с данными.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — практические ловушки",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "use client",
+              "secret",
+              "props"
+            ],
+            "ask": "как правильно использовать STRIPE_SECRET_KEY с Client Component checkout"
+          },
+          {
+            "match": [
+              ".env.local",
+              "git",
+              "commit"
+            ],
+            "ask": "куда класть production secrets вместо коммита .env.local"
+          }
+        ],
+        "mustConcepts": [
+          "use client",
+          "секрет",
+          "secret",
+          "props",
+          "пропс",
+          "Server Component",
+          "Server Action",
+          ".env.local",
+          "git",
+          "коммит",
+          "Vercel dashboard",
+          "GitHub Actions",
+          "secrets",
+          "rebuild",
+          "STRIPE_SECRET_KEY",
+          "publishable",
+          "не передавать секрет"
+        ],
+        "falseClaims": [
+          "можно передать DATABASE_URL как prop в Client Component",
+          ".env.local безопасно коммитить если репозиторий private",
+          "NEXT_PUBLIC_ меняется на лету в production без deploy",
+          "читать JWT_SECRET в use client — нормальный паттерн"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use_which",
+      "title": "Понимает когда какой тип переменной",
+      "expected": "Кандидат называет: DB URL, API keys, JWT — без префикса; analytics, public endpoints, Stripe publishable — NEXT_PUBLIC_; локальные значения — .env.local; Vercel dashboard для deploy-specific server vars.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "when to use which — практический выбор из ITLead",
+        "mustConcepts": [
+          "DATABASE_URL",
+          "API key",
+          "JWT",
+          "секрет",
+          "analytics",
+          "GA_ID",
+          "Stripe",
+          "publishable",
+          "Clerk",
+          "Supabase",
+          "публичн endpoint",
+          "без префикса",
+          "NEXT_PUBLIC_",
+          "Vercel dashboard",
+          "deploy",
+          ".env.local",
+          "локальн тест"
+        ],
+        "falseClaims": [
+          "Stripe secret key должен быть NEXT_PUBLIC_",
+          "Google Analytics ID нужно хранить без префикса",
+          "все API keys можно делать NEXT_PUBLIC_",
+          "DB connection string безопасно с NEXT_PUBLIC_"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Без префикса — server-only: DATABASE_URL в Client Component undefined. NEXT_PUBLIC_API_URL встраивается при next build. Server Component видит обе. Секрет читаю на сервере, клиенту передаю только данные через props.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Stripe: STRIPE_SECRET_KEY на сервере в Server Component, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY для клиентского SDK. .env.local для локальных секретов, .env.example в git. Порядок: .env.local > .env.development > .env.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "NEXT_PUBLIC_ — только process.env.NEXT_PUBLIC_X литерально, не process.env[key]. После смены публичной переменной нужен rebuild. Server-only vars в ISR читаются в runtime при revalidation.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Все переменные из .env доступны в браузере через process.env. NEXT_PUBLIC_ обновляется в runtime без rebuild. Можно динамически: const k = 'NEXT_PUBLIC_API_URL'; process.env[k].",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "JWT_SECRET читаю в use client компоненте и передаю в fetch — так проще. .env.local коммичу в monorepo, репозиторий же private.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "DATABASE_URL делаю NEXT_PUBLIC_DATABASE_URL чтобы Client Component мог подключиться к Postgres напрямую. .env всегда важнее .env.local.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "server_client_split",
+      "exampleType": "good",
+      "exampleText": "Server Component: process.env.DATABASE_URL и NEXT_PUBLIC_API_URL оба работают. Client Component: только NEXT_PUBLIC_, DATABASE_URL — undefined.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "server_client_split",
+      "exampleType": "good",
+      "exampleText": "ну без NEXT_PUBLIC_ в браузере undefined, dotenv только на сервере, в бандл не попадает",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "server_client_split",
+      "exampleType": "bad",
+      "exampleText": "NEXT_PUBLIC_ скрывает переменную от клиента, а без префикса она доступна в window.process.env.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "build_time_inlining",
+      "exampleType": "good",
+      "exampleText": "DefinePlugin подставляет NEXT_PUBLIC_API_URL литералом при next build — сменил .env.production, без rebuild в браузере старое значение.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "build_time_inlining",
+      "exampleType": "good",
+      "exampleText": "публичные — build time, server-only API_KEY в ISR page читается в runtime при каждой revalidation",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "build_time_inlining",
+      "exampleType": "bad",
+      "exampleText": "NEXT_PUBLIC_ vars hot-reload в production после правки Vercel env без нового deploy.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "env_files_priority",
+      "exampleType": "good",
+      "exampleText": "Приоритет: .env.local перекрывает .env.development и .env. Локальные секреты — только .env.local, в git — .env.example с плейсхолдерами.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "env_files_priority",
+      "exampleType": "good",
+      "exampleText": ".env.local gitignored, для прода — Vercel dashboard или CI secrets",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "env_files_priority",
+      "exampleType": "bad",
+      "exampleText": ".env всегда побеждает .env.local, поэтому секреты кладу в корневой .env и коммичу.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "define_plugin_dynamic",
+      "exampleType": "good",
+      "exampleText": "Работает: const url = process.env.NEXT_PUBLIC_API_URL. Не работает на клиенте: const key = 'NEXT_PUBLIC_API_URL'; process.env[key] — undefined.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "define_plugin_dynamic",
+      "exampleType": "good",
+      "exampleText": "webpack заменяет только literal process.env.NEXT_PUBLIC_*, динамический доступ — undefined",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "define_plugin_dynamic",
+      "exampleType": "bad",
+      "exampleText": "Можно loop по ['NEXT_PUBLIC_A','NEXT_PUBLIC_B'] и читать process.env[name] — DefinePlugin подставит runtime.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Checkout: stripe secret в Server Component, publishableKey prop в Client — raw secret не покидает сервер.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "не читаю DATABASE_URL в use client; production secrets в Vercel dashboard, не в git",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "const secret = process.env.STRIPE_SECRET_KEY в CheckoutButton с use client — норм, Next.js сам зашифрует в бандле.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "when_to_use_which",
+      "exampleType": "good",
+      "exampleText": "DB URL и JWT — без префикса server-only. NEXT_PUBLIC_GA_ID и publishable Stripe key — для браузера. Локально — .env.local.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "when_to_use_which",
+      "exampleType": "good",
+      "exampleText": "Supabase service key в Server Action, NEXT_PUBLIC_SUPABASE_URL для client SDK",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "when_to_use_which",
+      "exampleType": "bad",
+      "exampleText": "Все ключи делаю NEXT_PUBLIC_ — так проще импортировать в Client Components без props.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "environment-variables-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/environment-variables-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/environment-variables-in-nextjs",
+    "difficulty": "JUNIOR",
+    "titleEn": "Environment variables in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

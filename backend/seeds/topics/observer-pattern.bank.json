@@ -1,0 +1,590 @@
+{
+  "topic": {
+    "code": "observer_pattern",
+    "name": "Паттерн Observer (Наблюдатель)",
+    "skillCode": "patterns",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое паттерн Observer (Наблюдатель) и как он работает?",
+    "shortAnswer": "Observer — поведенческий паттерн, где subject хранит список observers и автоматически уведомляет их при изменении своего состояния. Ключевой механизм: subscribe(), notify(), unsubscribe(). Subject не импортирует observers напрямую — слабая связанность и возможность добавлять слушателей в runtime.",
+    "idealAnswer": "Observer (Наблюдатель) — поведенческий паттерн проектирования: объект-subject ведёт список подписчиков-observers и при изменении состояния рассылает им уведомления. Аналогия — YouTube-канал: подписчики получают push о новых видео, канал не знает их email напрямую. Ядро API: subscribe() добавляет observer, unsubscribe() удаляет, notify(data) итерирует массив и вызывает update() у каждого. Subject не знает типы и количество слушателей — это loose coupling: вместо прямых вызовов logger.log() в сервисе subject broadcast'ит событие, а observers подключаются динамически. Когда использовать: один объект меняется — много реагируют (login → UI, cache, analytics); число слушателей меняется в runtime (plugins, dashboards); слабая синхронизация модулей (MVC view наблюдает model, Redux store → компоненты). Не нужен, если хватает одного простого callback или слушатель всегда ровно один и не меняется. В JavaScript notify() по умолчанию синхронно итерирует массив observers; Node.js EventEmitter строится на той же идее, async work через libuv; React useEffect — observer на deps array, cleanup = unsubscribe, эффект после commit render. Типичные ошибки: (1) забытый unsubscribe → memory leak, observer остаётся в массиве subject, GC не собирает; в React — return cleanup из useEffect; в Node — off()/once(). (2) Синхронный notify в рекурсивных цепочках → stack overflow, если update() снова вызывает notify(); fix — setImmediate/async scheduling. (3) Передача mutable объектов — два observer мутируют одну ссылку; fix — snapshot/копия. (4) Нет try/catch в notify — один observer бросает ошибку, остальные не получают уведомление. Реальный мир: React useEffect, Node EventEmitter (req.on('data')), Redux store.subscribe(), RxJS Observable.subscribe(), Vue computed. Observer vs Pub-Sub: Observer держит прямые ссылки subject→observers; Pub-Sub добавляет broker и topics — publisher не знает подписчиков (Redis pub-sub, MQTT); Observer для in-process sync, Pub-Sub для distributed. Реализация без классов — closures: createSubject с массивом функций и тем же контрактом subscribe/unsubscribe/notify.",
+    "maxScore": 10,
+    "skills": [
+      "patterns",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "observer_definition",
+      "title": "Понимает суть паттерна Observer",
+      "expected": "Кандидат объясняет: subject хранит observers, при изменении состояния вызывает notify(); observers получают update(); subject не знает типы слушателей.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — subject, observer, notify",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "observer_definition",
+            "oftenConfusedWith": [
+              "core_api",
+              "observer_vs_pubsub"
+            ],
+            "anchorTermsExpected": [
+              "subject",
+              "observer",
+              "notify",
+              "subscribe",
+              "состоян",
+              "уведомл",
+              "update"
+            ],
+            "anchorTermsWrongTopic": [
+              "broker",
+              "topic",
+              "Pub-Sub это то же самое без различий"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "subject",
+              "observer",
+              "notify"
+            ],
+            "ask": "кто такой subject и observer и что происходит при изменении состояния"
+          }
+        ],
+        "mustConcepts": [
+          "Observer",
+          "Наблюдатель",
+          "subject",
+          "субъект",
+          "observer",
+          "наблюдат",
+          "notify",
+          "уведомл",
+          "update",
+          "состоян",
+          "изменен",
+          "подпис",
+          "список",
+          "observers",
+          "поведенческ",
+          "паттерн"
+        ],
+        "falseClaims": [
+          "subject напрямую импортирует каждый observer по типу",
+          "observer сам опрашивает subject в цикле polling",
+          "notify вызывается observers, а не subject",
+          "паттерн требует только классы, без функций нельзя"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "loose_coupling",
+      "title": "Понимает слабую связанность",
+      "expected": "Кандидат сравнивает прямые вызовы logger.log() с Observer: subject не знает слушателей, observers добавляются/удаляются в runtime без изменения subject.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Key difference из ITLead — loose coupling vs hard-wiring",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "observer_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "loose coupling",
+              "слаб",
+              "связан"
+            ],
+            "ask": "чем Observer лучше прямых вызовов logger.log() в сервисе"
+          }
+        ],
+        "mustConcepts": [
+          "loose coupling",
+          "слабая связан",
+          "слаб связ",
+          "прямой вызов",
+          "hard-wir",
+          "runtime",
+          "динамич",
+          "добав",
+          "удал",
+          "не знает тип",
+          "не знает колич",
+          "broadcast",
+          "рассыла",
+          "инверс",
+          "зависим"
+        ],
+        "falseClaims": [
+          "Observer жёстко связывает subject с конкретными классами observers",
+          "нельзя добавить observer без правки кода subject",
+          "loose coupling означает отсутствие связи между модулями вообще",
+          "прямые вызовы методов дают такую же гибкость как Observer"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "core_api",
+      "title": "Знает subscribe, notify, unsubscribe",
+      "expected": "Кандидат описывает контракт: subscribe добавляет в массив, unsubscribe удаляет, notify итерирует и вызывает update(); может привести минимальный пример на closures.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый механизм из quick example ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "subscribe",
+              "unsubscribe",
+              "notify"
+            ],
+            "ask": "что делает каждый метод subscribe, unsubscribe, notify"
+          }
+        ],
+        "mustConcepts": [
+          "subscribe",
+          "unsubscribe",
+          "notify",
+          "attach",
+          "detach",
+          "update",
+          "массив",
+          "observers",
+          "push",
+          "filter",
+          "forEach",
+          "closure",
+          "замыкан",
+          "createSubject"
+        ],
+        "falseClaims": [
+          "unsubscribe не нужен — GC сам уберёт observer из массива subject",
+          "notify асинхронный по умолчанию во всех реализациях",
+          "subscribe возвращает данные observer, а не регистрирует его"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда применять Observer",
+      "expected": "Кандидат называет: один объект меняется — много реагируют; число слушателей меняется; MVC/Redux sync; пропускает паттерн при одном простом callback.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use / skip из ITLead",
+        "mustConcepts": [
+          "один меня",
+          "много реаг",
+          "runtime",
+          "plugins",
+          "dashboard",
+          "MVC",
+          "model",
+          "view",
+          "Redux",
+          "store",
+          "callback",
+          "один слушат",
+          "login",
+          "UI",
+          "analytics",
+          "cache"
+        ],
+        "falseClaims": [
+          "Observer нужен всегда, даже для одного неизменного callback",
+          "Observer подходит только для UI, не для backend",
+          "если слушателей два — лучше два прямых вызова без паттерна всегда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "memory_leaks_unsubscribe",
+      "title": "Знает про unsubscribe и утечки памяти",
+      "expected": "Кандидат объясняет: забытый unsubscribe держит observer в массиве subject, GC не собирает; React cleanup из useEffect; Node off()/once(); EventEmitter на busy server.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistake #1 — production memory leaks",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_pitfalls",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "unsubscribe",
+              "memory leak",
+              "утечк",
+              "cleanup"
+            ],
+            "ask": "почему забытый unsubscribe вызывает memory leak и как чистить в React/Node"
+          },
+          {
+            "match": [
+              "useEffect",
+              "return",
+              "off",
+              "once"
+            ],
+            "ask": "как cleanup в useEffect и emitter.off/once связаны с unsubscribe"
+          }
+        ],
+        "mustConcepts": [
+          "unsubscribe",
+          "отписк",
+          "memory leak",
+          "утечк",
+          "памят",
+          "GC",
+          "сборщик",
+          "cleanup",
+          "useEffect",
+          "return cleanup",
+          "EventEmitter",
+          "off",
+          "once",
+          "removeListener",
+          "массив subject",
+          "долгожив",
+          "сервер"
+        ],
+        "falseClaims": [
+          "observer автоматически удаляется из subject при unmount без cleanup",
+          "memory leak от Observer возможен только в браузере, не в Node",
+          "once() не удаляет listener после первого события",
+          "unsubscribe не нужен если observer — стрелочная функция"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_pitfalls",
+      "title": "Знает типичные ошибки notify",
+      "expected": "Кандидат называет: рекурсивный sync notify → stack overflow (fix setImmediate); mutable shared state (fix snapshot); отсутствие try/catch — один observer ломает broadcast.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes #2–4 из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "рекурс",
+              "stack overflow",
+              "setImmediate"
+            ],
+            "ask": "как sync notify в цепочке update→notify вызывает stack overflow и как разорвать"
+          },
+          {
+            "match": [
+              "mutable",
+              "snapshot",
+              "копия",
+              "ссылк"
+            ],
+            "ask": "почему передача одного mutable объекта всем observers опасна"
+          },
+          {
+            "match": [
+              "try",
+              "catch",
+              "ошибк",
+              "throw"
+            ],
+            "ask": "что если один observer бросает ошибку в notify без try/catch"
+          }
+        ],
+        "mustConcepts": [
+          "рекурс",
+          "stack overflow",
+          "переполнен",
+          "setImmediate",
+          "async",
+          "синхрон",
+          "mutable",
+          "мутаб",
+          "snapshot",
+          "снимок",
+          "копия",
+          "spread",
+          "shared state",
+          "общий",
+          "try",
+          "catch",
+          "ошибк",
+          "broadcast",
+          "forEach"
+        ],
+        "falseClaims": [
+          "ошибка в одном observer не мешает notify остальным без try/catch",
+          "рекурсивный notify безопасен — V8 stack бесконечный",
+          "передача ссылки на один объект observers — рекомендуемый паттерн",
+          "async notify всегда ломает порядок доставки и его нельзя использовать"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "real_world_and_pubsub",
+      "title": "Знает примеры и отличие от Pub-Sub",
+      "expected": "Кандидат упоминает React useEffect, EventEmitter, Redux subscribe, RxJS; отличает Observer (прямые ссылки) от Pub-Sub (broker, topics, Redis/MQTT).",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "real-world usage + follow-up Observer vs Pub-Sub",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Pub-Sub",
+              "PubSub",
+              "broker",
+              "topic"
+            ],
+            "ask": "чем Observer отличается от Pub-Sub и когда что выбирать"
+          }
+        ],
+        "mustConcepts": [
+          "useEffect",
+          "deps",
+          "EventEmitter",
+          "Redux",
+          "subscribe",
+          "store",
+          "RxJS",
+          "Observable",
+          "Vue",
+          "computed",
+          "Pub-Sub",
+          "broker",
+          "topic",
+          "Redis",
+          "MQTT",
+          "in-process",
+          "distributed",
+          "прям",
+          "ссылк"
+        ],
+        "falseClaims": [
+          "Pub-Sub и Observer — одно и то же без архитектурных отличий",
+          "Redux store.subscribe не является Observer",
+          "useEffect не имеет отношения к Observer",
+          "Pub-Sub всегда лучше Observer внутри одного Node-процесса"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Observer — subject хранит массив observers и при изменении состояния вызывает notify(), который дергает update() у каждого. Subject не импортирует Logger напрямую — слабая связанность. Обязательно unsubscribe или cleanup, иначе observer остаётся в памяти.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "При login один notify из UserStore — Navbar и Analytics реагируют сами. В React useEffect с deps — это observer: productId меняется → cleanup старой подписки → новый fetch. В Node EventEmitter возвращаю функцию off из startListening, иначе на тысячах запросов listener'ы копятся.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Observer vs Pub-Sub: у нас subject держит прямые ссылки на observers — для синхронизации внутри процесса. Pub-Sub с broker и topics — для Redis/MQTT между сервисами, publisher не знает подписчиков.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Observer — это когда observer сам в setInterval опрашивает subject. Unsubscribe не нужен, GC всё почистит.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "notify лучше вызывать синхронно из update другого observer — так быстрее. Если один listener упал — остальные и так получат событие без try/catch.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Pub-Sub и Observer одно и то же. useEffect к Observer не относится — это просто side effect после render.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "observer_definition",
+      "exampleType": "good",
+      "exampleText": "Subject — источник событий, observers подписаны через subscribe; при login() subject меняет state и notify() рассылает update всем.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "observer_definition",
+      "exampleType": "good",
+      "exampleText": "ну subject как канал ютуба — подписчики observers, новое видео это notify, они получают push без того чтобы канал знал их email",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "observer_definition",
+      "exampleType": "bad",
+      "exampleText": "Observer — observer сам следит за subject через polling, subject никого не уведомляет.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "loose_coupling",
+      "exampleType": "good",
+      "exampleText": "Вместо service → logger.log() напрямую subject.notify() — добавляю AnalyticsObserver в runtime без правки UserStore.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "loose_coupling",
+      "exampleType": "good",
+      "exampleText": "слабая связь — subject не знает кто слушает, только контракт update(), можно плагины включать/выключать",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "loose_coupling",
+      "exampleType": "bad",
+      "exampleText": "Observer жёстко привязывает subject к NavbarObserver и AnalyticsObserver — без них код не компилируется.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "core_api",
+      "exampleType": "good",
+      "exampleText": "subscribe push в массив, unsubscribe filter, notify forEach с вызовом update(data) — минимальный контракт.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "core_api",
+      "exampleType": "good",
+      "exampleText": "createSubject на closures — ten lines, те же три метода без классов",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "core_api",
+      "exampleType": "bad",
+      "exampleText": "notify добавляет observers, subscribe рассылает события — методы перепутаны.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Login → UI, cache, analytics — один notify. Плагины с разным числом handlers — Observer. Один callback на кнопку — overkill.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "redux view подписаны на store — классический observer; один onClick handler — хватит callback",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Observer обязателен даже когда слушатель один и никогда не меняется — callback запрещён.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "memory_leaks_unsubscribe",
+      "exampleType": "good",
+      "exampleText": "subject.subscribe(obs) без unsubscribe — obs в массиве forever, GC не соберёт. React: return () => unsubscribe в useEffect.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "memory_leaks_unsubscribe",
+      "exampleType": "good",
+      "exampleText": "EventEmitter: startListening возвращает () => dataStream.off('data', handleData); на prod без stop() — сотни MB heap",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "memory_leaks_unsubscribe",
+      "exampleType": "bad",
+      "exampleText": "При unmount React сам удалит observer из subject без return cleanup — unsubscribe не пишу.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_pitfalls",
+      "exampleType": "good",
+      "exampleText": "update() внутри notify снова notify() — stack overflow; fix setImmediate(() => forEach). Mutable usersArray всем — snapshot [...usersArray]. try/catch на каждого observer.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_pitfalls",
+      "exampleType": "good",
+      "exampleText": "один observer throw — без try/catch остальные не получат notify; в prod pipeline это уже падало",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_pitfalls",
+      "exampleType": "bad",
+      "exampleText": "Передаю один mutable объект всем observers — они его мутируют, так и задумано. Рекурсивный sync notify безопасен.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "real_world_and_pubsub",
+      "exampleType": "good",
+      "exampleText": "React useEffect deps + cleanup; Node req.on('data'); Redux store.subscribe(); RxJS Subscription.unsubscribe(). Pub-Sub — broker между publisher и subscriber, Redis topics.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "real_world_and_pubsub",
+      "exampleType": "good",
+      "exampleText": "observer in-process прямые ссылки; pub-sub distributed — mqtt/redis, издатель не знает кто слушает",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "real_world_and_pubsub",
+      "exampleType": "bad",
+      "exampleText": "useEffect не observer. Pub-Sub всегда заменяет Observer в одном Node процессе.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "observer-pattern",
+    "apiUrl": "https://api.itlead.org/api/questions/observer-pattern",
+    "pageUrl": "https://itlead.org/interview-questions/patterns/observer-pattern",
+    "difficulty": "MIDDLE",
+    "titleEn": "Observer pattern",
+    "categorySlug": "patterns",
+    "syncedAt": "2026-06-18T15:00:00.000Z"
+  }
+}

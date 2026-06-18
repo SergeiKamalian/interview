@@ -1,0 +1,623 @@
+{
+  "topic": {
+    "code": "nodejs_libuv_async_io",
+    "name": "libuv и асинхронный I/O в Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое libuv и как он обеспечивает асинхронный ввод-вывод в Node.js?",
+    "shortAnswer": "libuv — кроссплатформенная C-библиотека, которая даёт Node.js event loop, пул потоков и async I/O, оборачивая epoll, kqueue и IOCP в единый API. Сетевой I/O идёт через OS polling без потоков; файловый I/O, DNS, crypto и zlib — через пул потоков (4 по умолчанию). JS-поток не блокируется: libuv регистрирует операции и вызывает callbacks при завершении.",
+    "idealAnswer": "libuv — кроссплатформенная C-библиотека между JS-кодом Node.js и ОС: скрывает различия платформ (epoll на Linux, kqueue на macOS, IOCP на Windows) за единым API. Event loop (uv_run) опрашивает OS handles о завершении I/O без выделения потока на каждый запрос. Блокирующие операции — fs, dns.lookup, crypto.pbkdf2, zlib — уходят в thread pool (4 потока по умолчанию, UV_THREADPOOL_SIZE до старта). Сетевой I/O (TCP/UDP, http, net) использует OS polling напрямую — без thread pool; поэтому Node обслуживает тысячи HTTP-соединений на одном JS-потоке. Стек: Node.js (JS/V8) → C++ bindings → libuv event loop → OS pollers или thread pool. Фазы loop (UV_RUN_DEFAULT): timers (setTimeout/setInterval) → pending callbacks → idle/prepare → poll (блокируется, ждёт I/O) → check (setImmediate) → close callbacks. setImmediate всегда после I/O callbacks той же poll-итерации. Handles — долгоживущие объекты (TCP server, timer, file watcher), держат процесс живым. Requests — одноразовые операции (readFile, DNS lookup), не блокируют exit сам по себе. Типичные ошибки: pbkdf2Sync в HTTP handler блокирует все запросы на JS-потоке; исчерпание thread pool (5-й pbkdf2 ждёт в очереди — p99 растёт); UV_THREADPOOL_SIZE после require crypto/fs/dns — пул уже инициализирован с 4; «зависания» искать в libuv/event loop, а не только в V8/GC. Отладка: process._getActiveHandles(), process._getActiveRequests(), clinic.js/0x. UV_RUN_DEFAULT — до дренажа handles/requests; UV_RUN_ONCE — одна итерация; UV_RUN_NOWAIT — без блокировки в poll (Electron/Deno embedding). Реальность: Express res.sendFile — thread pool + OS polling для TCP; chokidar — file watcher handles; AWS SDK — network I/O без pool; масштабный login с pbkdf2 — поднять UV_THREADPOOL_SIZE.",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "libuv_definition",
+      "title": "Понимает что такое libuv",
+      "expected": "Кандидат объясняет: libuv — C-библиотека с event loop, thread pool и async I/O; кроссплатформенный слой между Node.js и ОС; без libuv неблокирующая модель Node не работает.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — определение libuv и его роль в Node.js",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "libuv_definition",
+            "oftenConfusedWith": [
+              "nodejs_stack",
+              "event_loop_phases"
+            ],
+            "anchorTermsExpected": [
+              "libuv",
+              "event loop",
+              "thread pool",
+              "async I/O",
+              "C-библиотек",
+              "кроссплатформ"
+            ],
+            "anchorTermsWrongTopic": [
+              "libuv это V8",
+              "libuv только для файлов",
+              "event loop это часть JavaScript"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "libuv",
+              "event loop"
+            ],
+            "ask": "что именно libuv даёт Node.js и почему без него не работает async I/O"
+          }
+        ],
+        "mustConcepts": [
+          "libuv",
+          "event loop",
+          "цикл событий",
+          "thread pool",
+          "пул потоков",
+          "async I/O",
+          "асинхронн",
+          "C-библиотек",
+          "кроссплатформ",
+          "epoll",
+          "kqueue",
+          "IOCP",
+          "ОС",
+          "неблокирующ",
+          "uv_run",
+          "единый API"
+        ],
+        "falseClaims": [
+          "libuv — часть V8 или JavaScript runtime",
+          "libuv нужен только для fs.readFile",
+          "Node.js async I/O работает без libuv",
+          "libuv выделяет поток на каждый HTTP-запрос",
+          "event loop — чисто JavaScript-концепция без libuv"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "nodejs_stack",
+      "title": "Знает как libuv встроен в Node.js",
+      "expected": "Кандидат описывает стек: JS/V8 → C++ bindings → libuv (uv_run) → OS pollers или thread pool; fs/net/crypto вызывают libuv под капотом.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовая архитектура из ITLead diagram",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "bindings",
+              "C++",
+              "uv_run"
+            ],
+            "ask": "как вызов fs.readFile доходит до libuv — путь от JS до ОС"
+          }
+        ],
+        "mustConcepts": [
+          "V8",
+          "JavaScript",
+          "C++ bindings",
+          "bindings",
+          "uv_run",
+          "fs",
+          "net",
+          "crypto",
+          "OS poller",
+          "thread pool",
+          "callback",
+          "JS-поток",
+          "не ждёт",
+          "не блокиру"
+        ],
+        "falseClaims": [
+          "fs.readFile выполняется целиком в JavaScript без native code",
+          "libuv вызывается напрямую из JS без bindings",
+          "JS-поток блокируется на каждом readFile до завершения диска"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "thread_pool_vs_polling",
+      "title": "Отличает thread pool и OS polling",
+      "expected": "Кандидат сравнивает: TCP/UDP/timers — OS polling без потоков; fs, dns.lookup, crypto, zlib — thread pool (4 по умолчанию); понимает почему тысячи HTTP-соединений на одном потоке.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевой split — объясняет большинство performance-сюрпризов Node.js",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "libuv_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "thread_pool_vs_polling",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "thread pool",
+              "OS polling",
+              "epoll",
+              "fs.readFile",
+              "http",
+              "TCP",
+              "без потоков"
+            ],
+            "anchorTermsWrongTopic": [
+              "все async операции в thread pool",
+              "сеть всегда через 4 потока libuv"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "thread pool",
+              "polling",
+              "epoll"
+            ],
+            "ask": "почему http.get не использует thread pool, а fs.readFile — использует"
+          },
+          {
+            "match": [
+              "dns.lookup",
+              "dns.resolve",
+              "pbkdf2",
+              "zlib"
+            ],
+            "ask": "какие операции идут в thread pool и какие — через OS polling"
+          }
+        ],
+        "mustConcepts": [
+          "thread pool",
+          "пул потоков",
+          "OS polling",
+          "epoll",
+          "kqueue",
+          "IOCP",
+          "TCP",
+          "UDP",
+          "http.get",
+          "net.connect",
+          "fs.readFile",
+          "fs.writeFile",
+          "crypto.pbkdf2",
+          "dns.lookup",
+          "zlib",
+          "4 поток",
+          "без потоков",
+          "тысячи соединен",
+          "один поток",
+          "dns.resolve"
+        ],
+        "falseClaims": [
+          "все async операции Node.js идут в thread pool",
+          "сетевой I/O всегда использует thread pool",
+          "fs.readFile использует epoll напрямую без потоков",
+          "dns.resolve и dns.lookup оба идут в thread pool",
+          "на каждое HTTP-соединение выделяется отдельный поток"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "event_loop_phases",
+      "title": "Знает фазы event loop libuv",
+      "expected": "Кандидат перечисляет фазы: timers → pending → idle/prepare → poll → check → close; poll блокируется; setImmediate в check после I/O callbacks той же итерации.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "фазы loop — ядро senior-понимания libuv",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "timers",
+              "poll",
+              "check",
+              "setImmediate"
+            ],
+            "ask": "в каком порядке выполняются фазы и где блокируется loop"
+          },
+          {
+            "match": [
+              "setImmediate",
+              "setTimeout",
+              "poll"
+            ],
+            "ask": "setImmediate vs setTimeout(0) — когда что выполнится после I/O"
+          }
+        ],
+        "mustConcepts": [
+          "timers",
+          "setTimeout",
+          "setInterval",
+          "pending callbacks",
+          "idle",
+          "prepare",
+          "poll",
+          "check",
+          "setImmediate",
+          "close callbacks",
+          "блокиру",
+          "ожида",
+          "I/O",
+          "итерац",
+          "UV_RUN_DEFAULT",
+          "фаза",
+          "после I/O"
+        ],
+        "falseClaims": [
+          "setImmediate выполняется до I/O callbacks в poll",
+          "poll phase никогда блокируется",
+          "setTimeout(0) и setImmediate всегда в одной фазе",
+          "close callbacks выполняются перед timers"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "handles_vs_requests",
+      "title": "Различает handles и requests",
+      "expected": "Кандидат объясняет: handles долгоживущие (server, timer, watcher) держат процесс; requests одноразовые (readFile) не держат exit; _getActiveHandles для отладки.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "handles vs requests — отладка hang/early exit",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "handle",
+              "request",
+              "server.close"
+            ],
+            "ask": "почему скрипт с net.createServer не завершается, а readFile — завершается"
+          },
+          {
+            "match": [
+              "_getActiveHandles",
+              "_getActiveRequests"
+            ],
+            "ask": "как найти что держит event loop живым"
+          }
+        ],
+        "mustConcepts": [
+          "handle",
+          "handles",
+          "request",
+          "requests",
+          "долгоживущ",
+          "одноразов",
+          "TCP server",
+          "timer",
+          "file watcher",
+          "readFile",
+          "server.close",
+          "процесс жив",
+          "не заверша",
+          "_getActiveHandles",
+          "_getActiveRequests",
+          "uv_run",
+          "drain"
+        ],
+        "falseClaims": [
+          "readFile handle держит процесс живым как TCP server",
+          "requests и handles — одно и то же в libuv",
+          "закрытие timer не нужно для exit процесса",
+          "process._getActiveHandles не показывает открытые серверы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки libuv/thread pool",
+      "expected": "Кандидат называет: pbkdf2Sync блокирует JS-поток; исчерпание pool (5-й pbkdf2 в очереди); UV_THREADPOOL_SIZE до require; не путать V8 GC с libuv saturation.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "production pitfalls из ITLead Common mistakes",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "thread_pool_vs_polling",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "pbkdf2Sync",
+              "sync",
+              "блокиру"
+            ],
+            "ask": "чем pbkdf2Sync опасен в Express route vs async pbkdf2"
+          },
+          {
+            "match": [
+              "UV_THREADPOOL_SIZE",
+              "4 поток",
+              "очередь"
+            ],
+            "ask": "что происходит когда 5-й concurrent pbkdf2 при pool size 4"
+          },
+          {
+            "match": [
+              "V8",
+              "clinic",
+              "GC"
+            ],
+            "ask": "как отличить блокировку JS-потока от saturation thread pool"
+          }
+        ],
+        "mustConcepts": [
+          "pbkdf2Sync",
+          "sync crypto",
+          "блокиру",
+          "JS-поток",
+          "thread pool exhaustion",
+          "исчерпан",
+          "очередь",
+          "UV_THREADPOOL_SIZE",
+          "до require",
+          "инициализ",
+          "p99",
+          "latency",
+          "clinic.js",
+          "0x",
+          "V8",
+          "GC",
+          "libuv",
+          "setTimeout поздно"
+        ],
+        "falseClaims": [
+          "async pbkdf2 блокирует JS-поток как pbkdf2Sync",
+          "UV_THREADPOOL_SIZE можно менять после require crypto",
+          "4 потока pool — достаточно при любом масштабе login",
+          "зависания API всегда из-за V8 GC, не libuv",
+          "setTimeout для UV_THREADPOOL_SIZE работает нормально"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "uv_run_modes",
+      "title": "Знает режимы UV_RUN",
+      "expected": "Кандидат сравнивает UV_RUN_DEFAULT (до дренажа, блок в poll), UV_RUN_ONCE (одна итерация), UV_RUN_NOWAIT (без блока в poll); Node использует DEFAULT; NOWAIT для embedding.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "senior follow-up — UV_RUN modes, бонусный mention",
+        "mustConcepts": [
+          "UV_RUN_DEFAULT",
+          "UV_RUN_ONCE",
+          "UV_RUN_NOWAIT",
+          "poll",
+          "блокиру",
+          "одна итерац",
+          "active handles",
+          "Electron",
+          "Deno",
+          "embedding",
+          "host loop",
+          "Node использует"
+        ],
+        "falseClaims": [
+          "Node использует UV_RUN_NOWAIT по умолчанию",
+          "UV_RUN_ONCE запускает loop до полного exit",
+          "UV_RUN_DEFAULT никогда блокируется в poll",
+          "все три режима идентичны для Node.js сервера"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "libuv — C-слой между Node и ОС: event loop опрашивает epoll/kqueue/IOCP для сети, fs и crypto уходят в thread pool из 4 потоков. JS-поток не ждёт диск — callback приходит в poll phase. Тысячи HTTP на одном потоке потому что TCP не трогает pool.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На login route pbkdf2 async — в pool, JS свободен. pbkdf2Sync — убийца: все запросы стоят. При 5 concurrent pbkdf2 пятый ждёт в очереди — p99 скачет. UV_THREADPOOL_SIZE=32 в env до node server.js. Зависание — clinic.js, не только GC.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Фазы: timers → pending → poll (ждёт I/O) → check (setImmediate). Handle — net server держит процесс; request — readFile одноразовый. _getActiveHandles() покажет забытий timer. UV_RUN_DEFAULT — Node крутит до дренажа handles.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "libuv — часть V8, каждый HTTP-запрос получает свой поток из pool. fs.readFile и http.get работают одинаково через epoll без потоков.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "pbkdf2Sync в route норм — async и sync одинаково не блокируют. UV_THREADPOOL_SIZE ставлю в setTimeout после require crypto — pool пересоздаётся.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "setImmediate выполняется перед I/O callbacks в poll. readFile держит процесс живым как TCP server. Node использует UV_RUN_NOWAIT чтобы не блокировать poll.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "libuv_definition",
+      "exampleType": "good",
+      "exampleText": "libuv — C-библиотека: event loop, thread pool, async I/O; кроссплатформенный слой epoll/kqueue/IOCP для Node.js.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "libuv_definition",
+      "exampleType": "good",
+      "exampleText": "ну libuv под капотом node — цикл событий и пул потоков, без него неблокирующий io не работает",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "libuv_definition",
+      "exampleType": "bad",
+      "exampleText": "libuv — это JavaScript runtime внутри V8, event loop написан в JS.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "nodejs_stack",
+      "exampleType": "good",
+      "exampleText": "fs.readFile: JS → C++ bindings → libuv uv_run → thread pool → callback в event loop.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "nodejs_stack",
+      "exampleType": "good",
+      "exampleText": "v8 выполняет js, bindings дергают libuv, libuv либо epoll либо pool — js поток не стоит на диске",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "nodejs_stack",
+      "exampleType": "bad",
+      "exampleText": "readFile читается синхронно в JavaScript без native кода и libuv.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "thread_pool_vs_polling",
+      "exampleType": "good",
+      "exampleText": "http.get — epoll/kqueue, потоки не нужны; fs.readFile и pbkdf2 — thread pool 4 потока; dns.lookup в pool, dns.resolve — другой путь.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "thread_pool_vs_polling",
+      "exampleType": "good",
+      "exampleText": "тысячи tcp на одном js потоке потому что сеть через os polling, не через 4 потока libuv",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "thread_pool_vs_polling",
+      "exampleType": "bad",
+      "exampleText": "Все async операции Node включая http и net идут в thread pool из 4 потоков.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "event_loop_phases",
+      "exampleType": "good",
+      "exampleText": "Порядок: timers, pending, idle/prepare, poll (блок), check (setImmediate), close. setImmediate после I/O той же итерации.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "event_loop_phases",
+      "exampleType": "good",
+      "exampleText": "poll ждёт os, setimmediate в check — всегда после io callbacks из poll",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "event_loop_phases",
+      "exampleType": "bad",
+      "exampleText": "setImmediate выполняется в timers phase до poll. Poll никогда не блокируется.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "handles_vs_requests",
+      "exampleType": "good",
+      "exampleText": "net.createServer — handle, живёт до server.close(); readFile — request, не держит exit. _getActiveHandles() для hang debug.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "handles_vs_requests",
+      "exampleType": "good",
+      "exampleText": "забытый setInterval — handle в loop, файл прочитался — request ушёл, процесс не выйдет пока timer жив",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "handles_vs_requests",
+      "exampleType": "bad",
+      "exampleText": "readFile handle блокирует exit так же как открытый TCP server.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "pbkdf2Sync в /login — JS frozen 300ms, все запросы в очередь. Async pbkdf2 — pool, JS свободен. 5-й concurrent при pool=4 ждёт в очереди.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "UV_THREADPOOL_SIZE в самом начале entry до require fs/crypto — pool 32. setTimeout поздно — уже 4 потока.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Медленный API — всегда V8 GC, libuv и thread pool не влияют на latency.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "uv_run_modes",
+      "exampleType": "good",
+      "exampleText": "UV_RUN_DEFAULT — Node до дренажа handles, блок в poll. UV_RUN_NOWAIT — одна итерация без блока, для Electron embedding.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "uv_run_modes",
+      "exampleType": "good",
+      "exampleText": "default крутит пока есть handles, once — одна итерация, nowait — не стопорит host loop",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "uv_run_modes",
+      "exampleType": "bad",
+      "exampleText": "Node сервер использует UV_RUN_NOWAIT чтобы не ждать I/O в poll.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-libuv-async-io",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-libuv-async-io",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-libuv-async-io",
+    "difficulty": "SENIOR",
+    "titleEn": "What is libuv and how does it enable async i/o in Node.js?",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

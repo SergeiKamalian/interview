@@ -1,0 +1,567 @@
+{
+  "topic": {
+    "code": "event_loop_deep_dive_microtasks_vs_macrotasks_interviews",
+    "name": "Event Loop: микрозадачи vs макрозадачи",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работает Event Loop в JavaScript и чем отличаются микрозадачи от макрозадач?",
+    "shortAnswer": "Event Loop — однопоточный планировщик: сначала весь синхронный код, затем полностью вычищается очередь микрозадач (Promise, queueMicrotask), опционально рендер, потом одна макрозадача (setTimeout, I/O), и цикл повторяется. Микрозадачи всегда выполняются до следующей macrotask, включая setTimeout(..., 0).",
+    "idealAnswer": "Event Loop — бесконечный цикл однопоточного JavaScript: синхронный код выполняется до опустошения call stack, затем полностью дренируется очередь microtasks (Promise.then/catch/finally, queueMicrotask, MutationObserver), браузер проверяет необходимость repaint, затем берётся ровно одна macrotask (setTimeout/setInterval, I/O, DOM events, fetch callbacks в браузере), и цикл повторяется. Ключевое отличие: microtasks вычищаются целиком за цикл — если microtask ставит следующую microtask, она тоже выполнится до рендера и macrotask; macrotasks — по одной за цикл, между ними браузер может отрисовать кадр. Классический порядок: sync → microtasks → macrotask. Пример: console.log(1,4), Promise.then → 3, setTimeout(0) → 2. Microtasks: state updates до следующего paint (React/Vue batching), DOM measurements, validation в том же render. Macrotasks: таймеры, I/O, user events — всё, что может подождать кадр. Типичные ошибки: думать, что setTimeout(0) выполнится сразу после sync (ждёт drain microtasks); рекурсивные Promise.then блокируют UI (starvation); await Promise.resolve() в цикле не yield'ит браузеру — это microtask; await new Promise(r => setTimeout(r,0)) — macrotask, рендер возможен. MutationObserver — microtask: 1000 DOM-мутаций = 1000 callbacks до paint. async/await — синтаксис над Promise: код после await ставится в microtask queue. queueMicrotask() и Promise.resolve().then() — одна очередь; queueMicrotask дешевле без объекта Promise. React батчит setState через Promise.then — один re-render на handler. При starvation больших обновлений: setTimeout(...,0) между батчами, React 18 startTransition, requestIdleCallback/requestAnimationFrame для привязки к paint. Node.js v11+ совпадает с браузером; в Node v10 и раньше таймеры могли опережать microtasks в некоторых фазах.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "event_loop_overview",
+      "title": "Понимает цикл Event Loop",
+      "expected": "Кандидат описывает порядок: синхронный код → drain microtasks → проверка рендера → одна macrotask → повтор; однопоточность, call stack опустошается первым.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — порядок фаз цикла",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "event loop",
+              "цикл",
+              "call stack"
+            ],
+            "ask": "опиши полный цикл Event Loop от sync-кода до следующей macrotask"
+          }
+        ],
+        "mustConcepts": [
+          "event loop",
+          "цикл событий",
+          "синхронн",
+          "call stack",
+          "стек",
+          "microtask",
+          "микрозадач",
+          "macrotask",
+          "макрозадач",
+          "рендер",
+          "repaint",
+          "однопоточ",
+          "single-thread",
+          "drain",
+          "вычищ",
+          "очеред"
+        ],
+        "falseClaims": [
+          "Event Loop выполняет microtasks и macrotasks параллельно",
+          "macrotask выполняется до microtasks",
+          "синхронный код может прерываться microtask посередине",
+          "Event Loop — это отдельный поток браузера"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "microtask_macrotask_difference",
+      "title": "Отличает microtasks от macrotasks",
+      "expected": "Кандидат объясняет: microtasks дренируются полностью за цикл (включая вложенные); macrotasks — по одной; microtasks блокируют рендер при накоплении; между macrotasks браузер может paint.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевое отличие очередей — центр темы",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "event_loop_overview",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "microtask_macrotask_difference",
+            "oftenConfusedWith": [
+              "execution_order",
+              "when_to_use_queues"
+            ],
+            "anchorTermsExpected": [
+              "drain",
+              "полностью",
+              "одна macrotask",
+              "блокирует рендер",
+              "Promise",
+              "setTimeout"
+            ],
+            "anchorTermsWrongTopic": [
+              "Web Workers параллельно",
+              "fetch всегда microtask"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "100",
+              "цепоч",
+              "Promise",
+              "freeze"
+            ],
+            "ask": "почему сотня chained Promises может заморозить UI, а setTimeout loop — нет"
+          },
+          {
+            "match": [
+              "microtask",
+              "macrotask",
+              "очеред"
+            ],
+            "ask": "что происходит если microtask ставит в очередь ещё одну microtask"
+          }
+        ],
+        "mustConcepts": [
+          "microtask",
+          "macrotask",
+          "микрозадач",
+          "макрозадач",
+          "drain",
+          "полностью",
+          "одна за цикл",
+          "блокирует рендер",
+          "render",
+          "paint",
+          "Promise.then",
+          "setTimeout",
+          "queueMicrotask",
+          "MutationObserver",
+          "DOM events",
+          "fetch",
+          "вложенн",
+          "starvation"
+        ],
+        "falseClaims": [
+          "macrotasks дренируются полностью как microtasks",
+          "microtasks выполняются по одной за цикл",
+          "setTimeout никогда не блокирует рендер",
+          "microtasks не могут блокировать UI",
+          "fetch callback всегда microtask в браузере"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "execution_order",
+      "title": "Знает порядок выполнения sync/micro/macrotask",
+      "expected": "Кандидат предсказывает вывод классического примера: sync (1,4) → microtask (3) → macrotask (2); chained .then() до setTimeout(0).",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый quick example из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "console.log",
+              "setTimeout",
+              "Promise"
+            ],
+            "ask": "какой порядок вывода: sync, setTimeout(0), Promise.then — и почему"
+          }
+        ],
+        "mustConcepts": [
+          "sync",
+          "синхрон",
+          "setTimeout",
+          "Promise.then",
+          "порядок",
+          "1 4 3 2",
+          "start end promise timeout",
+          "цепоч",
+          "chained",
+          "0ms",
+          "macrotask после",
+          "microtask перед"
+        ],
+        "falseClaims": [
+          "setTimeout(0) выполняется сразу после sync до Promise",
+          "Promise.then и setTimeout(0) выполняются в порядке регистрации без учёта очередей",
+          "microtasks выполняются между каждыми двумя console.log"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use_queues",
+      "title": "Понимает когда microtask vs macrotask",
+      "expected": "Кандидат называет: microtasks — state до paint, DOM read, validation; macrotasks — таймеры, I/O, user events; правило «до paint — micro, можно кадр — macro».",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use таблица ITLead",
+        "mustConcepts": [
+          "state",
+          "состоян",
+          "DOM read",
+          "измерен",
+          "validation",
+          "таймер",
+          "I/O",
+          "click",
+          "scroll",
+          "user event",
+          "до paint",
+          "кадр",
+          "yield",
+          "React batching",
+          "Vue"
+        ],
+        "falseClaims": [
+          "все async операции нужно ставить в microtask",
+          "user click handlers выполняются как microtasks",
+          "DOM measurements всегда через setTimeout",
+          "microtasks и macrotasks взаимозаменяемы без последствий"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки Event Loop",
+      "expected": "Кандидат называет: setTimeout(0) не «сразу»; рекурсивные microtasks starve UI; await Promise.resolve в цикле не yield; MutationObserver batch; Node v10 vs v11.",
+      "score": 2.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "5 типичных mistakes из ITLead — production gotchas",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "starvation_and_yielding",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "setTimeout(0)",
+              "сразу",
+              "queueMicrotask"
+            ],
+            "ask": "чем заменить setTimeout(0) если нужно выполнить сразу после текущего скрипта"
+          },
+          {
+            "match": [
+              "await",
+              "цикл",
+              "Promise.resolve"
+            ],
+            "ask": "почему await Promise.resolve() в for-loop не даёт браузеру отрисовать кадр"
+          },
+          {
+            "match": [
+              "MutationObserver",
+              "1000",
+              "textContent"
+            ],
+            "ask": "почему 1000 DOM-мутаций в цикле блокируют paint до конца microtask queue"
+          }
+        ],
+        "mustConcepts": [
+          "setTimeout(0)",
+          "не сразу",
+          "queueMicrotask",
+          "рекурсив",
+          "starve",
+          "starvation",
+          "await",
+          "Promise.resolve",
+          "цикл",
+          "yield",
+          "MutationObserver",
+          "batch",
+          "Node v10",
+          "Node v11",
+          "microtask перед timer"
+        ],
+        "falseClaims": [
+          "setTimeout(..., 0) выполняется до drain microtasks",
+          "await в цикле всегда yield'ит браузеру",
+          "рекурсивный Promise.then не блокирует рендер",
+          "Node.js и браузер всегда совпадали по порядку очередей",
+          "MutationObserver выполняется как macrotask"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "async_await_microtasks",
+      "title": "Понимает async/await и microtask queue",
+      "expected": "Кандидат объясняет: await — синтаксис над Promise; код после await в microtask queue; queueMicrotask vs Promise.then — одна очередь, queueMicrotask без объекта Promise.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up Q async/await и queueMicrotask из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "async",
+              "await",
+              "microtask"
+            ],
+            "ask": "куда попадает код после await — microtask или macrotask queue"
+          },
+          {
+            "match": [
+              "queueMicrotask",
+              "Promise.resolve().then"
+            ],
+            "ask": "чем queueMicrotask отличается от Promise.resolve().then()"
+          }
+        ],
+        "mustConcepts": [
+          "async",
+          "await",
+          "Promise",
+          "microtask queue",
+          "микрочеред",
+          "queueMicrotask",
+          "then",
+          "синтаксис",
+          "пауза",
+          "возобнов",
+          "дешевле",
+          "chaining",
+          "без объекта Promise"
+        ],
+        "falseClaims": [
+          "await ставит продолжение функции в macrotask queue",
+          "queueMicrotask и Promise.then — разные очереди",
+          "async/await не связан с Promises",
+          "await всегда ждёт macrotask"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "starvation_and_yielding",
+      "title": "Знает starvation и способы yield",
+      "expected": "Кандидат описывает fix starvation: setTimeout между батчами; React batching через Promise.then; startTransition; requestIdleCallback / requestAnimationFrame для paint cycle.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "senior follow-up и real-world React/Vue из ITLead",
+        "mustConcepts": [
+          "starvation",
+          "starve",
+          "setTimeout yield",
+          "startTransition",
+          "React 18",
+          "requestIdleCallback",
+          "requestAnimationFrame",
+          "rAF",
+          "батч",
+          "setState",
+          "Promise.then",
+          "кадр",
+          "отзывчив",
+          "freeze",
+          "замороз"
+        ],
+        "falseClaims": [
+          "startTransition выполняет work синхронно без yield",
+          "setTimeout yield всегда хуже чем microtask chain",
+          "React setState каждый раз вызывает отдельный sync render без batching",
+          "requestAnimationFrame — это microtask queue"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Event Loop: sync до конца call stack, потом все microtasks (Promise, queueMicrotask), потом одна macrotask. setTimeout(0) — macrotask, поэтому после Promise.then. Рекурсивный Promise.then starve'ит UI — между итерациями нужен setTimeout(0).",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В handler два setState — React через Promise.then батчит в одну microtask, один re-render. Большой список обновляю через startTransition или setTimeout между чанками, чтобы браузер успел paint. await Promise.resolve в цикле не yield — только await new Promise(r => setTimeout(r, 0)).",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "console.log 1,4 sync; then 3 microtask; setTimeout 2 macro. Microtasks дренируются целиком — chained then до timeout. DOM read до paint — queueMicrotask; таймер или I/O — macrotask.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "setTimeout(0) выполняется сразу после sync, раньше Promise. Event Loop берёт по одной microtask и одной macrotask попеременно.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "await в for-loop всегда отдаёт управление браузеру для рендера. Рекурсивный Promise.then не мешает paint — microtasks не блокируют UI.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "queueMicrotask и Promise.then — разные очереди. Код после await попадает в macrotask queue как setTimeout.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "event_loop_overview",
+      "exampleType": "good",
+      "exampleText": "Однопоточный JS: sync → drain microtasks → check render → одна macrotask → снова.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "event_loop_overview",
+      "exampleType": "good",
+      "exampleText": "ну цикл: стек опустел, все микрозадачи, потом может paint, потом одна макро и по кругу",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "event_loop_overview",
+      "exampleType": "bad",
+      "exampleText": "Event Loop — это worker thread который параллельно выполняет Promises.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "microtask_macrotask_difference",
+      "exampleType": "good",
+      "exampleText": "Microtasks вычищаются полностью за цикл; macrotask — одна. Сотня then подряд freeze UI; setTimeout loop — paint между шагами.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "microtask_macrotask_difference",
+      "exampleType": "good",
+      "exampleText": "микрозадача может поставить ещё микрозадачу — обе в том же цикле до макро",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "microtask_macrotask_difference",
+      "exampleType": "bad",
+      "exampleText": "Macrotasks дренируются целиком как microtasks; между каждым then браузер рисует кадр.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "execution_order",
+      "exampleType": "good",
+      "exampleText": "1, 4 sync; 3 microtask; 2 setTimeout macro — даже с delay 0.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "execution_order",
+      "exampleType": "good",
+      "exampleText": "start, end, promise 1, promise 2, timeout — вся цепочка then до timeout",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "execution_order",
+      "exampleType": "bad",
+      "exampleText": "setTimeout(0) между start и end потому что зарегистрировался раньше Promise.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use_queues",
+      "exampleType": "good",
+      "exampleText": "State и DOM read до paint — microtask; таймер, fetch, click — macrotask, можно подождать кадр.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use_queues",
+      "exampleType": "good",
+      "exampleText": "react batching и vue reactivity — micro; scroll handler и io — macro",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use_queues",
+      "exampleType": "bad",
+      "exampleText": "Любой async код лучше ставить в microtask чтобы был быстрее.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Нужно сразу после script — queueMicrotask, не setTimeout(0). В цикле await setTimeout(0) для yield, не await Promise.resolve().",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "1000 textContent — 1000 MutationObserver microtasks до paint; батч одной мутацией.",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "setTimeout(0) выполняется до Promise.then потому что delay ноль.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "async_await_microtasks",
+      "exampleType": "good",
+      "exampleText": "await — Promise; продолжение функции в microtask queue, не macrotask.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "async_await_microtasks",
+      "exampleType": "good",
+      "exampleText": "queueMicrotask и then — одна очередь; queueMicrotask без аллокации Promise объекта",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "async_await_microtasks",
+      "exampleType": "bad",
+      "exampleText": "async/await использует отдельную macrotask queue для каждого await.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "starvation_and_yielding",
+      "exampleType": "good",
+      "exampleText": "React: setState батч через Promise.then; большой update — startTransition или setTimeout между батчами; rAF для paint-bound work.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "starvation_and_yielding",
+      "exampleType": "good",
+      "exampleText": "Promise.then(tick) рекурсия freeze; setTimeout(tick,0) — браузер рисует между tick",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "starvation_and_yielding",
+      "exampleType": "bad",
+      "exampleText": "startTransition делает update синхронно до конца без возможности paint.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "event-loop-deep-dive-microtasks-vs-macrotasks-for-interviews",
+    "apiUrl": "https://api.itlead.org/api/questions/event-loop-deep-dive-microtasks-vs-macrotasks-for-interviews",
+    "pageUrl": "https://itlead.org/interview-questions/javascript/event-loop-deep-dive-microtasks-vs-macrotasks-for-interviews",
+    "difficulty": "MIDDLE",
+    "titleEn": "Event Loop: Microtasks vs Macrotasks",
+    "categorySlug": "javascript",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

@@ -1,0 +1,567 @@
+{
+  "topic": {
+    "code": "vue_components_and_their_lifecycles",
+    "name": "Компоненты Vue и их жизненный цикл",
+    "skillCode": "vue",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как устроены компоненты Vue и какие фазы жизненного цикла проходит компонент от создания до удаления?",
+    "shortAnswer": "Жизненный цикл Vue-комponenta — упорядоченные фазы от создания до удаления с хуками для кода на каждом этапе. Options API: beforeCreate → created → beforeMount → mounted → beforeUpdate → updated → beforeUnmount → unmounted. Composition API: тот же порядок через onMounted, onBeforeUnmount и т.д. внутри setup(). DOM доступен только с mounted/onMounted; очистку таймеров и fetch делай в beforeUnmount/onBeforeUnmount.",
+    "idealAnswer": "Компоненты Vue — переиспользуемые части интерфейса, разбивающие приложение на независимые блоки. Жизненный цикл — упорядоченные фазы от создания до удаления с хуками для side effects на каждой точке. Аналогия: смена официанта — наняли (beforeCreate/created), вышел на смену (beforeMount/mounted), обрабатывает заказы (beforeUpdate/updated), ушёл (beforeUnmount/unmounted). data() инициализируется между beforeCreate и created — в beforeCreate this.count ещё undefined, в created уже доступен. DOM существует только с mounted/onMounted; $refs в created — undefined. Options API: хуки прямо на объекте компонента. Composition API: setup() выполняется в момент beforeCreate/created, onMounted/onBeforeUnmount и др. — тот же тайминг, другая организация кода; tree-shakable composables без this. Когда что: начальная загрузка данных — created или onMounted (created раньше DOM, onMounted безопаснее для SSR); работа с DOM — только mounted/onMounted; очистка при уходе — beforeUnmount/onBeforeUnmount (clearInterval, abort fetch, removeEventListener); реакция на изменения — updated/onUpdated или лучше watch/watchEffect; SSR-safe логика — created/setup (работают на сервере и клиенте), mounted только в браузере. Внутри: в created/setup Vue оборачивает data/ref в Proxy; при mount строит vnode-дерево и патчит в DOM через createElementNS/insertBefore; изменения ставятся в queueJob — несколько синхронных изменений дают один DOM-патч, updated срабатывает один раз; при unmount — unmountComponent, удаление vnodes, останов watchers. Типичные ошибки: $refs в created (TypeError); setInterval без clearInterval в beforeUnmount; async beforeMount блокирует render и ломает SSR hydration — лучше async setup или onMounted; stale $refs в updated — нужен nextTick. Порядок parent-child при обновлении prop: Parent beforeUpdate → Child beforeUpdate → Child updated → Parent updated; читать DOM ребёнка из parent hook — в updated, не beforeUpdate. SSR: beforeMount и mounted на сервере не вызываются; только beforeCreate, created, setup. mounted vs nextTick: mounted после patch vnode в DOM, но до paint; nextTick ждёт полного flush очереди включая дочерние. KeepAlive: activated при повторном показе кешированного компонента вместо mounted; deactivated при скрытии. Nuxt asyncData в created; Pinia beforeUnmount снимает подписки; AbortController в setup + abort в onBeforeUnmount.",
+    "maxScore": 10,
+    "skills": [
+      "vue",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "lifecycle_phases",
+      "title": "Знает фазы жизненного цикла",
+      "expected": "Кандидат перечисляет порядок хуков от beforeCreate/created через mount/update до beforeUnmount/unmounted; понимает что data готов в created, DOM — только с mounted.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — порядок фаз из ITLead TL;DR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "lifecycle_phases",
+            "oftenConfusedWith": [
+              "hook_usage_rules"
+            ],
+            "anchorTermsExpected": [
+              "beforeCreate",
+              "created",
+              "mounted",
+              "beforeUnmount",
+              "unmounted",
+              "порядок"
+            ],
+            "anchorTermsWrongTopic": [
+              "watchEffect",
+              "computed",
+              "Pinia store"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "beforeCreate",
+              "created",
+              "data"
+            ],
+            "ask": "что доступно в beforeCreate vs created — this.count и почему"
+          }
+        ],
+        "mustConcepts": [
+          "жизненный цикл",
+          "lifecycle",
+          "beforeCreate",
+          "created",
+          "beforeMount",
+          "mounted",
+          "beforeUpdate",
+          "updated",
+          "beforeUnmount",
+          "unmounted",
+          "data()",
+          "порядок",
+          "фаз",
+          "создан",
+          "удален",
+          "DOM не существ",
+          "undefined"
+        ],
+        "falseClaims": [
+          "DOM доступен уже в created",
+          "beforeCreate видит инициализированный data",
+          "unmounted вызывается до beforeUnmount",
+          "updated срабатывает до beforeUpdate"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "options_vs_composition",
+      "title": "Сопоставляет Options и Composition API",
+      "expected": "Кандидат сравнивает: Options — mounted/beforeUnmount на объекте; Composition — setup() в момент beforeCreate, onMounted/onBeforeUnmount; тот же тайминг, разная организация; прямого beforeCreate в Composition нет — код в начале setup().",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Options vs Composition mapping из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "setup",
+              "onMounted",
+              "Composition"
+            ],
+            "ask": "чем onMounted отличается от mounted по времени вызова"
+          },
+          {
+            "match": [
+              "beforeCreate",
+              "setup",
+              "эквивалент"
+            ],
+            "ask": "какой эквивалент beforeCreate в Composition API"
+          }
+        ],
+        "mustConcepts": [
+          "Options API",
+          "Composition API",
+          "setup",
+          "onMounted",
+          "onBeforeUnmount",
+          "onBeforeUpdate",
+          "onUpdated",
+          "mounted",
+          "beforeUnmount",
+          "composable",
+          "tree-shakable",
+          "без this",
+          "тот же тайминг",
+          "начало setup"
+        ],
+        "falseClaims": [
+          "Composition API меняет порядок хуков",
+          "onMounted вызывается раньше created",
+          "setup() выполняется после mounted",
+          "Options и Composition дают разное поведение DOM"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "hook_usage_rules",
+      "title": "Выбирает правильный хук для задачи",
+      "expected": "Кандидат называет: fetch — created или onMounted; DOM/$refs — только mounted; cleanup — beforeUnmount; реактивная логика — watch/watchEffect вместо тяжёлого updated; SSR-shared — created/setup.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "When to use each hook — ключ middle-практики",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "lifecycle_phases",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "fetch",
+              "API",
+              "created",
+              "onMounted"
+            ],
+            "ask": "где стартовать API-запрос — created, onMounted или beforeMount и почему"
+          },
+          {
+            "match": [
+              "$refs",
+              "DOM",
+              "mounted"
+            ],
+            "ask": "когда можно безопасно читать $refs и манипулировать DOM"
+          },
+          {
+            "match": [
+              "watch",
+              "watchEffect",
+              "updated"
+            ],
+            "ask": "почему реакцию на изменения лучше через watch, а не тяжёлая логика в updated"
+          }
+        ],
+        "mustConcepts": [
+          "fetch",
+          "API",
+          "created",
+          "onMounted",
+          "mounted",
+          "$refs",
+          "DOM",
+          "beforeUnmount",
+          "cleanup",
+          "clearInterval",
+          "removeEventListener",
+          "watch",
+          "watchEffect",
+          "updated",
+          "side effect",
+          "SSR-safe",
+          "setup"
+        ],
+        "falseClaims": [
+          "любой side effect можно в beforeCreate с DOM",
+          "updated — лучшее место для debounced API",
+          "mounted выполняется на сервере при SSR",
+          "очистку таймера можно отложить до unmounted без риска"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки lifecycle",
+      "expected": "Кандидат называет: $refs в created; setInterval без clearInterval; async beforeMount; stale $refs в updated без nextTick; AbortController + abort в beforeUnmount.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — частые production-баги",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "$refs",
+              "created",
+              "TypeError"
+            ],
+            "ask": "почему this.$refs.box в created даёт undefined"
+          },
+          {
+            "match": [
+              "setInterval",
+              "beforeUnmount",
+              "clearInterval"
+            ],
+            "ask": "что случится если не очистить interval при unmount"
+          },
+          {
+            "match": [
+              "async beforeMount",
+              "SSR",
+              "hydration"
+            ],
+            "ask": "почему async beforeMount ломает SSR и что использовать вместо"
+          }
+        ],
+        "mustConcepts": [
+          "$refs",
+          "created",
+          "undefined",
+          "TypeError",
+          "setInterval",
+          "clearInterval",
+          "beforeUnmount",
+          "async beforeMount",
+          "async setup",
+          "onMounted",
+          "SSR hydration",
+          "updated",
+          "nextTick",
+          "stale",
+          "AbortController",
+          "abort",
+          "unmounted component"
+        ],
+        "falseClaims": [
+          "$refs работает в created если ref уже в template",
+          "interval сам остановится при unmount",
+          "async beforeMount — рекомендуемый паттерн загрузки user",
+          "updated всегда видит актуальный DOM дочернего без nextTick"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "parent_child_order",
+      "title": "Знает порядок хуков parent-child",
+      "expected": "Кандидат описывает при обновлении prop: Parent beforeUpdate → Child beforeUpdate → Child updated → Parent updated; читать состояние ребёнка из parent — в updated, не beforeUpdate.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Child vs Parent hook order — частый gotcha из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Parent beforeUpdate",
+              "Child updated",
+              "порядок"
+            ],
+            "ask": "в каком порядке срабатывают beforeUpdate/updated у parent и child при смене prop"
+          }
+        ],
+        "mustConcepts": [
+          "parent",
+          "child",
+          "beforeUpdate",
+          "updated",
+          "prop",
+          "порядок",
+          "Parent beforeUpdate",
+          "Child beforeUpdate",
+          "Child updated",
+          "Parent updated",
+          "stale data",
+          "динамический список",
+          "TodoMVC",
+          "последним"
+        ],
+        "falseClaims": [
+          "parent updated всегда раньше child updated",
+          "можно читать обновлённый DOM ребёнка в parent beforeUpdate",
+          "порядок хуков одинаков для mount и update",
+          "Teleport меняет порядок lifecycle hooks"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "ssr_lifecycle",
+      "title": "Понимает SSR и lifecycle",
+      "expected": "Кандидат объясняет: на сервере beforeMount/mounted не вызываются; работают beforeCreate, created, setup; shared server/client логика — в setup/created; Nuxt asyncData в created.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "SSR impact — follow-up и Nuxt паттерн из ITLead",
+        "mustConcepts": [
+          "SSR",
+          "сервер",
+          "beforeMount",
+          "mounted",
+          "пропуск",
+          "не вызыва",
+          "created",
+          "setup",
+          "клиент",
+          "браузер",
+          "Nuxt",
+          "asyncData",
+          "hydration",
+          "shared logic"
+        ],
+        "falseClaims": [
+          "mounted выполняется на сервере при SSR",
+          "DOM доступен в created при SSR render",
+          "beforeUnmount вызывается на сервере для каждого request",
+          "SSR и CSR lifecycle полностью идентичны"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "mounted_nexttick_keepalive",
+      "title": "Отличает mounted, nextTick и KeepAlive",
+      "expected": "Кандидат сравнивает: mounted после patch до paint; nextTick после flush всей очереди включая children; KeepAlive activated/deactivated вместо mount при повторном показе.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "follow-up questions ITLead — бонус middle",
+        "mustConcepts": [
+          "mounted",
+          "nextTick",
+          "flush",
+          "очеред",
+          "paint",
+          "KeepAlive",
+          "activated",
+          "deactivated",
+          "кеш",
+          "повторн показ"
+        ],
+        "falseClaims": [
+          "mounted и nextTick всегда синхронны и идентичны",
+          "KeepAlive вызывает mounted при каждом показе",
+          "nextTick не нужен внутри updated",
+          "activated заменяет beforeUnmount"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Жизненный цикл: beforeCreate (data ещё нет) → created (data готов) → mounted (DOM и $refs) → при изменении beforeUpdate/updated → beforeUnmount/unmounted с cleanup. Composition: setup() = beforeCreate/created, onMounted = mounted. Fetch в onMounted, AbortController.abort в onBeforeUnmount.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Tooltip Element Plus — mounted, DOM есть, считаем позицию. Pinia подписка — снимаю в beforeUnmount. Parent меняет items prop: сначала parent beforeUpdate, потом child hooks, parent updated последним — читаю child DOM там. SSR: только setup/created, mounted на сервере нет.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Vue батчит через queueJob — три присвоения подряд, один updated. $refs в created — undefined, переношу в mounted. Stale ref child — nextTick в updated. KeepAlive route: activated обновляет данные при возврате на вкладку.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "DOM и $refs доступны с beforeCreate. setInterval в mounted сам остановится при navigate. async beforeMount для fetchUser — норм для Nuxt SSR. Parent beforeUpdate — лучшее место читать innerHTML дочернего ref.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Composition onMounted срабатывает раньше Options created. SSR вызывает mounted на Node. updated лучше watch для debounced search. KeepAlive каждый раз заново mounted.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Lifecycle Vue — это только mounted и unmounted, остальные deprecated. beforeUnmount не нужен если компонент маленький. nextTick и mounted одно и то же после каждого клика.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "lifecycle_phases",
+      "exampleType": "good",
+      "exampleText": "beforeCreate — this.message undefined; created — 'hello'; mounted — DOM ready; destroy: beforeUnmount → unmounted.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "lifecycle_phases",
+      "exampleType": "good",
+      "exampleText": "ну цикл как смена: наняли created, вышел mounted, уволился unmounted — data между beforeCreate и created появляется",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "lifecycle_phases",
+      "exampleType": "bad",
+      "exampleText": "В created уже можно this.$refs.box.style — DOM Vue создаёт раньше data.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "options_vs_composition",
+      "exampleType": "good",
+      "exampleText": "mounted() в Options = onMounted(() => {}) в setup — один тайминг; код до onX в setup = beforeCreate/created.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "options_vs_composition",
+      "exampleType": "good",
+      "exampleText": "composable useTimer: onMounted start, onBeforeUnmount clear — переиспользую без this",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "options_vs_composition",
+      "exampleType": "bad",
+      "exampleText": "Composition API меняет порядок: onMounted до created, setup после mounted.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "hook_usage_rules",
+      "exampleType": "good",
+      "exampleText": "Профиль: onMounted fetch + AbortController; tooltip position только mounted; debounced filter — watch, не updated.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "hook_usage_rules",
+      "exampleType": "good",
+      "exampleText": "SSR data в async setup или created; DOM-only chart.init в onMounted; listener remove в onBeforeUnmount",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "hook_usage_rules",
+      "exampleType": "bad",
+      "exampleText": "Тяжёлый debounced search кладу в updated — срабатывает на каждую реактивную мелочь, это правильно.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "created + this.$refs.box — TypeError; fix mounted. timer без clearInterval — утечка после route leave.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "async beforeMount fetchUser — Vue 3 warn, SSR hydration страдает; async setup или onMounted. updated + $refs.child — nextTick для свежего DOM.",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "$refs в created работает если v-if false — Vue всё равно создаёт элемент раньше.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "parent_child_order",
+      "exampleType": "good",
+      "exampleText": "Parent beforeUpdate → Child beforeUpdate → Child updated → Parent updated — parent финиширует последним.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "parent_child_order",
+      "exampleType": "good",
+      "exampleText": "nested list todo — читаю child state из parent updated, в beforeUpdate ещё stale",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "parent_child_order",
+      "exampleType": "bad",
+      "exampleText": "Child updated всегда после Parent updated при смене prop.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "ssr_lifecycle",
+      "exampleType": "good",
+      "exampleText": "Nuxt asyncData в created — данные до hydration; mounted/onMounted только client, tooltip init там.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "ssr_lifecycle",
+      "exampleType": "good",
+      "exampleText": "на сервере skip beforeMount/mounted — shared auth check в setup top level",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "ssr_lifecycle",
+      "exampleType": "bad",
+      "exampleText": "При SSR mounted на Node строит DOM через jsdom для каждого запроса как в браузере.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "mounted_nexttick_keepalive",
+      "exampleType": "good",
+      "exampleText": "mounted — patch готов; nextTick — вся очередь включая child; KeepAlive activated при возврате на cached route.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "mounted_nexttick_keepalive",
+      "exampleType": "good",
+      "exampleText": "updated + nextTick(() => refs.child) — дождаться child DOM после prop change",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "mounted_nexttick_keepalive",
+      "exampleType": "bad",
+      "exampleText": "KeepAlive каждый show вызывает mounted заново, activated не существует.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "vue-components-and-their-lifecycles",
+    "apiUrl": "https://api.itlead.org/api/questions/vue-components-and-their-lifecycles",
+    "pageUrl": "https://itlead.org/interview-questions/vue/vue-components-and-their-lifecycles",
+    "difficulty": "MIDDLE",
+    "titleEn": "Vue components and their lifecycles",
+    "categorySlug": "vue",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

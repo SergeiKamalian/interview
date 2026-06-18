@@ -1,0 +1,600 @@
+{
+  "topic": {
+    "code": "nextjs_how_server_components_rsc_work_nextjs",
+    "name": "Как работают Server Components (RSC) в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работают React Server Components (RSC) в Next.js App Router и чем они отличаются от Client Components и классического SSR?",
+    "shortAnswer": "React Server Components выполняются только на сервере: их код не попадает в JavaScript-бандл браузера. В App Router (13+) все компоненты по умолчанию серверные; для state, hooks и обработчиков добавляют `'use client'`. Результат уходит в браузер как RSC payload — бинарный поток с HTML серверных частей и «дырами» для гидратации Client Components.",
+    "idealAnswer": "React Server Components (RSC) — компоненты, которые выполняются исключительно на сервере один раз на запрос. Их код и тяжёлые зависимости (Prisma, парсеры markdown, SDK Stripe) никогда не попадают в клиентский bundle — браузер получает только сериализованный вывод. В Next.js App Router (13+) все компоненты Server Components по умолчанию; `'use client'` в начале файла переводит компонент и все его импорты в Client Component. Правило выбора: fetch из БД/файловой системы, env/secrets, тяжёлые библиотеки — Server Component с прямым `await db.query()`; state, hooks, event handlers, browser API (localStorage, geolocation) — Client Component. Server Component рендерит данные, Client — интерактив (фильтр, модалка, форма). Отличие от SSR: SSR отдаёт HTML плюс полный JS-bundle для гидратации всего дерева; RSC стримит partial payload — серверные части не гидратируются вообще, гидратируются только Client islands. Под капотом Next.js выполняет Server Components в Node.js, сериализует результат в RSC payload (бинарный поток с инструкциями для React runtime в браузере): HTML серверных узлов + placeholder holes для Client boundaries. Браузер сразу вставляет статику и гидратирует только клиентские островки. При навигации Next.js запрашивает RSC payload нового маршрута — Server Components перерендериваются на сервере, Client Components сохраняют state; код серверных компонентов браузер не скачивает. Client Component не может импортировать Server Component — передают через children/props: серверный Accordion wrapper получает `<p>{answer}</p>` как children. Типичные ошибки: `useState` в Server Component (build error); секреты через `NEXT_PUBLIC_` или fetch в Client Component; `'use client'` на всём дереве — bundle как до миграции; импорт Server Component внутри Client файла. Кеширование: Next.js deduplicates одинаковые `fetch`, по умолчанию `revalidate: 3600`; для не-fetch — `unstable_cache`. Context недоступен в Server Components — данные через props или повторный fetch. Streaming: вложенный Suspense стримит быстрые границы первыми, медленные — fallback, затем replacement chunk без full page re-render и без client JS для серверных частей.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "rsc_definition",
+      "title": "Понимает суть Server Components",
+      "expected": "Кандидат объясняет: RSC выполняются только на сервере, их код не попадает в клиентский JS-bundle; браузер получает сериализованный вывод, а не исходный код компонента.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — zero client JS для серверных частей",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "rsc_definition",
+            "oftenConfusedWith": [
+              "rsc_vs_ssr",
+              "rsc_payload_streaming"
+            ],
+            "anchorTermsExpected": [
+              "Server Component",
+              "серверн",
+              "zero JS",
+              "не попадает",
+              "bundle",
+              "бандл",
+              "сериализ"
+            ],
+            "anchorTermsWrongTopic": [
+              "RSC это hydration",
+              "Server Component гидратируется",
+              "код RSC скачивается в браузер"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Server Component",
+              "RSC",
+              "серверн"
+            ],
+            "ask": "что именно получает браузер от Server Component — код или вывод"
+          }
+        ],
+        "mustConcepts": [
+          "Server Component",
+          "RSC",
+          "React Server Components",
+          "сервер",
+          "только на сервере",
+          "zero JS",
+          "нулев",
+          "клиентск",
+          "bundle",
+          "бандл",
+          "не попадает",
+          "сериализ",
+          "вывод",
+          "код не скачива",
+          "App Router",
+          "Next.js"
+        ],
+        "falseClaims": [
+          "код Server Components попадает в browser bundle",
+          "Server Components выполняются в браузере после загрузки JS",
+          "RSC и Client Component одинаково влияют на bundle size",
+          "Server Components требуют hydration как SSR"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "app_router_default",
+      "title": "Знает default Server в App Router",
+      "expected": "Кандидат называет: в App Router (13+) все компоненты Server Components по умолчанию; `'use client'` явно переводит файл в Client Component.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовое правило App Router из TL;DR ITLead",
+        "mustConcepts": [
+          "App Router",
+          "13+",
+          "по умолчанию",
+          "default",
+          "Server Component",
+          "use client",
+          "'use client'",
+          "без директивы",
+          "явно",
+          "opt-in",
+          "клиент"
+        ],
+        "falseClaims": [
+          "в App Router все компоненты Client по умолчанию",
+          "'use server' обязателен для Server Components",
+          "Pages Router и App Router одинаково трактуют default",
+          "async function автоматически делает компонент Client"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "server_vs_client_rules",
+      "title": "Применяет правила Server vs Client",
+      "expected": "Кандидат различает: БД/env/тяжёлые libs — Server; state, hooks, handlers, browser API — Client с `'use client'`; push client down to leaf.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "decision rules — главный практический навык middle",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "rsc_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useState",
+              "hooks",
+              "onClick",
+              "обработчик"
+            ],
+            "ask": "куда перенести state и onClick — Server или Client и почему"
+          },
+          {
+            "match": [
+              "db",
+              "Prisma",
+              "env",
+              "secret",
+              "process.env"
+            ],
+            "ask": "где безопасно читать DB_URL и делать await db.query"
+          }
+        ],
+        "mustConcepts": [
+          "fetch",
+          "БД",
+          "database",
+          "db",
+          "env",
+          "secret",
+          "секрет",
+          "process.env",
+          "тяжёлы",
+          "библиотек",
+          "useState",
+          "hooks",
+          "хук",
+          "event handler",
+          "обработчик",
+          "onClick",
+          "localStorage",
+          "browser API",
+          "use client",
+          "leaf",
+          "лист",
+          "интерактив"
+        ],
+        "falseClaims": [
+          "можно использовать useState в Server Component",
+          "process.env.DB_URL безопасен в Client Component",
+          "тяжёлую chart library лучше импортировать в Client Component",
+          "localStorage доступен в Server Component"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "rsc_vs_ssr",
+      "title": "Отличает RSC от классического SSR",
+      "expected": "Кандидат сравнивает: SSR — HTML + полный JS-bundle, гидратация всего дерева; RSC — partial payload, zero JS для server parts, гидратируются только Client Components.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "частая путаница RSC vs SSR на middle+",
+        "confusionPairs": [
+          {
+            "checkpointKey": "rsc_vs_ssr",
+            "oftenConfusedWith": [
+              "rsc_definition",
+              "rsc_payload_streaming"
+            ],
+            "anchorTermsExpected": [
+              "SSR",
+              "hydration",
+              "гидрат",
+              "полный bundle",
+              "partial payload",
+              "не гидратиру"
+            ],
+            "anchorTermsWrongTopic": [
+              "RSC заменяет SSR полностью",
+              "Server Components всегда hydrate",
+              "SSR не отправляет JavaScript"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "SSR",
+              "hydration",
+              "гидрат"
+            ],
+            "ask": "что гидратируется при SSR и что — при RSC"
+          }
+        ],
+        "mustConcepts": [
+          "SSR",
+          "server-side rendering",
+          "RSC",
+          "hydration",
+          "гидрат",
+          "полный",
+          "bundle",
+          "JavaScript",
+          "partial",
+          "payload",
+          "не гидратиру",
+          "Client Component",
+          "остров",
+          "island",
+          "перерендер",
+          "навигац"
+        ],
+        "falseClaims": [
+          "RSC и SSR — одно и то же",
+          "Server Components гидратируются на клиенте",
+          "SSR не отправляет JavaScript в браузер",
+          "при RSC browser скачивает код всех компонентов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "rsc_payload_streaming",
+      "title": "Понимает RSC payload и streaming",
+      "expected": "Кандидат описывает: RSC payload — бинарный поток с HTML и holes для Client boundaries; при навигации fetch payload; Suspense стримит быстрые части первыми.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "under the hood + Suspense streaming из ITLead senior follow-up",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "payload",
+              "бинарн",
+              "stream",
+              "стрім"
+            ],
+            "ask": "что такое RSC payload и что в нём кроме HTML"
+          },
+          {
+            "match": [
+              "Suspense",
+              "fallback",
+              "boundary",
+              "медленн"
+            ],
+            "ask": "как вложенный Suspense стримит быструю и медленную части страницы"
+          }
+        ],
+        "mustConcepts": [
+          "RSC payload",
+          "payload",
+          "бинарн",
+          "stream",
+          "стрім",
+          "hole",
+          "дырк",
+          "placeholder",
+          "Client boundary",
+          "React runtime",
+          "навигац",
+          "Suspense",
+          "fallback",
+          "boundary",
+          "chunk",
+          "чанк",
+          "replacement",
+          "замен"
+        ],
+        "falseClaims": [
+          "RSC payload — это обычный JSON с исходным кодом компонентов",
+          "при навигации браузер скачивает server component code",
+          "Suspense streaming требует client JS для server parts",
+          "медленный Suspense блокирует всю страницу до готовности"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки RSC",
+      "expected": "Кандидат называет: useState в Server Component; секреты в Client/fetch; `'use client'` везде; импорт Server Component в Client file — fix через children/props.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — production pitfalls из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "server_vs_client_rules",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useState",
+              "Server Component",
+              "build error"
+            ],
+            "ask": "почему useState в page.tsx без use client ломает сборку"
+          },
+          {
+            "match": [
+              "import",
+              "Client Component",
+              "children",
+              "props"
+            ],
+            "ask": "как передать server-rendered контент в Client wrapper без import"
+          }
+        ],
+        "mustConcepts": [
+          "useState",
+          "hooks",
+          "build error",
+          "ошибка сборки",
+          "NEXT_PUBLIC",
+          "секрет",
+          "API key",
+          "useEffect",
+          "fetch",
+          "use client везде",
+          "bundle",
+          "200KB",
+          "импорт",
+          "Client Component",
+          "Server Component",
+          "children",
+          "props",
+          "server-only boundary",
+          "границ"
+        ],
+        "falseClaims": [
+          "можно импортировать Server Component в файл с use client",
+          "NEXT_PUBLIC_SECRET скрывает ключ от браузера",
+          "use client на layout не тянет все импорты в client bundle",
+          "useState работает в Server Component если обернуть в try/catch"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "composition_children_pattern",
+      "title": "Знает composition через children",
+      "expected": "Кандидат объясняет: Client не импортирует Server, но принимает server-rendered JSX через children/props; Accordion client + FAQ server content.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "accordion/children pattern из ITLead intermediate example",
+        "mustConcepts": [
+          "children",
+          "props",
+          "composition",
+          "композиц",
+          "Accordion",
+          "Client wrapper",
+          "server-rendered",
+          "отрендерен",
+          "не импортир",
+          "переда",
+          "slot",
+          "интерактив",
+          "обёртк"
+        ],
+        "falseClaims": [
+          "Client Component может напрямую import Server Component",
+          "children автоматически делает Client Component серверным",
+          "server content в children попадает в client bundle целиком",
+          "composition pattern требует API route между server и client"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Server Components выполняются на Node.js один раз на запрос — код Prisma не попадает в bundle. Client Component с `'use client'` держит filter state. RSC payload стримит HTML и holes; гидратируются только client islands. SSR бы отдал весь JS для hydration всего дерева.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В App Router page.tsx по умолчанию server — await db.problem.findMany(), отдаю список. FilterButton — отдельный файл с use client и useState. Секреты только на сервере, не через NEXT_PUBLIC в useEffect.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Accordion client управляет open/close, а `<p>{item.answer}</p>` рендерит server page и приходит как children — импорт ServerCard в client файл нельзя. При route change Next fetch RSC payload, client state сохраняется.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "RSC — это SSR с hydration всего дерева. Код Server Components скачивается в браузер, просто позже. useState в page.tsx без use client — норм, React сам разберётся.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Чтобы не думать, ставлю use client на layout и все страницы — так проще. Секрет к API кладу в NEXT_PUBLIC_KEY и fetch из Client Component.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Client Component импортирует ServerCard напрямую — так удобнее composition. RSC payload — обычный JSON с исходниками компонентов для eval в браузере.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "rsc_definition",
+      "exampleType": "good",
+      "exampleText": "RSC — zero client JS: сервер выполняет компонент, браузер получает сериализованный вывод, не исходный код.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "rsc_definition",
+      "exampleType": "good",
+      "exampleText": "ну server component — только на node, в bundle не летит, chart lib остаётся на сервере",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "rsc_definition",
+      "exampleType": "bad",
+      "exampleText": "Server Components — это lazy-loaded client components, код всё равно в bundle, просто позже.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "app_router_default",
+      "exampleType": "good",
+      "exampleText": "App Router 13+: без директивы — Server Component; use client только где нужны hooks.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "app_router_default",
+      "exampleType": "good",
+      "exampleText": "page.tsx async по умолчанию server, FilterButton.tsx — use client сверху",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "app_router_default",
+      "exampleType": "bad",
+      "exampleText": "В App Router нужно писать use server на каждый server component, иначе он client.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "server_vs_client_rules",
+      "exampleType": "good",
+      "exampleText": "DB query и process.env — в Server Component; onClick и useState — в client leaf с use client.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "server_vs_client_rules",
+      "exampleType": "good",
+      "exampleText": "markdown parser 200kb — server, modal open state — client, не тащу lib в bundle",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "server_vs_client_rules",
+      "exampleType": "bad",
+      "exampleText": "localStorage для темы читаю в Server Component через polyfill — так быстрее.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "rsc_vs_ssr",
+      "exampleType": "good",
+      "exampleText": "SSR: HTML + full bundle, hydrate всё дерево. RSC: server parts не hydrate, только client islands.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "rsc_vs_ssr",
+      "exampleType": "good",
+      "exampleText": "при rsc browser не качает server code при navigation — только payload с выводом",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "rsc_vs_ssr",
+      "exampleType": "bad",
+      "exampleText": "RSC и SSR одно и то же — и там и там React гидратирует каждый server component.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "rsc_payload_streaming",
+      "exampleType": "good",
+      "exampleText": "RSC payload — binary stream с HTML и holes для client boundaries; React runtime патчит DOM без server code.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "rsc_payload_streaming",
+      "exampleType": "good",
+      "exampleText": "Suspense: QuickLinks сразу, TeamStats fallback 2 сек, потом chunk замены — без full page rerender",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "rsc_payload_streaming",
+      "exampleType": "bad",
+      "exampleText": "RSC payload — gzip HTML file, Suspense streaming требует client JS для server stats.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "useState в page без use client — build error; users fetch в server parent, props в client child.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "use client на root layout — все импорты в bundle, как pages router; лучше push down к кнопке",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "import ServerCard в use client файл — норм, Next сам split. API key в NEXT_PUBLIC для fetch на клиенте — ок.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "composition_children_pattern",
+      "exampleType": "good",
+      "exampleText": "FAQ page server map items; Accordion client принимает children — answer JSX с сервера, не import.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "composition_children_pattern",
+      "exampleType": "good",
+      "exampleText": "интерактивная оболочка client, контент внутри — server children через props",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "composition_children_pattern",
+      "exampleType": "bad",
+      "exampleText": "Client Dialog импортирует ServerTable — правильный паттерн composition в RSC.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nextjs-how-server-components-rsc-work-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/nextjs-how-server-components-rsc-work-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/nextjs-how-server-components-rsc-work-in-nextjs",
+    "difficulty": "MIDDLE",
+    "titleEn": "How server components (rsc) work in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T18:30:00.000Z"
+  }
+}

@@ -1,0 +1,511 @@
+{
+  "topic": {
+    "code": "shcho_take_memoizatsiya",
+    "name": "Что такое мемоизация",
+    "skillCode": "react",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Что такое мемоизация и как она применяется в React?",
+    "shortAnswer": "Мемоизация — оптимизация, при которой функция сохраняет результат для конкретных аргументов и при повторном вызове с теми же аргументами возвращает значение из кеша, не пересчитывая. Работает только на чистых функциях; в React для этого есть `useMemo` и `useCallback`.",
+    "idealAnswer": "Мемоизация — техника оптимизации производительности: функция кеширует возвращаемое значение для заданного набора входных данных, и при следующем вызове с теми же аргументами пропускает вычисление и возвращает сохранённый результат. Аналогия: повар записывает время готовки в блокнот — тот же заказ снова, смотрит в блокнот, а не готовит с нуля. Базовая реализация — замыкание (closure) над объектом или `Map`: аргументы сериализуются в ключ кеша (`JSON.stringify`), при попадании тело функции не выполняется. Работает только на чистых функциях: одинаковые входы всегда дают одинаковый выход. Если функция читает `Date.now()`, `Math.random()`, глобальный счётчик, модульный config или делает запрос к БД — кеш возвращает устаревший результат. В React это проявляется с объектными props: новая ссылка `{a: 1}` на каждом рендере — `useMemo` пересчитывает, потому что deps сравниваются shallow через `Object.is`. Когда использовать: рекурсия с перекрывающимися подзадачами (fib(40) с O(2^n) до O(n)); фильтрация/трансформация больших списков на каждом рендере; повторные вызовы с одними ID (конфиг per-user). Не использовать: одноразовые вызовы, функции с side effects, операции быстрее ~1ms — накладные расходы на ключ и lookup часто больше выигрыша. `useMemo` хранит значение в fiber node и при каждом рендере сравнивает deps через `Object.is`; при совпадении возвращает кеш без запуска функции. `useCallback` стабилизирует ссылку на функцию для дочерних компонентов. Типичные ошибки: мемоизация нечистой функции (`memoize(() => Math.random())` — первый результат заморожен); stale deps (`useMemo(() => heavyCalc(items), [])` — exhaustive-deps ловит); over-memoizing дешёвых операций (`arr.map(x => x * 2)`); мутация закешированного объекта (кеш держит reference, не копию). Реальные применения: React 18 `useMemo`/`useCallback`; Lodash `_.memoize`; Redux Toolkit `createSelector` (Reselect); Next.js 14 `unstable_cache` для server components; Express middleware кеширует JSON на read-heavy endpoints. Мемоизация vs кеширование: мемоизация function-scoped, живёт в памяти closure/процесса; общий кеш — app-wide (Redis) с TTL и expire. Space tradeoff: кеш растёт с каждой уникальной комбинацией аргументов; для долгоживущих процессов — TTL eviction `{value, expiry}`. `useMemo` не предотвращает re-render если parent каждый раз передаёт новый объект — нужен `useCallback` выше по дереву для стабилизации reference.",
+    "maxScore": 10,
+    "skills": [
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "memoization_definition",
+      "title": "Понимает мемоизацию",
+      "expected": "Кандидат объясняет: функция кеширует результат для аргументов; повторный вызов с теми же args возвращает кеш без пересчёта; тело функции при hit не выполняется.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — кеш результата по аргументам",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "мемоиз",
+              "memoiz",
+              "кеш",
+              "cache"
+            ],
+            "ask": "чем мемоизация отличается от обычного вызова функции на примере fib(40)"
+          }
+        ],
+        "mustConcepts": [
+          "мемоиз",
+          "memoiz",
+          "кеш",
+          "cache",
+          "аргумент",
+          "вход",
+          "результат",
+          "повторн",
+          "same input",
+          "не пересчит",
+          "skip",
+          "пропуск",
+          "вычислен",
+          "compute",
+          "JSON.stringify",
+          "ключ",
+          "key",
+          "hit",
+          "попадан"
+        ],
+        "falseClaims": [
+          "мемоизация всегда ускоряет любую функцию",
+          "мемоизация работает с любыми функциями включая side effects",
+          "кеш автоматически обновляется при изменении внешнего состояния",
+          "мемоизация и кеширование — одно и то же"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "pure_functions_only",
+      "title": "Знает ограничение чистых функций",
+      "expected": "Кандидат объясняет: мемоизация предполагает детерминизм; Date.now(), Math.random(), глобалы, модульный config, DB — кеш stale; в React новый object ref в deps ломает useMemo.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "key point ITLead — pure functions only",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "memoization_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "чист",
+              "pure",
+              "Date.now",
+              "Math.random"
+            ],
+            "ask": "почему memoize(() => Math.random()) возвращает одно число всегда"
+          },
+          {
+            "match": [
+              "Object.is",
+              "deps",
+              "reference",
+              "ссылк"
+            ],
+            "ask": "почему useMemo пересчитывает при {a:1} и {a:1} как разных объектов"
+          }
+        ],
+        "mustConcepts": [
+          "чист",
+          "pure",
+          "детермин",
+          "same input same output",
+          "Date.now",
+          "Math.random",
+          "глобал",
+          "global",
+          "модульн",
+          "config",
+          "stale",
+          "устарел",
+          "Object.is",
+          "shallow",
+          "deps",
+          "reference",
+          "ссылк",
+          "объект",
+          "нечист"
+        ],
+        "falseClaims": [
+          "мемоизация безопасна для функций с Math.random",
+          "чистота не важна если аргументы не меняются",
+          "Object.is сравнивает объекты по содержимому глубоко",
+          "useMemo игнорирует reference equality в deps"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда применять",
+      "expected": "Кандидат называет: рекурсия с overlapping subproblems (fib); фильтрация больших списков; повторные lookup по ID; не использовать для cheap ops <1ms, side effects, one-time calls.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use блок ITLead",
+        "mustConcepts": [
+          "fib",
+          "Фибоначч",
+          "рекурс",
+          "O(2^n)",
+          "O(n)",
+          "фильтр",
+          "filter",
+          "список",
+          "list",
+          "1000",
+          "lookup",
+          "ID",
+          "1ms",
+          "дешёв",
+          "cheap",
+          "side effect",
+          "побочн",
+          "одноразов"
+        ],
+        "falseClaims": [
+          "мемоизировать всё что можно для performance",
+          "fib(40) быстрый без мемоизации в JS",
+          "useMemo нужен для любого map/filter",
+          "операции под 1ms всегда выигрывают от мемоизации"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "how_it_works",
+      "title": "Знает механизм кеша",
+      "expected": "Кандидат описывает: closure над Map/object; сериализация args в ключ; cache hit пропускает fn body; useMemo хранит в fiber и сравнивает deps Object.is.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "how it works internally из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Map",
+              "closure",
+              "замыкан"
+            ],
+            "ask": "как memoize wrapper хранит кеш и проверяет ключ"
+          }
+        ],
+        "mustConcepts": [
+          "closure",
+          "замыкан",
+          "Map",
+          "объект",
+          "object",
+          "JSON.stringify",
+          "ключ",
+          "key",
+          "cache hit",
+          "промах",
+          "miss",
+          "fiber",
+          "useMemo",
+          "Object.is",
+          "deps",
+          "не запуск",
+          "body",
+          "тело функц"
+        ],
+        "falseClaims": [
+          "useMemo кеширует в localStorage",
+          "Map не нужен — только plain object для любых ключей",
+          "deps сравниваются глубоко по всем полям",
+          "при cache hit функция всё равно выполняется"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "react_tools",
+      "title": "Применяет useMemo и useCallback",
+      "expected": "Кандидат показывает: useMemo для вычислений (filtered list); useCallback для стабильных handler refs; TodoList с filter deps [todos, filter] не searchText; createSelector, unstable_cache.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "React built-in tools — главный junior takeaway",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useMemo",
+              "useCallback"
+            ],
+            "ask": "разница useMemo и useCallback и когда что использовать"
+          },
+          {
+            "match": [
+              "TodoList",
+              "visibleTodos",
+              "searchText"
+            ],
+            "ask": "почему filter deps [todos, filter] а не searchText"
+          }
+        ],
+        "mustConcepts": [
+          "useMemo",
+          "useCallback",
+          "filtered",
+          "фильтр",
+          "handler",
+          "обработчик",
+          "reference",
+          "ссылк",
+          "child",
+          "дочерн",
+          "React.memo",
+          "createSelector",
+          "Reselect",
+          "unstable_cache",
+          "Next.js",
+          "Lodash",
+          "_.memoize",
+          "deps",
+          "todos",
+          "filter"
+        ],
+        "falseClaims": [
+          "useCallback мемоизирует результат вычисления",
+          "useMemo стабилизирует функцию",
+          "useMemo всегда предотвращает re-render child",
+          "createSelector не связан с мемоизацией"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: memoize impure (getRandom); stale deps empty []; over-memoize cheap map; mutate cached object; exhaustive-deps; parent new object ref; TTL для memory growth.",
+      "score": 2.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — частые interview traps из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "getRandom",
+              "Math.random",
+              "memoize"
+            ],
+            "ask": "почему memoize(() => Math.random()) всегда одно число"
+          },
+          {
+            "match": [
+              "exhaustive-deps",
+              "пустой deps",
+              "[]"
+            ],
+            "ask": "баг useMemo(() => heavyCalc(items), []) и как исправить"
+          },
+          {
+            "match": [
+              "mutat",
+              "tags.push",
+              "reference"
+            ],
+            "ask": "почему мутация cache[id].tags ломает всех пользователей кеша"
+          }
+        ],
+        "mustConcepts": [
+          "getRandom",
+          "Math.random",
+          "impure",
+          "нечист",
+          "stale deps",
+          "пустой deps",
+          "exhaustive-deps",
+          "heavyCalc",
+          "items",
+          "over-memo",
+          "дешёв",
+          "map",
+          "mutat",
+          "мутац",
+          "tags.push",
+          "reference",
+          "ссылк",
+          "TTL",
+          "expiry",
+          "memory",
+          "память",
+          "new object",
+          "parent"
+        ],
+        "falseClaims": [
+          "пустой deps [] всегда правильный для useMemo",
+          "мутация закешированного объекта безопасна",
+          "V8 оптимизирует fib(40) без мемоизации",
+          "мемоизация не растёт в памяти"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Мемоизация — функция кеширует результат по аргументам: fastFib(40) второй раз из кеша, O(n) вместо O(2^n). Работает только на чистых функциях. В React useMemo для filtered todos с deps [todos, filter], useCallback стабилизирует onClick для child.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Обёртка memoize — closure с Map, ключ JSON.stringify(args). useMemo в fiber сравнивает deps Object.is — новый {a:1} каждый рендер = пересчёт. Не мемоизирую map x*2 — дешевле 1ms, overhead больше выигрыша.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "TodoList: visibleTodos useMemo([todos, filter]) — searchText меняется, фильтр не перезапускается. Ошибка: useMemo(heavyCalc(items), []) — stale items, exhaustive-deps ловит. Redux createSelector — мемоизация derived state.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Мемоизация — когда React кеширует весь компонент в localStorage. Math.random в memoize — норм, кеш обновится сам. useMemo и useCallback одно и то же.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "useMemo(() => arr.map(x => x * 2), [arr]) на всё — всегда быстрее. Пустой deps [] для heavyCalc(items) — правильный паттерн, items не важны.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Закешированный объект можно мутировать — cache[id].tags.push безопасен, каждый caller получит свою копию.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "memoization_definition",
+      "exampleType": "good",
+      "exampleText": "Мемоизация — кеш return value по args; второй вызов с теми же аргументами — hit, fn body не выполняется.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "memoization_definition",
+      "exampleType": "good",
+      "exampleText": "ну как блокнот повара — fib(40) один раз считает, второй раз из кеша",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "memoization_definition",
+      "exampleType": "bad",
+      "exampleText": "Мемоизация пересчитывает результат каждый раз, но сохраняет в Redux store.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "pure_functions_only",
+      "exampleType": "good",
+      "exampleText": "memoize(() => Math.random()) — 0.42 всегда; Date.now в memoized fn — stale. useMemo deps shallow: два {a:1} разные refs — пересчёт.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "pure_functions_only",
+      "exampleType": "good",
+      "exampleText": "функция читает модульный config — выглядит pure, но кеш stale при смене config снаружи",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "pure_functions_only",
+      "exampleType": "bad",
+      "exampleText": "Мемоизация работает с нечистыми функциями — кеш сам обновится когда внешний state изменится.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "fib(40), filter 1000 todos, per-user config lookup — да. One-time call, side effects, ops <1ms — нет.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "рекурсия с overlapping — fib падает с экспоненты до линейной; список 1000 — useMemo на filter",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Мемоизировать всё в приложении — V8 не умеет оптимизировать без memoize wrapper.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "how_it_works",
+      "exampleType": "good",
+      "exampleText": "memoize(fn) — closure + Map, key JSON.stringify(args), hit return cache.get без вызова fn.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "how_it_works",
+      "exampleType": "good",
+      "exampleText": "useMemo value в fiber node, каждый render Object.is на deps — match skip computation",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "how_it_works",
+      "exampleType": "bad",
+      "exampleText": "useMemo глубоко сравнивает все поля объектов в deps массиве.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "react_tools",
+      "exampleType": "good",
+      "exampleText": "useMemo — expensive calc visibleTodos; useCallback — stable onClick ref для memo child. createSelector в RTK — мемоизация derived todos by userId.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "react_tools",
+      "exampleType": "good",
+      "exampleText": "todo filter deps [todos, filter] — searchText рендерит, но visibleTodos из кеша",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "react_tools",
+      "exampleType": "bad",
+      "exampleText": "useCallback кеширует результат map/filter, useMemo стабилизирует функцию — взаимозаменяемы.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "stale deps: useMemo(heavyCalc(items), []) — fix [items]. Over-memo: arr.map не нужен. cache[id].tags.push — мутирует shared ref.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "parent каждый render новый object prop — useMemo child не поможет, useCallback upstream",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "exhaustive-deps можно отключить — пустой deps для items нормальная практика.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "shcho-take-memoizatsiya",
+    "apiUrl": "https://api.itlead.org/api/questions/shcho-take-memoizatsiya",
+    "pageUrl": "https://itlead.org/interview-questions/react/shcho-take-memoizatsiya",
+    "difficulty": "JUNIOR",
+    "titleEn": "What is memoization?",
+    "categorySlug": "react",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

@@ -1,0 +1,599 @@
+{
+  "topic": {
+    "code": "how_usememo_works_and_why_is_it_needed",
+    "name": "Как работает useMemo и зачем он нужен",
+    "skillCode": "react",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работает useMemo в React и зачем он нужен?",
+    "shortAnswer": "useMemo кеширует вычисленное значение между re-render и пересчитывает его только при изменении зависимостей. Используй для тяжёлых filter/sort/reduce или когда нужна стабильная ссылка на объект/массив для дочерних компонентов с React.memo.",
+    "idealAnswer": "useMemo — хук React, который кеширует результат вычисления между re-render и пересчитывает его только когда меняются указанные зависимости. Без useMemo дорогая функция выполняется на каждом render, даже если входные данные те же; плюс каждый render создаёт новую ссылку на объект или массив, что ломает referential equality для дочерних компонентов и запускает их лишние re-render. useMemo хранит предыдущий результат в memoizedState на fiber-узле компонента, сравнивает deps через Object.is (areHookInputsEqual в исходниках React) и пропускает callback, если ничего не изменилось — экономит и CPU, и каскадные re-render ниже по дереву. Когда использовать: тяжёлая фильтрация/сортировка/reduce на больших массивах (1000+), производный state стабилен между большинством render, объект/массив передаётся в React.memo-компонент. Не использовать: вычисление <1ms (inline дешевле overhead хука), deps меняются каждый render (кеш не попадёт). Внутри: первый render — mountMemo сохраняет value и deps; повторный — updateMemo сравнивает deps; callback синхронен в render phase (async внутри нельзя); кеш не гарантирован — React может сбросить при memory pressure или unmount. useMemo возвращает значение, useCallback — функцию; для handlers — useCallback, для данных/объектов — useMemo. Типичные ошибки: нестабильный объект в deps ({ key: 'value' } каждый render новый ref), мемоизация a*2, мутация memoized массива (list.push ломает чистоту callback), пустой deps при использовании userId, каскад вложенных useMemo (data2 зависит от data1 — объединить в один pipeline). React.memo + useMemo — стандарт: memo пропускает re-render child, useMemo держит props referentially stable. React 18 concurrent: fiber может быть отброшен, memoizedState теряется, useMemo пересчитает с нуля; для некритичных вычислений — startTransition. Сложность сравнения deps — O(n) через Object.is; Date/new Date() каждый render — новая ссылка, всегда recompute; лучше timestamp или ISO string.",
+    "maxScore": 10,
+    "skills": [
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "usememo_definition",
+      "title": "Понимает назначение useMemo",
+      "expected": "Кандидат объясняет: useMemo кеширует вычисленное значение между re-render; пересчёт только при изменении deps; без него вычисление повторяется каждый render.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — кеш между render и deps",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "usememo_definition",
+            "oftenConfusedWith": [
+              "usememo_vs_usecallback",
+              "react_memo_combo"
+            ],
+            "anchorTermsExpected": [
+              "useMemo",
+              "кеш",
+              "зависимост",
+              "deps",
+              "re-render",
+              "пересчёт"
+            ],
+            "anchorTermsWrongTopic": [
+              "useMemo кеширует компонент",
+              "useMemo это React.memo",
+              "useMemo для функций"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useMemo",
+              "кеш",
+              "deps"
+            ],
+            "ask": "что происходит при re-render родителя, если todos и filter не изменились"
+          }
+        ],
+        "mustConcepts": [
+          "useMemo",
+          "кеш",
+          "кешир",
+          "вычислен",
+          "значен",
+          "re-render",
+          "рендер",
+          "зависимост",
+          "deps",
+          "пересчёт",
+          "Object.is",
+          "callback",
+          "между render",
+          "inputs",
+          "входные"
+        ],
+        "falseClaims": [
+          "useMemo предотвращает все re-render компонента",
+          "useMemo работает асинхронно вне render phase",
+          "useMemo гарантирует постоянный кеш навсегда",
+          "useMemo заменяет useState для хранения данных",
+          "без useMemo React не может рендерить списки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "referential_equality",
+      "title": "Понимает стабильность ссылок",
+      "expected": "Кандидат объясняет: без useMemo каждый render создаёт новый объект/массив; referential equality ломается; дочерние компоненты re-render даже при тех же данных.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "вторая причина useMemo — stable refs для children",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "usememo_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "referential",
+              "ссылк",
+              "React.memo"
+            ],
+            "ask": "почему новый объект в props каждый render ломает React.memo skip"
+          }
+        ],
+        "mustConcepts": [
+          "referential",
+          "ссылк",
+          "equality",
+          "равенств",
+          "новый объект",
+          "новый массив",
+          "reference",
+          "стабильн",
+          "props",
+          "дочерн",
+          "каскад",
+          "re-render child",
+          "filter",
+          "map",
+          "тот же результат"
+        ],
+        "falseClaims": [
+          "React сравнивает props по deep equality по умолчанию",
+          "новый массив с теми же элементами не вызывает re-render child",
+          "useMemo нужен только для CPU, не для ссылок",
+          "Object.is сравнивает содержимое массива по элементам"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Знает когда применять useMemo",
+      "expected": "Кандидат называет: тяжёлые filter/sort/reduce на больших данных, стабильный derived state, props для React.memo; пропускает для дешёвых вычислений и нестабильных deps.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use из ITLead — практический порог",
+        "mustConcepts": [
+          "filter",
+          "sort",
+          "reduce",
+          "1000",
+          "тяжёл",
+          "дорог",
+          "derived",
+          "производн",
+          "React.memo",
+          "inline",
+          "1ms",
+          "5ms",
+          "нестабильн deps",
+          "каждый render",
+          "overhead"
+        ],
+        "falseClaims": [
+          "useMemo нужен для любого filter даже на 10 элементах",
+          "useMemo всегда ускоряет приложение",
+          "если deps меняются каждый render — useMemo всё равно помогает",
+          "useMemo заменяет виртуализацию списков"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "internal_mechanism",
+      "title": "Знает внутреннее устройство useMemo",
+      "expected": "Кандидат описывает: memoizedState на fiber, mountMemo/updateMemo, сравнение deps через Object.is/areHookInputsEqual; синхронный render phase; кеш не гарантирован.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "mountMemo/updateMemo — ключ middle+",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "memoizedState",
+              "mountMemo",
+              "updateMemo"
+            ],
+            "ask": "что делает updateMemo при совпадении всех deps"
+          },
+          {
+            "match": [
+              "Object.is",
+              "areHookInputsEqual",
+              "Date"
+            ],
+            "ask": "почему new Date() в deps ломает кеш и какая сложность сравнения deps"
+          }
+        ],
+        "mustConcepts": [
+          "memoizedState",
+          "fiber",
+          "mountMemo",
+          "updateMemo",
+          "Object.is",
+          "areHookInputsEqual",
+          "render phase",
+          "синхрон",
+          "linked list",
+          "deps array",
+          "memory pressure",
+          "unmount",
+          "optimization hint",
+          "O(n)",
+          "concurrent"
+        ],
+        "falseClaims": [
+          "useMemo callback выполняется в useEffect phase",
+          "кеш useMemo никогда не сбрасывается",
+          "React сравнивает deps через JSON.stringify",
+          "async функции внутри useMemo поддерживаются нативно"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "usememo_vs_usecallback",
+      "title": "Отличает useMemo от useCallback",
+      "expected": "Кандидат сравнивает: useMemo возвращает значение (данные, объекты, массивы); useCallback — стабильную функцию для handlers/callbacks.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "частая путаница middle — value vs function",
+        "confusionPairs": [
+          {
+            "checkpointKey": "usememo_vs_usecallback",
+            "oftenConfusedWith": [
+              "usememo_definition"
+            ],
+            "anchorTermsExpected": [
+              "useMemo",
+              "useCallback",
+              "значение",
+              "функция",
+              "handler"
+            ],
+            "anchorTermsWrongTopic": [
+              "useMemo для onClick",
+              "useCallback для filtered array"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "useCallback",
+          "useMemo",
+          "значение",
+          "value",
+          "функция",
+          "function",
+          "handler",
+          "callback",
+          "объект",
+          "массив",
+          "event handler",
+          "стабильн функц",
+          "return"
+        ],
+        "falseClaims": [
+          "useMemo и useCallback делают одно и то же",
+          "useCallback кеширует результат вычисления",
+          "useMemo возвращает функцию",
+          "для filter массива нужен useCallback"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки useMemo",
+      "expected": "Кандидат называет: нестабильный объект в deps, мемоизация дешёвых операций, мутация memoized value, missing deps, каскад вложенных useMemo; знает исправления.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "referential_equality",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "нестабильн",
+              "config",
+              "примитив"
+            ],
+            "ask": "почему { key: 'value' } в deps пересчитывает каждый render и как исправить"
+          },
+          {
+            "match": [
+              "каскад",
+              "data1",
+              "data2",
+              "pipeline"
+            ],
+            "ask": "почему цепочка useMemo data1→data2 часто бесполезна и как объединить"
+          },
+          {
+            "match": [
+              "missing deps",
+              "userId",
+              "[]"
+            ],
+            "ask": "что не так с useMemo(() => fetchData(userId), [])"
+          }
+        ],
+        "mustConcepts": [
+          "нестабильн",
+          "объект в deps",
+          "примитив",
+          "destructure",
+          "a * 2",
+          "дешёв",
+          "inline",
+          "мутац",
+          "push",
+          "pure",
+          "missing deps",
+          "userId",
+          "каскад",
+          "pipeline",
+          "объедин",
+          "eslint",
+          "exhaustive-deps"
+        ],
+        "falseClaims": [
+          "можно мутировать массив из useMemo — React сам обновит кеш",
+          "пустой deps всегда правильный для fetch по userId",
+          "useMemo(a * 2) всегда быстрее чем a * 2",
+          "линтер всегда ловит нестабильный config в deps"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "react_memo_combo",
+      "title": "Понимает связку React.memo и useMemo",
+      "expected": "Кандидат объясняет: React.memo пропускает re-render child при неизменных props; useMemo держит props referentially stable — иначе memo не срабатывает.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "стандартный combo из ITLead real-world",
+        "confusionPairs": [
+          {
+            "checkpointKey": "react_memo_combo",
+            "oftenConfusedWith": [
+              "usememo_definition",
+              "usememo_vs_usecallback"
+            ],
+            "anchorTermsExpected": [
+              "React.memo",
+              "useMemo",
+              "props",
+              "skip",
+              "стабильн"
+            ],
+            "anchorTermsWrongTopic": [
+              "React.memo кеширует значение внутри компонента",
+              "useMemo оборачивает компонент"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "React.memo",
+          "useMemo",
+          "props",
+          "skip",
+          "пропуск",
+          "re-render",
+          "стабильн",
+          "referential",
+          "combo",
+          "дочерн",
+          "TodoStats",
+          "Chart",
+          "createSelector",
+          "TanStack Query"
+        ],
+        "falseClaims": [
+          "React.memo и useMemo решают одну задачу",
+          "достаточно только React.memo без stable props",
+          "useMemo оборачивает компонент как React.memo",
+          "React.memo сравнивает props deep equal всегда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "useMemo кеширует результат filter между re-render: если todos и filter не менялись, возвращается тот же массив по ссылке — не тратим CPU и не будим React.memo-детей. Deps сравниваются через Object.is в updateMemo.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На списке 5k товаров filter+sort оборачиваю в useMemo с [products, search]. Для Chart передаю processed через useMemo с [data, theme] — theme примитив, не весь config объект. Handlers — useCallback, не useMemo.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Без useMemo todos.filter каждый render даёт новый массив — MemoizedRow re-renderится зря. React.memo на Row + useMemo на visible — skip реально работает.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "useMemo — это то же что React.memo, оборачиваю им компонент чтобы он не рендерился. Для onClick тоже useMemo.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "const doubled = useMemo(() => a * 2, [a]) на каждое поле формы — так быстрее. В deps кладу { theme: config.theme } — объект же с тем же содержимым.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Кеш useMemo вечный, можно list.push в memoized массив. fetchData(userId) с deps [] — userId не меняется же по смыслу.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "usememo_definition",
+      "exampleType": "good",
+      "exampleText": "useMemo(() => todos.filter(...), [todos, filter]) — пересчёт только когда deps изменились, иначе cached value.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "usememo_definition",
+      "exampleType": "good",
+      "exampleText": "ну useMemo запоминает результат между рендерами, пока todos и filter те же — filter не гоняется заново",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "usememo_definition",
+      "exampleType": "bad",
+      "exampleText": "useMemo откладывает вычисление в useEffect после paint.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "referential_equality",
+      "exampleType": "good",
+      "exampleText": "Без useMemo filter каждый render — новая ссылка на массив, React.memo на ListItem не skip даже при тех же id.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "referential_equality",
+      "exampleType": "good",
+      "exampleText": "TodoStats возвращает объект из useMemo — та же ссылка пока todos не менялся, memo на stats срабатывает",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "referential_equality",
+      "exampleType": "bad",
+      "exampleText": "React сам сравнит массивы по содержимому, referential equality не важна для props.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "10k строк — useMemo на sort/filter; a + b inline без хука; deps меняются каждый render — memo бесполезен.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "derived stats от todos — memo; простой includes на 20 items — inline",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "useMemo обязателен на любой .map в JSX, иначе React падает.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "internal_mechanism",
+      "exampleType": "good",
+      "exampleText": "mountMemo на первом render, updateMemo сравнивает deps через areHookInputsEqual/Object.is — все совпали, callback не вызывается.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "internal_mechanism",
+      "exampleType": "good",
+      "exampleText": "callback синхронен в render phase; кеш на fiber memoizedState, при unmount теряется; Date в deps — всегда новая ссылка",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "internal_mechanism",
+      "exampleType": "bad",
+      "exampleText": "useMemo запускает callback в idle callback после commit phase.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "usememo_vs_usecallback",
+      "exampleType": "good",
+      "exampleText": "filtered list — useMemo; onSubmit handler для memo child — useCallback.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "usememo_vs_usecallback",
+      "exampleType": "good",
+      "exampleText": "useMemo(() => a+b) value; useCallback(() => doX()) stable fn",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "usememo_vs_usecallback",
+      "exampleType": "bad",
+      "exampleText": "Для стабильного onClick на кнопке использую useMemo(() => () => handleClick()).",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Fix config в deps: деструктурирую theme, в deps [data, theme], не [data, config].",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Каскад data1/data2 — объединяю в один useMemo pipeline; fetchData(userId) — [userId] в deps, не [].",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "не мутирую list из useMemo — spread [...list, item]; a*2 без useMemo",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "list.push ok после useMemo — React пересчитает при следующем render сам.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "react_memo_combo",
+      "exampleType": "good",
+      "exampleText": "Row = React.memo; visible = useMemo — без stable visible memo на Row бесполезен.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "react_memo_combo",
+      "exampleType": "good",
+      "exampleText": "memo на Chart + useMemo processed props — стандартная пара как createSelector на уровне store",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "react_memo_combo",
+      "exampleType": "bad",
+      "exampleText": "React.memo достаточно — новый объект props каждый render всё равно skip.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "how-usememo-works-and-why-is-it-needed",
+    "apiUrl": "https://api.itlead.org/api/questions/how-usememo-works-and-why-is-it-needed",
+    "pageUrl": "https://itlead.org/interview-questions/react/how-usememo-works-and-why-is-it-needed",
+    "difficulty": "MIDDLE",
+    "titleEn": "How useMemo works and why is it needed",
+    "categorySlug": "react",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

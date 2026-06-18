@@ -1,0 +1,625 @@
+{
+  "topic": {
+    "code": "nextjs_routing_in_nextjs_file_based_routing",
+    "name": "Маршрутизация в Next.js (file-based routing)",
+    "skillCode": "nextjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работает file-based routing в Next.js App Router и какие типы маршрутов поддерживаются?",
+    "shortAnswer": "File-based routing в Next.js строит URL из структуры папок в `app/`: каждый `page.tsx` делает сегмент доступным как маршрут. Динамические сегменты — `[slug]`, catch-all — `[...slug]`, опциональный catch-all — `[[...slug]]`. Группы `(name)` организуют код без влияния на URL. Папка без `page.tsx` маршрут не создаёт.",
+    "idealAnswer": "В Next.js App Router маршрутизация основана на файловой системе: структура папок в `app/` напрямую определяет URL. Каждый `page.tsx` регистрирует сегмент маршрута — отдельная конфигурация роутера, `<Route>` или react-router не нужны. Next.js при сборке (Turbopack/webpack) рекурсивно обходит `app/`, строит route manifest (`build-manifest.json`), на запросе сервер матчит URL по regex-паттернам и извлекает `params`. `app/page.tsx` → `/`, `app/blog/page.tsx` → `/blog`, `app/blog/[slug]/page.tsx` → `/blog/my-post` с `params.slug`. Динамические сегменты в квадратных скобках: `[category]`, вложенность даёт несколько ключей в `params`. Catch-all `[...slug]` захватывает 1+ сегментов в массив; `[[...slug]]` делает сегменты опциональными — `/docs` матчится с пустым массивом, одинарный `[...slug]` на `/docs` даст 404. Route groups `(marketing)` и `(platform)` не попадают в URL, но позволяют разным веткам иметь свой `layout.tsx`. Parallel routes через `@stats`, `@activity` рендерят независимые слоты в одном layout со streaming. Intercepting routes `(.)`, `(..)`, `(...)` показывают страницу в другом контексте (модалка при клике, полная страница при прямом URL). Спецфайлы: `layout.tsx` (persist), `loading.tsx` (Suspense), `error.tsx`, `not-found.tsx`, `template.tsx` (remount), `route.ts` (Route Handler). Папка без `page.tsx` — только colocation, маршрут не регистрируется. `params` — из path (`/post/123` → `{ id: '123' }`), `searchParams` — из query (`?draft=true`). В Server Components `params`/`searchParams` приходят props; в Client Components — `useParams()` / `useSearchParams()` из `next/navigation`. Типичные ошибки: читать `params` как prop в `'use client'` (undefined), использовать `[...slug]` вместо `[id]` (захватывает лишние сегменты), путать `[...slug]` и `[[...slug]]` для индексной docs-страницы, забыть `generateStaticParams` для известных slug на build. `generateStaticParams` возвращает массив объектов params — Next.js pre-render статический HTML, улучшает TTFB. `notFound()` из `next/navigation` активирует ближайший `not-found.tsx`. Middleware rewrite меняет обработчик файла, но `params` извлекаются из паттерна matched page.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "react"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "file_based_routing",
+      "title": "Понимает file-based routing",
+      "expected": "Кандидат объясняет: структура `app/` = URL; `page.tsx` регистрирует маршрут; отдельный router config не нужен; Next.js строит route manifest при сборке.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — папка = сегмент URL, page.tsx обязателен",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "file_based_routing",
+            "oftenConfusedWith": [
+              "dynamic_routes",
+              "special_files"
+            ],
+            "anchorTermsExpected": [
+              "app/",
+              "page.tsx",
+              "file-based",
+              "файлов",
+              "route manifest",
+              "без конфиг"
+            ],
+            "anchorTermsWrongTopic": [
+              "нужен react-router",
+              "pages/ вместо app/",
+              "любая папка создаёт маршрут"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "app/",
+              "page.tsx",
+              "folder"
+            ],
+            "ask": "как `app/docs/page.tsx` превращается в URL и что нужно для регистрации маршрута"
+          }
+        ],
+        "mustConcepts": [
+          "file-based",
+          "файлов",
+          "app/",
+          "page.tsx",
+          "папк",
+          "сегмент",
+          "URL",
+          "route manifest",
+          "build-manifest",
+          "сборк",
+          "без конфиг",
+          "react-router",
+          "Route",
+          "регистр",
+          "маршрут",
+          "colocation",
+          "без page.tsx"
+        ],
+        "falseClaims": [
+          "нужна отдельная конфигурация роутера в next.config",
+          "любая папка в app/ автоматически создаёт маршрут",
+          "file-based routing работает только в Pages Router",
+          "URL задаётся именем файла, а не папки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "dynamic_routes",
+      "title": "Знает динамические маршруты [slug]",
+      "expected": "Кандидат объясняет: `[slug]` захватывает один сегмент в `params`; вложенность `app/shop/[category]/[id]/page.tsx` даёт оба ключа; один `[slug]` не матчит многосегментный path.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "динамические сегменты — базовый паттерн middle Next.js",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "file_based_routing",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "[slug]",
+              "params",
+              "динамич"
+            ],
+            "ask": "что вернёт `params` на `/shop/laptops/123` для `app/shop/[category]/[id]/page.tsx`"
+          },
+          {
+            "match": [
+              "[slug]",
+              "404",
+              "один сегмент"
+            ],
+            "ask": "почему `/docs/a/b` даст 404 при `app/docs/[slug]/page.tsx`"
+          }
+        ],
+        "mustConcepts": [
+          "[slug]",
+          "динамич",
+          "params",
+          "сегмент",
+          "квадратн",
+          "скобк",
+          "вложен",
+          "category",
+          "id",
+          "один сегмент",
+          "regex",
+          "паттерн",
+          "Server Component",
+          "prop",
+          "захват",
+          "path"
+        ],
+        "falseClaims": [
+          "один [slug] захватывает несколько сегментов пути",
+          "params доступен только на клиенте через useParams в server component",
+          "динамический сегмент не требует квадратных скобок в имени папки",
+          "[slug] и [...slug] работают одинаково для одного сегмента"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "catch_all_routes",
+      "title": "Различает [...slug] и [[...slug]]",
+      "expected": "Кандидат объясняет: `[...slug]` — 1+ сегментов в массив, корень без сегментов → 404; `[[...slug]]` — 0+ сегментов, `/docs` матчится с пустым массивом.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "частая причина 404 на docs index — ключевой middle pitfall",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "catch_all_routes",
+            "oftenConfusedWith": [
+              "dynamic_routes"
+            ],
+            "anchorTermsExpected": [
+              "[...slug]",
+              "[[...slug]]",
+              "массив",
+              "опциональн",
+              "пустой массив",
+              "404"
+            ],
+            "anchorTermsWrongTopic": [
+              "одинарный и двойной catch-all одинаковы на /docs",
+              "[...slug] матчит /docs без сегментов"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "[...slug]",
+              "[[...slug]]",
+              "catch-all"
+            ],
+            "ask": "чем отличается `/docs` для `[...slug]` и `[[...slug]]`"
+          }
+        ],
+        "mustConcepts": [
+          "[...slug]",
+          "[[...slug]]",
+          "catch-all",
+          "массив",
+          "string[]",
+          "опциональн",
+          "пустой массив",
+          "404",
+          "корнев",
+          "индекс",
+          "docs",
+          "join",
+          "хотя бы один",
+          "двойн",
+          "скобк",
+          "сегмент"
+        ],
+        "falseClaims": [
+          "[...slug] и [[...slug]] одинаково матчат /docs без дополнительных сегментов",
+          "catch-all захватывает ровно один сегмент",
+          "[[...slug]] требует минимум один сегмент",
+          "на /docs/a/b один [slug] достаточно вместо catch-all"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "route_groups_slots",
+      "title": "Знает route groups и parallel routes",
+      "expected": "Кандидат объясняет: `(name)` не в URL, разные layout в одном `app/`; `@slot` — parallel routes со независимым loading/streaming; может упомянуть intercepting `(.)` для модалок.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "организация app/ без загрязнения URL — middle+",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "(marketing)",
+              "route group",
+              "групп"
+            ],
+            "ask": "почему `(marketing)/about/page.tsx` даёт `/about`, а не `/marketing/about`"
+          },
+          {
+            "match": [
+              "@stats",
+              "@activity",
+              "parallel",
+              "слот"
+            ],
+            "ask": "как parallel routes передаются в layout и зачем независимый streaming"
+          },
+          {
+            "match": [
+              "(.)",
+              "intercept",
+              "перехват",
+              "модал"
+            ],
+            "ask": "зачем intercepting route при клике на карточку vs прямом URL"
+          }
+        ],
+        "mustConcepts": [
+          "route group",
+          "групп",
+          "(marketing)",
+          "скобк",
+          "не в URL",
+          "layout.tsx",
+          "parallel",
+          "параллельн",
+          "@stats",
+          "@activity",
+          "слот",
+          "slot",
+          "streaming",
+          "intercept",
+          "перехват",
+          "(.)",
+          "модал",
+          "контекст"
+        ],
+        "falseClaims": [
+          "имя в скобках (marketing) появляется в URL",
+          "parallel routes требуют отдельный layout на каждый слот вне dashboard",
+          "intercepting routes меняют URL в адресной строке",
+          "@slot работает только в Pages Router"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "special_files",
+      "title": "Знает специальные файлы сегмента",
+      "expected": "Кандидат перечисляет: `page.tsx` (маршрут), `layout.tsx`, `loading.tsx`, `error.tsx`, `not-found.tsx`, `template.tsx`, `route.ts`; папка без `page.tsx` — не маршрут.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "таблица special files из ITLead — базовая грамотность",
+        "mustConcepts": [
+          "page.tsx",
+          "layout.tsx",
+          "loading.tsx",
+          "error.tsx",
+          "not-found.tsx",
+          "template.tsx",
+          "route.ts",
+          "Route Handler",
+          "Suspense",
+          "Error boundary",
+          "404",
+          "без page.tsx",
+          "colocation",
+          "сегмент",
+          "спецфайл"
+        ],
+        "falseClaims": [
+          "layout.tsx создаёт отдельный URL-сегмент",
+          "route.ts рендерит React-страницу как page.tsx",
+          "папка с только layout.tsx регистрирует маршрут",
+          "loading.tsx заменяет error boundary"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "params_vs_searchparams",
+      "title": "Различает params и searchParams",
+      "expected": "Кандидат объясняет: `params` из path, `searchParams` из query; в Server Components — props; в Client — `useParams()` / `useSearchParams()`.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up из ITLead — частая путаница path vs query",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "params",
+              "searchParams",
+              "query"
+            ],
+            "ask": "откуда берутся params и searchParams для `/post/123?draft=true`"
+          },
+          {
+            "match": [
+              "useParams",
+              "use client",
+              "Server Component"
+            ],
+            "ask": "как читать params в client component после рефакторинга из server"
+          }
+        ],
+        "mustConcepts": [
+          "params",
+          "searchParams",
+          "path",
+          "query",
+          "строка запрос",
+          "useParams",
+          "useSearchParams",
+          "next/navigation",
+          "Server Component",
+          "use client",
+          "prop",
+          "draft",
+          "id",
+          "сегмент"
+        ],
+        "falseClaims": [
+          "searchParams и params — одно и то же",
+          "params как prop работает в use client компоненте",
+          "useParams нужен в server component",
+          "query string попадает в params.slug"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки routing",
+      "expected": "Кандидат называет: params в client без useParams; `[...slug]` вместо `[id]`; путаница catch-all; забытый `generateStaticParams`; `notFound()` для отсутствующего ресурса.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production bugs",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "catch_all_routes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useParams",
+              "undefined",
+              "use client"
+            ],
+            "ask": "почему params.slug undefined в client component с prop params"
+          },
+          {
+            "match": [
+              "generateStaticParams",
+              "TTFB",
+              "build"
+            ],
+            "ask": "зачем generateStaticParams для /blog/[slug] когда slug известны на deploy"
+          }
+        ],
+        "mustConcepts": [
+          "useParams",
+          "undefined",
+          "use client",
+          "generateStaticParams",
+          "статич",
+          "TTFB",
+          "build",
+          "notFound",
+          "catch-all",
+          "захватывает слишком",
+          "[...userId]",
+          "profile",
+          "ISR",
+          "force-cache",
+          "ошибк",
+          "review"
+        ],
+        "falseClaims": [
+          "params prop надёжно работает в use client без useParams",
+          "generateStaticParams не влияет на TTFB динамических страниц",
+          "app/[...userId] корректно для /profile/123",
+          "notFound() рендерит дефолтную Next.js 404 без not-found.tsx"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "В App Router папка = сегмент URL: `app/blog/[slug]/page.tsx` → `/blog/:slug`. Next.js на build строит route manifest. `[...slug]` — массив сегментов, `[[...slug]]` ещё и `/docs` без хвоста. В server component `params` приходит prop, в client — `useParams()`.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для маркетинга и дашборда делаю `(marketing)` и `(platform)` с разными layout — в URL только `/about` и `/dashboard`. Блог: `generateStaticParams` по slug из CMS, иначе каждый запрос SSR и медленный TTFB. Docs index — только `[[...slug]]`, иначе `/docs` 404.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Parallel routes: `@stats` и `@activity` в layout dashboard — стримятся отдельно. Intercepting `(.)` — клик открывает модалку, прямой URL полную страницу. `notFound()` если пост не найден — срабатывает `not-found.tsx` сегмента.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "File-based routing — это когда в next.config прописываешь все Route. Любая папка в app/ автоматически доступна по URL, page.tsx не обязателен.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "На `/docs/a/b` сработает `app/docs/[slug]/page.tsx` — [slug] захватит оба сегмента. `[...slug]` и `[[...slug]]` на корне `/docs` ведут себя одинаково.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В use client компоненте params приходит prop как в server — useParams не нужен. Для динамики всегда ставлю `app/[...slug]` на корне app/.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "file_based_routing",
+      "exampleType": "good",
+      "exampleText": "`app/docs/page.tsx` → `/docs`; route manifest строится при сборке из дерева `app/`, отдельный router config не нужен.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "file_based_routing",
+      "exampleType": "good",
+      "exampleText": "ну file-based — папки в app это url, page.tsx делает маршрут живым, без react-router",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "file_based_routing",
+      "exampleType": "bad",
+      "exampleText": "Маршрут создаётся любой папкой в app/, даже без page.tsx — достаточно layout.tsx.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "dynamic_routes",
+      "exampleType": "good",
+      "exampleText": "`app/shop/[category]/[id]/page.tsx` на `/shop/laptops/42` даёт `params.category` и `params.id`.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "dynamic_routes",
+      "exampleType": "good",
+      "exampleText": "один [slug] — ровно один сегмент, /docs/a/b с [slug] даст 404",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "dynamic_routes",
+      "exampleType": "bad",
+      "exampleText": "[slug] в имени папки захватывает весь остаток пути как массив.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "catch_all_routes",
+      "exampleType": "good",
+      "exampleText": "`app/docs/[[...slug]]/page.tsx`: `/docs` → `slug = []`, `/docs/react/hooks` → `['react','hooks']`. Одинарный `[...slug]` на `/docs` — 404.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "catch_all_routes",
+      "exampleType": "good",
+      "exampleText": "для docs индекса только двойные скобки, иначе корень не матчится",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "catch_all_routes",
+      "exampleType": "bad",
+      "exampleText": "[...slug] и [[...slug]] оба матчат /docs с пустым массивом — разницы нет.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "route_groups_slots",
+      "exampleType": "good",
+      "exampleText": "`(marketing)/about/page.tsx` → `/about`; `(marketing)` не в URL. `@stats` в layout — отдельный parallel slot со своим loading.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "route_groups_slots",
+      "exampleType": "good",
+      "exampleText": "intercepting (.) — клик модалка, прямой url полная страница, url не меняется при модалке",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "route_groups_slots",
+      "exampleType": "bad",
+      "exampleText": "Route group (platform) добавляет /platform/ в URL перед dashboard.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "special_files",
+      "exampleType": "good",
+      "exampleText": "page.tsx — маршрут; layout persist; loading Suspense; error boundary; not-found 404; route.ts — API handler.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "special_files",
+      "exampleType": "good",
+      "exampleText": "папка только с components без page — colocation, url не создаёт",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "special_files",
+      "exampleType": "bad",
+      "exampleText": "loading.tsx регистрирует новый URL /loading для сегмента.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "params_vs_searchparams",
+      "exampleType": "good",
+      "exampleText": "`/post/123?draft=true`: params.id='123', searchParams.draft='true'. Client — useParams/useSearchParams.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "params_vs_searchparams",
+      "exampleType": "good",
+      "exampleText": "рефактор в use client — убрал params prop, взял useParams из next/navigation",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "params_vs_searchparams",
+      "exampleType": "bad",
+      "exampleText": "searchParams.slug приходит из path сегмента /blog/my-post.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Client page: useParams(), не params prop. Blog: generateStaticParams из CMS slug. Docs root: [[...slug]], не [...slug].",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "app/[...userId] на /profile/123 захватит ['profile','123'] — фикс: app/profile/[userId]",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "generateStaticParams не нужен — Next.js сам кеширует все динамические маршруты навсегда.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nextjs-routing-in-nextjs-file-based-routing",
+    "apiUrl": "https://api.itlead.org/api/questions/nextjs-routing-in-nextjs-file-based-routing",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/nextjs-routing-in-nextjs-file-based-routing",
+    "difficulty": "MIDDLE",
+    "titleEn": "Routing in Next.js (file-based routing)",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T16:30:00.000Z"
+  }
+}

@@ -1,0 +1,586 @@
+{
+  "topic": {
+    "code": "utility_type_awaited_typescript",
+    "name": "Utility type Awaited в TypeScript",
+    "skillCode": "typescript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое utility type `Awaited<T>` в TypeScript и как его правильно использовать?",
+    "shortAnswer": "`Awaited<T>` — utility type TypeScript (с версии 4.5), который рекурсивно снимает все слои Promise и возвращает тип финального разрешённого значения. Стандартный паттерн для async-функций: `Awaited<ReturnType<typeof fn>>`.",
+    "idealAnswer": "`Awaited<T>` — встроенный utility type TypeScript (с 4.5), рекурсивно разворачивающий цепочки Promise до обычного типа. Аналогия: каждый Promise — обёртка; Awaited снимает все слои, сколько бы их ни было. `Awaited<Promise<string>>` → `string`; `Awaited<Promise<Promise<number>>>` → `number`; если T не Promise — возвращается T без изменений (`Awaited<string>` → `string`). Реализация — conditional type: если `T extends Promise<infer U>`, рекурсия на `Awaited<U>`, иначе T. Всё на этапе компиляции, zero runtime cost. Union distribution: `Awaited<Promise<A> | B>` → `A | B`, TypeScript применяет условный тип к каждому члену union отдельно; `Awaited<Promise<A> | Promise<B>>` → `A | B`. Стандартный паттерн: `Awaited<ReturnType<typeof fetchUser>>` — ReturnType даёт `Promise<User>`, Awaited снимает обёртку → `User`. Без Awaited: `ReturnType<typeof loadData>` остаётся `Promise<{...}>`. Когда использовать: типизация async-функций и API-клиентов; неизвестная глубина Promise в SDK; union async-результатов; `Promise.all` с mapped type по кортежу. Не нужен, если T уже plain type. Типичные ошибки: `Awaited<Fn>` где Fn — тип функции → `never` (нужен `Awaited<ReturnType<Fn>>`); ручной `T extends Promise<infer U> ? U : T` снимает один слой, на `Promise<Promise<string>>` остаётся `Promise<string>`; ожидание разворота Promise внутри полей объекта — `{ data: Promise<string> }` не меняется, нужен рекурсивный mapped type. `Awaited<Promise<void>>` → `void`, не `never`. `Awaited<void>` остаётся `void`; для исключения void — отдельно `Exclude<Resolved, void>`. Ручная реализация: `type MyAwaited<T> = T extends Promise<infer U> ? MyAwaited<U> : T`. Практика: TanStack Query выводит `data` через Awaited; tRPC `inferRouterOutputs` использует Awaited; Express async handlers; Zod с async transform. Изменение return type `queryFn` автоматически обновляет тип `data` — ручная анотация может устареть без warning.",
+    "maxScore": 10,
+    "skills": [
+      "typescript",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "awaited_definition",
+      "title": "Понимает суть Awaited<T>",
+      "expected": "Кандидат объясняет: `Awaited<T>` рекурсивно снимает все слои Promise и возвращает тип финального значения; если T не Promise — возвращает T без изменений; доступен с TypeScript 4.5.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — ядро темы middle",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Awaited",
+              "Promise",
+              "рекурсив"
+            ],
+            "ask": "чем `Awaited<Promise<Promise<number>>>` отличается от одного `Promise<infer U> ? U : T`"
+          }
+        ],
+        "mustConcepts": [
+          "Awaited",
+          "utility type",
+          "утилит",
+          "Promise",
+          "промис",
+          "рекурсив",
+          "разворот",
+          "unwrap",
+          "снимает",
+          "слой",
+          "обёртк",
+          "финальн",
+          "разрешён",
+          "resolved",
+          "plain type",
+          "обычн",
+          "4.5",
+          "TypeScript",
+          "conditional type"
+        ],
+        "falseClaims": [
+          "`Awaited<T>` работает в runtime и меняет Promise",
+          "`Awaited<T>` снимает только один слой Promise",
+          "`Awaited<string>` возвращает `never`",
+          "`Awaited` доступен только в TypeScript 5+"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "recursive_mechanism",
+      "title": "Знает механизм рекурсивного разворота",
+      "expected": "Кандидат описывает: conditional type `T extends Promise<infer U> ? Awaited<U> : T`; рекурсия до non-Promise; compile-time only, zero runtime overhead.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "How recursive unwrapping works — ключевая модель middle",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "awaited_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "infer U",
+              "conditional",
+              "compile-time"
+            ],
+            "ask": "как TypeScript реализует Awaited через conditional type и infer"
+          }
+        ],
+        "mustConcepts": [
+          "conditional type",
+          "условн",
+          "infer",
+          "infer U",
+          "extends Promise",
+          "рекурс",
+          "рекурси",
+          "compile-time",
+          "компил",
+          "type checker",
+          "проверк тип",
+          "runtime",
+          "zero cost",
+          "стир",
+          "erase",
+          "V8",
+          "Node",
+          "non-Promise",
+          "plain"
+        ],
+        "falseClaims": [
+          "Awaited выполняется в runtime при await",
+          "infer U работает только на одном уровне без рекурсии",
+          "conditional type добавляет код в JavaScript",
+          "Awaited меняет поведение Promise в Node.js"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "returntype_pattern",
+      "title": "Применяет Awaited<ReturnType<typeof fn>>",
+      "expected": "Кандидат описывает паттерн `Awaited<ReturnType<typeof fn>>` для типизации async-функций; объясняет, что ReturnType alone оставляет Promise, Awaited снимает обёртку.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Decision rule ITLead — стандартный production-паттерн",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "returntype_pattern",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "ReturnType",
+              "typeof",
+              "Awaited",
+              "async"
+            ],
+            "anchorTermsWrongTopic": [
+              "Awaited<Fn>",
+              "never",
+              "только ReturnType"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ReturnType",
+              "typeof",
+              "async"
+            ],
+            "ask": "как получить тип User из async function fetchUser без ручной аннотации"
+          }
+        ],
+        "mustConcepts": [
+          "ReturnType",
+          "typeof",
+          "Awaited",
+          "async",
+          "асинхрон",
+          "fetchUser",
+          "queryFn",
+          "Promise<User>",
+          "User",
+          "снимает",
+          "обёртк",
+          "паттерн",
+          "стандарт",
+          "типизац",
+          "результат",
+          "функц",
+          "return type",
+          "возврат"
+        ],
+        "falseClaims": [
+          "ReturnType<typeof asyncFn> уже даёт resolved type без Awaited",
+          "Awaited<typeof fn> — правильный паттерн для async-функций",
+          "Awaited заменяет ReturnType полностью",
+          "ручная анотация data надёжнее чем Awaited<ReturnType>"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "union_distribution",
+      "title": "Понимает распределение по union",
+      "expected": "Кандидат объясняет: `Awaited<Promise<A> | B>` → `A | B`; distributive conditional type применяется к каждому члену union; `Awaited<Promise<A> | Promise<B>>` → `A | B`.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Union distribution — важный edge из ITLead theory",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "union",
+              "распредел",
+              "distribut"
+            ],
+            "ask": "чему равен `Awaited<Promise<string> | number>` и почему"
+          },
+          {
+            "match": [
+              "void",
+              "Promise<void>"
+            ],
+            "ask": "что даёт `Awaited<Promise<void>>` — void или never"
+          }
+        ],
+        "mustConcepts": [
+          "union",
+          "union type",
+          "объединен",
+          "распредел",
+          "distribut",
+          "distributive",
+          "conditional",
+          "член",
+          "member",
+          "Promise<A> | B",
+          "A | B",
+          "void",
+          "never",
+          "Exclude",
+          "string | void",
+          "коллапс",
+          "отдельно"
+        ],
+        "falseClaims": [
+          "`Awaited<Promise<A> | B>` даёт `Promise<A | B>`",
+          "`Awaited<Promise<void>>` становится `never`",
+          "union distribution не работает с Awaited",
+          "Awaited автоматически убирает void из union"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Знает когда использовать Awaited",
+      "expected": "Кандидат называет: типизация async-функций, API с переменной глубиной Promise, union async-результатов, Promise.all + mapped type; TanStack Query, tRPC, Express handlers; не нужен для plain types.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "When to use из ITLead — практический контекст middle",
+        "mustConcepts": [
+          "async",
+          "API",
+          "SDK",
+          "TanStack Query",
+          "React Query",
+          "tRPC",
+          "inferRouterOutputs",
+          "Express",
+          "middleware",
+          "Zod",
+          "async transform",
+          "Promise.all",
+          "mapped type",
+          "кортеж",
+          "tuple",
+          "plain type",
+          "не нужен",
+          "skip",
+          "queryFn",
+          "data"
+        ],
+        "falseClaims": [
+          "Awaited нужен для всех типов в проекте",
+          "Awaited разворачивает Promise внутри полей объекта автоматически",
+          "TanStack Query не использует Awaited под капотом",
+          "Awaited заменяет runtime await"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с Awaited",
+      "expected": "Кандидат называет: `Awaited<Fn>` → never (нужен ReturnType); ручной однослойный unwrap не рекурсирует; Awaited не разворачивает Promise внутри полей объекта; забытый ReturnType для async-функций.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes ITLead — четыре частых ловушки middle",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "returntype_pattern",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "never",
+              "Fn",
+              "тип функции"
+            ],
+            "ask": "почему `Awaited<() => Promise<number>>` даёт never"
+          },
+          {
+            "match": [
+              "объект",
+              "поле",
+              "data: Promise"
+            ],
+            "ask": "развернёт ли Awaited `{ data: Promise<string> }`"
+          },
+          {
+            "match": [
+              "OldWay",
+              "ручн",
+              "polyfill"
+            ],
+            "ask": "чем ручной `T extends Promise<infer U> ? U : T` хуже встроенного Awaited"
+          }
+        ],
+        "mustConcepts": [
+          "never",
+          "тип функции",
+          "function type",
+          "ReturnType",
+          "забыт",
+          "ручн",
+          "polyfill",
+          "однослой",
+          "single layer",
+          "Promise<Promise",
+          "вложен",
+          "nested",
+          "объект",
+          "поле",
+          "mapped type",
+          "рекурсив",
+          "top-level",
+          "верхн",
+          "уровн"
+        ],
+        "falseClaims": [
+          "`Awaited<Fn>` корректно даёт resolved type функции",
+          "ручной unwrap `T extends Promise<infer U> ? U : T` эквивалентен Awaited на любой глубине",
+          "Awaited рекурсивно разворачивает все Promise внутри свойств объекта",
+          "`Awaited<Obj>` где Obj содержит Promise-поля — меняет форму объекта"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "manual_implementation",
+      "title": "Может реализовать Awaited вручную",
+      "expected": "Кандидат приводит `type MyAwaited<T> = T extends Promise<infer U> ? MyAwaited<U> : T`; понимает, что union distribution встроена в distributive conditional types.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Follow-up ITLead — interview probe для middle+",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "MyAwaited",
+              "реализ",
+              "вручную"
+            ],
+            "ask": "напишите MyAwaited без встроенного utility type"
+          }
+        ],
+        "mustConcepts": [
+          "MyAwaited",
+          "реализ",
+          "вручную",
+          "manual",
+          "extends Promise",
+          "infer U",
+          "рекурс",
+          "MyAwaited<U>",
+          "distributive",
+          "распредел",
+          "conditional",
+          "union",
+          "автомат",
+          "встроен"
+        ],
+        "falseClaims": [
+          "ручная реализация не может рекурсировать",
+          "union distribution требует отдельного mapped type в MyAwaited",
+          "MyAwaited должен использовать infer без рекурсии",
+          "встроенный Awaited работает иначе чем MyAwaited<T extends Promise<infer U> ? MyAwaited<U> : T>"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "`Awaited<T>` рекурсивно снимает Promise-обёртки: `Awaited<Promise<string>>` → `string`, `Awaited<Promise<Promise<number>>>` → `number`. Для async-функций стандарт — `Awaited<ReturnType<typeof fetchUser>>`. Union: `Awaited<Promise<string> | number>` → `string | number`. Всё compile-time, в JS не попадает.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В TanStack Query тип data держу через `Awaited<ReturnType<typeof fetchPost>>` — меняю return fetchPost, тип data обновляется сам. Старый SDK с `Promise<Promise<T>>` Awaited разворачивает без костылей. `{ data: Promise<string> }` Awaited не трогает — нужен mapped type.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну awaited — снимает все promise слои рекурсивно. returntype даёт promise, awaited докручивает до чистого типа. void из promise<void> остаётся void",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "`Awaited<() => Promise<number>>` даёт `number` — тип функции сам по себе Promise. Awaited разворачивает Promise внутри `{ data: Promise<string> }`. Ручной `T extends Promise<infer U> ? U : T` полностью заменяет Awaited.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "`Awaited<Promise<void>>` становится `never`. `Awaited<Promise<A> | B>` даёт `Promise<A | B>`. Awaited выполняется в runtime при каждом await.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "ReturnType<typeof asyncFn> уже resolved type, Awaited не нужен. TanStack Query требует ручную анотацию data — infer из queryFn не работает.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "awaited_definition",
+      "exampleType": "good",
+      "exampleText": "Awaited<T> — utility type с TS 4.5: рекурсивно unwrap Promise до plain type; если T не Promise — возвращает T.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "awaited_definition",
+      "exampleType": "good",
+      "exampleText": "каждый promise — коробка, awaited открывает все коробки подряд до финального типа",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "awaited_definition",
+      "exampleType": "bad",
+      "exampleText": "Awaited снимает ровно один слой Promise, для вложенных нужен вложенный infer вручную.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "recursive_mechanism",
+      "exampleType": "good",
+      "exampleText": "Conditional type: `T extends Promise<infer U> ? Awaited<U> : T` — рекурсия в type checker, V8/Node не видят Awaited.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "recursive_mechanism",
+      "exampleType": "good",
+      "exampleText": "double-wrapped promise из старого sdk — awaited докрутит до string, однослойный infer оставит promise<string>",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "recursive_mechanism",
+      "exampleType": "bad",
+      "exampleText": "Awaited добавляет runtime-обёртку вокруг Promise для проверки типов.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "returntype_pattern",
+      "exampleType": "good",
+      "exampleText": "ReturnType<typeof fetchUser> → Promise<User>; Awaited<ReturnType<typeof fetchUser>> → User — стандарт для async.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "returntype_pattern",
+      "exampleType": "good",
+      "exampleText": "type PostData = Awaited<ReturnType<typeof fetchPost>> — без дублирования interface Post в хуке",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "returntype_pattern",
+      "exampleType": "bad",
+      "exampleText": "Awaited<typeof loadData> — правильный способ типизировать async loadData.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "union_distribution",
+      "exampleType": "good",
+      "exampleText": "`Awaited<Promise<string> | number>` → `string | number`; distributive conditional применяется к каждому члену union.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "union_distribution",
+      "exampleType": "good",
+      "exampleText": "Promise<Promise<string> | void> → string | void; void не коллапсирует в never; exclude void отдельно",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "union_distribution",
+      "exampleType": "bad",
+      "exampleText": "Awaited<Promise<void>> → never, потому что void — пустой тип.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Async API, React Query queryFn, tRPC outputs, Express handler return — Awaited<ReturnType>. Plain string — Awaited бессмысленен.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "promise.all tuple — mapped + awaited на каждый элемент; sdk версии с разной глубиной promise",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Awaited нужен на каждом поле интерфейса, даже если там нет Promise.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "type Fn = () => Promise<number>; Awaited<Fn> → never; Awaited<ReturnType<Fn>> → number. Функция не extends Promise.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "OldWay<Promise<Promise<string>>> → Promise<string>; Awaited → string. Obj с data: Promise<string> — Awaited<Obj> = Obj.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Awaited<{ data: Promise<string> }> рекурсивно делает data: string автоматически.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "manual_implementation",
+      "exampleType": "good",
+      "exampleText": "type MyAwaited<T> = T extends Promise<infer U> ? MyAwaited<U> : T — покрывает рекурсию; union distribution встроена в conditional.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "manual_implementation",
+      "exampleType": "good",
+      "exampleText": "на собесе пишу myawaited с infer u и рекурсией — union ts разрулит сам",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "manual_implementation",
+      "exampleType": "bad",
+      "exampleText": "MyAwaited без рекурсии на U эквивалентен встроенному Awaited для Promise<Promise<T>>.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "utility-type-awaited-in-typescript",
+    "apiUrl": "https://api.itlead.org/api/questions/utility-type-awaited-in-typescript",
+    "pageUrl": "https://itlead.org/interview-questions/typescript/utility-type-awaited-in-typescript",
+    "difficulty": "MIDDLE",
+    "titleEn": "Utility type awaited in TypeScript",
+    "categorySlug": "typescript",
+    "syncedAt": "2026-06-18T15:00:00.000Z"
+  }
+}

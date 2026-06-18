@@ -1,0 +1,564 @@
+{
+  "topic": {
+    "code": "nodejs_async_vs_sync",
+    "name": "Синхронный и асинхронный код в Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "В чём разница между синхронным и асинхронным кодом в Node.js и когда что использовать?",
+    "shortAnswer": "Синхронный код блокирует event loop до завершения операции; асинхронный передаёт задачу libuv и возвращается сразу, оставляя цикл свободным для других запросов. Главное правило: никогда не использовать sync I/O в обработчике сервера — одно блокирующее чтение останавливает все параллельные запросы.",
+    "idealAnswer": "Node.js однопоточный: пока синхронный I/O выполняется, главный поток ждёт диск или сеть и event loop не обрабатывает новые задачи. Асинхронный I/O делегирует ожидание libuv (пул потоков по умолчанию 4 или OS polling), главный поток продолжает принимать события; callback попадает в очередь после сигнала ОС и выполняется когда call stack пуст. Пример порядка вывода: readFileSync — Start → содержимое файла → End; readFile/async — Start → End → содержимое позже. Когда sync допустим: CLI-скрипт с одним файлом, парсинг JSON уже в памяти, одноразовый debug. Когда только async: API-сервер, запросы к БД и HTTP (50–200 ms round trip). Три паттерна async — callbacks (err первым), Promises (.catch), async/await (try/catch); под капотом один механизм libuv. V8 выполняет JS на call stack; fs.readFile → libuv → OS/thread pool → poll phase event loop. Promises и await используют microtask queue, которая дренируется до следующего тика loop — поэтому await «читается» как sync. Типичные ошибки: readFileSync в Express handler блокирует все запросы; await в for сериализует чтения (10×100 ms = 1000 ms вместо ~100 ms с Promise.all); пропуск err в callback — data на самом деле объект ошибки; callback hell вместо Promise.all. CPU-интенсивная работа блокирует loop независимо от async-синтаксиса — worker_threads или cluster. Тысячи concurrent запросов возможны потому что I/O не блокирует JS-поток. process.nextTick — до следующей фазы loop, setImmediate — в check после I/O; рекурсивный nextTick может задержать I/O. UV_THREADPOOL_SIZE задаётся до старта Node (default 4, max 1024). В production: fs.promises, axios, ORM на Promises; Express/NestJS/Fastify — async handlers.",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "sync_vs_async_definition",
+      "title": "Понимает sync vs async в Node.js",
+      "expected": "Кандидат объясняет: sync блокирует event loop до завершения операции; async регистрирует задачу в libuv и возвращается сразу; Node однопоточный — заблокированный loop не обрабатывает запросы.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — блокировка loop vs делегирование libuv",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "sync_vs_async_definition",
+            "oftenConfusedWith": [
+              "sync_async_output_order",
+              "node_internals_concurrency"
+            ],
+            "anchorTermsExpected": [
+              "event loop",
+              "libuv",
+              "блокир",
+              "неблокир",
+              "однопоток",
+              "callback"
+            ],
+            "anchorTermsWrongTopic": [
+              "async создаёт новый поток на каждый запрос",
+              "sync не блокирует loop",
+              "Node многопоточный для JS"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "sync",
+              "async",
+              "event loop",
+              "libuv"
+            ],
+            "ask": "чем sync I/O отличается от async на уровне event loop"
+          }
+        ],
+        "mustConcepts": [
+          "sync",
+          "синхрон",
+          "async",
+          "асинхрон",
+          "event loop",
+          "цикл событий",
+          "libuv",
+          "блокир",
+          "неблокир",
+          "однопоток",
+          "главный поток",
+          "callback",
+          "колбек",
+          "возвраща",
+          "сразу",
+          "ждёт",
+          "I/O",
+          "диск",
+          "сеть",
+          "readFileSync",
+          "readFile"
+        ],
+        "falseClaims": [
+          "async создаёт отдельный JS-поток на каждый запрос",
+          "sync I/O не блокирует event loop в Node.js",
+          "Node.js многопоточный для выполнения JavaScript",
+          "async означает что операция выполняется мгновенно",
+          "sync и async дают одинаковую пропускную способность сервера"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "sync_async_output_order",
+      "title": "Знает порядок вывода sync и async",
+      "expected": "Кандидат описывает: readFileSync — Start → data → End подряд; async readFile/await — Start → End → data позже; loop свободен между Start и callback при async.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "quick example из ITLead — наглядный порядок console.log",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Start",
+              "End",
+              "readFileSync",
+              "readFile"
+            ],
+            "ask": "какой порядок console.log при sync readFileSync vs async readFile"
+          }
+        ],
+        "mustConcepts": [
+          "readFileSync",
+          "readFile",
+          "Start",
+          "End",
+          "порядок",
+          "позже",
+          "callback",
+          "await",
+          "loop свобод",
+          "заморож",
+          "между",
+          "сначала",
+          "потом"
+        ],
+        "falseClaims": [
+          "async readFile всегда выводит data до End",
+          "sync и async дают одинаковый порядок логов",
+          "await readFile блокирует loop как readFileSync",
+          "порядок логов доказывает что async быстрее sync на одном файле"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Знает когда sync, когда async",
+      "expected": "Кандидат называет: sync — CLI с одним файлом, JSON в памяти, debug; async — API server, БД, HTTP; sync read в handler под нагрузкой блокирует все запросы.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use таблица ITLead — практический выбор",
+        "mustConcepts": [
+          "CLI",
+          "скрипт",
+          "API",
+          "сервер",
+          "handler",
+          "обработчик",
+          "БД",
+          "HTTP",
+          "память",
+          "JSON.parse",
+          "debug",
+          "нагрузк",
+          "конкурент",
+          "параллельн",
+          "500ms",
+          "блокирует все"
+        ],
+        "falseClaims": [
+          "readFileSync в Express handler безопасен под нагрузкой",
+          "sync всегда быстрее async для файлов",
+          "в production сервере sync I/O допустим для конфигов в каждом запросе",
+          "async нужен только для сети, файлы можно sync"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "async_patterns",
+      "title": "Сравнивает callbacks, Promises и async/await",
+      "expected": "Кандидат сравнивает: callbacks — err первым, вложенность; Promises — .catch(), цепочки; async/await — try/catch, линейный код; все три — один механизм libuv под капотом.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "таблица async patterns — база для всего Node-кода",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "sync_vs_async_definition",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "callback",
+              "Promise",
+              "async/await",
+              "await"
+            ],
+            "ask": "чем отличаются callbacks, Promises и async/await в обработке ошибок и читаемости"
+          }
+        ],
+        "mustConcepts": [
+          "callback",
+          "колбек",
+          "err",
+          "Promise",
+          "async/await",
+          "await",
+          "try/catch",
+          ".catch()",
+          ".then()",
+          "вложен",
+          "callback hell",
+          "цепоч",
+          "линейн",
+          "legacy",
+          "production",
+          "fs.promises",
+          "один механизм",
+          "libuv"
+        ],
+        "falseClaims": [
+          "async/await — другой event loop, не Promises",
+          "Promises не используют libuv",
+          "callbacks не нужны — только await",
+          "try/catch работает с error-first callback без обёртки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки sync/async",
+      "expected": "Кандидат называет: readFileSync в HTTP handler; await в for сериализует; пропуск err в callback; callback hell; правильно — fs.promises, Promise.all, (err, data).",
+      "score": 2.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes ITLead — критичные production-антипаттерны",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "when_to_use",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "readFileSync",
+              "handler",
+              "Express"
+            ],
+            "ask": "почему readFileSync в route handler убивает throughput под нагрузкой"
+          },
+          {
+            "match": [
+              "await",
+              "for",
+              "Promise.all"
+            ],
+            "ask": "await в цикле for vs Promise.all — разница по времени для 10 файлов"
+          },
+          {
+            "match": [
+              "err",
+              "callback",
+              "ENOENT"
+            ],
+            "ask": "что будет если в fs.readFile callback пропустить err и использовать первый аргумент как data"
+          }
+        ],
+        "mustConcepts": [
+          "readFileSync",
+          "handler",
+          "Express",
+          "блокирует",
+          "await",
+          "for",
+          "сериализ",
+          "Promise.all",
+          "параллель",
+          "err",
+          "ENOENT",
+          "callback hell",
+          "пирамида",
+          "fs.promises",
+          "конфиг",
+          "нагрузк",
+          "1000ms",
+          "100ms",
+          "map"
+        ],
+        "falseClaims": [
+          "await в for читает файлы параллельно как Promise.all",
+          "пропуск err в callback безопасен — data всегда строка",
+          "readFileSync в handler блокирует только текущий запрос",
+          "callback hell — единственный способ цепочки файлов",
+          "Promise.all медленнее последовательного await в цикле"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "node_internals_concurrency",
+      "title": "Понимает внутренности и масштабирование",
+      "expected": "Кандидат объясняет: V8 + libuv + poll phase; microtask queue для Promises/await; тысячи запросов за счёт неблокирующего I/O; CPU work блокирует loop — worker_threads/cluster; nextTick vs setImmediate; UV_THREADPOOL_SIZE.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "follow-up questions ITLead — связка event loop, CPU, concurrency",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "node_internals_concurrency",
+            "oftenConfusedWith": [
+              "sync_vs_async_definition"
+            ],
+            "anchorTermsExpected": [
+              "microtask",
+              "worker_threads",
+              "UV_THREADPOOL_SIZE",
+              "nextTick",
+              "setImmediate",
+              "CPU"
+            ],
+            "anchorTermsWrongTopic": [
+              "async снимает блокировку CPU",
+              "await создаёт новый поток"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "тысяч",
+              "concurrent",
+              "однопоток"
+            ],
+            "ask": "почему однопоточный Node обслуживает тысячи одновременных HTTP-запросов"
+          },
+          {
+            "match": [
+              "CPU",
+              "worker_threads",
+              "cluster"
+            ],
+            "ask": "почему тяжёлый JSON.parse в handler блокирует loop и что делать"
+          },
+          {
+            "match": [
+              "nextTick",
+              "setImmediate",
+              "microtask"
+            ],
+            "ask": "чем process.nextTick отличается от setImmediate и microtask queue"
+          }
+        ],
+        "mustConcepts": [
+          "V8",
+          "call stack",
+          "libuv",
+          "poll",
+          "microtask",
+          "microtask queue",
+          "await",
+          "Promise",
+          "тысяч",
+          "concurrent",
+          "неблокирующ",
+          "I/O",
+          "CPU",
+          "worker_threads",
+          "cluster",
+          "process.nextTick",
+          "setImmediate",
+          "check phase",
+          "UV_THREADPOOL_SIZE",
+          "thread pool",
+          "4 поток",
+          "crypto",
+          "блокирует loop"
+        ],
+        "falseClaims": [
+          "async/await убирает блокировку CPU на главном потоке",
+          "await создаёт OS-поток на каждую операцию",
+          "setImmediate выполняется раньше process.nextTick",
+          "UV_THREADPOOL_SIZE можно менять в runtime после старта без перезапуска",
+          "однопоточный Node не может обраблатать параллельные HTTP-запросы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Sync блокирует event loop — пока readFileSync ждёт диск, новые запросы не обрабатываются. Async передаёт чтение libuv, handler возвращается, callback после poll phase. В API только fs.promises/await; sync — для CLI и JSON в памяти. await в for сериализует — для N файлов Promise.all.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На Express все роуты async: await User.findById и fs.promises.readFile. Конфиг гружу один раз при старте sync — ok. В handler readFileSync под трафиком — p99 взлетает. Три конфига — Promise.all параллельно ~100ms, не три await подряд ~300ms.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Callbacks (err, data), Promises .catch, async try/catch — один libuv механизм. Microtask queue дренируется до следующего tick — await выглядит sync. CPU-heavy — worker_threads, не await. UV_THREADPOOL_SIZE=16 до node server.js для crypto.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Async создаёт поток на каждый readFile — поэтому Node многопоточный. readFileSync в GET /data безопасен, блокируется только один клиент.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "await в for так же параллелит файлы как Promise.all. В callback первый аргумент всегда data, err не проверяю.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "async/await другой runtime без Promises. Тяжёлый цикл в async handler не блокирует loop — await же async.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "sync_vs_async_definition",
+      "exampleType": "good",
+      "exampleText": "Sync: поток ждёт диск, loop заморожен. Async: libuv + callback когда OS готова — loop принимает другие запросы.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "sync_vs_async_definition",
+      "exampleType": "good",
+      "exampleText": "ну sync стопорит весь node пока файл читается, async отдаёт в libuv и идёт дальше",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "sync_vs_async_definition",
+      "exampleType": "bad",
+      "exampleText": "Async не использует event loop — каждый запрос в своём JS-потоке.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "sync_async_output_order",
+      "exampleType": "good",
+      "exampleText": "readFileSync: Start, data, End подряд. readFile: Start, End, потом data в callback — между Start и data loop был свободен.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "sync_async_output_order",
+      "exampleType": "good",
+      "exampleText": "async/await внутри функции A-B-C по порядку, но другой код на loop мог выполниться между A и await",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "sync_async_output_order",
+      "exampleType": "bad",
+      "exampleText": "Async readFile всегда печатает файл до End как sync.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "CLI migrate.js — readFileSync ok. Production API — только async; 500ms sync read × 100 RPS = очередь.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "JSON.parse из буфера в памяти — sync cpu, io нет. axios к API — async обязательно.",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Конфиг readFileSync на каждый HTTP запрос — норм, файл маленький.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "async_patterns",
+      "exampleType": "good",
+      "exampleText": "Legacy fs.readFile(err,data); modern await fs.promises.readFile + try/catch; под капотом Promise и libuv одинаково.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "async_patterns",
+      "exampleType": "good",
+      "exampleText": "callback hell — три вложенных readFile; fix — Promise.all трёх fs.promises.readFile",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "async_patterns",
+      "exampleType": "bad",
+      "exampleText": "async/await не Promises — .catch на async function не работает.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "app.get async + await fs.promises.readFile вместо readFileSync — loop свободен для второго запроса.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "10 файлов: for+await = сумма latencies; Promise.all(map readFile) = max latency",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "fs.readFile('./x', (data) => log(data)) — ENOENT выведу как content, err не нужен.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "node_internals_concurrency",
+      "exampleType": "good",
+      "exampleText": "HTTP I/O через OS polling без блокировки JS; pbkdf2Sync в handler — блок всех; worker_threads для CPU.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "node_internals_concurrency",
+      "exampleType": "good",
+      "exampleText": "nextTick раньше I/O callbacks, setImmediate в check после poll; рекурсивный nextTick может отложить readFile",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "node_internals_concurrency",
+      "exampleType": "bad",
+      "exampleText": "UV_THREADPOOL_SIZE меняю внутри app.listen — pool уже 4 потока, env не поможет.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-async-vs-sync",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-async-vs-sync",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-async-vs-sync",
+    "difficulty": "JUNIOR",
+    "titleEn": "Synchronous vs asynchronous code in Node.js",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T16:30:00.000Z"
+  }
+}

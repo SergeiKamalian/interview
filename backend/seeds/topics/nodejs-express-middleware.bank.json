@@ -1,0 +1,617 @@
+{
+  "topic": {
+    "code": "nodejs_express_middleware",
+    "name": "Middleware в Express.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое middleware в Express.js и как оно работает?",
+    "shortAnswer": "Middleware в Express.js — это функция с доступом к `req`, `res` и `next()`, которая выполняется между входящим HTTP-запросом и обработчиком маршрута. Middleware запускается в порядке регистрации; без вызова `next()` или отправки ответа цепочка останавливается и запрос зависает.",
+    "idealAnswer": "Middleware в Express.js — функция между входящим HTTP-запросом и route handler с доступом к `req`, `res` и `next()`. Express при инициализации строит стек слоёв в `app._router.stack`; при запросе `app.handle(req, res)` проходит по стеку последовательно — каждый слой либо вызывает `next()` для передачи управления, либо завершает ответ через `res.send()`/`res.json()` и останавливает цепочку. Порядок регистрации критичен: `app.use(logger)` до маршрутов, error handler — после всех routes. Типы: application-level (`app.use()` — глобально или по префиксу), route-level (`app.get('/path', mw, handler)` — цепочка перед handler), error-handling (ровно 4 аргумента `(err, req, res, next)`, Express распознаёт сигнатуру и направляет туда `next(err)`), built-in (`express.json()`, `express.urlencoded()`, `express.static()`), third-party (`morgan`, `helmet`, `cors`, `express-rate-limit`). `next()` — к следующему middleware/handler; `next('route')` — пропустить оставшиеся middleware текущего стека и перейти к следующему matching route (fallback routing); `next(err)` — сразу в error handler. Async middleware не вызывает `next()` автоматически: async-функция возвращает Promise, Express не ждёт — нужен явный `next()` после `await` и `try/catch` с `next(err)` при ошибке; иначе запрос висит или unhandled rejection крашит процесс (Node 15+). Типичные ошибки: забытый `next()` в async; глобальный middleware после routes (не сработает для уже зарегистрированных); двойной `next()` (duplicate processing, «headers already sent»); error handler до routes; чтение `req.body` до `express.json()`. Cross-cutting (логирование, CORS, auth, rate limit) — middleware; бизнес-логика — в route handler. `app.use()` глобально на приложении; `router.use()` — только для sub-router при модульном API. Производительность: синхронный проход по стеку ~1 мкс на слой; узкое место — async I/O, не глубина стека.",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "middleware_definition",
+      "title": "Понимает что такое middleware",
+      "expected": "Кандидат объясняет: middleware — функция между запросом и handler с доступом к req, res, next; может изменить req/res, завершить ответ или передать управление дальше через next().",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — определение middleware и роль next()",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "middleware_definition",
+            "oftenConfusedWith": [
+              "pipeline_and_order"
+            ],
+            "anchorTermsExpected": [
+              "middleware",
+              "req",
+              "res",
+              "next",
+              "между",
+              "запрос",
+              "handler"
+            ],
+            "anchorTermsWrongTopic": [
+              "middleware это route handler",
+              "next вызывается автоматически в async"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "middleware",
+              "req",
+              "res",
+              "next"
+            ],
+            "ask": "что делает middleware между запросом и route handler и зачем нужен next()"
+          }
+        ],
+        "mustConcepts": [
+          "middleware",
+          "промежуточ",
+          "req",
+          "res",
+          "next",
+          "запрос",
+          "ответ",
+          "handler",
+          "обработчик",
+          "между",
+          "функция",
+          "HTTP",
+          "Express",
+          "переда",
+          "управлен",
+          "цепоч",
+          "останов"
+        ],
+        "falseClaims": [
+          "middleware и route handler — одно и то же",
+          "middleware не имеет доступа к req и res",
+          "next() вызывается автоматически после выполнения middleware",
+          "middleware может только логировать, но не менять req",
+          "без next() Express сам переходит к следующему слою"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "pipeline_and_order",
+      "title": "Понимает pipeline и порядок регистрации",
+      "expected": "Кандидат описывает стек слоёв app._router.stack, последовательное выполнение app.handle; порядок регистрации важен — app.use до routes, error handler последним.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "order matters — ключевой принцип Express pipeline",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "middleware_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "pipeline_and_order",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "порядок",
+              "стек",
+              "stack",
+              "app.use",
+              "регистрац",
+              "последователь"
+            ],
+            "anchorTermsWrongTopic": [
+              "порядок регистрации не важен",
+              "middleware после route всё равно выполнится"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "порядок",
+              "stack",
+              "стек",
+              "app._router"
+            ],
+            "ask": "как Express хранит middleware и почему порядок app.use и routes критичен"
+          }
+        ],
+        "mustConcepts": [
+          "pipeline",
+          "стек",
+          "stack",
+          "app._router",
+          "слой",
+          "layer",
+          "порядок",
+          "регистрац",
+          "app.handle",
+          "последователь",
+          "app.use",
+          "до маршрут",
+          "после маршрут",
+          "error handler",
+          "последн",
+          "пропуск",
+          "matching"
+        ],
+        "falseClaims": [
+          "порядок регистрации middleware не влияет на выполнение",
+          "app.use после app.get всё равно выполнится для этого маршрута",
+          "error handler можно поставить в начале файла",
+          "Express выполняет все middleware параллельно",
+          "стек middleware пересчитывается на каждый запрос заново с нуля"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "middleware_types",
+      "title": "Различает типы middleware",
+      "expected": "Кандидат называет: application-level (app.use), route-level (в определении маршрута), error-handling (4 аргумента), built-in (express.json, static), third-party (morgan, helmet, cors).",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "типы middleware — application/route/error/built-in/third-party",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "application",
+              "app.use",
+              "route-level",
+              "route"
+            ],
+            "ask": "чем application-level middleware отличается от route-level"
+          },
+          {
+            "match": [
+              "error",
+              "4 аргумент",
+              "err"
+            ],
+            "ask": "как Express распознаёт error-handling middleware"
+          }
+        ],
+        "mustConcepts": [
+          "application-level",
+          "app.use",
+          "route-level",
+          "app.get",
+          "цепоч",
+          "error-handling",
+          "4 аргумент",
+          "err",
+          "next(err)",
+          "express.json",
+          "express.static",
+          "urlencoded",
+          "built-in",
+          "third-party",
+          "morgan",
+          "helmet",
+          "cors",
+          "rate-limit",
+          "body-parser"
+        ],
+        "falseClaims": [
+          "error middleware может иметь 3 аргумента как обычное",
+          "app.use и route-level middleware работают одинаково по области",
+          "express.json() нужно ставить после middleware читающего req.body",
+          "third-party middleware нельзя использовать с app.use",
+          "express.static не является middleware"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "next_and_error_handling",
+      "title": "Знает next(), next(err) и next('route')",
+      "expected": "Кандидат объясняет: next() — к следующему слою; next(err) — в error handler; next('route') — пропуск оставшихся middleware текущего route stack; res.send() без return и последующий next() даёт headers already sent.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "next variants и error routing — middle+ must know",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "next(err)",
+              "error handler",
+              "4 аргумент"
+            ],
+            "ask": "когда вызывать next(err) вместо res.status(500).send"
+          },
+          {
+            "match": [
+              "next('route')",
+              "fallback",
+              "route"
+            ],
+            "ask": "зачем нужен next('route') и чем отличается от next()"
+          }
+        ],
+        "mustConcepts": [
+          "next()",
+          "next(err)",
+          "next('route')",
+          "error handler",
+          "4 параметр",
+          "headers already sent",
+          "return",
+          "res.send",
+          "пропуск",
+          "fallback",
+          "route stack",
+          "центральн",
+          "обработчик ошибок",
+          "переда",
+          "ошибк"
+        ],
+        "falseClaims": [
+          "next(err) и res.status(500) всегда эквивалентны",
+          "next('route') то же самое что next()",
+          "можно вызвать res.send() и потом next() без последствий",
+          "error handler с 3 аргументами перехватит next(err)",
+          "next('route') прерывает весь Express и не ищет другие routes"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "async_middleware",
+      "title": "Правильно пишет async middleware",
+      "expected": "Кандидат объясняет: async не вызывает next() автоматически; нужен await + next() в try/catch; next(err) при ошибке; иначе запрос висит или unhandled rejection.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "async pitfalls — частая production-ошибка из ITLead Common mistakes",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "async",
+              "await",
+              "Promise"
+            ],
+            "ask": "почему async middleware без next() зависает и как правильно обработать ошибку"
+          },
+          {
+            "match": [
+              "try/catch",
+              "next(err)",
+              "unhandled"
+            ],
+            "ask": "что случится с unhandled rejection в async middleware на Node 15+"
+          }
+        ],
+        "mustConcepts": [
+          "async",
+          "await",
+          "Promise",
+          "next()",
+          "вручную",
+          "не автоматическ",
+          "try/catch",
+          "next(err)",
+          "завис",
+          "hang",
+          "unhandled rejection",
+          "Node 15",
+          "не ждёт",
+          "синхрон",
+          "после await",
+          "ошибк"
+        ],
+        "falseClaims": [
+          "Express автоматически ждёт await в async middleware",
+          "async middleware не нужно вызывать next()",
+          "unhandled rejection в middleware безопасно игнорируется",
+          "достаточно res.send в catch без next(err)",
+          "Promise.resolve автоматически вызывает next()"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки middleware",
+      "expected": "Кандидат называет: забытый next() в async; middleware после routes; двойной next(); error handler не последним; req.body до express.json(); return перед res.send().",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — частые баги на интервью",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "двойной next",
+              "next дважды",
+              "headers already sent"
+            ],
+            "ask": "что произойдёт при двойном вызове next() в одном middleware"
+          },
+          {
+            "match": [
+              "req.body",
+              "express.json",
+              "undefined"
+            ],
+            "ask": "почему middleware читает req.body undefined и как исправить порядок"
+          }
+        ],
+        "mustConcepts": [
+          "забыт",
+          "next()",
+          "после routes",
+          "до routes",
+          "двойной next",
+          "headers already sent",
+          "error handler",
+          "последн",
+          "req.body",
+          "express.json",
+          "undefined",
+          "return",
+          "res.send",
+          "дублир",
+          "завис",
+          "logger"
+        ],
+        "falseClaims": [
+          "можно безопасно вызывать next() дважды для надёжности",
+          "logger после app.get('/users') всё равно залогирует /users",
+          "req.body доступен до express.json()",
+          "error handler в начале файла перехватит ошибки routes",
+          "res.send() и next() можно вызывать подряд без return"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда использовать middleware",
+      "expected": "Кандидат разделяет: cross-cutting (logging, auth, CORS, security) — app.use; проверки конкретного маршрута — route-level; бизнес-логика — в handler; app.use vs router.use для модульного API.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "when to use и app.use vs router.use — бонус middle",
+        "mustConcepts": [
+          "cross-cutting",
+          "логирован",
+          "auth",
+          "CORS",
+          "бизнес-логик",
+          "route handler",
+          "app.use",
+          "router.use",
+          "sub-router",
+          "passport",
+          "morgan",
+          "helmet",
+          "static",
+          "валидац",
+          "глобальн"
+        ],
+        "falseClaims": [
+          "вся логика API должна быть в middleware",
+          "app.use и router.use полностью идентичны по области",
+          "бизнес-логику лучше держать в middleware для переиспользования",
+          "auth всегда только через глобальный app.use на все routes",
+          "express.static заменяет route handler для API"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Middleware — функция между запросом и handler с req, res, next. Регистрирую logger через app.use до routes, auth — route-level на /private. Async middleware: try/await, next() после успеха, next(err) в catch. Error handler с 4 аргументами — последним.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Express идёт по стеку слоёв по порядку регистрации. express.json() первым, потом middleware читает req.body. На /profile цепочка: loadUser async → checkAdmin → res.json. Без next() после await запрос висит.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну middleware как досмотр в аэропорту — каждый проверяет req, может остановить или next() дальше. morgan/helmet/cors сверху, бизнес-логика в handler, не в mw",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Middleware — это route handler. Express сам вызывает next() после async await. Порядок app.use не важен, можно logger после всех routes.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Error middleware с тремя аргументами перехватит next(err). Можно res.send() и потом next() — так надёжнее. req.body работает без express.json().",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Вся бизнес-логика в middleware через app.use на /api — handlers пустые. next() вызываю дважды на всякий случай.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "middleware_definition",
+      "exampleType": "good",
+      "exampleText": "Middleware — функция (req, res, next) между HTTP-запросом и handler; может обогатить req, отправить ответ или вызвать next() для следующего слоя.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "middleware_definition",
+      "exampleType": "good",
+      "exampleText": "промежуточная функция — req/res/next, как фильтр перед route handler",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "middleware_definition",
+      "exampleType": "bad",
+      "exampleText": "Middleware и route handler — синонимы, next() Express вызывает сам всегда.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "pipeline_and_order",
+      "exampleType": "good",
+      "exampleText": "app._router.stack — слои в порядке регистрации; app.handle идёт по ним. app.use(logger) до app.get, иначе logger не попадёт на /users.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "pipeline_and_order",
+      "exampleType": "good",
+      "exampleText": "порядок критичен — сначала json parser, потом auth, потом routes, error handler в конце",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "pipeline_and_order",
+      "exampleType": "bad",
+      "exampleText": "Express выполняет middleware в произвольном порядке, регистрация после route не мешает.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "middleware_types",
+      "exampleType": "good",
+      "exampleText": "app.use — application-level на все или /api; app.get('/x', auth, handler) — route-level цепочка; (err,req,res,next) — error; express.json и helmet — built-in/third-party.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "middleware_types",
+      "exampleType": "good",
+      "exampleText": "morgan логирует все запросы глобально, requireAuth только на /private — route middleware",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "middleware_types",
+      "exampleType": "bad",
+      "exampleText": "Error handler с тремя параметрами (req, res, next) — стандарт Express для next(err).",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "next_and_error_handling",
+      "exampleType": "good",
+      "exampleText": "next() — следующий слой; next(err) — в 4-arg error handler; next('route') — skip оставшихся mw текущего route. return res.status(401) без next().",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "next_and_error_handling",
+      "exampleType": "good",
+      "exampleText": "res.send потом next — headers already sent, нужен return перед send",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "next_and_error_handling",
+      "exampleType": "bad",
+      "exampleText": "next('route') и next() делают одно и то же — просто идут дальше по стеку.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "async_middleware",
+      "exampleType": "good",
+      "exampleText": "async (req,res,next) => { try { req.user = await db.find(); next(); } catch(e) { next(e); } } — Express не ждёт Promise сам.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "async_middleware",
+      "exampleType": "good",
+      "exampleText": "без next после await запрос висит; unhandled rejection на node 15+ крашит процесс",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "async_middleware",
+      "exampleType": "bad",
+      "exampleText": "async middleware — Express автоматически await-ит и вызывает next() когда Promise resolved.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Ошибки: async без next(); app.use(logger) после routes; next() дважды; errorHandler до routes; req.body до express.json().",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "двойной next — duplicate logs и headers already sent",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Logger после app.get('/users') всё равно сработает — Express пересканирует стек на каждый запрос.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Cross-cutting: morgan, helmet, cors через app.use сверху. Auth конкретного route — в app.get. Бизнес-логика в handler. router.use для модульного API.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "passport.initialize глобально, requireAuth на protected routes — не вся логика в mw",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Вся бизнес-логика CRUD в middleware app.use('/api') — handlers не нужны.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-express-middleware",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-express-middleware",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-express-middleware",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is middleware in Express.js and how does it work?",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T23:00:00.000Z"
+  }
+}

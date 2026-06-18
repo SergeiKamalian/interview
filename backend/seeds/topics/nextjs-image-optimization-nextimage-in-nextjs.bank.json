@@ -1,0 +1,596 @@
+{
+  "topic": {
+    "code": "nextjs_image_optimization_nextimage_nextjs",
+    "name": "Оптимизация изображений (next/image) в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как работает оптимизация изображений через компонент next/image в Next.js?",
+    "shortAnswer": "Компонент Image из next/image заменяет обычный <img>: конвертирует в WebP/AVIF, генерирует варианты размеров через srcset, по умолчанию lazy-load и резервирует место под картинку (без CLS). priority — только для LCP (hero); внешние URL требуют remotePatterns. Без sizes на fill браузер качает desktop-вариант даже на мобильном.",
+    "idealAnswer": "next/image — встроенный компонент Next.js для автоматической оптимизации. Обычный <img> отдаёт полный оригинал (например 2000×1200 JPEG ~2MB) на любое устройство; next/image через Sharp на build/runtime генерирует 8+ вариантов (≈25/50/75/100% и device breakpoints), выводит <picture> с MIME-типизированным srcset (AVIF → WebP → оригинал) — браузер выбирает по Accept и дескрипторам w + подсказке sizes до загрузки CSS. На мобильном часто 35–50% меньше трафика (400w WebP вместо 2000px JPEG). По умолчанию: lazy loading, конвертация формата, width/height против CLS. priority={true} — только для above-the-fold/LCP (1–2 картинки): отключает lazy и добавляет <link rel=\"preload\">. fill — для неизвестных размеров внутри position:relative родителя с явными w/h; обязателен корректный sizes, иначе браузер считает 100vw. Внешние URL (Unsplash, Cloudinary, GitHub avatars) — remotePatterns в next.config.js, иначе runtime error. placeholder=\"blur\" + blurDataURL — preview для hero; empty — для мелких thumb. Типичные ошибки: Image без width/height; fill без relative parent; priority на всех картинках; sizes=\"100vw\" в 3-column grid (нужно ~33vw). Внутри: Sharp кеш в .next/cache/images; AVIF ~75% меньше JPEG, WebP ~30–50%; ISR/SSG делят тот же кеш. Custom loader обходит Sharp (CloudFront/Lambda@Edge, Unsplash API). SVG/base64 <10KB или unoptimized={true} — иногда оставляют обычный <img>. Senior: ISR + S3 product images — custom loader на CDN или сужение deviceSizes/imageSizes + прогрев кеша post-deploy.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "react"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "next_image_definition",
+      "title": "Понимает назначение next/image",
+      "expected": "Кандидат объясняет: next/image автоматически конвертирует форматы, генерирует responsive-варианты, lazy-load по умолчанию, резервирует размеры против CLS; выигрыш 35–50% на mobile vs полный оригинал.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — замена img и базовые выгоды",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "next_image_definition",
+            "oftenConfusedWith": [
+              "vs_regular_img",
+              "internal_pipeline"
+            ],
+            "anchorTermsExpected": [
+              "next/image",
+              "WebP",
+              "AVIF",
+              "lazy",
+              "srcset",
+              "CLS",
+              "width",
+              "height"
+            ],
+            "anchorTermsWrongTopic": [
+              "next/image это CSS background",
+              "оптимизация только на Vercel CDN без Sharp"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "next/image",
+              "Image",
+              "lazy"
+            ],
+            "ask": "чем next/image отличается от обычного img для mobile bandwidth"
+          }
+        ],
+        "mustConcepts": [
+          "next/image",
+          "Image",
+          "WebP",
+          "AVIF",
+          "lazy",
+          "отложен",
+          "srcset",
+          "формат",
+          "конверт",
+          "CLS",
+          "layout shift",
+          "width",
+          "height",
+          "вариант",
+          "размер",
+          "mobile",
+          "мобильн"
+        ],
+        "falseClaims": [
+          "next/image просто оборачивает img без изменений",
+          "lazy loading отключён по умолчанию",
+          "next/image не нужны width и height",
+          "оптимизация работает только для внешних CDN"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "vs_regular_img",
+      "title": "Отличает next/image от обычного img",
+      "expected": "Кандидат объясняет: браузер без sizes не знает финальный render size и качает оригинал; next/image генерирует picture/srcset, браузер выбирает w-дескриптор до download.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевая разница из ITLead Key difference",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "next_image_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "picture",
+              "srcset",
+              "sizes",
+              "100vw"
+            ],
+            "ask": "почему без sizes на fill sidebar thumbnail качает full-width variant"
+          }
+        ],
+        "mustConcepts": [
+          "img",
+          "оригинал",
+          "picture",
+          "srcset",
+          "sizes",
+          "w дескриптор",
+          "браузер",
+          "layout",
+          "CSS",
+          "100vw",
+          "sidebar",
+          "thumbnail",
+          "минiat",
+          "bandwidth",
+          "трафик"
+        ],
+        "falseClaims": [
+          "браузер всегда знает render width до загрузки CSS",
+          "обычный img автоматически отдаёт WebP",
+          "srcset есть у любого img без next/image",
+          "next/image не использует picture element"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "props_dimensions_fill_priority",
+      "title": "Знает width, height, fill, sizes, priority",
+      "expected": "Кандидат описывает: width/height обязательны (кроме fill); fill в relative parent; sizes под реальную ширину; priority только для LCP/hero (1–2 на страницу).",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "основные props из When to use и Common mistakes",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "priority",
+              "LCP",
+              "hero"
+            ],
+            "ask": "когда ставить priority и почему не на всех картинках"
+          },
+          {
+            "match": [
+              "fill",
+              "relative",
+              "object-cover"
+            ],
+            "ask": "как правильно использовать fill для blog card cover"
+          },
+          {
+            "match": [
+              "sizes",
+              "33vw",
+              "grid"
+            ],
+            "ask": "какой sizes для 3-column card grid на desktop"
+          }
+        ],
+        "mustConcepts": [
+          "width",
+          "height",
+          "fill",
+          "sizes",
+          "priority",
+          "LCP",
+          "hero",
+          "above the fold",
+          "relative",
+          "position",
+          "object-cover",
+          "preload",
+          "33vw",
+          "100vw",
+          "breakpoint",
+          "grid"
+        ],
+        "falseClaims": [
+          "priority можно ставить на все изображения",
+          "fill работает без position relative у родителя",
+          "sizes не влияет на выбор srcset variant",
+          "width/height опциональны для локальных файлов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "internal_pipeline",
+      "title": "Понимает Sharp, форматы и кеш",
+      "expected": "Кандидат упоминает Sharp, генерацию WebP/AVIF/JPEG variants, picture + Accept negotiation, кеш .next/cache/images; ISR/SSG переиспользуют кеш.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "How it works internally — senior depth",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Sharp",
+              "AVIF",
+              "Accept"
+            ],
+            "ask": "как next/image выбирает между AVIF и WebP"
+          },
+          {
+            "match": [
+              "cache",
+              ".next/cache",
+              "ISR",
+              "SSG"
+            ],
+            "ask": "где хранятся сгенерированные variants и как ISR их переиспользует"
+          }
+        ],
+        "mustConcepts": [
+          "Sharp",
+          "WebP",
+          "AVIF",
+          "JPEG",
+          "picture",
+          "Accept",
+          "content negotiation",
+          "кеш",
+          "cache",
+          ".next/cache",
+          "build",
+          "runtime",
+          "variant",
+          "ISR",
+          "SSG",
+          "blurhash",
+          "base64"
+        ],
+        "falseClaims": [
+          "Sharp работает только в браузере",
+          "AVIF всегда отдаётся независимо от Accept",
+          "каждый request заново прогоняет Sharp без кеша",
+          "WebP больше JPEG по размеру"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки next/image",
+      "expected": "Кандидат называет: нет width/height; fill без relative parent; external без remotePatterns; priority везде; sizes=100vw в grid; объясняет fix.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "props_dimensions_fill_priority",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "remotePatterns",
+              "hostname",
+              "unsplash"
+            ],
+            "ask": "что будет с external URL без remotePatterns"
+          },
+          {
+            "match": [
+              "layout shift",
+              "console error",
+              "width height"
+            ],
+            "ask": "последствия Image без width и height"
+          }
+        ],
+        "mustConcepts": [
+          "width",
+          "height",
+          "fill",
+          "relative",
+          "remotePatterns",
+          "hostname",
+          "runtime error",
+          "priority",
+          "lazy",
+          "sizes",
+          "100vw",
+          "grid",
+          "layout shift",
+          "overflow",
+          "next.config"
+        ],
+        "falseClaims": [
+          "можно использовать любой external URL без конфига",
+          "priority ускоряет все картинки без trade-off",
+          "fill без размеров родителя — нормальный паттерн",
+          "sizes=100vw оптимален для card в 3-column grid"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "remote_patterns_loader",
+      "title": "Настраивает remotePatterns и custom loader",
+      "expected": "Кандидат объясняет remotePatterns в next.config; custom loader для Cloudinary/Unsplash/CDN; loader обходит Sharp когда resize на CDN.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "external images и advanced Unsplash example",
+        "mustConcepts": [
+          "remotePatterns",
+          "next.config",
+          "loader",
+          "custom loader",
+          "Cloudinary",
+          "Unsplash",
+          "CDN",
+          "quality",
+          "hostname",
+          "protocol",
+          "Sharp обход",
+          "Lambda",
+          "CloudFront"
+        ],
+        "falseClaims": [
+          "custom loader отменяет необходимость remotePatterns",
+          "remotePatterns нужен только для localhost",
+          "loader заменяет alt attribute",
+          "внешние картинки оптимизируются без конфигурации"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "placeholder_when_to_use",
+      "title": "Placeholder, when to use img, senior ISR",
+      "expected": "Кандидат различает blur vs empty placeholder; когда оставить <img>/unoptimized; senior: ISR+S3 — custom loader или warm cache + deviceSizes.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "follow-up и real-world — бонус senior",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "blur",
+              "blurDataURL",
+              "empty"
+            ],
+            "ask": "разница placeholder blur и empty"
+          },
+          {
+            "match": [
+              "ISR",
+              "S3",
+              "100ms",
+              "warm"
+            ],
+            "ask": "как уложить оптимизацию dynamic product images в ISR под 100ms"
+          }
+        ],
+        "mustConcepts": [
+          "placeholder",
+          "blur",
+          "blurDataURL",
+          "empty",
+          "unoptimized",
+          "SVG",
+          "base64",
+          "img",
+          "ISR",
+          "S3",
+          "deviceSizes",
+          "imageSizes",
+          "minimumCacheTTL",
+          "warm cache"
+        ],
+        "falseClaims": [
+          "blur placeholder работает без blurDataURL для remote",
+          "SVG всегда нужно через next/image",
+          "ISR не использует image cache",
+          "unoptimized отключает alt requirement"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "next/image через Sharp генерирует WebP/AVIF variants и srcset; браузер качает 400w на mobile вместо 2MB JPEG. Hero — priority + sizes; gallery — lazy + sizes под grid. External — remotePatterns. fill только в relative h-64 контейнере.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На лендинге один hero с priority и blur placeholder. Карточки блога — fill + sizes (max-width 768px) 100vw, 33vw на desktop. Unsplash через remotePatterns и custom loader — resize на их CDN, Sharp не трогаем.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Accept header решает AVIF vs WebP. Кеш в .next/cache/images переживает повторные ISR hits. SVG иконки до 10KB оставляю обычным img или unoptimized.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "next/image — это просто img с loading=lazy, Sharp не участвует, sizes не нужен для fill.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Ставлю priority на все картинки в галерее — так быстрее LCP. External URL работают без next.config.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "fill в обычном div без relative и высоты — норм, Next сам подстроит. sizes=100vw для thumbnail в sidebar экономит трафик.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "next_image_definition",
+      "exampleType": "good",
+      "exampleText": "Image из next/image: WebP/AVIF, lazy по умолчанию, width/height против CLS, mobile получает маленький variant.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "next_image_definition",
+      "exampleType": "good",
+      "exampleText": "ну next/image сам режет картинку под экран, не тащит двухмегабайтный jpeg на телефон",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "next_image_definition",
+      "exampleType": "bad",
+      "exampleText": "next/image только добавляет className, форматы и размеры браузер не меняет.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "vs_regular_img",
+      "exampleType": "good",
+      "exampleText": "Обычный img — браузер качает оригинал; next/image отдаёт picture/srcset, выбор w до загрузки CSS по sizes.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "vs_regular_img",
+      "exampleType": "good",
+      "exampleText": "без sizes на fill браузер думает 100vw — sidebar thumb качает full width, зря трафик",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "vs_regular_img",
+      "exampleType": "bad",
+      "exampleText": "Разницы нет — img и next/image всегда качают один файл.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "props_dimensions_fill_priority",
+      "exampleType": "good",
+      "exampleText": "Hero: width/height + priority. Blog card: relative h-64 + fill + sizes media queries. Gallery cards: lazy без priority.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "props_dimensions_fill_priority",
+      "exampleType": "good",
+      "exampleText": "priority только на LCP hero, максимум пара штук — иначе убиваем lazy и первую загрузку",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "props_dimensions_fill_priority",
+      "exampleType": "bad",
+      "exampleText": "priority на каждой аватарке в списке — best practice для Core Web Vitals.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "internal_pipeline",
+      "exampleType": "good",
+      "exampleText": "Build/runtime Sharp → variants в cache; runtime picture с AVIF/WebP srcset; Accept выбирает AVIF если поддерживается.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "internal_pipeline",
+      "exampleType": "good",
+      "exampleText": "ISR повторно не гоняет Sharp если variant уже в .next/cache/images",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "internal_pipeline",
+      "exampleType": "bad",
+      "exampleText": "Next.js всегда отдаёт JPEG оригинал, WebP только если руками указать format prop.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Image без width/height — error и CLS. fill нужен relative parent. Grid: sizes 33vw, не 100vw. Unsplash — remotePatterns.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "priority на всех — defeats lazy, TTFB хуже; external без hostname — runtime throw",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Можно <Image src=\"https://random.com/p.jpg\" /> без конфига — Next проксирует всё.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "remote_patterns_loader",
+      "exampleType": "good",
+      "exampleText": "next.config images.remotePatterns для unsplash.com; loader возвращает URL с w и q — resize на CDN Unsplash.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "remote_patterns_loader",
+      "exampleType": "good",
+      "exampleText": "CloudFront + Lambda@Edge loader — Sharp в Next не нужен для S3 product photos",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "remote_patterns_loader",
+      "exampleType": "bad",
+      "exampleText": "Custom loader заменяет remotePatterns — hostname можно не whitelist.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "placeholder_when_to_use",
+      "exampleType": "good",
+      "exampleText": "blur + blurDataURL на hero; empty на мелких thumb. ISR S3: сузить deviceSizes + post-deploy warm paths или CDN loader.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "placeholder_when_to_use",
+      "exampleType": "good",
+      "exampleText": "svg иконки — обычный img, next/image для них overkill",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "placeholder_when_to_use",
+      "exampleType": "bad",
+      "exampleText": "placeholder blur автоматически работает для любого remote URL без blurDataURL.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nextjs-image-optimization-nextimage-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/nextjs-image-optimization-nextimage-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/nextjs-image-optimization-nextimage-in-nextjs",
+    "difficulty": "SENIOR",
+    "titleEn": "Image optimization (next/image) in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

@@ -1,0 +1,616 @@
+{
+  "topic": {
+    "code": "css_will_change_property",
+    "name": "CSS-свойство will-change",
+    "skillCode": "html-css",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что делает CSS-свойство `will-change` и как его правильно применять для оптимизации анимаций?",
+    "shortAnswer": "`will-change` — CSS-подсказка браузеру, какие свойства элемента скоро изменятся, чтобы заранее выделить GPU compositor layer. Добавляй непосредственно перед анимацией (`:hover` или JS), снимай через `will-change: auto` после завершения. Глобальное применение создаёт сотни слоёв и ухудшает производительность вместо ускорения.",
+    "idealAnswer": "`will-change` сообщает браузеру, какие CSS-свойства элемента будут анимироваться, чтобы он заранее подготовил оптимизации — чаще всего promotion элемента на отдельный compositor layer на GPU. Без подсказки каждый кадр `transform` или `opacity` может идти через main thread: CPU пересчитывает пиксели, загружает в GPU, blend — при 60fps бюджет ~16ms на кадр быстро съедается. С `will-change: transform` в Blink Chrome выделяется `cc::Layer`: GPU растеризует элемент в тайлы один раз и композитит каждый кадр без layout/paint; стоимость кадра падает с 50ms+ до <5ms для transform/opacity.\n\nРаботает только для compositor-fast свойств: `transform`, `opacity`, `filter`, `scroll-position`. `width`, `height`, `color`, `margin`, `top`/`left` promotion не получают — браузер игнорирует подсказку; для ширины имитируй `transform: scaleX()`.\n\nПравильный lifecycle: на `:hover` перед transition; в JS — `element.style.willChange = 'transform'` за один `requestAnimationFrame` до старта; для модалок — при открытии, сброс `will-change: auto` в `transitionend`/`animationend`. Не держи постоянно в глобальном CSS.\n\nОтличие от `transform: translateZ(0)`: translateZ создаёт GPU-layer сразу и навсегда (хак до 2015); `will-change` выделяет лениво и снимается через `auto` — ты контролируешь lifecycle. Для статичных элементов translateZ держит слой вечно и тратит память.\n\nКаждый layer — несколько MB GPU RAM; 50 слоёв на мобильном ≈200MB+. Chrome держит soft budget ~20 активных слоёв на stacking context, auto-demote лишних после ~250ms idle (Chrome 110+); Safari быстрее (~60ms). `will-change: auto` не освобождает мгновенно — batch demotion ~128ms.\n\nТипичные ошибки: `will-change: transform` на все `.card` при загрузке (80+ слоёв, scroll 30fps); не сбрасывать после анимации (iOS Safari — падение scroll perf на 30%); `will-change: width` без эффекта; на всём scroll-списке без лимита. Fix: mouseenter/transitionend, viewport-scoped через `getBoundingClientRect` + rAF throttle, виртуализация списка.\n\nВ проде: GSAP `gsap.set(el, { willChange: 'transform' })`, Framer Motion управляет внутри, Ionic 7 на modal overlays. DevTools Layers panel показывает allocation/demotion.",
+    "maxScore": 10,
+    "skills": [
+      "html-css",
+      "css"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "will_change_definition",
+      "title": "Понимает назначение will-change",
+      "expected": "Кандидат объясняет: `will-change` — подсказка браузеру о предстоящих изменениях свойств; заранее готовит оптимизации (compositor layer); не меняет визуально сам по себе.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — что такое will-change и зачем",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "will_change_definition",
+            "oftenConfusedWith": [
+              "compositor_layer_promotion",
+              "when_and_how_to_use"
+            ],
+            "anchorTermsExpected": [
+              "подсказк",
+              "hint",
+              "браузер",
+              "заранее",
+              "compositor",
+              "GPU",
+              "анимац"
+            ],
+            "anchorTermsWrongTopic": [
+              "will-change ускоряет любые свойства",
+              "will-change это transform",
+              "will-change заменяет transition"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "will-change",
+              "подсказк",
+              "hint"
+            ],
+            "ask": "что именно делает will-change и чем это отличается от самой анимации"
+          }
+        ],
+        "mustConcepts": [
+          "will-change",
+          "подсказк",
+          "hint",
+          "браузер",
+          "заранее",
+          "оптимизац",
+          "compositor",
+          "GPU",
+          "layer",
+          "слой",
+          "анимац",
+          "свойств",
+          "ожидаем",
+          "изменен",
+          "performance",
+          "производительн"
+        ],
+        "falseClaims": [
+          "will-change само по себе запускает анимацию",
+          "will-change ускоряет любое CSS-свойство автоматически",
+          "will-change заменяет transition или animation",
+          "will-change меняет визуальный вид элемента без других свойств"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "compositor_layer_promotion",
+      "title": "Понимает promotion на compositor layer",
+      "expected": "Кандидат описывает: без layer — repaint на main thread каждый кадр; с will-change — GPU compositor, rasterize один раз, composite без layout/paint; main thread свободен; 16ms бюджет при 60fps.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "механизм layer promotion — сердце темы",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "will_change_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "compositor",
+              "GPU",
+              "layer",
+              "main thread"
+            ],
+            "ask": "что происходит на main thread и GPU при анимации transform с will-change и без"
+          }
+        ],
+        "mustConcepts": [
+          "compositor",
+          "compositor layer",
+          "GPU",
+          "promotion",
+          "main thread",
+          "главн",
+          "поток",
+          "repaint",
+          "paint",
+          "layout",
+          "rasteriz",
+          "растериз",
+          "composite",
+          "композит",
+          "16ms",
+          "60fps",
+          "кадр",
+          "cc::Layer",
+          "Blink"
+        ],
+        "falseClaims": [
+          "will-change убирает необходимость в transition",
+          "compositor layer создаётся только через translateZ, не через will-change",
+          "с will-change layout пересчитывается каждый кадр",
+          "GPU compositing всегда идёт через main thread paint"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "compositor_fast_properties",
+      "title": "Знает compositor-fast свойства",
+      "expected": "Кандидат перечисляет: `transform`, `opacity`, `filter`, `scroll-position` получают promotion; `width`, `height`, `color`, `margin`, `top`/`left` — нет; для width — `scaleX()`.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "критичный список свойств — частая ошибка на собесах",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "transform",
+              "opacity",
+              "width",
+              "height"
+            ],
+            "ask": "для каких CSS-свойств will-change реально даёт GPU compositor promotion"
+          }
+        ],
+        "mustConcepts": [
+          "transform",
+          "opacity",
+          "filter",
+          "scroll-position",
+          "compositor-fast",
+          "promotion",
+          "width",
+          "height",
+          "color",
+          "margin",
+          "top",
+          "left",
+          "игнорир",
+          "не работает",
+          "scaleX",
+          "scale",
+          "имитир"
+        ],
+        "falseClaims": [
+          "will-change: width даёт GPU compositing",
+          "will-change ускоряет анимацию color и margin",
+          "top и left promotion получают через will-change",
+          "любое CSS-свойство в will-change ускоряется одинаково"
+        ],
+        "falseClaimCapFraction": 0,
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_and_how_to_use",
+      "title": "Знает когда и как применять",
+      "expected": "Кандидат описывает: `:hover` перед transition; JS за rAF до анимации; модалки — set при open, `will-change: auto` в transitionend; scroll-эффекты только в viewport; не на всей странице при load.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "практический lifecycle из ITLead When to use",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "will_change_definition",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              ":hover",
+              "requestAnimationFrame",
+              "transitionend",
+              "auto"
+            ],
+            "ask": "когда именно ставить will-change и когда снимать через auto"
+          }
+        ],
+        "mustConcepts": [
+          ":hover",
+          "перед",
+          "анимац",
+          "transition",
+          "requestAnimationFrame",
+          "rAF",
+          "JavaScript",
+          "JS",
+          "модал",
+          "open",
+          "transitionend",
+          "animationend",
+          "will-change: auto",
+          "auto",
+          "сброс",
+          "прибра",
+          "viewport",
+          "видим",
+          "mouseenter"
+        ],
+        "falseClaims": [
+          "will-change нужно ставить в глобальном CSS на все элементы при загрузке",
+          "will-change: auto мгновенно уничтожает слой в тот же кадр",
+          "достаточно will-change в конце анимации, до неё не нужно",
+          "will-change на scroll-list для всех 100 элементов — нормальная практика"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.8
+      }
+    },
+    {
+      "key": "translatez_vs_will_change",
+      "title": "Отличает will-change от translateZ(0)",
+      "expected": "Кандидат сравнивает: `translateZ(0)` — layer сразу и навсегда (legacy hack); `will-change` — ленивое выделение, снятие через `auto`; для контролируемых анимаций will-change предпочтительнее.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "частая путаница с translateZ hack",
+        "confusionPairs": [
+          {
+            "checkpointKey": "translatez_vs_will_change",
+            "oftenConfusedWith": [
+              "compositor_layer_promotion"
+            ],
+            "anchorTermsExpected": [
+              "translateZ",
+              "translateZ(0)",
+              "навсегда",
+              "ленив",
+              "auto",
+              "lifecycle"
+            ],
+            "anchorTermsWrongTopic": [
+              "translateZ и will-change полностью идентичны",
+              "will-change держит layer вечно как translateZ"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "translateZ",
+          "translateZ(0)",
+          "translate3d",
+          "hack",
+          "хак",
+          "2015",
+          "навсегда",
+          "постоянн",
+          "ленив",
+          "lazy",
+          "will-change: auto",
+          "lifecycle",
+          "жизненн",
+          "цикл",
+          "статичн",
+          "контролир"
+        ],
+        "falseClaims": [
+          "translateZ(0) и will-change: transform работают абсолютно одинаково по lifecycle",
+          "will-change держит GPU layer навсегда без сброса",
+          "translateZ(0) можно снять через will-change: auto на том же элементе мгновенно",
+          "для статичных элементов translateZ(0) всегда лучше will-change"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.8
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: глобальный will-change на все карточки (память, jank); не сбрасывать после анимации; will-change на non-composited свойствах; на всём длинном списке без лимита; fix через mouseenter/transitionend или viewport-scoped JS.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "advanced",
+        "weightRationale": "Common mistakes ITLead — anti-patterns senior должен знать",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.5
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "when_and_how_to_use",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "глобальн",
+              "все",
+              "карточ",
+              "список"
+            ],
+            "ask": "почему will-change на каждой карточке в глобальном CSS ломает scroll"
+          },
+          {
+            "match": [
+              "не сбрасы",
+              "animationend",
+              "iOS",
+              "Safari"
+            ],
+            "ask": "что будет если не вызвать will-change: auto после анимации"
+          }
+        ],
+        "mustConcepts": [
+          "глобальн",
+          "все элементы",
+          "карточ",
+          "product-card",
+          "память",
+          "RAM",
+          "jank",
+          "лаг",
+          "scroll",
+          "скрол",
+          "30fps",
+          "не сбрасы",
+          "забыл",
+          "animationend",
+          "transitionend",
+          "iOS",
+          "Safari",
+          "WebKit",
+          "width",
+          "список",
+          "100",
+          "mouseenter",
+          "виртуализ",
+          "react-window",
+          "viewport"
+        ],
+        "falseClaims": [
+          "чем больше will-change на странице — тем быстрее всё",
+          "will-change на width ускоряет transition width",
+          "после анимации layer сам исчезает мгновенно без auto",
+          "Chrome никогда не демотирует лишние слои автоматически"
+        ],
+        "falseClaimCapFraction": 0,
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "layer_budget_limits",
+      "title": "Понимает лимиты слоёв и память",
+      "expected": "Кандидат упоминает: каждый layer — MB GPU RAM; soft budget ~20 слоёв на stacking context; Chrome auto-demote ~250ms idle; Safari ~60ms; demotion batch ~128ms после auto.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "бюджет слоёв и память — senior trade-off",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "20",
+              "слой",
+              "layer",
+              "память",
+              "250ms"
+            ],
+            "ask": "сколько compositor layers Chrome держит до деградации и что происходит с лишними"
+          }
+        ],
+        "mustConcepts": [
+          "память",
+          "RAM",
+          "GPU",
+          "MB",
+          "слой",
+          "layer",
+          "бюджет",
+          "budget",
+          "20",
+          "stacking context",
+          "demote",
+          "демот",
+          "250ms",
+          "60ms",
+          "idle",
+          "простой",
+          "128ms",
+          "thrashing",
+          "DevTools",
+          "Layers panel",
+          "measureUserAgentSpecificMemory"
+        ],
+        "falseClaims": [
+          "количество GPU layers не влияет на память мобильных устройств",
+          "Chrome держит неограниченное число compositor layers без деградации",
+          "will-change: auto освобождает слой в том же animation frame",
+          "Safari и Chrome одинаково демотируют слои через 250ms"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "will-change — подсказка браузеру: скоро будет transform. На :hover ставлю will-change: transform, потом scale — GPU compositor анимирует без main-thread paint. После transitionend — will-change: auto, иначе слой висит и жрёт RAM.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для модалки: перед открытием modal.style.willChange = 'transform, opacity', rAF, потом класс visible. На transitionend сбрасываю auto. Работает только transform/opacity/filter — width через will-change бессмысленно, делаю scaleX.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "translateZ(0) — вечный layer, legacy. will-change выделяет лениво и снимается. На product grid не вешаю глобально — 80 слоёв, scroll 30fps; только mouseenter на карточку, Chrome ~20 слоёв budget.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Ставлю will-change: transform на все .card в app.css при загрузке — так все анимации всегда быстрые. will-change ускоряет width и color тоже.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "will-change и translateZ(0) — одно и то же, layer сам исчезает когда анимация кончилась. Можно держать will-change на 100 элементах списка без проблем с памятью.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "will-change заменяет transition — достаточно написать will-change: transform и элемент сам анимируется. auto сбрасывает слой в тот же кадр без задержки.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "will_change_definition",
+      "exampleType": "good",
+      "exampleText": "will-change — performance hint: браузер заранее готовит compositor layer под будущие изменения transform/opacity.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "will_change_definition",
+      "exampleType": "good",
+      "exampleText": "ну это подсказка движку — «скоро буду менять transform», чтобы не ловить repaint на cpu каждый кадр",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "will_change_definition",
+      "exampleType": "bad",
+      "exampleText": "will-change — это сокращённая запись transition, само запускает анимацию без других свойств.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "compositor_layer_promotion",
+      "exampleType": "good",
+      "exampleText": "Без layer transform каждый кадр — CPU repaint + upload в GPU. С will-change Blink выделяет cc::Layer, rasterize один раз, дальше composite off main thread — <5ms на кадр.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "compositor_layer_promotion",
+      "exampleType": "good",
+      "exampleText": "главный поток свободен, gpu композитит transform — вот зачем promotion",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "compositor_layer_promotion",
+      "exampleType": "bad",
+      "exampleText": "will-change всё равно гоняет layout и paint на main thread каждый кадр, GPU только blend в конце.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "compositor_fast_properties",
+      "exampleType": "good",
+      "exampleText": "Promotion только у transform, opacity, filter, scroll-position. width/height/color — браузер hint игнорирует; ширину анимирую через scaleX.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "compositor_fast_properties",
+      "exampleType": "good",
+      "exampleText": "will-change: width на transition width — ноль gpu выгоды, только лишний слой иногда",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "compositor_fast_properties",
+      "exampleType": "bad",
+      "exampleText": "will-change: margin и top/left тоже уходят на compositor как transform.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_and_how_to_use",
+      "exampleType": "good",
+      "exampleText": ".card:hover { will-change: transform; transform: translateY(-4px); } — layer до transition. В JS: willChange='transform' → rAF → start tween → transitionend → auto.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_and_how_to_use",
+      "exampleType": "good",
+      "exampleText": "на модалке open — willChange, close — transitionend once:true и auto, иначе handlers копятся",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_and_how_to_use",
+      "exampleType": "bad",
+      "exampleText": "Пишу will-change: transform в :root на все интерактивные элементы — так браузер всегда готов.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "translatez_vs_will_change",
+      "exampleType": "good",
+      "exampleText": "translateZ(0) — layer сразу и навсегда, старый hack. will-change лениво и снимается auto — lifecycle под контролем.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "translatez_vs_will_change",
+      "exampleType": "good",
+      "exampleText": "на статичном блоке translateZ держит mb gpu зря, will-change только на время hover",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "translatez_vs_will_change",
+      "exampleType": "bad",
+      "exampleText": "will-change: transform и transform: translateZ(0) — полные синонимы по lifecycle и памяти.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Аудит: 80 product-card с глобальным will-change — Layers 80+, scroll 30fps. Убрал глобальное, mouseenter/transitionend — 60fps.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "на ios safari забыли auto после spin animation — скролл потом тормозит, фикс в animationend",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "На списке из 100 карточек will-change: transform на каждой — Chrome сам всё оптимизирует, память не важна.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "layer_budget_limits",
+      "exampleType": "good",
+      "exampleText": "~20 активных слоёв на stacking context; Chrome 110+ demote лишние после 250ms idle; auto demotion batch ~128ms.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "layer_budget_limits",
+      "exampleType": "good",
+      "exampleText": "50 слоёв на мид-андроид — сотни mb gpu, смотрю Layers в devtools и measureUserAgentSpecificMemory",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "layer_budget_limits",
+      "exampleType": "bad",
+      "exampleText": "Количество compositor layers не влияет на mobile RAM, можно хоть 200 will-change на странице.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "css-will-change-property",
+    "apiUrl": "https://api.itlead.org/api/questions/css-will-change-property",
+    "pageUrl": "https://itlead.org/interview-questions/html-css/css-will-change-property",
+    "difficulty": "SENIOR",
+    "titleEn": "CSS will-change property",
+    "categorySlug": "html-css",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

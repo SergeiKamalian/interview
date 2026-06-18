@@ -1,0 +1,587 @@
+{
+  "topic": {
+    "code": "nuxt_composables",
+    "name": "Composables в Nuxt",
+    "skillCode": "nuxt",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое composables в Nuxt и как они работают?",
+    "shortAnswer": "Composables в Nuxt — это функции Vue Composition API из директории `composables/`, которые автоматически импортируются на этапе сборки и возвращают реактивное состояние с логикой для переиспользования между компонентами. Ключевое отличие от обычных Vue composables: auto-import и `useState` для SSR-безопасного общего состояния, которое сохраняется при клиентской навигации.",
+    "idealAnswer": "Composables в Nuxt — auto-imported функции Vue Composition API из директории `composables/`, инкапсулирующие реактивное состояние и логику работы с ним. Вызов `useCounter()` в любом компоненте или странице не требует import — Nuxt сканирует `composables/` при сборке и добавляет named exports в `.nuxt/imports.d.ts`, Vite-плагин инжектит импорты автоматически. Отличие от plain Vue composables: (1) автоматический импорт на build time; (2) `useState(key, factory)` — SSR-safe shared state с ключом-строкой: на сервере Map scoped к текущему запросу (нет утечки между пользователями), на клиенте значение сохраняется при client-side navigation; обычный `ref` внутри composable локален для компонента, вызвавшего функцию. Пример: `useState('counter', () => 0)` — все компоненты с `useCounter()` делят один reactive ref. Когда использовать: повторяющаяся fetch-логика на 3+ страницах; общий app state (auth, theme) до Pinia; composables работают в plugins и middleware. Для логики одного компонента — inline `ref`/`computed`. Pinia — для нормализованного глобального state из многих несвязанных частей; для самодостаточной логики composable проще. Типичные ошибки: (1) забыть `.value` на `useState` — прямое присвоение `count = 5` заменяет ref-объект, реактивность ломается; (2) async в factory `useState` — factory синхронная, нужен `useLazyAsyncData` или fetch в `onMounted`; (3) browser API (`localStorage`, `window`) на top level без guard → hydration mismatch (server null, client value); guard через `process.client` или выровнять initial values через `useState`; (4) event listeners без `onBeforeUnmount` cleanup — накапливаются при каждой навигации. Реальные примеры: Nuxt Auth `useUser()`, Nuxt UI `useTabs()`, Nuxt Content `useAsyncData()`, Supabase `useSupabaseUser()`. Два composable с одним `useState` key — last write wins, оба держат ссылку на один ref. Client-only composable: `if (process.client)`, `onMounted()`, или `useLazyAsyncData`. Дебаг hydration mismatch: проверить client-only API на top level, консистентность ключей `useState`, Nitro storage; заменить `ref` на `useState` или добавить guards.",
+    "maxScore": 10,
+    "skills": [
+      "nuxt",
+      "vue"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "composables_definition",
+      "title": "Понимает что такое composables в Nuxt",
+      "expected": "Кандидат объясняет: composables — функции Composition API из `composables/`, auto-import, возвращают реактивное состояние и методы для переиспользования между компонентами без явного import.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — определение и роль composables",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "composables",
+              "composable",
+              "auto-import",
+              "автоимпорт"
+            ],
+            "ask": "чем Nuxt composable отличается от обычного Vue composable с ручным import"
+          }
+        ],
+        "mustConcepts": [
+          "composable",
+          "composables",
+          "Composition API",
+          "composables/",
+          "директор",
+          "auto-import",
+          "автоимпорт",
+          "реактивн",
+          "состоян",
+          "логик",
+          "переиспольз",
+          "без import",
+          "без импорт",
+          "named export",
+          "useCounter"
+        ],
+        "falseClaims": [
+          "composables в Nuxt требуют ручного import в каждом компоненте",
+          "composables это только Pinia stores",
+          "composables работают только в pages, не в components",
+          "composables заменяют Vue Composition API"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "useState_vs_ref",
+      "title": "Отличает useState от ref в composable",
+      "expected": "Кандидат сравнивает: `ref` локален для компонента, вызвавшего composable; `useState` с string key — shared между всеми компонентами, persists при client navigation; на сервере изолированный store per request.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевое отличие Nuxt composables — SSR-safe shared state",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "composables_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "useState_vs_ref",
+            "oftenConfusedWith": [
+              "composables_definition",
+              "ssr_client_guards"
+            ],
+            "anchorTermsExpected": [
+              "useState",
+              "ref",
+              "ключ",
+              "key",
+              "shared",
+              "локальн",
+              "навигац",
+              "per request"
+            ],
+            "anchorTermsWrongTopic": [
+              "ref всегда shared",
+              "useState локален для компонента"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useState",
+              "ref",
+              "ключ"
+            ],
+            "ask": "что произойдёт при навигации home→about если counter в ref vs useState('counter')"
+          },
+          {
+            "match": [
+              "SSR",
+              "сервер",
+              "запрос",
+              "per request"
+            ],
+            "ask": "как useState изолирует state между пользователями на сервере"
+          }
+        ],
+        "mustConcepts": [
+          "useState",
+          "ref",
+          "ключ",
+          "key",
+          "string key",
+          "shared",
+          "общ",
+          "локальн",
+          "компонент",
+          "навигац",
+          "client-side",
+          "persist",
+          "сохран",
+          "SSR",
+          "per request",
+          "изолир",
+          "утечк",
+          "reactive ref",
+          "factory"
+        ],
+        "falseClaims": [
+          "ref в composable автоматически shared между всеми компонентами",
+          "useState сбрасывается при каждой client-side навигации",
+          "useState на сервере глобален для всех пользователей",
+          "useState и ref дают одинаковое поведение при SSR"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "auto_import_mechanism",
+      "title": "Знает как работает auto-import в Nuxt",
+      "expected": "Кандидат описывает: Nuxt сканирует `composables/` при build, генерирует `.nuxt/imports.d.ts`, Vite-плагин инжектит импорты; TypeScript autocomplete без import в компонентах.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "механизм auto-import из ITLead theory",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "imports.d.ts",
+              "Vite",
+              "сканир"
+            ],
+            "ask": "что именно генерирует Nuxt при сборке для auto-import composables"
+          }
+        ],
+        "mustConcepts": [
+          "auto-import",
+          "автоимпорт",
+          "composables/",
+          "build",
+          "сборк",
+          "imports.d.ts",
+          ".nuxt",
+          "Vite",
+          "плагин",
+          "сканир",
+          "named export",
+          "TypeScript",
+          "autocomplete",
+          "глобальн",
+          "доступн"
+        ],
+        "falseClaims": [
+          "auto-import работает только в runtime без build step",
+          "нужно вручную регистрировать каждый composable в nuxt.config",
+          "auto-import не даёт TypeScript типов",
+          "composables из подпапок composables/ не импортируются"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда использовать composables",
+      "expected": "Кандидат называет: повторяющаяся логика на 3+ компонентах; shared app state до Pinia; plugins/middleware; для одного компонента — inline ref/computed; Pinia для нормализованного global state.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use таблица из ITLead",
+        "mustConcepts": [
+          "повтор",
+          "3+",
+          "нескольк",
+          "shared state",
+          "общий стан",
+          "auth",
+          "тема",
+          "theme",
+          "Pinia",
+          "inline",
+          "ref",
+          "computed",
+          "один компонент",
+          "plugin",
+          "middleware",
+          "fetch",
+          "$fetch",
+          "нормализ",
+          "global"
+        ],
+        "falseClaims": [
+          "любой computed нужно выносить в composable",
+          "composables всегда лучше Pinia",
+          "Pinia обязательна для любого shared state в Nuxt",
+          "composables не работают в middleware"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "usestate_value_async",
+      "title": "Знает ошибки с .value и async в useState",
+      "expected": "Кандидат объясняет: useState возвращает ref — нужен `.value`; прямое `count = 5` ломает реактивность; async в factory синхронна — использовать `useLazyAsyncData` или `onMounted`.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Common mistakes #1 и #2 из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              ".value",
+              "присво",
+              "ref"
+            ],
+            "ask": "почему `count = 5` вместо `count.value = 5` ломает реактивность useState"
+          },
+          {
+            "match": [
+              "async",
+              "factory",
+              "fetchConfig"
+            ],
+            "ask": "почему нельзя положить async fetch прямо в factory useState"
+          }
+        ],
+        "mustConcepts": [
+          ".value",
+          "ref",
+          "useState",
+          "присво",
+          "реактивн",
+          "лома",
+          "замен",
+          "ref-объект",
+          "factory",
+          "фабрик",
+          "синхрон",
+          "async",
+          "useLazyAsyncData",
+          "onMounted",
+          "fetch",
+          "singleton",
+          "синглтон"
+        ],
+        "falseClaims": [
+          "useState возвращает обычное число, не ref",
+          "можно присваивать useState напрямую без .value",
+          "factory useState может быть async и await внутри",
+          "async в factory выполнится корректно при каждом вызове composable"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "ssr_client_guards",
+      "title": "Защищает browser API при SSR",
+      "expected": "Кандидат объясняет: localStorage/window/document на top level → hydration mismatch; guard через `process.client` или aligned initial values через `useState`; client-only — `onMounted` или `useLazyAsyncData`.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistake #3 и senior follow-up про hydration debug",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "usestate_value_async",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "localStorage",
+              "window",
+              "hydration",
+              "mismatch"
+            ],
+            "ask": "почему localStorage в top level composable даёт hydration mismatch"
+          },
+          {
+            "match": [
+              "process.client",
+              "onMounted",
+              "useLazyAsyncData"
+            ],
+            "ask": "как сделать composable только для клиента"
+          }
+        ],
+        "mustConcepts": [
+          "SSR",
+          "сервер",
+          "localStorage",
+          "window",
+          "document",
+          "browser API",
+          "браузерн",
+          "top level",
+          "верхн",
+          "уровн",
+          "hydration",
+          "mismatch",
+          "гидрат",
+          "несовпад",
+          "process.client",
+          "onMounted",
+          "useLazyAsyncData",
+          "guard",
+          "защит",
+          "null",
+          "initial value",
+          "Nitro"
+        ],
+        "falseClaims": [
+          "localStorage доступен на сервере при SSR",
+          "hydration mismatch из composable невозможен если использовать ref",
+          "process.client не нужен в Nuxt composables",
+          "достаточно suppressHydrationWarning без исправления причины"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "listener_cleanup",
+      "title": "Очищает event listeners в composables",
+      "expected": "Кандидат описывает: addEventListener в composable без `onBeforeUnmount` cleanup накапливает listeners при навигации; правильно — removeEventListener в onBeforeUnmount; useWindowSize паттерн.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistake #4 — memory leak при SPA navigation",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "onBeforeUnmount",
+              "removeEventListener",
+              "cleanup"
+            ],
+            "ask": "что произойдёт при 5 навигациях без cleanup resize listener"
+          }
+        ],
+        "mustConcepts": [
+          "addEventListener",
+          "removeEventListener",
+          "onBeforeUnmount",
+          "cleanup",
+          "очист",
+          "слушат",
+          "listener",
+          "resize",
+          "навигац",
+          "накаплив",
+          "memory leak",
+          "утечк",
+          "useWindowSize",
+          "unmount",
+          "размонтир"
+        ],
+        "falseClaims": [
+          "Vue автоматически удаляет все window listeners при unmount",
+          "listeners в composable не накапливаются при client navigation",
+          "onBeforeUnmount нельзя использовать в composable",
+          "один listener на resize безвреден при любой навигации"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Composables — функции из `composables/` с auto-import. `useState('counter', () => 0)` даёт shared ref между страницами и SSR-safe изоляцию per request. Обычный `ref` в composable локален. Browser API только под `process.client`, listeners чистим в `onBeforeUnmount`.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для auth session делаю `useAuth()` с `useState('user', () => null)` — layout, pages и middleware видят один ref без Pinia. Fetch профиля — `useUserProfile()` с `$fetch` в `onMounted`, не async в factory. Counter между home и about сохраняется благодаря ключу 'counter'.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Nuxt на build сканирует composables/, пишет `.nuxt/imports.d.ts`, Vite инжектит — в `<script setup>` просто `const { count } = useCounter()` без import. Hydration mismatch из composable — проверяю localStorage/window на top level и консистентность useState keys.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Composables в Nuxt — это Pinia stores. useState возвращает обычное число, присваиваю `count = 5` напрямую. localStorage в top level composable — нормально, Nuxt сам разберётся с SSR.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "ref в composable автоматически shared между всеми компонентами как useState. Auto-import не нужен — всегда пишу import вручную. Resize listener без cleanup — Vue сам удалит при навигации.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Кладу `fetchConfig()` async прямо в factory useState — factory же вызывается один раз. Для одного computed на 10 строк обязательно выношу composable. Pinia нужна даже для простого счётчика на двух страницах.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "composables_definition",
+      "exampleType": "good",
+      "exampleText": "Composable — функция Composition API в `composables/`, auto-import, возвращает state + методы для переиспользования.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "composables_definition",
+      "exampleType": "good",
+      "exampleText": "ну composable как общий ящик с инструментами — вызвал useCounter() где угодно, import не писал",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "composables_definition",
+      "exampleType": "bad",
+      "exampleText": "Composables — это только хуки из node_modules, свои писать нельзя без регистрации в nuxt.config.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "useState_vs_ref",
+      "exampleType": "good",
+      "exampleText": "ref локален для компонента; useState('counter') — один ref на всё приложение, на сервере Map per request, на клиенте живёт при навигации.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "useState_vs_ref",
+      "exampleType": "good",
+      "exampleText": "перешёл home→about — counter на useState не сбросился, потому что ключ 'counter' тот же; с ref был бы новый инстанс",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "useState_vs_ref",
+      "exampleType": "bad",
+      "exampleText": "useState и ref в composable ведут себя одинаково — оба shared и сбрасываются при каждой навигации.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "auto_import_mechanism",
+      "exampleType": "good",
+      "exampleText": "Build сканирует composables/, генерирует `.nuxt/imports.d.ts`, Vite-плагин добавляет импорты — autocomplete без ручного import.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "auto_import_mechanism",
+      "exampleType": "good",
+      "exampleText": "каждый named export из composables/ глобально доступен в pages и components после сборки",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "auto_import_mechanism",
+      "exampleType": "bad",
+      "exampleText": "Auto-import работает в dev без генерации imports.d.ts, типы не подхватываются.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Fetch на 4 страницах — composable; auth session до Pinia — useState composable; один computed в карточке — inline ref.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "pinia когда нормализованный store из кучи модулей; для useTabs или useUser достаточно composable",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Всегда composable даже для одной строки логики; Pinia никогда не нужна в Nuxt.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "usestate_value_async",
+      "exampleType": "good",
+      "exampleText": "useState возвращает ref — только `count.value++`, не `count = 5`. Async fetch — в onMounted или useLazyAsyncData, не в factory.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "usestate_value_async",
+      "exampleType": "good",
+      "exampleText": "factory useState синхронная — fetchConfig() туда не кладу, иначе Promise в state и непредсказуемость",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "usestate_value_async",
+      "exampleType": "bad",
+      "exampleText": "setTimeout(() => count = 5) — нормально для useState, .value не обязателен.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "ssr_client_guards",
+      "exampleType": "good",
+      "exampleText": "localStorage только под `if (process.client)` — иначе server null vs client value и hydration mismatch.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "ssr_client_guards",
+      "exampleType": "good",
+      "exampleText": "дебажу mismatch: top-level window/document, ключи useState, заменяю ref на useState с одинаковым initial",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "ssr_client_guards",
+      "exampleType": "bad",
+      "exampleText": "window.innerWidth в ref при инициализации composable — безопасный SSR паттерн без guards.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "listener_cleanup",
+      "exampleType": "good",
+      "exampleText": "useWindowSize: addEventListener в process.client + onBeforeUnmount removeEventListener — иначе 5 listeners после 5 переходов.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "listener_cleanup",
+      "exampleType": "good",
+      "exampleText": "без cleanup resize слушатели копятся при spa навигации — классический memory leak в nuxt",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "listener_cleanup",
+      "exampleType": "bad",
+      "exampleText": "addEventListener в composable — Vue Router сам снимает все window listeners при смене страницы.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nuxt-composables",
+    "apiUrl": "https://api.itlead.org/api/questions/nuxt-composables",
+    "pageUrl": "https://itlead.org/interview-questions/nuxt/nuxt-composables",
+    "difficulty": "MIDDLE",
+    "titleEn": "What are composables in Nuxt?",
+    "categorySlug": "nuxt",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

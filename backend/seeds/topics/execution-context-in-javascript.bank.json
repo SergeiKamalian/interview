@@ -1,0 +1,569 @@
+{
+  "topic": {
+    "code": "execution_context_in_javascript",
+    "name": "Контекст выполнения в JavaScript",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое контекст выполнения (execution context) в JavaScript и как он связан с call stack, hoisting и замыканиями?",
+    "shortAnswer": "Контекст выполнения — среда, которую движок создаёт для каждого фрагмента кода: переменные, привязка `this`, цепочка областей видимости. Три типа: глобальный, функциональный и eval. Каждый контекст проходит две фазы — создание (выделение памяти, hoisting) и выполнение (построчный запуск). Контексты складываются на call stack по LIFO.",
+    "idealAnswer": "Execution context — runtime-среда, в которой JavaScript оценивает и выполняет код. Движок создаёт новый контекст для глобального скрипта, каждого вызова функции и кода внутри eval(). Внутри контекста три ключевых компонента: LexicalEnvironment (let, const, function declarations + ссылка на внешнее окружение для scope chain), VariableEnvironment (var и arguments) и ThisBinding (значение this). Две фазы: creation phase — движок сканирует scope, выделяет память, var получает undefined, function declarations сохраняются целиком, let/const помечаются неинициализированными (TDZ); execution phase — код выполняется построчно, присваиваются значения, вызываются функции. Каждый вызов push-ит новый функциональный контекст на call stack (LIFO), return — pop. Внутренний контекст видит внешний через scope chain, но не наоборот. Практическая разница LexicalEnvironment vs VariableEnvironment: var до строки объявления читается как undefined; let/const до строки — ReferenceError (TDZ). Замыкания работают потому, что LexicalEnvironment внутренней функции хранит ссылку на окружение внешней функции даже после её return. Типичные ошибки: потеря this в обычном callback (новый контекст, this = global/undefined в strict mode) — стрелочные функции наследуют this лексически; stale closure в React — колбек захватил переменные из контекста старого рендера; глубокая рекурсия — каждый вызов новый контекст, V8 ~10k frames → RangeError. В браузере глобальный this = window; в Node.js CommonJS модуле this на вершине = {}, не global. Async/await и генераторы: контекст приостанавливается, сохраняется в памяти и возобновляется через microtask queue без размотки всего стека.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "execution_context_definition",
+      "title": "Понимает суть execution context",
+      "expected": "Кандидат объясняет: execution context — среда выполнения кода с переменными, this и доступом к внешнему scope; движок создаёт контекст для каждого выполняемого фрагмента.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — что такое контекст выполнения",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "execution context",
+              "контекст выполн",
+              "среда"
+            ],
+            "ask": "что именно хранит execution context и зачем движку нужен отдельный контекст на каждый вызов"
+          }
+        ],
+        "mustConcepts": [
+          "execution context",
+          "контекст выполн",
+          "среда",
+          "runtime",
+          "перемен",
+          "this",
+          "scope",
+          "область видим",
+          "движок",
+          "созда",
+          "фрагмент",
+          "код",
+          "оцен",
+          "выполня"
+        ],
+        "falseClaims": [
+          "execution context — это просто call stack, одно и то же",
+          "контекст выполнения существует только для глобального кода",
+          "execution context не содержит привязку this",
+          "контекст создаётся только на этапе выполнения, не при вызове"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "context_types",
+      "title": "Знает три типа контекстов",
+      "expected": "Кандидат перечисляет: глобальный (один на скрипт), функциональный (на каждый вызов функции), eval (внутри eval()); может упомянуть различие global this в браузере (window) и Node.js модуле ({}).",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "типы контекстов из Theory ITLead",
+        "mustConcepts": [
+          "глобальн",
+          "global",
+          "функциональн",
+          "function",
+          "eval",
+          "один на скрипт",
+          "каждый вызов",
+          "window",
+          "globalThis",
+          "Node",
+          "модул",
+          "CommonJS",
+          "this"
+        ],
+        "falseClaims": [
+          "функциональный контекст создаётся один раз при объявлении функции",
+          "eval не создаёт отдельный execution context",
+          "в Node.js глобальный this всегда равен global",
+          "в браузере и Node.js глобальный контекст идентичен"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "creation_execution_phases",
+      "title": "Знает фазы создания и выполнения",
+      "expected": "Кандидат объясняет две фазы: creation — сканирование scope, выделение памяти, hoisting (var → undefined, function declarations целиком, let/const неинициализированы); execution — построчное выполнение, присвоение значений, вызовы функций.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "две фазы — ключевой механизм hoisting внутри контекста",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "execution_context_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "creation",
+              "execution",
+              "фаз",
+              "создан"
+            ],
+            "ask": "что происходит в creation phase до первой исполняемой строки"
+          }
+        ],
+        "mustConcepts": [
+          "creation",
+          "execution",
+          "фаз",
+          "создан",
+          "выполнен",
+          "памят",
+          "выдел",
+          "hoisting",
+          "поднят",
+          "сканир",
+          "scope",
+          "var",
+          "undefined",
+          "function declaration",
+          "let",
+          "const",
+          "неинициализ",
+          "построч"
+        ],
+        "falseClaims": [
+          "execution phase идёт раньше creation phase",
+          "hoisting происходит только в execution phase",
+          "creation phase выполняет код построчно",
+          "let и const инициализируются в creation phase как var"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "context_components",
+      "title": "Знает LexicalEnvironment, VariableEnvironment, ThisBinding",
+      "expected": "Кандидат описывает структуру контекста: LexicalEnvironment — let/const и function declarations + ссылка на внешнее окружение; VariableEnvironment — var и arguments; ThisBinding — значение this в этом контексте.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "внутренняя структура контекста из ITLead Theory",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "LexicalEnvironment",
+              "VariableEnvironment",
+              "ThisBinding"
+            ],
+            "ask": "чем LexicalEnvironment отличается от VariableEnvironment и что хранит ThisBinding"
+          }
+        ],
+        "mustConcepts": [
+          "LexicalEnvironment",
+          "VariableEnvironment",
+          "ThisBinding",
+          "лексическ",
+          "перемен",
+          "let",
+          "const",
+          "var",
+          "arguments",
+          "this",
+          "привяз",
+          "внешн",
+          "окружен",
+          "scope chain",
+          "цепочк",
+          "function declaration"
+        ],
+        "falseClaims": [
+          "var хранится в LexicalEnvironment, а let в VariableEnvironment",
+          "ThisBinding не входит в execution context",
+          "LexicalEnvironment не содержит ссылку на внешний scope",
+          "arguments хранятся в LexicalEnvironment"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "call_stack_lifo",
+      "title": "Связывает контексты с call stack",
+      "expected": "Кандидат объясняет: активные контексты на call stack по LIFO; вызов функции — push нового контекста, return — pop; пример вложенных вызовов [Global] → [first] → [second] → [third]; глубокая рекурсия переполняет стек (~10k frames в V8).",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "call stack как носитель execution contexts",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "execution_context_definition",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "call stack",
+              "LIFO",
+              "first",
+              "second",
+              "third"
+            ],
+            "ask": "как меняется стек при цепочке first → second → third и что происходит при return"
+          }
+        ],
+        "mustConcepts": [
+          "call stack",
+          "стек",
+          "LIFO",
+          "push",
+          "pop",
+          "контекст",
+          "вызов",
+          "return",
+          "вложен",
+          "Global",
+          "рекурс",
+          "RangeError",
+          "Maximum call stack",
+          "V8",
+          "10000",
+          "фрейм"
+        ],
+        "falseClaims": [
+          "execution context не связан с call stack",
+          "return не снимает контекст со стека",
+          "call stack работает по FIFO",
+          "бесконечная рекурсия не создаёт новые контексты"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "lexical_vs_variable_environment",
+      "title": "Понимает var vs let/const в creation phase",
+      "expected": "Кандидат объясняет: var в VariableEnvironment инициализируется undefined в creation phase — чтение до строки даёт undefined; let/const в LexicalEnvironment остаются в TDZ до инициализации — ReferenceError; inner function читает outer через scope chain.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевая практическая разница из ITLead — var undefined vs let TDZ",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "lexical_vs_variable_environment",
+            "oftenConfusedWith": [
+              "creation_execution_phases"
+            ],
+            "anchorTermsExpected": [
+              "var",
+              "undefined",
+              "let",
+              "TDZ",
+              "ReferenceError",
+              "LexicalEnvironment",
+              "VariableEnvironment"
+            ],
+            "anchorTermsWrongTopic": [
+              "let hoisting как var",
+              "var бросает ReferenceError до объявления"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "console.log(a)",
+              "undefined",
+              "ReferenceError",
+              "outer",
+              "inner"
+            ],
+            "ask": "почему console.log(a) до var a даёт undefined, а до let y — ReferenceError внутри test()"
+          },
+          {
+            "match": [
+              "scope chain",
+              "outer",
+              "inner"
+            ],
+            "ask": "как inner() находит a=1 из контекста outer через scope chain"
+          }
+        ],
+        "mustConcepts": [
+          "LexicalEnvironment",
+          "VariableEnvironment",
+          "var",
+          "undefined",
+          "let",
+          "const",
+          "TDZ",
+          "temporal dead zone",
+          "ReferenceError",
+          "creation",
+          "инициализ",
+          "scope chain",
+          "outer",
+          "inner",
+          "внешн",
+          "контекст"
+        ],
+        "falseClaims": [
+          "let hoisting ведёт себя как var — undefined до строки",
+          "var до объявления бросает ReferenceError",
+          "LexicalEnvironment и VariableEnvironment хранят одни и те же binding",
+          "inner function не может читать переменные outer через scope chain"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "closure_this_pitfalls",
+      "title": "Связывает контекст с замыканиями и this",
+      "expected": "Кандидат объясняет: замыкание — LexicalEnvironment inner сохраняет ссылку на outer после return; потеря this в обычном callback (новый контекст); стрелочные наследуют this лексически; strict mode — this undefined без receiver; stale closure в React effect с пустым deps.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes и real-world из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "setTimeout",
+              "this.path",
+              "стрелоч",
+              "arrow"
+            ],
+            "ask": "почему обычный callback в setTimeout теряет this и как arrow это исправляет"
+          },
+          {
+            "match": [
+              "useEffect",
+              "stale",
+              "count",
+              "deps"
+            ],
+            "ask": "почему setInterval в useEffect с [] всегда видит старый count"
+          }
+        ],
+        "mustConcepts": [
+          "замыкан",
+          "closure",
+          "LexicalEnvironment",
+          "ссылк",
+          "outer",
+          "return",
+          "this",
+          "callback",
+          "стрелоч",
+          "arrow",
+          "lexical",
+          "strict mode",
+          "undefined",
+          "stale closure",
+          "React",
+          "useEffect",
+          "deps",
+          "рендер",
+          "контекст"
+        ],
+        "falseClaims": [
+          "стрелочная функция создаёт свой this binding",
+          "замыкание не связано с execution context",
+          "strict mode this = window при вызове fn() без receiver",
+          "stale closure в React не связано с контекстом рендера"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Execution context — среда для выполнения кода: переменные, this, scope chain. Три типа: global, function (на каждый вызов), eval. Две фазы: creation (память, hoisting) и execution (построчный код). Контексты на call stack по LIFO.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Внутри контекста LexicalEnvironment (let/const, function decl + внешний scope), VariableEnvironment (var, arguments), ThisBinding. var до строки — undefined; let — TDZ и ReferenceError. Замыкание — inner держит ссылку на LexicalEnvironment outer после return.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "first→second→third: стек [Global]→[first]→[second]→[third], return pop-ит сверху. Обычный setTimeout callback теряет this — новый контекст; arrow наследует this от route handler. React useEffect с [] — stale closure на count первого рендера.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Execution context — это просто другое название hoisting. Контекст создаётся один раз при загрузке страницы и переиспользуется для всех функций.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "let и var в creation phase оба инициализируются undefined. Call stack и execution context — разные вещи, контексты не попадают на стек.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Стрелочная функция в setTimeout создаёт свой this = window. Замыкание — когда функция возвращает другую функцию, execution context тут ни при чём.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "execution_context_definition",
+      "exampleType": "good",
+      "exampleText": "Execution context — runtime-среда с переменными, привязкой this и доступом к внешнему scope; движок создаёт новый контекст для каждого выполняемого фрагмента кода.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "execution_context_definition",
+      "exampleType": "good",
+      "exampleText": "ну контекст выполнения — как рабочий стол функции: свои переменные, свой this, знает кто снаружи по scope chain",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "execution_context_definition",
+      "exampleType": "bad",
+      "exampleText": "Execution context — это только глобальный объект window, больше ничего не создаётся.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "context_types",
+      "exampleType": "good",
+      "exampleText": "Три типа: global (один на скрипт, this=window в браузере), function (на каждый вызов), eval (внутри eval). В Node CommonJS модуле this на вершине — {}, не global.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "context_types",
+      "exampleType": "good",
+      "exampleText": "каждый fn() — новый function execution context, даже если функция объявлена один раз",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "context_types",
+      "exampleType": "bad",
+      "exampleText": "Function context создаётся один раз при function declaration и переиспользуется.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "creation_execution_phases",
+      "exampleType": "good",
+      "exampleText": "Creation phase: scan scope, var→undefined, function decl целиком в память, let/const неинициализированы. Execution phase: код строка за строкой, присвоения, вызовы.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "creation_execution_phases",
+      "exampleType": "good",
+      "exampleText": "console.log(x) до var x=1 → undefined потому что creation phase уже подняла var; execution ещё не дошла до присвоения 1",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "creation_execution_phases",
+      "exampleType": "bad",
+      "exampleText": "Hoisting происходит в execution phase после выполнения всех строк файла.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "context_components",
+      "exampleType": "good",
+      "exampleText": "LexicalEnvironment: let, const, function declarations + ссылка на outer env для scope chain. VariableEnvironment: var и arguments. ThisBinding: this текущего контекста.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "context_components",
+      "exampleType": "good",
+      "exampleText": "Scope chain строится через ссылку LexicalEnvironment на внешнее окружение — inner поднимается вверх к outer, но outer не видит inner",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "context_components",
+      "exampleType": "bad",
+      "exampleText": "ThisBinding хранится отдельно от execution context в глобальном объекте, не входит в контекст.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "call_stack_lifo",
+      "exampleType": "good",
+      "exampleText": "first() вызывает second() → third(): стек [Global]→[first]→[second]→[third]. Return third pop-ит его контекст, потом second, потом first.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "call_stack_lifo",
+      "exampleType": "good",
+      "exampleText": "factorial(10000) — каждый вызов новый function context на стеке, V8 ~10k лимит → RangeError: Maximum call stack size exceeded",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "call_stack_lifo",
+      "exampleType": "bad",
+      "exampleText": "Return не снимает execution context — контексты копятся в памяти навсегда на стеке.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "lexical_vs_variable_environment",
+      "exampleType": "good",
+      "exampleText": "outer(): console.log(a) до var a=1 → undefined (VariableEnvironment, var инициализирован undefined в creation). inner() без своего a идёт по scope chain к outer и видит a=1.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "lexical_vs_variable_environment",
+      "exampleType": "good",
+      "exampleText": "test(): console.log(y) до let y=2 → ReferenceError, не undefined: let в LexicalEnvironment в TDZ до строки инициализации",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "lexical_vs_variable_environment",
+      "exampleType": "bad",
+      "exampleText": "let hoisting как var — console.log(name) до let name='Alice' вернёт undefined.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "closure_this_pitfalls",
+      "exampleType": "good",
+      "exampleText": "Замыкание: inner LexicalEnvironment хранит ссылку на outer env после return outer — переменные outer живут. obj.handle + setTimeout(function(){this.path}) — this undefined, новый context; arrow наследует this='/users'.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "closure_this_pitfalls",
+      "exampleType": "good",
+      "exampleText": "useEffect с []: setInterval захватил count из контекста первого рендера — stale closure; fix: count в deps или setCount(c=>c+1). 'use strict'; fn() без receiver → this undefined.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "closure_this_pitfalls",
+      "exampleType": "bad",
+      "exampleText": "Arrow function в callback создаёт свой this binding как обычная function. Stale closure в React — баг React, не связан с execution context рендера.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "execution-context-in-javascript",
+    "apiUrl": "https://api.itlead.org/api/questions/execution-context-in-javascript",
+    "pageUrl": "https://itlead.org/interview-questions/javascript/execution-context-in-javascript",
+    "difficulty": "MIDDLE",
+    "titleEn": "Execution context in JavaScript",
+    "categorySlug": "javascript",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

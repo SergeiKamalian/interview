@@ -1,0 +1,541 @@
+{
+  "topic": {
+    "code": "why_transform_is_better_for_animations_than_top_left",
+    "name": "Почему transform лучше top/left для анимаций",
+    "skillCode": "html-css",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Почему для CSS-анимаций лучше использовать transform, а не top и left?",
+    "shortAnswer": "CSS `transform` пропускает layout и paint на каждом кадре анимации — браузер обновляет только composite на GPU. `top` и `left` меняют позицию в документе и заставляют пересчитывать layout и paint каждый кадр на CPU. Правило: любой визуальный рух (hover, slide-in, параллакс) — через `transform`; `top`/`left` оставляют для статического позиционирования.",
+    "idealAnswer": "При анимациях в CSS `transform` перемещает элемент, применяя матрицу к уже отрисованному слою — браузер пропускает layout и paint на каждом кадре. `top` и `left` меняют место элемента в документе, что заставляет пересчитывать геометрию с нуля каждый кадр. Браузер рендерит в три шага: layout (расчёт позиций), paint (отрисовка пикселей), composite (сборка слоёв). `transform` затрагивает только composite; `top`/`left` перезапускают цепочку с layout. Аналогия: `top`/`left` — как переставить мебель (всё вокруг сдвигается); `transform` — как сдвинуть изображение проектора (комната не двигается). `transform` продвигает элемент на отдельный GPU-слой и обрабатывается асинхронно вне main thread; `top`/`left` нагружают CPU в бюджете 16 мс на кадр при 60fps. На сложной странице анимация `top`/`left` падает до 10–20 fps; `transform` держит 60 fps. `transform` не влияет на document flow — соседи не сдвигаются; `top`/`left` сдвигают следующие элементы. Когда что: визуальный рух (hover lift, slide-in, параллакс) — `transform: translate`; масштаб без сдвига соседей — `scale`; вращение — `rotate`; статическое позиционирование без анимации — `top`/`left` допустимы; mobile и 60fps — всегда `transform`. `will-change: transform` подсказывает браузеру заранее выделить слой, но на 100+ элементах одновременно может съесть сотни МБ GPU-памяти. Типичные ошибки: анимировать `width`/`height` вместо `scale`; slide-in через `position: relative` + `top` вместо `translateY`; `will-change` на всём списке; конфликт `margin: 0 auto` с `translateX`. В проде: Framer Motion и GSAP компилируют движение в `translateX`; Swiper — `translate3d`; React Transition Group — `translate3d` для переходов. Отладка: Performance в DevTools — spikes «Recalculate Style» и «Layout» означают layout thrash; чистый `transform` показывает только «Composite Layers». `transform` не меняет layout box — поток видит исходный нетрансформированный блок; дробные `translateX(0.5px)` рендерятся через GPU subpixel blending.",
+    "maxScore": 10,
+    "skills": [
+      "html-css",
+      "css"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "rendering_pipeline",
+      "title": "Понимает pipeline layout → paint → composite",
+      "expected": "Кандидат объясняет три шага рендеринга: layout считает позиции, paint рисует пиксели, composite собирает слои; анимация свойств, затрагивающих геометрию, перезапускает цепочку с layout.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — три шага pipeline и почему top/left тяжелее",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "layout",
+              "paint",
+              "composite"
+            ],
+            "ask": "какие шаги рендеринга затрагивает анимация top/left по сравнению с transform"
+          }
+        ],
+        "mustConcepts": [
+          "layout",
+          "paint",
+          "composite",
+          "рендер",
+          "pipeline",
+          "позиц",
+          "пиксел",
+          "слой",
+          "шаг",
+          "пересчёт",
+          "геометр",
+          "кадр",
+          "браузер",
+          "reflow",
+          "repaint",
+          "16 мс",
+          "60fps",
+          "бюджет кадра"
+        ],
+        "falseClaims": [
+          "transform запускает полный layout каждый кадр",
+          "top/left затрагивают только composite",
+          "paint и layout — одно и то же",
+          "composite выполняется до layout",
+          "анимация любого CSS-свойства одинаково дёшева"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "transform_composite_only",
+      "title": "Понимает преимущества transform",
+      "expected": "Кандидат: transform применяет матрицу к отрисованному слою, пропускает layout и paint, продвигает элемент на GPU-слой, не сдвигает соседей в document flow, держит ~60fps на сложных страницах.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевая разница transform — composite-only и GPU",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "rendering_pipeline",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "transform_composite_only",
+            "oftenConfusedWith": [
+              "top_left_reflow"
+            ],
+            "anchorTermsExpected": [
+              "transform",
+              "composite",
+              "GPU",
+              "layout не",
+              "поток",
+              "translate"
+            ],
+            "anchorTermsWrongTopic": [
+              "transform сдвигает соседей",
+              "transform меняет document flow"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "transform",
+              "translate",
+              "GPU"
+            ],
+            "ask": "почему transform не влияет на layout, хотя элемент визуально двигается"
+          }
+        ],
+        "mustConcepts": [
+          "transform",
+          "translate",
+          "translateX",
+          "translateY",
+          "translate3d",
+          "composite",
+          "GPU",
+          "слой",
+          "матриц",
+          "layout не",
+          "paint не",
+          "поток документа",
+          "сосед",
+          "не сдвига",
+          "60fps",
+          "main thread",
+          "асинхрон",
+          "отрисован"
+        ],
+        "falseClaims": [
+          "transform меняет document flow и сдвигает соседей",
+          "transform пересчитывает layout каждый кадр",
+          "transform работает только на CPU",
+          "transform и top/left одинаково быстры",
+          "transform нельзя анимировать через transition"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "top_left_reflow",
+      "title": "Понимает стоимость top и left",
+      "expected": "Кандидат: top/left инвалидируют геометрию элемента, браузер пересчитывает layout от корня, ставит paint для затронутых областей, нагружают CPU, сдвигают соседей, на сложной странице дают 10–20fps.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "drawbacks top/left — layout+paint+flow из ITLead",
+        "mustConcepts": [
+          "top",
+          "left",
+          "right",
+          "position",
+          "layout",
+          "reflow",
+          "paint",
+          "CPU",
+          "сосед",
+          "сдвига",
+          "поток",
+          "10-20fps",
+          "джанк",
+          "инвалид",
+          "геометр",
+          "корень документа",
+          "RenderBox",
+          "скролл"
+        ],
+        "falseClaims": [
+          "top/left анимируются только на GPU",
+          "top/left не влияют на соседние элементы",
+          "анимация top так же плавна как transform на мобильных",
+          "top/left пропускают layout при transition",
+          "position fixed + top безопаснее transform для slide-in"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Выбирает transform vs top/left по задаче",
+      "expected": "Кандидат: визуальный рух (hover, slide-in, параллакс) — transform; scale/rotate для эффектов без сдвига соседей; top/left — статическое позиционирование без анимации; на mobile и при 60fps — transform.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "decision rule из ITLead When to use",
+        "mustConcepts": [
+          "hover",
+          "slide-in",
+          "параллакс",
+          "translate",
+          "scale",
+          "rotate",
+          "статическ",
+          "позицион",
+          "top",
+          "left",
+          "mobile",
+          "60fps",
+          "transition",
+          "keyframes",
+          "визуальн",
+          "движен",
+          "fixed",
+          "absolute"
+        ],
+        "falseClaims": [
+          "top/left всегда лучше для любых анимаций",
+          "transform нельзя использовать для hover",
+          "для slide-in обязательно анимировать right",
+          "статическое позиционирование тоже надо анимировать через top",
+          "transform подходит только для 3D"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "gpu_layer_promotion",
+      "title": "Понимает GPU-слои и composite",
+      "expected": "Кандидат: анимированный transform продвигает элемент на отдельный composite-слой; GPU обновляет матрицу без layout tree; проверка в Layers DevTools; opacity и 3D тоже продвигают слой.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "How browser handles — layer promotion из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "слой",
+              "GPU",
+              "Layers"
+            ],
+            "ask": "когда браузер выделяет элемент в отдельный composite-слой"
+          }
+        ],
+        "mustConcepts": [
+          "GPU",
+          "слой",
+          "composite layer",
+          "promotion",
+          "продвиж",
+          "Skia",
+          "Blink",
+          "матриц",
+          "opacity",
+          "translateZ",
+          "Layers",
+          "DevTools",
+          "main thread",
+          "асинхрон",
+          "cc::Layer",
+          "subpixel"
+        ],
+        "falseClaims": [
+          "GPU-слой создаётся только при will-change",
+          "transform всегда выполняется на main thread",
+          "composite layer включает пересчёт layout",
+          "translateZ(0) обязателен на всех iOS",
+          "opacity не продвигает на отдельный слой"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "will_change_usage",
+      "title": "Правильно использует will-change",
+      "expected": "Кандидат: will-change: transform подсказывает браузеру заранее выделить слой и избежать задержки первого кадра; применять только на элементах, которые скоро анимируются; массовое применение на списках жрёт GPU-память.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "will-change из ITLead — hint vs overuse",
+        "mustConcepts": [
+          "will-change",
+          "transform",
+          "слой",
+          "заранее",
+          "первый кадр",
+          "GPU память",
+          "список",
+          "hover",
+          "переиспольз",
+          "подсказк",
+          "промоуш",
+          "200 МБ",
+          "вкладк",
+          "эконом"
+        ],
+        "falseClaims": [
+          "will-change: transform на всех .list-item — best practice",
+          "will-change не влияет на потребление памяти",
+          "will-change заменяет transform в анимации",
+          "will-change нужен на каждом элементе страницы",
+          "браузер никогда не продвигает слой без will-change"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки анимации",
+      "expected": "Кандидат: не анимировать width/height для роста — использовать scale; slide-in через translateY, не top; will-change только перед анимацией; position:fixed для позиции, transform для движения; не смешивать margin auto с translate без цепочки transform.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — практический middle CSS performance",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "width",
+              "height",
+              "scale"
+            ],
+            "ask": "почему анимировать width хуже transform: scale"
+          },
+          {
+            "match": [
+              "Performance",
+              "Layout",
+              "джанк"
+            ],
+            "ask": "как в DevTools увидеть layout thrash при анимации"
+          }
+        ],
+        "mustConcepts": [
+          "width",
+          "height",
+          "scale",
+          "slide-in",
+          "translateY",
+          "top",
+          "relative",
+          "will-change",
+          "список",
+          "margin",
+          "auto",
+          "цепочк transform",
+          "position fixed",
+          "right",
+          "Performance",
+          "Recalculate Style",
+          "Layout thrash",
+          "Composite Layers",
+          "grow",
+          "hover card"
+        ],
+        "falseClaims": [
+          "анимировать width для grow — правильный composite-only паттерн",
+          "slide-in через top: -20px не сдвигает соседей",
+          "анимировать right на fixed элементе так же плавно как translateX",
+          "will-change на 50+ статичных элементах безопасен",
+          "margin: 0 auto и translateX(10px) всегда совместимы без цепочки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "transform применяет матрицу к уже отрисованному слою — только composite, без layout и paint. top/left меняют позицию в документе, каждый кадр reflow и repaint на CPU. На hover карточки делаю translateY(-8px) scale(1.02), не top: -8px — соседи не прыгают, 60fps в гриде из сотни карточек.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Пайплайн: layout → paint → composite. Любой визуальный рух — transform: translate/scale/rotate. top/left оставляю для статики. Notification: position fixed задаёт угол, transform: translateX(110%) → 0 анимирует выезд. will-change: transform только на :hover перед transition, не на всём списке.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну transform только composite на gpu, top-left layout каждый кадр и соседей двигает. slide-in через translateY, width не анимирую — scale. в performance смотрю layout spikes — значит надо на transform",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "transform и top/left одинаково быстры — браузер всё равно на GPU. Анимация top на hover норм, соседи не сдвигаются. will-change: transform на каждом li в меню — стандарт.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для slide-in notification анимирую right от 110% до 16px — локально плавно. Рост блока через width: 0 → 200px в keyframes — правильный паттерн без layout.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "transform меняет document flow, поэтому для центрирования лучше top/left. Composite выполняется до layout, поэтому paint не нужен при translate.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "rendering_pipeline",
+      "exampleType": "good",
+      "exampleText": "Три шага: layout считает геометрию, paint рисует, composite собирает слои. top/left на каждом кадре — снова layout и paint; transform — только composite.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "rendering_pipeline",
+      "exampleType": "good",
+      "exampleText": "бюджет 16мс на кадр — top анимация жрёт layout+paint, transform один composite",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "rendering_pipeline",
+      "exampleType": "bad",
+      "exampleText": "Paint и layout — синонимы; transform проходит все три шага как top.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "transform_composite_only",
+      "exampleType": "good",
+      "exampleText": "translate(50px, 50px) в keyframes — GPU composite, layout tree не трогаем. Поток документа видит исходный box, соседи на месте.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "transform_composite_only",
+      "exampleType": "good",
+      "exampleText": "hover карточки: transition transform 0.2s, translateY(-8px) scale(1.02) — без reflow в гриде",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "transform_composite_only",
+      "exampleType": "bad",
+      "exampleText": "transform: translateY сдвигает следующие элементы в потоке как top.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "top_left_reflow",
+      "exampleType": "good",
+      "exampleText": "@keyframes bad { to { top: 50px; left: 50px } } — layout+paint каждый кадр; на сложной странице 10–20fps при скролле.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "top_left_reflow",
+      "exampleType": "good",
+      "exampleText": "position relative + top slide-in сдвигает всё ниже по DOM пока идёт анимация",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "top_left_reflow",
+      "exampleType": "bad",
+      "exampleText": "top и left при transition не вызывают reflow, только composite.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Hover lift, slide-in, параллакс — translate. Статический absolute top/left без анимации — ок. Mobile 60fps — только transform.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "fixed notification: right/bottom статика, движение translateX — два разных concern",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Для любой анимации движения всегда анимирую left и top — transform устарел.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "gpu_layer_promotion",
+      "exampleType": "good",
+      "exampleText": "Анимированный transform продвигает на cc::Layer, GPU обновляет матрицу. Layers panel в DevTools показывает слои. opacity тоже может продвинуть.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "gpu_layer_promotion",
+      "exampleType": "good",
+      "exampleText": "translate3d и gpu off main thread — поэтому good keyframes держит 60fps",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "gpu_layer_promotion",
+      "exampleType": "bad",
+      "exampleText": "Transform всегда на main thread, GPU только для WebGL.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "will_change_usage",
+      "exampleType": "good",
+      "exampleText": "will-change: transform на :hover перед lift — слой готов к первому кадру. Не вешаю на 100 list-item — утечка GPU RAM.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "will_change_usage",
+      "exampleType": "good",
+      "exampleText": "подсказка браузеру заранее, не замена transform",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "will_change_usage",
+      "exampleType": "bad",
+      "exampleText": ".list-item { will-change: transform } на всём каталоге — best practice для плавности.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "grow-bad: width 200px в keyframes — layout каждый кадр; grow-good: transform scale(2). slide-bad: top -20px; slide-good: translateY(-20px).",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Performance record: Recalculate Style + Layout spikes = thrash; чистый transform — только Composite Layers",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Анимирую right на fixed toast вместо translateX — на бюджетном Android так же 60fps как transform.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "why-transform-is-better-for-animations-than-top-left",
+    "apiUrl": "https://api.itlead.org/api/questions/why-transform-is-better-for-animations-than-top-left",
+    "pageUrl": "https://itlead.org/interview-questions/html-css/why-transform-is-better-for-animations-than-top-left",
+    "difficulty": "MIDDLE",
+    "titleEn": "Why transform is better for animations than top, left",
+    "categorySlug": "html-css",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

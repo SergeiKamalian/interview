@@ -1,0 +1,613 @@
+{
+  "topic": {
+    "code": "nestjs_exception_filters",
+    "name": "Exception filters в NestJS",
+    "skillCode": "nestjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое exception filters в NestJS и как их использовать?",
+    "shortAnswer": "Exception filters в NestJS перехватывают необработанные исключения до отправки HTTP-ответа клиенту и формируют status code и тело ответа. Реализуй интерфейс ExceptionFilter, укажи типы через @Catch() и зарегистрируй глобально через APP_FILTER (с DI) или локально через @UseFilters(). @Catch(HttpException) ловит только NestJS HTTP-исключения; @Catch() без аргументов — любое thrown value.",
+    "idealAnswer": "Exception filters — классы, реализующие ExceptionFilter, которые перехватывают необработанные исключения после того, как они всплыли из контроллера, но до отправки ответа клиенту. Декоратор @Catch() задаёт, какие типы исключений обрабатывает фильтр: @Catch(HttpException) — только HttpException и подклассы; @Catch(BadRequestException) — конкретный тип; @Catch() без аргументов — всё, включая TypeError и ReferenceError. В методе catch(exception, host) через ArgumentsHost и host.switchToHttp() получают Express Request/Response, выставляют status и json-тело. NestJS поставляет встроенный BaseExceptionFilter для HttpException; кастомные фильтры переопределяют или дополняют его — единый формат ошибок, логирование, Sentry, Prometheus без try/catch в каждом handler. Регистрация: глобально — APP_FILTER в providers модуля (поддерживает DI, предпочтительно) или app.useGlobalFilters() в main.ts (без DI); на контроллере/методе — @UseFilters(MyFilter). Фильтр на методе переопределяет фильтр контроллера для этого endpoint — они не стекуются. При нескольких глобальных APP_FILTER порядок на runtime инвертирован: последний зарегистрированный срабатывает первым; для цепочки нужен multi: true, иначе один провайдер может заменить встроенный handler. Широкие @Catch() регистрируют последними, иначе перекроют типизированные. Фильтры синхронны: async catch() с await может оставить ответ без тела — side effects (Slack, Sentry) лучше fire-and-forget через setImmediate. Типичные кейсы: глобальный AllExceptionsFilter для единого JSON { statusCode, message, timestamp, path }; ValidationFilter на @Catch(BadRequestException) для class-validator; PrismaExceptionFilter для P2002 → 409 Conflict; GraphQL — @Catch(ApolloError); в микросервисах domain-фильтры в сервисах, observability — в gateway. Фильтры не видят контекст guard/interceptor — только данные запроса через ArgumentsHost.",
+    "maxScore": 10,
+    "skills": [
+      "nestjs",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "exception_filter_definition",
+      "title": "Понимает назначение exception filter",
+      "expected": "Кандидат объясняет: filter перехватывает необработанные исключения перед отправкой ответа, контролирует status code и body; реализует ExceptionFilter с методом catch(); @Catch() задаёт типы; альтернатива разрозненным try/catch в контроллерах.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — перехват и формат ответа",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "exception_filter_definition",
+            "oftenConfusedWith": [
+              "filter_execution_flow",
+              "catch_http_vs_all"
+            ],
+            "anchorTermsExpected": [
+              "ExceptionFilter",
+              "catch",
+              "@Catch",
+              "необработ",
+              "HTTP-ответ",
+              "status"
+            ],
+            "anchorTermsWrongTopic": [
+              "interceptor ловит исключения",
+              "pipe формирует ошибку клиенту",
+              "guard отправляет 500"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ExceptionFilter",
+              "exception filter",
+              "фильтр"
+            ],
+            "ask": "когда срабатывает exception filter и что он контролирует в ответе"
+          }
+        ],
+        "mustConcepts": [
+          "exception filter",
+          "фильтр винят",
+          "ExceptionFilter",
+          "catch",
+          "@Catch",
+          "необработ",
+          "исключен",
+          "HTTP-ответ",
+          "status code",
+          "тело ответ",
+          "response body",
+          "перехват",
+          "до клиент",
+          "BaseExceptionFilter",
+          "HttpException",
+          "единый формат",
+          "логирован"
+        ],
+        "falseClaims": [
+          "exception filter срабатывает до выброса исключения в контроллере",
+          "interceptor и exception filter делают одно и то же с ошибками",
+          "без кастомного фильтра NestJS не возвращает JSON при ошибке",
+          "filter заменяет необходимость throw HttpException",
+          "catch() вызывается на каждый успешный запрос"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "catch_http_vs_all",
+      "title": "Различает @Catch(HttpException) и @Catch()",
+      "expected": "Кандидат объясняет: @Catch(HttpException) — только NestJS HTTP-исключения, сырые Error проходят к встроенному handler; @Catch() без аргументов — любое thrown value, включая TypeError/ReferenceError, риск маскировки багов под 500.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевое различие из TL;DR ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "exception_filter_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "catch_http_vs_all",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "@Catch(HttpException)",
+              "@Catch()",
+              "TypeError",
+              "ReferenceError",
+              "500"
+            ],
+            "anchorTermsWrongTopic": [
+              "@Catch ловит только ValidationError",
+              "HttpException и Error одно и то же"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "@Catch(HttpException)",
+              "@Catch()"
+            ],
+            "ask": "чем отличается @Catch(HttpException) от @Catch() без аргументов и когда что выбирать"
+          }
+        ],
+        "mustConcepts": [
+          "@Catch",
+          "HttpException",
+          "BadRequestException",
+          "NotFoundException",
+          "без аргумент",
+          "catch all",
+          "TypeError",
+          "ReferenceError",
+          "Error",
+          "500",
+          "INTERNAL_SERVER_ERROR",
+          "подкласс",
+          "встроенн",
+          "BaseExceptionFilter",
+          "сыро",
+          "programmer error"
+        ],
+        "falseClaims": [
+          "@Catch() без аргументов ловит только HttpException",
+          "@Catch(HttpException) перехватывает TypeError",
+          "NestJS автоматически превращает любой Error в HttpException",
+          "catch all filter безопасен везде без риска скрыть баги",
+          "@Catch(BadRequestException) ловит все HTTP-ошибки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "registration_global_local",
+      "title": "Знает способы регистрации фильтров",
+      "expected": "Кандидат описывает: APP_FILTER в providers (DI работает) vs useGlobalFilters в main.ts (без DI); @UseFilters на контроллере/методе для локальной области; метод переопределяет контроллер, не стекуются.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "APP_FILTER vs UseFilters — практический middle паттерн",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "APP_FILTER",
+              "useGlobalFilters",
+              "UseFilters"
+            ],
+            "ask": "как зарегистрировать фильтр глобально и чем APP_FILTER отличается от useGlobalFilters"
+          },
+          {
+            "match": [
+              "контроллер",
+              "метод",
+              "переопредел",
+              "стек"
+            ],
+            "ask": "стекуются ли фильтры контроллера и метода на одном endpoint"
+          }
+        ],
+        "mustConcepts": [
+          "APP_FILTER",
+          "useGlobalFilters",
+          "UseFilters",
+          "providers",
+          "main.ts",
+          "глобальн",
+          "контроллер",
+          "метод",
+          "endpoint",
+          "dependency injection",
+          "DI",
+          "useClass",
+          "переопредел",
+          "не стек",
+          "override",
+          "app-wide",
+          "route-specific"
+        ],
+        "falseClaims": [
+          "useGlobalFilters поддерживает DI так же как APP_FILTER",
+          "фильтры контроллера и метода складываются в цепочку",
+          "@UseFilters на методе дополняет глобальный, не заменяя",
+          "APP_FILTER можно зарегистрировать только в main.ts",
+          "локальный фильтр автоматически применяется ко всем маршрутам модуля"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "filter_execution_flow",
+      "title": "Понимает момент срабатывания и ArgumentsHost",
+      "expected": "Кандидат описывает: исключение всплывает из контроллера → NestJS ищет подходящий @Catch → catch() пишет ответ; ArgumentsHost.switchToHttp() даёт Request/Response; контекст guard/interceptor недоступен.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый flow из How NestJS processes filters",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ArgumentsHost",
+              "switchToHttp",
+              "Request",
+              "Response"
+            ],
+            "ask": "как из catch() получить request и response и когда фильтр относительно guard/interceptor"
+          }
+        ],
+        "mustConcepts": [
+          "ArgumentsHost",
+          "switchToHttp",
+          "getRequest",
+          "getResponse",
+          "Request",
+          "Response",
+          "Express",
+          "всплы",
+          "bubbles up",
+          "контроллер",
+          "до ответ",
+          "фаза ошиб",
+          "guard",
+          "interceptor",
+          "недоступ",
+          "metadata",
+          "первый подходящ"
+        ],
+        "falseClaims": [
+          "filter может прочитать данные, установленные interceptor в success phase",
+          "ArgumentsHost доступен только в guards",
+          "filter срабатывает до pipes",
+          "catch() получает ExecutionContext guard как второй аргумент",
+          "несколько фильтров с одним @Catch всегда выполняются все"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "filter_order_multi",
+      "title": "Знает порядок и multi для глобальных фильтров",
+      "expected": "Кандидат объясняет: несколько APP_FILTER — порядок на runtime инвертирован, последний зарегистрированный первый; multi: true для цепочки; широкие @Catch() регистрируют последними.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "частая production-ловушка из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "multi",
+              "порядок",
+              "order",
+              "APP_FILTER"
+            ],
+            "ask": "как NestJS выбирает фильтр при нескольких глобальных APP_FILTER и зачем multi: true"
+          }
+        ],
+        "mustConcepts": [
+          "APP_FILTER",
+          "multi: true",
+          "multi",
+          "порядок",
+          "order",
+          "инверт",
+          "reversed",
+          "последн",
+          "зарегистрир",
+          "первым",
+          "цепоч",
+          "chain",
+          "широк",
+          "catch all",
+          "перекры",
+          "shadow",
+          "типизир",
+          "built-in",
+          "fallback"
+        ],
+        "falseClaims": [
+          "первый APP_FILTER в providers всегда срабатывает первым без инверсии",
+          "multi: true не нужен для нескольких глобальных фильтров",
+          "можно регистрировать @Catch() первым без влияния на типизированные фильтры",
+          "NestJS запускает все matching filters по очереди для одного исключения",
+          "useGlobalFilters и APP_FILTER всегда объединяются в один порядок"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с filters",
+      "expected": "Кандидат называет: async catch() зависает ответ; забытый multi: true; @Catch() везде маскирует баги; @UseFilters на методе не стекуется с контроллером; side effects через setImmediate, ответ синхронно.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — критично для middle",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "async",
+              "await",
+              "завис",
+              "hang"
+            ],
+            "ask": "почему async catch() с await Slack/Sentry опасен и как правильно"
+          },
+          {
+            "match": [
+              "multi: true",
+              "UseFilters",
+              "стек"
+            ],
+            "ask": "типичные ошибки с multi: true и стекингом UseFilters"
+          }
+        ],
+        "mustConcepts": [
+          "async catch",
+          "await",
+          "завис",
+          "hang",
+          "setImmediate",
+          "fire and forget",
+          "синхрон",
+          "multi: true",
+          "замен",
+          "built-in handler",
+          "@Catch()",
+          "TypeError",
+          "500",
+          "UseFilters",
+          "не стек",
+          "override",
+          "Slack",
+          "Sentry",
+          "response never sent"
+        ],
+        "falseClaims": [
+          "async catch() — рекомендуемый способ await логирования в NestJS",
+          "один APP_FILTER без multi автоматически дополняет встроенный handler",
+          "фильтры контроллера и метода выполняются оба для одного запроса",
+          "await sendToSlack в catch() гарантированно отправит HTTP-ответ после",
+          "@Catch() на всех фильтрах — best practice для любого проекта"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "real_world_scenarios",
+      "title": "Приводит практические сценарии",
+      "expected": "Кандидат упоминает кейсы: Prisma P2002 → 409; ValidationFilter для class-validator/BadRequestException; Sentry captureException; GraphQL ApolloError; domain filters в сервисах, observability в gateway.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "real-world usage из ITLead — бонус middle",
+        "mustConcepts": [
+          "Prisma",
+          "P2002",
+          "409",
+          "Conflict",
+          "class-validator",
+          "BadRequestException",
+          "ValidationFilter",
+          "errors array",
+          "Sentry",
+          "captureException",
+          "GraphQL",
+          "ApolloError",
+          "gateway",
+          "microservice",
+          "observability",
+          "domain",
+          "duplicate",
+          "unique constraint"
+        ],
+        "falseClaims": [
+          "Prisma ошибки автоматически становятся HttpException без фильтра",
+          "Sentry нужно вызывать только в контроллерах, не в filter",
+          "GraphQL и REST всегда используют один и тот же exception filter без @Catch",
+          "validation errors class-validator нельзя переформатировать через filter",
+          "в gateway не нужны фильтры — только в микросервисах"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Exception filter реализует ExceptionFilter: @Catch(HttpException), в catch() через host.switchToHttp() беру response/request, status = exception.getStatus(), отдаю JSON с statusCode, timestamp, path. Глобально регистрирую через APP_FILTER в AppModule — DI работает для Logger. @Catch() без аргументов — только для safety net, типизированные фильтры регистрирую раньше широкого.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На signup вешаю ValidationFilter с @Catch(BadRequestException) — вытаскиваю массив ошибок class-validator. Prisma P2002 маплю в 409 через отдельный filter. Sentry — setImmediate(() => captureException) до response.json. Несколько APP_FILTER с multi: true, catch-all последним.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Filter ловит throw после контроллера, guard context уже недоступен — только req/res. useGlobalFilters в main.ts без DI; для инжекта Logger — APP_FILTER. Метод @UseFilters перебивает контроллерный для этого route.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Exception filter — это interceptor, который ловит ошибки до контроллера. Ставлю async catch с await slack и жду отправки — NestJS сам дождётся и ответ уйдёт.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "На все фильтры @Catch() без аргументов — так проще. Фильтры на контроллере и методе складываются. APP_FILTER без multi: true норм для двух глобальных handlers.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "ArgumentsHost даёт доступ к данным interceptor. useGlobalFilters в main.ts — единственный способ DI в filter. HttpException filter автоматически ловит TypeError.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "exception_filter_definition",
+      "exampleType": "good",
+      "exampleText": "ExceptionFilter + @Catch(HttpException): единый JSON для всех HTTP-ошибок, логирование в одном месте вместо try/catch в каждом handler.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "exception_filter_definition",
+      "exampleType": "good",
+      "exampleText": "ну фильтр как сортировщик на почте — поймал throw, решил какой status и body отдать клиенту",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "exception_filter_definition",
+      "exampleType": "bad",
+      "exampleText": "Pipe и exception filter одинаково формируют финальный HTTP-ответ при любой ошибке.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "catch_http_vs_all",
+      "exampleType": "good",
+      "exampleText": "@Catch(HttpException) — только Nest HTTP errors; сырой Error идёт во встроенный handler. @Catch() — всё, включая TypeError, часто 500 и скрывает баг.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "catch_http_vs_all",
+      "exampleType": "good",
+      "exampleText": "для prod catch-all отдельно и последним, основной filter на HttpException",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "catch_http_vs_all",
+      "exampleType": "bad",
+      "exampleText": "@Catch(BadRequestException) перехватывает NotFoundException и InternalServerError.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "registration_global_local",
+      "exampleType": "good",
+      "exampleText": "APP_FILTER { provide: APP_FILTER, useClass: AllExceptionsFilter, multi: true } в AppModule — DI для Logger. AdminController @UseFilters(AdminErrorFilter) только для /admin.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "registration_global_local",
+      "exampleType": "good",
+      "exampleText": "useGlobalFilters в bootstrap — быстро, но без inject; @UseFilters на метод signup переопределяет controller-level",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "registration_global_local",
+      "exampleType": "bad",
+      "exampleText": "ValidationFilter на контроллере + HttpFilter на методе — оба отработают для signup.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "filter_execution_flow",
+      "exampleType": "good",
+      "exampleText": "throw в service → bubble to controller → Nest match @Catch → catch(exception, host) → ctx.switchToHttp().getResponse().status().json().",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "filter_execution_flow",
+      "exampleType": "good",
+      "exampleText": "guard положил user в req — ok; context interceptor в filter не достать, только request через ArgumentsHost",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "filter_execution_flow",
+      "exampleType": "bad",
+      "exampleText": "Filter запускается до pipes и может отменить validation exception.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "filter_order_multi",
+      "exampleType": "good",
+      "exampleText": "Два APP_FILTER: typed HttpExceptionFilter регистрирую первым, AllExceptionsFilter вторым — на runtime catch-all сработает после typed (инверсия порядка).",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "filter_order_multi",
+      "exampleType": "good",
+      "exampleText": "без multi: true второй APP_FILTER может выкинуть built-in — цепочку только с multi",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "filter_order_multi",
+      "exampleType": "bad",
+      "exampleText": "Порядок providers в module = порядок catch без инверсии. Широкий @Catch() можно поставить первым.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "async catch с await Slack — response hang; fix: setImmediate(() => sendToSlack), response.json синхронно сразу.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "ошибки: нет multi, catch() везде, думал UseFilters стекуются controller+method",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "await Sentry в catch() — правильный паттерн NestJS, документация рекомендует async filters.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "real_world_scenarios",
+      "exampleType": "good",
+      "exampleText": "PrismaExceptionFilter: code P2002 → 409 с полем duplicate. ValidationFilter на auth signup — errors: ['email must be an email'].",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "real_world_scenarios",
+      "exampleType": "good",
+      "exampleText": "gateway — logging/tracing filter; в user-service — NotFound с деталями entity. GQL — @Catch(ApolloError) отдельно от REST.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "real_world_scenarios",
+      "exampleType": "bad",
+      "exampleText": "Prisma сам возвращает 409 Conflict без кастомного filter. Sentry только через middleware, filter не нужен.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-exception-filters",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-exception-filters",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-exception-filters",
+    "difficulty": "MIDDLE",
+    "titleEn": "What are exception filters in NestJS?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

@@ -1,0 +1,508 @@
+{
+  "topic": {
+    "code": "shcho_ne_tak_z_var_u_tsykli_ta_settimeout",
+    "name": "var в цикле и setTimeout",
+    "skillCode": "javascript",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Что не так с var в цикле и setTimeout?",
+    "shortAnswer": "При `for (var i = 0; i < 3; i++)` с `setTimeout` все колбеки выводят финальное значение счётчика (3, 3, 3), потому что `var` имеет function scope и все итерации делят одну переменную. Колбеки `setTimeout` — макрозадачи: они выполняются после завершения синхронного цикла, когда `i` уже равно 3. Замена `var` на `let` создаёт новую привязку на каждую итерацию — вывод 0, 1, 2.",
+    "idealAnswer": "Классическая проблема: `for (var i = 0; i < 3; i++) { setTimeout(() => console.log(i), 100); }` печатает 3, 3, 3, а не 0, 1, 2. Причина — область видимости `var`: переменная `i` поднимается (hoisting) на function scope, одна `i` на весь цикл. Цикл выполняется синхронно; каждый `setTimeout` регистрирует колбек в очередь макрозадач (macrotask queue). Очередь обрабатывается только после завершения всего синхронного кода — когда цикл уже закончился и `i` равно 3. Все три замыкания (closure) закрываются над одной и той же `i` и читают её финальное значение. `let i` решает проблему: спецификация ES6 создаёт новую lexical binding на каждую итерацию for-loop — каждый колбек захватывает свою копию `i`. Синхронный `console.log(i)` внутри цикла печатает 0, 1, 2, потому что выполняется в теле итерации с текущим значением; `setTimeout` откладывает выполнение через event loop. `setTimeout(..., 0)` не синхронный — колбек всё равно ждёт в очереди после цикла. В ES5 без `let`: IIFE с передачей `i` как аргумента `(function(i){ setTimeout(() => console.log(i), 100); })(i)` — аргумент становится локальной копией на момент вызова. IIFE без аргумента не помогает — внутренняя функция всё равно читает внешнюю `i`. `for (const i = 0; i < 3; i++)` — SyntaxError: `i++` нарушает const. `for...of` с `var` — та же пастка: `for (var item of arr)` все колбеки видят последнее значение; `let item` фиксит. `forEach` безопасен по умолчанию — аргумент колбека создаёт свой scope; но закрытие над внешним `var` снаружи forEach даёт тот же баг. Практика: в циклах с `setTimeout`, Promises и event listeners — всегда `let`.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "var_function_scope_shared",
+      "title": "Понимает function scope var в цикле",
+      "expected": "Кандидат объясняет: `var i` — одна переменная на function scope; hoisting поднимает `i` на уровень функции; все итерации цикла делят одну и ту же `i`, а не создают новую на каждый проход.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ядро проблемы — одна shared variable вместо per-iteration binding",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "var",
+              "function scope",
+              "одна",
+              "общ"
+            ],
+            "ask": "почему var в for создаёт одну переменную на весь цикл, а не на итерацию"
+          }
+        ],
+        "mustConcepts": [
+          "var",
+          "function scope",
+          "функциональн",
+          "область видим",
+          "одна перемен",
+          "общ",
+          "делят",
+          "итерац",
+          "hoisting",
+          "поднят",
+          "Lexical Environment",
+          "binding",
+          "привязк",
+          "for",
+          "цикл",
+          "не блок",
+          "block scope нет"
+        ],
+        "falseClaims": [
+          "var создаёт новую i на каждой итерации for",
+          "var имеет block scope как let",
+          "var в цикле изолирован внутри блока for",
+          "все итерации for (var i) имеют разные переменные i"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "setTimeout_macrotask_queue",
+      "title": "Знает setTimeout и очередь макрозадач",
+      "expected": "Кандидат объясняет: `setTimeout` — макрозадача; колбеки регистрируются в очередь и выполняются после завершения синхронного кода; когда колбеки срабатывают, цикл уже закончился и `i` равно 3.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "event loop + macrotask — почему колбеки видят финальное i",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "var_function_scope_shared",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "setTimeout_macrotask_queue",
+            "oftenConfusedWith": [
+              "settimeout_zero_not_sync"
+            ],
+            "anchorTermsExpected": [
+              "macrotask",
+              "макрозадач",
+              "очеред",
+              "после цикла",
+              "синхронн",
+              "event loop"
+            ],
+            "anchorTermsWrongTopic": [
+              "setTimeout выполняется внутри итерации",
+              "колбек сразу при регистрации"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "macrotask",
+              "макрозадач",
+              "очеред",
+              "event loop"
+            ],
+            "ask": "когда именно выполняются колбеки setTimeout — во время цикла или после"
+          }
+        ],
+        "mustConcepts": [
+          "setTimeout",
+          "macrotask",
+          "макрозадач",
+          "очеред",
+          "queue",
+          "event loop",
+          "после цикла",
+          "синхронн",
+          "отложен",
+          "defer",
+          "завершен",
+          "i = 3",
+          "финальн",
+          "регистр",
+          "колбек",
+          "асинхрон"
+        ],
+        "falseClaims": [
+          "setTimeout выполняет колбек синхронно внутри итерации",
+          "колбек setTimeout читает i в момент регистрации, а не выполнения",
+          "макрозадачи выполняются параллельно с синхронным циклом",
+          "event loop не влияет на значение i в setTimeout"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "let_per_iteration_binding",
+      "title": "Знает fix через let",
+      "expected": "Кандидат объясняет: `let i` создаёт новую lexical binding на каждую итерацию for-loop; каждое замыкание захватывает свою `i` → вывод 0, 1, 2; это основной и правильный фикс.",
+      "score": 2.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "advanced",
+        "weightRationale": "ключевой fix и понимание per-iteration binding из спецификации",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "var_function_scope_shared",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "let",
+              "binding",
+              "привязк",
+              "0, 1, 2"
+            ],
+            "ask": "как let создаёт отдельную i на каждую итерацию и почему колбеки печатают 0,1,2"
+          },
+          {
+            "match": [
+              "closure",
+              "замыкан",
+              "захват"
+            ],
+            "ask": "что именно захватывает замыкание в setTimeout — переменную или binding"
+          }
+        ],
+        "mustConcepts": [
+          "let",
+          "новая привязк",
+          "binding",
+          "итерац",
+          "for loop block scope",
+          "lexical",
+          "замыкан",
+          "closure",
+          "захват",
+          "0, 1, 2",
+          "отдельн",
+          "своя i",
+          "фикс",
+          "let вместо var",
+          "спецификац",
+          "per iteration"
+        ],
+        "falseClaims": [
+          "let делит одну i между всех итераций как var",
+          "let и var ведут себя одинаково в for",
+          "замена var на let не меняет результат setTimeout",
+          "let поднимается на function scope без per-iteration binding"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "settimeout_zero_not_sync",
+      "title": "Понимает что setTimeout(0) не синхронный",
+      "expected": "Кандидат объясняет: `setTimeout(..., 0)` не выполняется «сразу» внутри цикла — колбек всё равно идёт в macrotask queue и срабатывает после завершения синхронного кода; результат с var — всё равно 3, 3, 3.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "типичная interview trap — нулевая задержка не означает синхронность",
+        "mustConcepts": [
+          "setTimeout",
+          "0ms",
+          "ноль",
+          "не синхрон",
+          "не сразу",
+          "очеред",
+          "macrotask",
+          "после цикла",
+          "3, 3, 3",
+          "задержк",
+          "delay",
+          "отложен",
+          "синхронн код"
+        ],
+        "falseClaims": [
+          "setTimeout с 0ms выполняется синхронно в теле цикла",
+          "нулевая задержка означает мгновенный вызов до i++",
+          "setTimeout(0) и console.log в цикле работают одинаково по таймингу",
+          "0ms обходит event loop и очередь макрозадач"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "iife_es5_fix",
+      "title": "Знает IIFE-фикс для ES5",
+      "expected": "Кандидат описывает: `(function(i){ setTimeout(() => console.log(i), 100); })(i)` — `i` передаётся как аргумент и становится локальной копией на момент вызова IIFE; без аргумента IIFE не помогает.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "ES5 workaround из ITLead when to use",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "IIFE",
+              "аргумент",
+              "ES5"
+            ],
+            "ask": "почему IIFE без передачи i как аргумента не фиксит проблему"
+          }
+        ],
+        "mustConcepts": [
+          "IIFE",
+          "immediately invoked",
+          "аргумент",
+          "параметр",
+          "локальн",
+          "копия",
+          "момент вызова",
+          "ES5",
+          "legacy",
+          "без let",
+          "передач",
+          "function(i)",
+          "внешн",
+          "закрыва"
+        ],
+        "falseClaims": [
+          "пустой IIFE без аргумента изолирует i на каждую итерацию",
+          "IIFE всегда фиксит var в цикле без передачи значения",
+          "forEach не создаёт отдельный scope для аргумента",
+          "const i в for с i++ работает как let"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes_traps",
+      "title": "Знает типичные ошибки и for...of",
+      "expected": "Кандидат называет: IIFE без аргумента; `const` в for с `i++` — SyntaxError; `for (var x of arr)` — та же пастка с последним значением; forEach безопасен по аргументу, но внешний `var` снаружи — баг.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes 1–3 и for...of/forEach из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "for...of",
+              "for of",
+              "item"
+            ],
+            "ask": "почему for (var item of arr) с setTimeout печатает последний элемент три раза"
+          },
+          {
+            "match": [
+              "const",
+              "SyntaxError",
+              "i++"
+            ],
+            "ask": "почему for (const i = 0; i < 3; i++) не работает"
+          },
+          {
+            "match": [
+              "forEach",
+              "внешн",
+              "external"
+            ],
+            "ask": "может ли forEach иметь тот же баг с внешним var"
+          }
+        ],
+        "mustConcepts": [
+          "IIFE без аргумент",
+          "внешн i",
+          "const",
+          "SyntaxError",
+          "Assignment to constant",
+          "i++",
+          "for...of",
+          "for of",
+          "var item",
+          "let item",
+          "последн",
+          "c, c, c",
+          "forEach",
+          "аргумент колбек",
+          "внешн var",
+          "регистрац",
+          "выполнен"
+        ],
+        "falseClaims": [
+          "for (var x of arr) создаёт новый x на каждую итерацию",
+          "const i в for с i++ работает нормально",
+          "forEach никогда может воспроизвести этот баг",
+          "IIFE без параметра создаёт локальную копию i автоматически"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "for (var i = 0; i < 3; i++) setTimeout(() => console.log(i), 100) печатает 3,3,3: var — одна i на function scope, setTimeout — макрозадача после цикла. for (let i...) → 0,1,2: новая binding на итерацию. setTimeout(0) не синхронный. ES5: (function(i){ setTimeout(()=>console.log(i),100); })(i).",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Цикл синхронный, колбеки в очередь. Когда они стартуют — i уже 3, все closure читают одну var. let фиксит. console.log(i) в теле цикла ок — синхронно в итерации. for (var item of ['a','b','c']) — 'c','c','c'. const в for с i++ — SyntaxError.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На собесе часто дают setTimeout(...,0) — ноль не значит «сейчас в цикле». IIFE без (i) не помогает — внутри всё равно внешняя i. forEach с аргументом безопасен; если снаружи var x и в forEach закрываешься над x — баг при выполнении.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "var в for создаёт новую i каждый раз, setTimeout с var печатает 0,1,2. setTimeout(0) выполняется синхронно в итерации.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "let и var в цикле одинаковы для setTimeout. IIFE (function(){ setTimeout(()=>log(i)) })() фиксит var без передачи i.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "for (const i=0; i<3; i++) — нормальный способ заменить var. for (var x of arr) безопасен — x новая на каждую итерацию.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "var_function_scope_shared",
+      "exampleType": "good",
+      "exampleText": "var i поднимается на function scope — одна переменная на весь for; все три setTimeout closure делят одну i.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "var_function_scope_shared",
+      "exampleType": "good",
+      "exampleText": "ну var не блочная — в for одна i на функцию, не на итерацию, hoisting наверх функции",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "var_function_scope_shared",
+      "exampleType": "bad",
+      "exampleText": "var в for изолирован в блоке цикла — каждая итерация получает свою локальную i.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "setTimeout_macrotask_queue",
+      "exampleType": "good",
+      "exampleText": "setTimeout ставит колбек в macrotask queue; очередь чистится после синхронного кода — цикл уже закончился, i=3.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "setTimeout_macrotask_queue",
+      "exampleType": "good",
+      "exampleText": "event loop: сначала весь for, потом три колбека — они все читают финальное i",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "setTimeout_macrotask_queue",
+      "exampleType": "bad",
+      "exampleText": "setTimeout вызывает console.log прямо в момент setTimeout внутри итерации — i ещё 0,1,2.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "let_per_iteration_binding",
+      "exampleType": "good",
+      "exampleText": "for (let i = 0; i < 3; i++) setTimeout(() => console.log(i), 100) → 0,1,2: спецификация создаёт новый binding i на каждую итерацию.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "let_per_iteration_binding",
+      "exampleType": "good",
+      "exampleText": "let — правильный фикс: каждое замыкание захватывает свою привязку, не общую var",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "let_per_iteration_binding",
+      "exampleType": "bad",
+      "exampleText": "let в for делит одну i между итераций — результат с setTimeout такой же 3,3,3 как с var.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "settimeout_zero_not_sync",
+      "exampleType": "good",
+      "exampleText": "setTimeout(() => console.log(i), 0) с var — всё равно 3,3,3: 0ms не синхронный, колбек после цикла.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "settimeout_zero_not_sync",
+      "exampleType": "good",
+      "exampleText": "ноль миллисекунд — не «сейчас в цикле», колбек в очереди макрозадач",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "settimeout_zero_not_sync",
+      "exampleType": "bad",
+      "exampleText": "setTimeout(fn, 0) выполняется мгновенно в теле for до следующей итерации.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "iife_es5_fix",
+      "exampleType": "good",
+      "exampleText": "for (var i=0;i<3;i++) (function(i){ setTimeout(()=>console.log(i),100); })(i) — i как параметр, локальная копия 0,1,2.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "iife_es5_fix",
+      "exampleType": "good",
+      "exampleText": "в ES5 без let — IIFE с (i) в аргументе; пустой IIFE без i в параметрах не спасает",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "iife_es5_fix",
+      "exampleType": "bad",
+      "exampleText": "(function(){ setTimeout(()=>console.log(i),100); })() в for с var печатает 0,1,2.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes_traps",
+      "exampleType": "good",
+      "exampleText": "for (var item of ['a','b','c']) setTimeout(()=>log(item),0) → 'c','c','c'; let item фиксит. for (const i=0;i<3;i++) — SyntaxError на i++.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes_traps",
+      "exampleType": "good",
+      "exampleText": "forEach безопасен по аргументу; var x снаружи + forEach(()=>setTimeout(()=>log(x))) — x на момент выполнения",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes_traps",
+      "exampleType": "bad",
+      "exampleText": "for (var x of arr) всегда создаёт новый x; forEach никогда воспроизводит баг с замыканием.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "shcho-ne-tak-z-var-u-tsykli-ta-settimeout",
+    "apiUrl": "https://api.itlead.org/api/questions/shcho-ne-tak-z-var-u-tsykli-ta-settimeout",
+    "pageUrl": "https://itlead.org/interview-questions/javascript/shcho-ne-tak-z-var-u-tsykli-ta-settimeout",
+    "difficulty": "JUNIOR",
+    "titleEn": "Що не так з var у циклі та setTimeout?",
+    "categorySlug": "javascript",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

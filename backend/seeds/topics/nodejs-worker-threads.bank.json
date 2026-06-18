@@ -1,0 +1,734 @@
+{
+  "topic": {
+    "code": "nodejs_worker_threads",
+    "name": "Worker threads в Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое worker threads в Node.js и когда их использовать?",
+    "shortAnswer": "Worker threads запускают JavaScript в параллельных потоках внутри одного процесса Node.js — для CPU-intensive задач, которые иначе блокировали бы event loop. В отличие от Cluster (отдельные процессы), потоки могут делить память через SharedArrayBuffer и общаться через MessagePort без overhead процессов.",
+    "idealAnswer": "Worker threads (модуль worker_threads, стабилен с Node.js 12) выполняют JavaScript в параллельных OS-потоках внутри одного Node-процесса. Назначение — CPU-bound работа: криптография, обработка изображений, тяжёлый парсинг, синхронные вычисления. I/O (HTTP, fs.readFile) event loop и libuv обрабатывают асинхронно — worker для I/O лишний overhead. Node по умолчанию один JS-поток: 4-секундный hash на главном потоке задерживает все запросы на 4 секунды; worker выносит вычисление в отдельный поток, главный остаётся свободным. Каждый Worker создаёт новый V8 isolate — отдельный контекст движка, свой event loop, свой module cache и heap. Связь через MessagePort: postMessage/parentPort по умолчанию клонирует данные (structured clone) — 10MB объект копирует 10MB. Для zero-copy: transfer list postMessage({ buf }, [buf]) или SharedArrayBuffer с Atomics для потокобезопасного доступа. SharedArrayBuffer без Atomics даёт race condition — два потока инкрементируют shared[0]++ и теряют обновления; нужны Atomics.add/store/load. Worker pool в production: новый Worker на запрос стоит 50–100ms на инициализацию isolate; пул размером os.cpus().length переиспользует workers и очередь задач. Worker threads vs Cluster: workers — один process, SharedArrayBuffer, MessagePort быстрее IPC, но crash worker может убить process; Cluster — отдельные processes, изоляция crash, IPC медленнее, лучше для масштабирования HTTP по ядрам. workerData — read-only конфиг при создании Worker; postMessage — двусторонняя коммуникация после старта. Каждый worker имеет свой require cache — lodash грузится отдельно. Необработанная ошибка worker → event 'error' → без listener крашит весь process. Типичные ошибки: worker для I/O; worker per request без pool; копирование 50MB через postMessage без transfer; отсутствие error/exit handlers — Promise висит навсегда. Реальность: sharp, bcrypt, webpack/esbuild, piscina, Jest — worker pools. Child process — когда нужна полная изоляция или внешний executable.",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "worker_threads_definition",
+      "title": "Понимает назначение worker threads",
+      "expected": "Кандидат объясняет: параллельные потоки JS в одном process; CPU-intensive задачи без блокировки event loop; модуль worker_threads, Worker, parentPort.postMessage.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — CPU-bound в параллельных потоках одного process",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "worker_threads_definition",
+            "oftenConfusedWith": [
+              "event_loop_cpu_limit",
+              "workers_vs_cluster"
+            ],
+            "anchorTermsExpected": [
+              "worker_threads",
+              "CPU",
+              "event loop",
+              "один process",
+              "Worker",
+              "parentPort"
+            ],
+            "anchorTermsWrongTopic": [
+              "worker threads для HTTP запросов",
+              "Cluster и worker threads одно и то же",
+              "worker threads заменяют async/await"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Worker",
+              "worker_threads",
+              "CPU"
+            ],
+            "ask": "зачем нужны worker threads если Node уже асинхронный"
+          }
+        ],
+        "mustConcepts": [
+          "worker threads",
+          "worker_threads",
+          "Worker",
+          "CPU-intensive",
+          "CPU-bound",
+          "event loop",
+          "не блокир",
+          "параллельн",
+          "один process",
+          "один процесс",
+          "parentPort",
+          "postMessage",
+          "workerData",
+          "главн поток",
+          "main thread",
+          "Node.js 12",
+          "модуль"
+        ],
+        "falseClaims": [
+          "worker threads нужны для любого async I/O",
+          "worker threads создают отдельный OS-process как cluster",
+          "Worker блокирует главный поток до завершения",
+          "worker threads заменяют libuv thread pool",
+          "worker threads — единственный способ параллелизма в Node"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "event_loop_cpu_limit",
+      "title": "Понимает почему event loop недостаточен для CPU",
+      "expected": "Кандидат объясняет: один JS-поток; I/O ждёт в libuv/OS, callbacks не блокируют; синхронный CPU-цикл на главном потоке задерживает все запросы; worker выносит вычисление.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевой мотив — single thread + blocking CPU vs async I/O",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "worker_threads_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "event_loop_cpu_limit",
+            "oftenConfusedWith": [
+              "worker_threads_definition"
+            ],
+            "anchorTermsExpected": [
+              "один поток",
+              "I/O",
+              "libuv",
+              "синхронн",
+              "блокир",
+              "CPU"
+            ],
+            "anchorTermsWrongTopic": [
+              "event loop параллелит JS на все ядра",
+              "await fs.readFile блокирует event loop навсегда"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "event loop",
+              "один поток",
+              "CPU"
+            ],
+            "ask": "что произойдёт с API если 4-секундный hash выполняется на главном потоке"
+          },
+          {
+            "match": [
+              "I/O",
+              "libuv",
+              "async"
+            ],
+            "ask": "почему чтение файла не требует worker thread"
+          }
+        ],
+        "mustConcepts": [
+          "event loop",
+          "один JS",
+          "single thread",
+          "главн поток",
+          "I/O",
+          "libuv",
+          "асинхрон",
+          "callback",
+          "CPU-bound",
+          "синхронн",
+          "блокир",
+          "задерж",
+          "запрос",
+          "Math.sqrt",
+          "hash",
+          "crypto",
+          "не ждёт",
+          "OS level"
+        ],
+        "falseClaims": [
+          "event loop выполняет JS на нескольких ядрах одновременно",
+          "любой await блокирует event loop как CPU-цикл",
+          "libuv thread pool выполняет JavaScript callbacks",
+          "I/O в Node всегда требует worker thread",
+          "CPU-работа на главном потоке не влияет на другие запросы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "internal_architecture",
+      "title": "Знает внутреннее устройство Worker",
+      "expected": "Кандидат описывает: каждый Worker — новый V8 isolate, свой event loop и module cache; MessagePort; structured clone по умолчанию копирует данные; transfer list для zero-copy.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "How worker threads work internally из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "V8 isolate",
+              "MessagePort",
+              "structured clone"
+            ],
+            "ask": "чем worker отличается от главного потока по изоляции и как передаются большие объекты"
+          }
+        ],
+        "mustConcepts": [
+          "V8 isolate",
+          "isolate",
+          "event loop",
+          "module cache",
+          "require cache",
+          "MessagePort",
+          "structured clone",
+          "клонир",
+          "копир",
+          "transfer",
+          "zero-copy",
+          "detached",
+          "heap",
+          "globals",
+          "отдельн контекст",
+          "parentPort"
+        ],
+        "falseClaims": [
+          "worker делит V8 heap с главным потоком по умолчанию",
+          "postMessage всегда zero-copy без transfer list",
+          "worker использует общий require cache с main thread",
+          "MessagePort и IPC cluster — одно и то же",
+          "structured clone передаёт ссылку без копирования"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "shared_memory",
+      "title": "Понимает SharedArrayBuffer и Atomics",
+      "expected": "Кандидат объясняет: SharedArrayBuffer — общая физическая память между потоками; без Atomics race condition; Atomics.store/add/load для потокобезопасных операций.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Shared memory блок — критично для senior и отличия от postMessage",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "internal_architecture",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "SharedArrayBuffer",
+              "Atomics",
+              "race"
+            ],
+            "ask": "почему shared[0]++ из двух потоков теряет обновления и как это исправить"
+          },
+          {
+            "match": [
+              "SharedArrayBuffer",
+              "postMessage"
+            ],
+            "ask": "чем SharedArrayBuffer отличается от postMessage для 5MB буфера"
+          }
+        ],
+        "mustConcepts": [
+          "SharedArrayBuffer",
+          "Atomics",
+          "Atomics.store",
+          "Atomics.add",
+          "Atomics.load",
+          "race condition",
+          "гонк",
+          "потокобезоп",
+          "thread-safe",
+          "общ памят",
+          "shared",
+          "Int32Array",
+          "без копир",
+          "interleave",
+          "перетин",
+          "increment",
+          "счётчик"
+        ],
+        "falseClaims": [
+          "SharedArrayBuffer без Atomics потокобезопасен для increment",
+          "postMessage и SharedArrayBuffer одинаково копируют 5MB",
+          "Atomics нужны только в browser Workers, не в Node",
+          "два потока могут безопасно писать в обычный ArrayBuffer одновременно",
+          "SharedArrayBuffer автоматически синхронизирует все операции"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "workers_vs_cluster",
+      "title": "Отличает worker threads от Cluster",
+      "expected": "Кандидат сравнивает: workers — один process, SharedArrayBuffer, MessagePort, низкая crash isolation, CPU compute; Cluster — отдельные processes, IPC, высокая изоляция, масштабирование HTTP.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "таблица Worker vs Cluster — частый senior вопрос",
+        "confusionPairs": [
+          {
+            "checkpointKey": "workers_vs_cluster",
+            "oftenConfusedWith": [
+              "worker_threads_definition"
+            ],
+            "anchorTermsExpected": [
+              "Cluster",
+              "process",
+              "IPC",
+              "SharedArrayBuffer",
+              "HTTP",
+              "изоляц"
+            ],
+            "anchorTermsWrongTopic": [
+              "Cluster для CPU hash внутри одного запроса",
+              "worker threads масштабируют Express по ядрам лучше cluster"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Cluster",
+              "worker",
+              "process"
+            ],
+            "ask": "когда выбрать worker threads, а когда cluster.fork для Express"
+          },
+          {
+            "match": [
+              "child process",
+              "изоляц"
+            ],
+            "ask": "worker thread vs child_process — когда нужна полная изоляция crash"
+          }
+        ],
+        "mustConcepts": [
+          "Cluster",
+          "cluster.fork",
+          "отдельн process",
+          "один process",
+          "IPC",
+          "MessagePort",
+          "SharedArrayBuffer",
+          "изоляц",
+          "crash",
+          "HTTP",
+          "масштаб",
+          "CPU compute",
+          "соединен",
+          "connection",
+          "child_process",
+          "overhead"
+        ],
+        "falseClaims": [
+          "Cluster и worker threads решают одну задачу",
+          "worker crash никогда не влияет на parent process",
+          "Cluster быстрее MessagePort для CPU внутри одной задачи",
+          "worker threads лучше cluster для приёма входящих TCP на все ядра",
+          "Cluster делит память через SharedArrayBuffer"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки worker threads",
+      "expected": "Кандидат называет: worker для I/O; новый Worker на каждый запрос; postMessage больших буферов без transfer; SharedArrayBuffer без Atomics; отсутствие error и exit handlers.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — 5 production-ловушек",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "shared_memory",
+            "floorFraction": 0.4
+          },
+          {
+            "checkpointKey": "worker_pool",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "I/O",
+              "readFile",
+              "fs"
+            ],
+            "ask": "почему Worker для readFile — антипаттерн"
+          },
+          {
+            "match": [
+              "error",
+              "exit",
+              "Promise",
+              "hang"
+            ],
+            "ask": "что случится с Promise если worker упадёт без error handler"
+          },
+          {
+            "match": [
+              "transfer",
+              "50MB",
+              "hugeBuffer"
+            ],
+            "ask": "как передать большой ArrayBuffer без копирования"
+          }
+        ],
+        "mustConcepts": [
+          "I/O",
+          "readFile",
+          "fs.promises",
+          "антипаттерн",
+          "новый Worker",
+          "на запрос",
+          "per request",
+          "transfer list",
+          "detached",
+          "Atomics",
+          "race",
+          "error handler",
+          "exit handler",
+          "Promise hang",
+          "завис",
+          "uncaught",
+          "crash process",
+          "overhead"
+        ],
+        "falseClaims": [
+          "worker для fs.readFile ускоряет чтение файла",
+          "новый Worker на каждый HTTP запрос — норма в production",
+          "postMessage с 50MB буфером zero-copy по умолчанию",
+          "достаточно только worker.on('message') без error/exit",
+          "Atomics не нужны если increment редкий"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "worker_data_vs_postmessage",
+      "title": "Различает workerData и postMessage",
+      "expected": "Кандидат объясняет: workerData — read-only при создании Worker для начальной конфигурации; postMessage/parentPort — двусторонняя коммуникация после старта; отдельный require cache у worker.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Follow-up questions из ITLead — бонусное уточнение",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "workerData",
+              "postMessage"
+            ],
+            "ask": "когда передавать конфиг через workerData, а когда через postMessage"
+          },
+          {
+            "match": [
+              "require cache",
+              "lodash"
+            ],
+            "ask": "делят ли worker и main thread кеш модулей require"
+          }
+        ],
+        "mustConcepts": [
+          "workerData",
+          "postMessage",
+          "parentPort",
+          "read-only",
+          "только чтение",
+          "создан",
+          "creation",
+          "двусторон",
+          "конфиг",
+          "require cache",
+          "module cache",
+          "отдельн загруз",
+          "lodash",
+          "startup cost",
+          "инициализац"
+        ],
+        "falseClaims": [
+          "workerData можно изменять из worker и видеть в main",
+          "postMessage работает только до старта worker",
+          "worker и main делят один require cache",
+          "workerData заменяет postMessage для всех сообщений",
+          "require в worker бесплатен — модули уже в памяти main"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "worker_pool",
+      "title": "Понимает паттерн worker pool",
+      "expected": "Кандидат описывает: предсозданный пул workers, очередь задач, busy flag; размер os.cpus().length; piscina/sharp/webpack как примеры; spawn 50–100ms дорого.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Worker pool pattern — бонус production practice",
+        "mustConcepts": [
+          "pool",
+          "пул",
+          "os.cpus",
+          "очеред",
+          "queue",
+          "busy",
+          "reuse",
+          "переиспольз",
+          "50ms",
+          "100ms",
+          "isolate",
+          "piscina",
+          "sharp",
+          "webpack",
+          "esbuild",
+          "Jest",
+          "context switch",
+          "ядр",
+          "CPU cores"
+        ],
+        "falseClaims": [
+          "создавать новый Worker на каждую задачу быстрее пула",
+          "пул должен быть больше числа ядер для CPU задач",
+          "worker pool не нужен если задач мало",
+          "os.cpus().length irrelevant для размера пула",
+          "пул workers делит один V8 isolate"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Worker threads — параллельный JS в одном Node process для CPU: crypto hash, resize картинок. Главный поток принимает HTTP, тяжёлое вычисление уходит в Worker через postMessage. I/O через fs.promises и event loop — worker не нужен. Для production — пул на os.cpus().length, не новый Worker на запрос.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На bcrypt проверку пароля повесил worker pool — API не замирает на 200ms sync hash. SharedArrayBuffer + Atomics для shared counter между 4 workers. Cluster оставил для HTTP по ядрам, workers — только compute внутри процесса.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "new Worker('./compute.js', { workerData: { n: 1e8 } }) — main сразу пишет 'free'. V8 isolate у worker свой, lodash require грузится отдельно. Большой буфер — postMessage(data, [data]) transfer, иначе structured clone копирует всё.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Worker threads — это то же что Cluster, просто другое имя. Для каждого fs.readFile создаю Worker — так быстрее async I/O.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "SharedArrayBuffer шарит память, поэтому shared[0]++ из двух потоков безопасен без Atomics. Достаточно worker.on('message') — если worker упадёт, Promise сам reject.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Event loop уже параллелит JS на все ядра, worker threads нужны только для WebSocket. postMessage всегда zero-copy, transfer list не нужен.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "worker_threads_definition",
+      "exampleType": "good",
+      "exampleText": "worker_threads модуль — Worker в отдельном OS thread внутри того же process; CPU-bound off main thread, parentPort.postMessage результат.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "worker_threads_definition",
+      "exampleType": "good",
+      "exampleText": "ну workers для тяжёлой математики и hash — главный поток не блокируется, запросы живут",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "worker_threads_definition",
+      "exampleType": "bad",
+      "exampleText": "Worker threads создают отдельный Node process для каждого потока как cluster.fork.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "event_loop_cpu_limit",
+      "exampleType": "good",
+      "exampleText": "I/O ждёт в libuv — JS thread свободен. Синхронный crypto на main — все запросы стоят 4 секунды. Worker выносит hash.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "event_loop_cpu_limit",
+      "exampleType": "good",
+      "exampleText": "await readFile не блокирует как цикл sqrt на 100M итераций — для второго нужен worker",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "event_loop_cpu_limit",
+      "exampleType": "bad",
+      "exampleText": "Event loop выполняет JavaScript на всех ядрах CPU одновременно по умолчанию.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "internal_architecture",
+      "exampleType": "good",
+      "exampleText": "Каждый Worker — новый V8 isolate, свой event loop. postMessage клонирует через structured clone; transfer [buffer] — zero-copy detached в main.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "internal_architecture",
+      "exampleType": "good",
+      "exampleText": "require cache у worker свой — lodash грузится второй раз, отсюда cost старта isolate",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "internal_architecture",
+      "exampleType": "bad",
+      "exampleText": "Worker делит heap и globals с main thread, postMessage передаёт указатель без копии всегда.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "shared_memory",
+      "exampleType": "good",
+      "exampleText": "SharedArrayBuffer + Atomics.add(counter, 0, 1) — четыре workers по 1000 increment дают ровно 4000, без race.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "shared_memory",
+      "exampleType": "good",
+      "exampleText": "5MB через postMessage — клон 5MB; SharedArrayBuffer — одна память, но Atomics обязательны для записи",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "shared_memory",
+      "exampleType": "bad",
+      "exampleText": "Два потока делают shared[0]++ — JavaScript сам сериализует, Atomics не нужны.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "workers_vs_cluster",
+      "exampleType": "good",
+      "exampleText": "Cluster — 4 process на 4 ядра для HTTP connections; worker threads — hash внутри одного process без IPC overhead.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "workers_vs_cluster",
+      "exampleType": "good",
+      "exampleText": "child_process когда crash должен убить только child; worker error без handler — весь Node падает",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "workers_vs_cluster",
+      "exampleType": "bad",
+      "exampleText": "Для масштабирования Express по ядрам лучше worker threads чем cluster — они быстрее для TCP.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "readFile — await fs.promises, не Worker. app.get создаёт Worker каждый раз — под нагрузкой 100ms spawn; нужен pool + error/exit handlers.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "postMessage(hugeBuffer, [hugeBuffer]) transfer — main теряет буфер, worker владеет без копии 50MB",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Worker для HTTP fetch ускоряет сеть. Только on('message') достаточно — worker throw не страшен.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "worker_data_vs_postmessage",
+      "exampleType": "good",
+      "exampleText": "workerData: { n: 1e8 } при new Worker — начальный конфиг read-only; дальше parentPort.postMessage для результатов и новых задач.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "worker_data_vs_postmessage",
+      "exampleType": "good",
+      "exampleText": "конфиг в workerData при старте, ongoing chat через postMessage в обе стороны",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "worker_data_vs_postmessage",
+      "exampleType": "bad",
+      "exampleText": "workerData можно менять из worker и main увидит изменения — общий объект.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "worker_pool",
+      "exampleType": "good",
+      "exampleText": "WorkerPool size os.cpus().length, busy flag, queue pending — как piscina/sharp; spawn isolate 50-100ms amortized.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "worker_pool",
+      "exampleType": "good",
+      "exampleText": "jest гоняет файлы в worker threads параллельно — один pool, не fork на каждый test file с нуля каждый раз если переиспользуют",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "worker_pool",
+      "exampleType": "bad",
+      "exampleText": "Пул из 32 workers на 4-ядерном CPU быстрее для CPU hash чем 4 workers.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-worker-threads",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-worker-threads",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-worker-threads",
+    "difficulty": "SENIOR",
+    "titleEn": "What are worker threads in Node.js?",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

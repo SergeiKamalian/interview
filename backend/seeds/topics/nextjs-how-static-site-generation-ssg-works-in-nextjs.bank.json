@@ -1,0 +1,575 @@
+{
+  "topic": {
+    "code": "nextjs_how_static_site_generation_ssg_works_nextjs",
+    "name": "SSG (Static Site Generation) в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работает Static Site Generation (SSG) в Next.js?",
+    "shortAnswer": "SSG в Next.js генерирует HTML-страницы один раз при `next build`, затем раздаёт их с CDN без серверных вычислений на каждый запрос. Рендеринг переносится с времени запроса на время сборки — TTFB ~10 ms с CDN против 100–500 ms у SSR. Для обновления данных после деплоя используют ISR с `export const revalidate = 60`.",
+    "idealAnswer": "Static Site Generation (SSG) в Next.js предварительно рендерит страницы в HTML-файлы во время `next build`, затем раздаёт их с CDN — на запрос не выполняется серверный код. SSR запускает Node.js на каждый запрос; SSG — ровно один раз при сборке. Отсюда TTFB ~10 ms с CDN против 100–500 ms у SSR, но данные «заморожены» до следующей сборки или ISR-ревалидации. При сборке Next.js сканирует страницы, выполняет React Server Components в Node.js, fetch с `cache: 'force-cache'`, сериализует дерево через `renderToPipeableStream` и пишет `.html` в `.next/server/app`. Для динамических маршрутов `generateStaticParams` задаёт, какие пути предрендерить; без него маршрут падает в SSR — частая регрессия производительности. ISR (Incremental Static Regeneration) обновляет страницу в фоне: `export const revalidate = 60` или `next: { revalidate: 60 }` в fetch — первый запрос после TTL отдаёт stale HTML и регенерирует, второй получает свежий. SSG подходит для документации, блогов, маркетинга, каталогов с редкими обновлениями; не подходит для дашбордов, персонализации, realtime. Сравнение: SSG — render при build, TTFB ~10 ms, нулевой server cost после деплоя, SEO полный; SSR — каждый запрос, всегда свежие данные; CSR — в браузере, слабый SEO. App Router: SSG по умолчанию при статическом fetch; Pages Router: `getStaticProps` + `getStaticPaths`. Типичные ошибки: fetch без `force-cache` (страница становится dynamic); отсутствие `generateStaticParams`; `cookies()`, `headers()`, `searchParams` в компоненте — `force-dynamic` и SSR; `revalidate: 0` отключает SSG; мутация данных в `getStaticProps`. Next.js при `next build` помечает маршруты `○ (Static)` или `λ (Dynamic)` по наличию dynamic functions. `dynamicParams = false` — 404 для путей вне `generateStaticParams`; по умолчанию `true` — SSR fallback для неизвестных slug.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "ssg_definition",
+      "title": "Понимает суть SSG",
+      "expected": "Кандидат объясняет: HTML генерируется один раз при `next build`, раздаётся как статика с CDN, сервер не участвует в каждом запросе; данные «запекаются» на момент сборки.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — build time vs request time",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "ssg_definition",
+            "oftenConfusedWith": [
+              "ssg_vs_ssr_csr",
+              "build_static_pages"
+            ],
+            "anchorTermsExpected": [
+              "next build",
+              "build time",
+              "CDN",
+              "статик",
+              "HTML",
+              "без сервер"
+            ],
+            "anchorTermsWrongTopic": [
+              "SSR на каждый запрос",
+              "SSG без hydration",
+              "рендер в браузере"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "next build",
+              "build time",
+              "CDN"
+            ],
+            "ask": "чем SSG отличается от SSR по моменту рендеринга и TTFB"
+          }
+        ],
+        "mustConcepts": [
+          "SSG",
+          "Static Site Generation",
+          "next build",
+          "build time",
+          "время сборки",
+          "CDN",
+          "HTML",
+          "статик",
+          "предрендер",
+          "pre-render",
+          "без сервер",
+          "на запрос",
+          "запеч",
+          "baked",
+          "force-cache",
+          "hydration"
+        ],
+        "falseClaims": [
+          "SSG рендерит HTML на каждый запрос",
+          "SSG не требует JavaScript на клиенте для интерактива",
+          "SSG и CSR дают одинаковый TTFB",
+          "после деплоя SSG всегда обращается к Node.js на каждый запрос"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "ssg_vs_ssr_csr",
+      "title": "Сравнивает SSG, SSR и CSR",
+      "expected": "Кандидат сравнивает: SSG — render при build, TTFB ~10 ms, нулевой runtime cost; SSR — каждый запрос, свежие данные, 100–500 ms; CSR — в браузере, слабый SEO; может назвать когда что выбирать.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевой trade-off скорость/свежесть/SEO",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "ssg_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "ssg_vs_ssr_csr",
+            "oftenConfusedWith": [
+              "when_to_use_ssg"
+            ],
+            "anchorTermsExpected": [
+              "SSG",
+              "SSR",
+              "CSR",
+              "TTFB",
+              "SEO",
+              "build",
+              "каждый запрос"
+            ],
+            "anchorTermsWrongTopic": [
+              "SSG всегда свежие данные",
+              "CSR лучше для SEO блога"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "SSG",
+          "SSR",
+          "CSR",
+          "TTFB",
+          "SEO",
+          "build time",
+          "каждый запрос",
+          "браузер",
+          "server cost",
+          "свежест",
+          "frozen",
+          "заморож",
+          "getStaticProps",
+          "getServerSideProps",
+          "useEffect"
+        ],
+        "falseClaims": [
+          "SSG и SSR дают одинаковую свежесть данных",
+          "CSR подходит для публичного SEO-блога",
+          "SSG не даёт pre-rendered HTML для SEO",
+          "SSR дешевле SSG при высоком трафике"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "build_static_pages",
+      "title": "Знает процесс сборки статики",
+      "expected": "Кандидат описывает: `next build` сканирует страницы, RSC в Node.js, fetch с `cache: 'force-cache'`, `renderToPipeableStream`, `.html` в `.next/server/app`; CDN раздаёт без Node на запрос.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "механизм из ITLead How Next.js Builds",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "renderToPipeableStream",
+              "force-cache",
+              "next build"
+            ],
+            "ask": "что происходит с компонентом и fetch во время next build"
+          }
+        ],
+        "mustConcepts": [
+          "next build",
+          "React Server Components",
+          "RSC",
+          "fetch",
+          "force-cache",
+          "renderToPipeableStream",
+          ".next/server",
+          "index.html",
+          "Node.js",
+          "сканиру",
+          "сериализ",
+          "CDN",
+          "App Router"
+        ],
+        "falseClaims": [
+          "next build выполняет fetch на каждый будущий запрос пользователя",
+          "статические HTML не попадают в .next/server",
+          "renderToPipeableStream работает только в браузере"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "generate_static_params",
+      "title": "Понимает generateStaticParams",
+      "expected": "Кандидат объясняет: `generateStaticParams` возвращает slug-и для предрендера динамических маршрутов; без него — SSR fallback; `dynamicParams = false` — 404 для неизвестных путей.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "частая регрессия — dynamic route без params",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "generateStaticParams",
+              "dynamicParams",
+              "slug"
+            ],
+            "ask": "что будет с app/blog/[slug] без generateStaticParams и что даёт dynamicParams = false"
+          },
+          {
+            "match": [
+              "getStaticPaths",
+              "fallback"
+            ],
+            "ask": "аналог в Pages Router — getStaticPaths и fallback"
+          }
+        ],
+        "mustConcepts": [
+          "generateStaticParams",
+          "dynamic route",
+          "динамическ",
+          "slug",
+          "params",
+          "SSR fallback",
+          "dynamicParams",
+          "404",
+          "pre-build",
+          "getStaticPaths",
+          "fallback",
+          "paths",
+          "build генерир"
+        ],
+        "falseClaims": [
+          "динамический маршрут всегда SSG без generateStaticParams",
+          "generateStaticParams выполняется на каждый запрос",
+          "dynamicParams = false включает SSR для неизвестных slug",
+          "getStaticPaths не нужен в Pages Router для SSG"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "isr_revalidation",
+      "title": "Знает ISR и revalidate",
+      "expected": "Кандидат объясняет ISR: stale-while-revalidate в фоне; `export const revalidate = 60` vs `next: { revalidate: 60 }` в fetch; `revalidate: 0` отключает SSG; `revalidate: false` — чистая статика.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ISR — практический паттерн «mostly static»",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "revalidate",
+              "ISR",
+              "stale"
+            ],
+            "ask": "что происходит при первом и втором запросе после истечения revalidate"
+          },
+          {
+            "match": [
+              "export const revalidate",
+              "next: { revalidate"
+            ],
+            "ask": "разница между page-level revalidate и fetch-level next.revalidate"
+          }
+        ],
+        "mustConcepts": [
+          "ISR",
+          "Incremental Static Regeneration",
+          "revalidate",
+          "stale",
+          "фон",
+          "background",
+          "export const revalidate",
+          "next.revalidate",
+          "60",
+          "revalidate: 0",
+          "revalidate: false",
+          "свеж",
+          "ребилд",
+          "без downtime"
+        ],
+        "falseClaims": [
+          "revalidate: 0 — это ISR каждую секунду",
+          "ISR требует полного next build для каждого обновления",
+          "page-level и fetch-level revalidate всегда независимы без приоритета",
+          "ISR нельзя использовать с App Router"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки SSG",
+      "expected": "Кандидат называет: fetch без `force-cache`; отсутствие `generateStaticParams`; `cookies()`/`headers()`/`searchParams` → force-dynamic; мутация в `getStaticProps`; `export const dynamic = 'force-static'` как явный статический режим.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "generate_static_params",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "force-cache",
+              "no-store",
+              "Dynamic"
+            ],
+            "ask": "почему fetch без cache: force-cache ломает SSG в App Router"
+          },
+          {
+            "match": [
+              "cookies()",
+              "headers()",
+              "searchParams"
+            ],
+            "ask": "почему cookies() в server component отменяет статическую генерацию"
+          }
+        ],
+        "mustConcepts": [
+          "force-cache",
+          "no-store",
+          "generateStaticParams",
+          "cookies()",
+          "headers()",
+          "searchParams",
+          "force-dynamic",
+          "force-static",
+          "Dynamic Function",
+          "getStaticProps",
+          "мутац",
+          "immutable",
+          "build log",
+          "⚠ Dynamic",
+          "revalidate: 0"
+        ],
+        "falseClaims": [
+          "cookies() не влияет на static/dynamic при наличии generateStaticParams",
+          "fetch в App Router всегда force-cache по умолчанию в Next.js 14+",
+          "можно мутировать объект props в getStaticProps",
+          "revalidate: 0 — рекомендуемый способ включить ISR"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use_ssg",
+      "title": "Понимает когда использовать SSG",
+      "expected": "Кандидат называет: документация, блоги, маркетинг, каталоги с редкими обновлениями + ISR; не SSG — дашборды, персонализация, realtime (акции, чат).",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "when to use — краткий контекст middle",
+        "mustConcepts": [
+          "документ",
+          "блог",
+          "маркетинг",
+          "каталог",
+          "SEO",
+          "дашборд",
+          "персонализ",
+          "realtime",
+          "traffic spike",
+          "Jamstack",
+          "Vercel",
+          "TailwindUI"
+        ],
+        "falseClaims": [
+          "SSG подходит для персонализированного dashboard",
+          "realtime котировки лучше на SSG",
+          "SSG не нужен когда важен SEO"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "SSG при next build один раз рендерит HTML с данными из fetch с cache: force-cache, кладёт в .next/server и раздаёт с CDN — TTFB около 10 ms. Для блога с [slug] нужен generateStaticParams, иначе маршрут уйдёт в SSR. Обновления раз в минуту — ISR с revalidate: 60.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для docs.itlead.org беру SSG: контент меняется редко, SEO важен, CDN тянет пики. fetch с force-cache на build. Если slug не в generateStaticParams и dynamicParams false — 404, не SSR-сюрприз в проде.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "SSG vs SSR: сборка один раз против Node на каждый запрос. Данные заморожены до rebuild или ISR. cookies() в layout — force-dynamic, даже если generateStaticParams настроен.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "SSG — это когда Next.js на каждый запрос генерирует HTML на сервере, как getServerSideProps. CDN не участвует.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для app/shop/[id] достаточно async page без generateStaticParams — Next сам сделает SSG для всех id. fetch без опций всегда кешируется на build.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "revalidate: 0 — это ISR каждый запрос. cookies() в server component не мешает статике, если есть force-static в соседнем файле.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "ssg_definition",
+      "exampleType": "good",
+      "exampleText": "SSG — HTML генерируется при next build, потом CDN отдаёт файл без Node на запрос; JS на клиенте только hydration.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "ssg_definition",
+      "exampleType": "good",
+      "exampleText": "ну ssg — печём страницы на сборке, юзер получает готовый html с cdn, сервер не крутится на каждый hit",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "ssg_definition",
+      "exampleType": "bad",
+      "exampleText": "SSG рендерит страницу в браузере пользователя при каждом визите, как чистый CSR.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "ssg_vs_ssr_csr",
+      "exampleType": "good",
+      "exampleText": "SSG — build + CDN ~10 ms TTFB, данные stale; SSR — свежие данные, 100–500 ms и server CPU; CSR — SEO слабый, ждём JS bundle.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "ssg_vs_ssr_csr",
+      "exampleType": "good",
+      "exampleText": "публичный блог — ssg/isr, личный кабинет — ssr или csr, spa админка — csr ок",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "ssg_vs_ssr_csr",
+      "exampleType": "bad",
+      "exampleText": "CSR лучше для SEO документации, SSG только для realtime дашбордов.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "build_static_pages",
+      "exampleType": "good",
+      "exampleText": "next build: RSC + fetch force-cache → renderToPipeableStream → index.html в .next/server/app; запросы идут в CDN.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "build_static_pages",
+      "exampleType": "good",
+      "exampleText": "компонент с fetch выполняется один раз на сборке, ответ вшит в html",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "build_static_pages",
+      "exampleType": "bad",
+      "exampleText": "При каждом визите next build заново запускает renderToPipeableStream на edge.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "generate_static_params",
+      "exampleType": "good",
+      "exampleText": "generateStaticParams возвращает [{ slug: 'a' }, { slug: 'b' }] — build создаёт /blog/a и /blog/b. Без него [slug] → SSR.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "generate_static_params",
+      "exampleType": "good",
+      "exampleText": "dynamicParams false — неизвестный slug сразу 404, без on-demand ssr",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "generate_static_params",
+      "exampleType": "bad",
+      "exampleText": "generateStaticParams вызывается на каждый HTTP-запрос для проверки slug.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "isr_revalidation",
+      "exampleType": "good",
+      "exampleText": "revalidate 60: после TTL первый запрос отдаёт stale и триггерит фоновую регенерацию, второй — свежий HTML.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "isr_revalidation",
+      "exampleType": "good",
+      "exampleText": "fetch next revalidate 60 переопределяет page-level export const revalidate для этого запроса",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "isr_revalidation",
+      "exampleType": "bad",
+      "exampleText": "revalidate: 0 включает ISR каждую секунду без полного rebuild.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "fetch('/api/data') без force-cache → dynamic render, в build log ⚠ Dynamic. Исправление: cache force-cache или export const dynamic = 'force-static'.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "cookies().get('session') в page — force-dynamic, generateStaticParams не спасёт; auth страницы — SSR.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "В getStaticProps можно data.count++ — мутация props нормальна для SSG.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "when_to_use_ssg",
+      "exampleType": "good",
+      "exampleText": "Docs, landing, blog — SSG+ISR; user dashboard с session cookie — SSR; live chat — не SSG.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "when_to_use_ssg",
+      "exampleType": "good",
+      "exampleText": "каталог с weekly update — isr 3600, не full rebuild на 10k sku",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "when_to_use_ssg",
+      "exampleType": "bad",
+      "exampleText": "Биржевые котировки и персональный dashboard — идеальный кейс для чистого SSG без ISR.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nextjs-how-static-site-generation-ssg-works-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/nextjs-how-static-site-generation-ssg-works-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/nextjs-how-static-site-generation-ssg-works-in-nextjs",
+    "difficulty": "MIDDLE",
+    "titleEn": "How static site generation (SSG) works in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

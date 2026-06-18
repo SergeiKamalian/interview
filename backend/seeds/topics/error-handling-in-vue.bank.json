@@ -1,0 +1,591 @@
+{
+  "topic": {
+    "code": "error_handling_in_vue",
+    "name": "Обработка ошибок в Vue.js",
+    "skillCode": "vue",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как в Vue.js перехватывать и обрабатывать ошибки в компонентах?",
+    "shortAnswer": "Vue предоставляет несколько механизмов: хук `onErrorCaptured` в родительском компоненте перехватывает синхронные ошибки потомков во время render, setup или watch; `return false` останавливает всплытие по дереву. Для async-операций нужен `try/catch` вокруг `await`. Глобальный `app.config.errorHandler` в `main.ts` — последний рубеж для логирования в Sentry и всего, что локальные границы не остановили.",
+    "idealAnswer": "Обработка ошибок в Vue.js перехватывает runtime-исключения внутри компонентов и не даёт им обрушить всё приложение. `onErrorCaptured` в родителе — локальная «противопожарная полоса»: перехватывает синхронные ошибки любого потомка во время render, setup, watchers и lifecycle hooks. Хук получает три аргумента: объект ошибки, экземпляр компонента и строку `info` (`\"render\"`, `\"setup()\"`, `\"watcher\"`). Возврат `false` останавливает всплытие; без него ошибка поднимается дальше до `app.config.errorHandler`. Ошибки ведут себя как DOM-события — bubble up по дереву компонентов. `onErrorCaptured` ловит только sync throws — async-функции и rejected Promise он не перехватывает; для fetch нужен `try/catch` и реактивный ref с ошибкой. Для необработанных rejection вне Vue — `window.addEventListener('unhandledrejection', ...)`. `app.config.errorHandler` — глобальный обработчик последней инстанции: логирование в Sentry/Datadog с `info` и именем компонента. `app.config.warnHandler` — только dev-предупреждения. Паттерн ErrorBoundary: отдельный wrapper-комponent с `<slot>`, `onErrorCaptured` и fallback UI; хук не ловит ошибки в том же компоненте, где объявлен — только у потомков. При retry недостаточно очистить error ref: нужно сбросить данные, вызвавшие падение, и при необходимости `store.$reset()` + `nextTick` перед re-mount. В Vue 3.4+ ошибки async setup внутри `<Suspense>` передаются ближайшей границе; на старых версиях могли обходить boundary — безопаснее оборачивать async setup в `try/catch`. В Nuxt SSR `onErrorCaptured` работает на клиенте; в плагинах нужен guard `process.client`, серверные ошибки — в server middleware. VueUse `useFetch` возвращает реактивный `error` ref — caller не получает uncaught exception.",
+    "maxScore": 10,
+    "skills": [
+      "vue",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "on_error_captured_basics",
+      "title": "Понимает onErrorCaptured",
+      "expected": "Кандидат объясняет: `onErrorCaptured` в родителе перехватывает sync-ошибки потомков во время render, setup, watch; работает как локальная граница ошибок вокруг `<slot>`.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — TL;DR и quick example из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "onErrorCaptured",
+              "потомк",
+              "descendant"
+            ],
+            "ask": "какие ошибки и на какой фазе lifecycle перехватывает onErrorCaptured"
+          }
+        ],
+        "mustConcepts": [
+          "onErrorCaptured",
+          "родител",
+          "потомк",
+          "descendant",
+          "render",
+          "setup",
+          "watch",
+          "watcher",
+          "синхронн",
+          "sync",
+          "границ",
+          "boundary",
+          "slot",
+          "ErrorBoundary",
+          "перехват",
+          "локальн",
+          "обёртк"
+        ],
+        "falseClaims": [
+          "onErrorCaptured перехватывает все ошибки включая async rejection",
+          "onErrorCaptured ловит ошибки в том же компоненте где объявлен",
+          "onErrorCaptured срабатывает для ошибок в setTimeout",
+          "onErrorCaptured заменяет try/catch для fetch"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "error_bubbling",
+      "title": "Знает всплытие и return false",
+      "expected": "Кандидат описывает: ошибки bubble up по дереву как DOM-события; хук получает `(err, instance, info)`; `return false` останавливает всплытие; без него ошибка доходит до `app.config.errorHandler`.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "механизм propagation и info — ключ из How errors propagate",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "on_error_captured_basics",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "error_bubbling",
+            "oftenConfusedWith": [
+              "global_error_handler"
+            ],
+            "anchorTermsExpected": [
+              "return false",
+              "bubble",
+              "всплыт",
+              "info",
+              "render",
+              "setup()"
+            ],
+            "anchorTermsWrongTopic": [
+              "errorHandler первым",
+              "return true останавливает"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "return false",
+              "info",
+              "bubble"
+            ],
+            "ask": "что делает return false и зачем логировать параметр info"
+          }
+        ],
+        "mustConcepts": [
+          "bubble",
+          "всплыт",
+          "spill",
+          "return false",
+          "return",
+          "info",
+          "render",
+          "setup()",
+          "watcher",
+          "instance",
+          "экземпляр",
+          "err",
+          "глобальн",
+          "errorHandler",
+          "останов",
+          "продолжа",
+          "DOM-событ"
+        ],
+        "falseClaims": [
+          "return false не влияет на всплытие ошибки",
+          "info всегда пустой и не нужен для дебага",
+          "ошибка не всплывает к родителям без onErrorCaptured",
+          "onErrorCaptured срабатывает раньше глобального errorHandler при return false"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "caught_vs_not_caught",
+      "title": "Отличает что ловит onErrorCaptured",
+      "expected": "Кандидат называет: ловит sync throws в setup/render/watchers/lifecycle потомков; не ловит async rejection без await, emit-события, setTimeout, ошибки в том же компоненте.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "границы sync vs async — главная ловушка middle",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "async",
+              "Promise",
+              "rejection"
+            ],
+            "ask": "почему loadData() с throw внутри async не попадает в onErrorCaptured"
+          },
+          {
+            "match": [
+              "emit",
+              "setTimeout",
+              "собственн"
+            ],
+            "ask": "что onErrorCaptured точно не перехватывает"
+          }
+        ],
+        "mustConcepts": [
+          "sync",
+          "синхронн",
+          "async",
+          "асинхрон",
+          "Promise",
+          "rejection",
+          "await",
+          "setup()",
+          "render",
+          "lifecycle",
+          "emit",
+          "setTimeout",
+          "собственн",
+          "тот же компонент",
+          "потомк",
+          "throw",
+          "не перехват"
+        ],
+        "falseClaims": [
+          "onErrorCaptured ловит rejected Promise из loadData() без await",
+          "onErrorCaptured перехватывает ошибки emit handlers",
+          "onErrorCaptured работает для ошибок в setTimeout callback",
+          "onErrorCaptured ловит ошибку в setup того же компонента"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "global_error_handler",
+      "title": "Отличает локальную границу от глобального handler",
+      "expected": "Кандидат сравнивает: `onErrorCaptured` — локальный, первый на пути всплытия, изоляция UI; `app.config.errorHandler` — глобальный последний рубеж для Sentry/Datadog; используют оба.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "local vs global — follow-up question из ITLead",
+        "confusionPairs": [
+          {
+            "checkpointKey": "global_error_handler",
+            "oftenConfusedWith": [
+              "error_bubbling"
+            ],
+            "anchorTermsExpected": [
+              "app.config.errorHandler",
+              "Sentry",
+              "локальн",
+              "глобальн",
+              "последн"
+            ],
+            "anchorTermsWrongTopic": [
+              "errorHandler заменяет boundary",
+              "только один механизм"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "errorHandler",
+              "Sentry",
+              "глобальн"
+            ],
+            "ask": "когда onErrorCaptured недостаточно и зачем app.config.errorHandler"
+          }
+        ],
+        "mustConcepts": [
+          "app.config.errorHandler",
+          "errorHandler",
+          "глобальн",
+          "локальн",
+          "Sentry",
+          "Datadog",
+          "main.ts",
+          "captureException",
+          "component name",
+          "имя компонента",
+          "extra",
+          "логирован",
+          "последн",
+          "изоляц",
+          "UI",
+          "fallback",
+          "warnHandler"
+        ],
+        "falseClaims": [
+          "app.config.errorHandler заменяет onErrorCaptured для изоляции виджета",
+          "глобальный handler срабатывает раньше локального boundary",
+          "достаточно только errorHandler без boundary компонентов",
+          "warnHandler используется для runtime exceptions в production"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "async_handling",
+      "title": "Знает обработку async-ошибок",
+      "expected": "Кандидат объясняет: async fetch — `try/catch` вокруг `await`, реактивный ref с ошибкой; необработанные rejection вне Vue — `unhandledrejection`; VueUse useFetch возвращает `error` ref.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "async паттерн — обязательный fix из Common mistakes",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "caught_vs_not_caught",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "try/catch",
+              "await",
+              "fetch"
+            ],
+            "ask": "как показать ошибку fetch в UI без uncaught rejection"
+          },
+          {
+            "match": [
+              "unhandledrejection",
+              "useFetch"
+            ],
+            "ask": "чем отличается try/catch в компоненте от window unhandledrejection"
+          }
+        ],
+        "mustConcepts": [
+          "try/catch",
+          "await",
+          "async",
+          "fetch",
+          "rejection",
+          "ref",
+          "реактивн",
+          "error ref",
+          "unhandledrejection",
+          "window.addEventListener",
+          "useFetch",
+          "VueUse",
+          "uncaught",
+          "ручн",
+          "обнов",
+          "loadData"
+        ],
+        "falseClaims": [
+          "onErrorCaptured автоматически ловит ошибки в async function",
+          "достаточно throw в async без try/catch — boundary поймает",
+          "unhandledrejection заменяет try/catch внутри компонента",
+          "VueUse useFetch бросает uncaught exception в render"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки boundary",
+      "expected": "Кандидат называет: забытый `return false`; boundary в том же компоненте что падает; retry без сброса state/store; игнор `info`; в Nuxt SSR — guard `process.client`.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes блок ITLead — частые production ловушки",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "retry",
+              "reset",
+              "$reset",
+              "nextTick"
+            ],
+            "ask": "почему кнопка Retry без сброса store снова падает с той же ошибкой"
+          },
+          {
+            "match": [
+              "Nuxt",
+              "SSR",
+              "process.client"
+            ],
+            "ask": "почему error boundary может не сработать при Nuxt SSR"
+          }
+        ],
+        "mustConcepts": [
+          "return false",
+          "забы",
+          "обёртк",
+          "wrapper",
+          "тот же компонент",
+          "retry",
+          "повтор",
+          "сброс",
+          "store",
+          "$reset",
+          "nextTick",
+          "re-mount",
+          "info",
+          "Nuxt",
+          "SSR",
+          "process.client",
+          "middleware",
+          "Suspense",
+          "Vue 3.4"
+        ],
+        "falseClaims": [
+          "достаточно error = null для retry без сброса данных",
+          "onErrorCaptured одинаково работает на сервере и клиенте в Nuxt",
+          "boundary в падающем компоненте поймает его собственную ошибку",
+          "console.log в onErrorCaptured без return false изолирует UI"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Выбирает механизм по сценарию",
+      "expected": "Кандидат сопоставляет: изоляция виджета — onErrorCaptured wrapper; Sentry/Datadog — errorHandler; async fetch — try/catch; rejection вне Vue — unhandledrejection; dev warnings — warnHandler.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "таблица When to use — бонус middle",
+        "mustConcepts": [
+          "изоляц",
+          "виджет",
+          "Sentry",
+          "errorHandler",
+          "try/catch",
+          "fetch",
+          "unhandledrejection",
+          "warnHandler",
+          "dev",
+          "production",
+          "логирован",
+          "обёртк"
+        ],
+        "falseClaims": [
+          "onErrorCaptured подходит для логирования всех ошибок приложения в Sentry",
+          "try/catch не нужен если есть global errorHandler",
+          "warnHandler отправляет ошибки в production monitoring"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "onErrorCaptured в ErrorBoundary ловит sync throw из UserDashboard при render/setup. return false останавливает всплытие — остальная страница жива. Async fetch оборачиваю в try/catch и кладу ошибку в ref. В main.ts app.config.errorHandler шлёт всё не пойманное в Sentry с info и именем компонента.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Рискованный виджет оборачиваю в boundary со slot — упал chart, показали fallback и Retry. Для API — try/catch + error ref, не жду что boundary поймает Promise. Глобальный handler — последняя сеть для Sentry.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Ошибка в setup() онука всплывает к onErrorCaptured; info=\"setup()\" логирую в Sentry. loadData() с throw без await — boundary не сработает, только try/catch. При retry делаю store.$reset() и nextTick перед re-mount.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "onErrorCaptured ловит любые ошибки включая async fetch и setTimeout. Достаточно console.log в хуке — UI изолируется автоматически.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Ставлю onErrorCaptured в том же компоненте где throw в setup — boundary поймает. Retry — просто error = null, store трогать не нужно.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "app.config.errorHandler заменяет boundary — оборачивать виджеты не нужно. warnHandler шлёт runtime errors в Datadog на production.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "on_error_captured_basics",
+      "exampleType": "good",
+      "exampleText": "onErrorCaptured в родителе перехватывает sync ошибки потомков в render, setup и watchers; показываем fallback через slot.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "on_error_captured_basics",
+      "exampleType": "good",
+      "exampleText": "ну boundary вокруг дашборда — onErrorCaptured ловит падение chart, остальной ui ок",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "on_error_captured_basics",
+      "exampleType": "bad",
+      "exampleText": "onErrorCaptured ловит rejected Promise из async loadData без await.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "error_bubbling",
+      "exampleType": "good",
+      "exampleText": "return false в onErrorCaptured останавливает bubble; info=\"render\" подсказывает где упало.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "error_bubbling",
+      "exampleType": "good",
+      "exampleText": "без return false ошибка дойдёт до глобального errorHandler и консоли",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "error_bubbling",
+      "exampleType": "bad",
+      "exampleText": "info не несёт смысла — достаточно err.message для дебага.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "caught_vs_not_caught",
+      "exampleType": "good",
+      "exampleText": "loadData() async throw — Promise reject, onErrorCaptured молчит; нужен try/catch и error ref.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "caught_vs_not_caught",
+      "exampleType": "good",
+      "exampleText": "sync JSON.parse в setup потомка — boundary поймает; setTimeout throw — нет",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "caught_vs_not_caught",
+      "exampleType": "bad",
+      "exampleText": "onErrorCaptured перехватывает ошибки emit и setTimeout callback так же как render.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "global_error_handler",
+      "exampleType": "good",
+      "exampleText": "Boundary изолирует UI; app.config.errorHandler в main.ts — Sentry.captureException с info и component name.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "global_error_handler",
+      "exampleType": "good",
+      "exampleText": "локальный onErrorCaptured первый, глобальный errorHandler последний — оба нужны",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "global_error_handler",
+      "exampleType": "bad",
+      "exampleText": "errorHandler срабатывает раньше boundary и заменяет его для изоляции виджета.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "async_handling",
+      "exampleType": "good",
+      "exampleText": "try { await fetch() } catch (e) { error.value = e.message } — UI показывает ошибку без uncaught rejection.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "async_handling",
+      "exampleType": "good",
+      "exampleText": "useFetch из VueUse отдаёт error ref — компонент не ловит exception в render",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "async_handling",
+      "exampleType": "bad",
+      "exampleText": "throw в async function без await — onErrorCaptured поймает как sync ошибку.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "ErrorBoundary.vue — отдельная обёртка; retry: store.$reset(), nextTick, потом clear error ref.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "в nuxt плагине errorHandler только с process.client — на ssr boundary не то же самое",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "onErrorCaptured в UserChart поймает throw в setup UserChart — достаточно одного компонента.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Виджет метрик — boundary; Sentry — errorHandler; fetch — try/catch; unhandledrejection — для кода вне Vue.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "dev warnings — warnHandler, в prod вырезаем; runtime exceptions — не туда",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Для изоляции одного виджета достаточно только app.config.errorHandler без wrapper.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "error-handling-in-vue",
+    "apiUrl": "https://api.itlead.org/api/questions/error-handling-in-vue",
+    "pageUrl": "https://itlead.org/interview-questions/vue/error-handling-in-vue",
+    "difficulty": "MIDDLE",
+    "titleEn": "Error handling in Vue.js",
+    "categorySlug": "vue",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

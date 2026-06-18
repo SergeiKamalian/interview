@@ -1,0 +1,555 @@
+{
+  "topic": {
+    "code": "synthetic_events_react",
+    "name": "Синтетические события в React",
+    "skillCode": "react",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое SyntheticEvent в React и как работает система синтетических событий?",
+    "shortAnswer": "SyntheticEvent — кросс-браузерная обёртка React вокруг нативных DOM-событий: нормализует свойства (например event.target.value) и регистрирует один слушатель на корневом узле вместо отдельного на каждый элемент. В React 17 убрали пулинг событий — асинхронный доступ к свойствам работает без event.persist().",
+    "idealAnswer": "SyntheticEvent — обёртка React вокруг нативного DOM-события с единым API для Chrome, Firefox и legacy IE. Обработчик onClick/onChange получает не нативный MouseEvent, а SyntheticEvent с теми же методами (preventDefault, stopPropagation) плюс e.nativeEvent для доступа к сырому событию. React использует делегирование: не вешает listener на каждую кнопку, а один на корень (#root в React 17+, document в React 16). Нативное событие всплывает до корня, React оборачивает его в SyntheticEvent, нормализует свойства и вызывает нужный handler — список из 1000 кнопок имеет один listener в браузере. В React 16 SyntheticEvent объекты пулились: после выхода из handler свойства обнулялись, и setTimeout(() => e.target) давал null. Фикс — e.persist() или синхронное сохранение const val = e.target.value. React 17 убрал пулинг; persist() остался no-op. e.target — элемент, на который кликнули (глубочайший в DOM); e.currentTarget — элемент, на котором зарегистрирован handler. Клик на span внутри button: target=span, currentTarget=button. В формах для элемента с handler читай currentTarget, не target. stopPropagation() в React ставит внутренний флаг — родительские React-handlers не вызываются, но нативное событие всё равно доходит до корневого listener. React 17 перенёс listener с document на #root — изоляция при нескольких React-деревьях на странице. Порталы: события всплывают по React-дереву компонентов, не по DOM — клик в modal portal триггерит React-родителя. Capture-фаза: onClickCapture на пропе, порядок capture сверху вниз, затем bubble. Типичные ошибки: чтение e.target.value в setTimeout без синхронного capture; addEventListener на React-элементы в useEffect (двойной fire, leak); return false вместо preventDefault(); путать target и currentTarget в form handlers. addEventListener в useEffect норм для window resize/scroll с cleanup. TypeScript: MouseEvent/ChangeEvent из react, не из DOM. D3 и сторонние библиотеки — e.nativeEvent.",
+    "maxScore": 10,
+    "skills": [
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "synthetic_event_definition",
+      "title": "Понимает SyntheticEvent",
+      "expected": "Кандидат объясняет: обёртка вокруг нативного DOM-события, нормализация свойств между браузерами, e.nativeEvent для сырого события, preventDefault/stopPropagation работают единообразно.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — что такое SyntheticEvent и зачем обёртка",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "synthetic_event_definition",
+            "oftenConfusedWith": [
+              "event_delegation"
+            ],
+            "anchorTermsExpected": [
+              "SyntheticEvent",
+              "обёртка",
+              "нативн",
+              "nativeEvent",
+              "нормализ",
+              "preventDefault"
+            ],
+            "anchorTermsWrongTopic": [
+              "делегирование это SyntheticEvent",
+              "SyntheticEvent это Virtual DOM"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "SyntheticEvent",
+              "обёртка",
+              "nativeEvent"
+            ],
+            "ask": "чем SyntheticEvent отличается от нативного DOM-события и когда нужен nativeEvent"
+          }
+        ],
+        "mustConcepts": [
+          "SyntheticEvent",
+          "синтетич",
+          "обёртка",
+          "нативн",
+          "DOM",
+          "nativeEvent",
+          "нормализ",
+          "кросс-браузер",
+          "preventDefault",
+          "stopPropagation",
+          "MouseEvent",
+          "onClick",
+          "onChange",
+          "handler",
+          "обработчик"
+        ],
+        "falseClaims": [
+          "SyntheticEvent это нативный DOM MouseEvent",
+          "nativeEvent не существует в React",
+          "preventDefault работает только в Chrome",
+          "SyntheticEvent не поддерживает stopPropagation"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "event_delegation",
+      "title": "Знает делегирование событий в React",
+      "expected": "Кандидат объясняет: один listener на корневом узле (#root / document), не на каждый элемент; React перехватывает всплытие, оборачивает и диспатчит handler; динамические списки без re-bind.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "делегирование — ключевый механизм performance и архитектура React events",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "synthetic_event_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "делегир",
+              "один listener",
+              "корнев",
+              "root"
+            ],
+            "ask": "как React обрабатывает клик на 1000 кнопок без 1000 listeners"
+          }
+        ],
+        "mustConcepts": [
+          "делегир",
+          "delegation",
+          "один listener",
+          "корнев",
+          "root",
+          "#root",
+          "document",
+          "всплыт",
+          "bubble",
+          "перехват",
+          "dispatch",
+          "динамическ",
+          "re-bind",
+          "1000 кнопок",
+          "без переподпис"
+        ],
+        "falseClaims": [
+          "React вешает listener на каждый элемент",
+          "делегирование отменяет всплытие в DOM",
+          "SyntheticEvent не использует делегирование",
+          "динамический список требует addEventListener на каждый новый элемент"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "event_pooling",
+      "title": "Понимает пулинг событий React 16 vs 17",
+      "expected": "Кандидат объясняет: React 16 пулил SyntheticEvent — async доступ к e.target давал null; e.persist() или синхронный capture; React 17 убрал пулинг, persist() — no-op.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "частая production-ошибка async + event pooling в React 16",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "пул",
+              "pool",
+              "persist",
+              "setTimeout",
+              "async"
+            ],
+            "ask": "почему e.target в setTimeout был null в React 16 и как это фиксить"
+          },
+          {
+            "match": [
+              "React 17",
+              "persist",
+              "no-op"
+            ],
+            "ask": "нужен ли persist() в React 17+"
+          }
+        ],
+        "mustConcepts": [
+          "пул",
+          "pool",
+          "pooling",
+          "React 16",
+          "React 17",
+          "persist",
+          "setTimeout",
+          "async",
+          "null",
+          "e.target",
+          "синхронн",
+          "capture",
+          "захват",
+          "const val",
+          "перериспольз",
+          "no-op",
+          "обнуля"
+        ],
+        "falseClaims": [
+          "persist() обязателен в React 18 для async",
+          "пулинг событий работает в React 17",
+          "e.target всегда null в setTimeout в любом React",
+          "React 17 добавил пулинг событий"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "target_vs_current_target",
+      "title": "Отличает target и currentTarget",
+      "expected": "Кандидат объясняет: target — элемент, на который кликнули (глубочайший); currentTarget — элемент с handler; при клике на span внутри button target=span, currentTarget=button.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "target vs currentTarget — типичный вопрос на собеседовании и в формах",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "target",
+              "currentTarget"
+            ],
+            "ask": "клик на span внутри button — что будет target и currentTarget"
+          }
+        ],
+        "mustConcepts": [
+          "target",
+          "currentTarget",
+          "кликнули",
+          "глубочайш",
+          "handler",
+          "обработчик",
+          "span",
+          "button",
+          "вложен",
+          "дочерн",
+          "форма",
+          "form",
+          "элемент с handler"
+        ],
+        "falseClaims": [
+          "target и currentTarget всегда одинаковы",
+          "currentTarget всегда document",
+          "target указывает на элемент с handler",
+          "в React target и currentTarget не нормализуются"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с SyntheticEvent",
+      "expected": "Кандидат называет: async без синхронного capture; addEventListener на React-элементы в useEffect; return false вместо preventDefault(); путать target и currentTarget в формах; addEventListener на window — ок с cleanup.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — практические anti-patterns",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "addEventListener",
+              "useEffect"
+            ],
+            "ask": "почему addEventListener на React-кнопку в useEffect — плохая идея"
+          },
+          {
+            "match": [
+              "return false",
+              "preventDefault"
+            ],
+            "ask": "работает ли return false в React handler как в HTML"
+          }
+        ],
+        "mustConcepts": [
+          "async",
+          "setTimeout",
+          "capture",
+          "addEventListener",
+          "useEffect",
+          "двойн",
+          "leak",
+          "утечк",
+          "return false",
+          "preventDefault",
+          "window",
+          "resize",
+          "scroll",
+          "cleanup",
+          "onClick",
+          "форма",
+          "target",
+          "currentTarget"
+        ],
+        "falseClaims": [
+          "return false в React отменяет default action",
+          "addEventListener на button в useEffect — рекомендуемый паттерн",
+          "не нужен cleanup для addEventListener",
+          "async e.target.value безопасен во всех версиях React"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "react17_root_listener",
+      "title": "Знает изменения React 17: root listener",
+      "expected": "Кандидат объясняет: listener перенесён с document на #root для изоляции React-деревьев; несколько версий React на странице не конфликтируют; persist убран.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "React 17 migration — document vs #root из ITLead follow-up",
+        "mustConcepts": [
+          "React 17",
+          "document",
+          "#root",
+          "корнев",
+          "изоляц",
+          "несколько React",
+          "версии",
+          "конфликт",
+          "фреймворк",
+          "persist",
+          "no-op",
+          "пулинг убра"
+        ],
+        "falseClaims": [
+          "React 17 оставил listener на document",
+          "перенос на root ухудшил performance делегирования",
+          "persist() в React 17 обязателен для async"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "capture_portals",
+      "title": "Знает capture-фазу и порталы",
+      "expected": "Кандидат упоминает onClickCapture и порядок capture→bubble; порталы — всплытие по React-дереву, не DOM; e.nativeEvent для DOM propagation path.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "capture phase и portals — senior follow-up, бонус для middle",
+        "mustConcepts": [
+          "Capture",
+          "onClickCapture",
+          "фаза захват",
+          "bubble",
+          "всплыт",
+          "portal",
+          "портал",
+          "modal",
+          "React-дерево",
+          "компонент",
+          "DOM-дерево",
+          "nativeEvent",
+          "stopPropagation",
+          "dispatch"
+        ],
+        "falseClaims": [
+          "порталы всплывают только по DOM-дереву",
+          "React не поддерживает capture-фазу",
+          "stopPropagation останавливает нативное всплытие в DOM полностью"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "SyntheticEvent — обёртка React: нормализует target.value между браузерами. Один listener на #root, не на каждую кнопку. В React 16 пулинг ломал async e.target — фикс const val = e.target.value синхронно. React 17 убрал пулинг.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Клик на span в button: target=span, currentTarget=button. Для формы читаю currentTarget если handler на form. stopPropagation в React не даёт родительским handlers, но нативное событие доходит до root listener.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На 1000 кнопок — один listener через делегирование. D3 ждёт сырой DOM — даю e.nativeEvent. addEventListener в useEffect только для window resize с cleanup, не для React-кнопок.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "SyntheticEvent — нативный MouseEvent браузера. React вешает onClick listener на каждый элемент отдельно.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В setTimeout безопасно читать e.target.value — React всегда держит объект события. return false в handler отменяет навигацию как в HTML.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "target и currentTarget всегда совпадают. Портал всплывает только по DOM, React-родитель не получит клик из modal portal.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "synthetic_event_definition",
+      "exampleType": "good",
+      "exampleText": "onClick получает SyntheticEvent — не нативный MouseEvent, но с preventDefault и e.nativeEvent для сырого события.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "synthetic_event_definition",
+      "exampleType": "good",
+      "exampleText": "ну синтетическое событие — обёртка react, нормализует свойства, nativeEvent если библиотеке нужен dom event",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "synthetic_event_definition",
+      "exampleType": "bad",
+      "exampleText": "SyntheticEvent — это Virtual DOM diff, не связано с событиями браузера.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "event_delegation",
+      "exampleType": "good",
+      "exampleText": "React один listener на root: событие всплывает, React оборачивает в SyntheticEvent и вызывает handler — 1000 кнопок без 1000 listeners.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "event_delegation",
+      "exampleType": "good",
+      "exampleText": "делегирование на #root — динамический список кликов без rebinding на каждый новый item",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "event_delegation",
+      "exampleType": "bad",
+      "exampleText": "React attach listener на каждый onClick проп — без делегирования.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "event_pooling",
+      "exampleType": "good",
+      "exampleText": "React 16: setTimeout(() => e.target) → null из пула. Фикс: const t = e.target синхронно или e.persist().",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "event_pooling",
+      "exampleType": "good",
+      "exampleText": "в react 17 пулинг убрали, persist no-op, но я всё равно capture value синхронно в handleChange",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "event_pooling",
+      "exampleType": "bad",
+      "exampleText": "persist() обязателен в React 18 для любого async handler с event.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "target_vs_current_target",
+      "exampleType": "good",
+      "exampleText": "Клик на span внутри button: e.target — span, e.currentTarget — button с onClick.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "target_vs_current_target",
+      "exampleType": "good",
+      "exampleText": "в form onSubmit currentTarget — form, target может быть вложенный span внутри label",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "target_vs_current_target",
+      "exampleType": "bad",
+      "exampleText": "target всегда элемент с handler, currentTarget — где кликнули.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Не addEventListener на getElementById btn — onClick на button. return false не работает — только e.preventDefault().",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "handleChange: const val = e.target.value до setTimeout — безопасно в react 16 и 17",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "useEffect без cleanup addEventListener на каждую React-кнопку — нормальный паттерн.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "react17_root_listener",
+      "exampleType": "good",
+      "exampleText": "React 17: listener на #root вместо document — две версии react на странице не перехватывают события друг друга.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "react17_root_listener",
+      "exampleType": "good",
+      "exampleText": "react 17 root + убрали pooling, persist оставили как no-op для старого кода",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "react17_root_listener",
+      "exampleType": "bad",
+      "exampleText": "React 17 всё ещё слушает document и требует persist для async.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "capture_portals",
+      "exampleType": "good",
+      "exampleText": "onClickCapture на div — capture сверху вниз до button bubble. Portal modal — parent React handler сработает, DOM parent вне portal.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "capture_portals",
+      "exampleType": "good",
+      "exampleText": "клик в portal modal — всплывает по react tree к app, не по dom; dom path через nativeEvent",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "capture_portals",
+      "exampleType": "bad",
+      "exampleText": "stopPropagation в React останавливает нативное всплытие до document и порталы не всплывают в React-родителя.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "synthetic-events-in-react",
+    "apiUrl": "https://api.itlead.org/api/questions/synthetic-events-in-react",
+    "pageUrl": "https://itlead.org/interview-questions/react/synthetic-events-in-react",
+    "difficulty": "MIDDLE",
+    "titleEn": "Synthetic events in React",
+    "categorySlug": "react",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

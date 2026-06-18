@@ -1,0 +1,621 @@
+{
+  "topic": {
+    "code": "nextjs_how_client_side_rendering_csr_works_nextjs",
+    "name": "Клиентский рендеринг (CSR) в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как работает client-side rendering (CSR) в Next.js и чем он отличается от чистого SPA?",
+    "shortAnswer": "CSR в Next.js — это Client Components с директивой `'use client'`, которые гидратируются и выполняются в браузере поверх HTML-оболочки, сгенерированной Server Components. В отличие от CRA, сервер всегда отдаёт реальный HTML, а не пустой `<div>`; интерактивность и browser API — зона CSR, начальная загрузка данных — Server Components.",
+    "idealAnswer": "CSR (client-side rendering) в Next.js означает, что Client Component с `'use client'` выполняется и перерендеривается в браузере после того, как сервер отдал начальную HTML-оболочку от Server Component. Next.js никогда не делает «чистый» CSR как Create React App: каждая страница начинается с Server Component, который отправляет реальный HTML, а не пустой root. Client Component тоже рендерится на сервере для начального снимка; браузер получает HTML, `hydrateRoot` привязывает React к существующим узлам DOM без полного перерендера, затем выполняются `useEffect`. Код Server Components в браузер не попадает — в bundle попадают только модули, достижимые от `'use client'` границ. Отличие от CRA: CRA шлёт пустой div + весь JS, FCP медленный, SEO пустой; Next.js — контент виден сразу, интерактивность после hydration. Когда CSR: user-triggered fetch (поиск, фильтр, пагинация), browser API (`localStorage`, geolocation, WebSocket, canvas), real-time UI (чаты, графики). Когда Server Components: SEO-критичный и статический контент, начальная загрузка данных — `async` server fetch без лишнего JS. Hydration mismatch: разный HTML server/client (Date, Math.random, window в render) → warning и full re-render поддерева, теряется SSR-выгода. Типичные ошибки: вся страница `'use client'` без причины; `useState(window.innerWidth)` в render; недетерминированные значения в initial render; fetch в `useEffect` без try/catch; `'use client'` слишком высоко в дереве (layout) — раздувает bundle. `'use client'` распространяется на все импорты файла — границу держат на leaf-компонентах. Для CSR-данных: `useEffect`+`fetch` для разовых запросов; SWR/TanStack Query для кеша, dedup, refetch on focus. Dynamic import с `ssr: false` — для Monaco, canvas, WebSocket-клиентов, которым нужен только браузер. React Server Components + `<Suspense>`: частичная гидратация по мере стриминга; partial prerendering (App Router v14+): статическая оболочка на deploy, Client Components в Suspense «пробивают дыры» и гидратируются изолированно. Реальные кейсы: Vercel Dashboard (live charts), Linear (WebSocket), Clerk (modals, localStorage), Recharts (window/canvas), search-as-you-type с AbortController.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "javascript",
+      "react"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "csr_nextjs_definition",
+      "title": "Понимает CSR в контексте Next.js",
+      "expected": "Кандидат объясняет: `'use client'` помечает Client Component; он гидратируется в браузере поверх server HTML; Next.js не делает чистый CSR — сервер всегда рендерит оболочку первым.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — CSR как слой поверх server shell, не пустой SPA",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "csr_nextjs_definition",
+            "oftenConfusedWith": [
+              "nextjs_csr_vs_spa",
+              "hydration_internal"
+            ],
+            "anchorTermsExpected": [
+              "'use client'",
+              "Client Component",
+              "Server Component",
+              "гидрат",
+              "HTML оболочк",
+              "не пустой div"
+            ],
+            "anchorTermsWrongTopic": [
+              "чистый CSR как CRA",
+              "сервер не рендерит",
+              "только браузер строит HTML"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "'use client'",
+              "Client Component",
+              "гидрат"
+            ],
+            "ask": "чем CSR в Next.js отличается от «всё рендерится только в браузере»"
+          }
+        ],
+        "mustConcepts": [
+          "'use client'",
+          "Client Component",
+          "клиентск",
+          "Server Component",
+          "серверн",
+          "гидрат",
+          "hydrate",
+          "HTML оболочк",
+          "начальн",
+          "снимок",
+          "не пустой",
+          "не CRA",
+          "слой поверх",
+          "интерактив",
+          "state",
+          "событ"
+        ],
+        "falseClaims": [
+          "Next.js делает чистый CSR как Create React App",
+          "сервер отправляет только пустой div",
+          "'use client' отключает серверный рендер полностью",
+          "CSR в Next.js означает отсутствие HTML с сервера",
+          "Server Components не участвуют в первом ответе страницы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "nextjs_csr_vs_spa",
+      "title": "Отличает Next.js CSR от чистого SPA",
+      "expected": "Кандидат сравнивает: CRA — пустой root, медленный FCP, плохой SEO; Next.js — pre-rendered HTML от Server Components, контент сразу виден, hydrateRoot без full re-render.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевой trade-off FCP/SEO vs модель Next.js App Router",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "csr_nextjs_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "nextjs_csr_vs_spa",
+            "oftenConfusedWith": [
+              "when_to_use_csr"
+            ],
+            "anchorTermsExpected": [
+              "CRA",
+              "Create React App",
+              "пустой div",
+              "FCP",
+              "SEO",
+              "pre-rendered HTML"
+            ],
+            "anchorTermsWrongTopic": [
+              "Next.js тоже пустой root",
+              "hydration заменяет SSR в Next.js"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "CRA",
+          "Create React App",
+          "SPA",
+          "пустой div",
+          "root",
+          "FCP",
+          "First Contentful Paint",
+          "SEO",
+          "crawler",
+          "TTFB",
+          "pre-rendered",
+          "готовый HTML",
+          "виден сразу",
+          "blank screen",
+          "пустой экран",
+          "bundle"
+        ],
+        "falseClaims": [
+          "Next.js и CRA одинаково отдают пустую страницу до JS",
+          "CSR в Next.js хуже для SEO так же как чистый SPA",
+          "CRA быстрее показывает контент чем Next.js с Server Components",
+          "hydrateRoot в Next.js пересоздаёт DOM с нуля как createRoot в CRA"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "hydration_internal",
+      "title": "Знает механизм hydration и bundle boundaries",
+      "expected": "Кандидат описывает: HTML + JS bundle → hydrateRoot привязывает fiber к DOM без пересоздания узлов → useEffect; код Server Components не попадает в браузер; Suspense позволяет частичную гидратацию при стриминге.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "внутренний flow hydration + RSC bundle split — senior must-know",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes_csr",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "hydrateRoot",
+              "fiber",
+              "useEffect"
+            ],
+            "ask": "что происходит после получения HTML: hydrateRoot, fiber, useEffect"
+          },
+          {
+            "match": [
+              "Server Component",
+              "bundle",
+              "'use client'"
+            ],
+            "ask": "какой код попадает в client bundle и почему Server Components не грузятся в браузер"
+          },
+          {
+            "match": [
+              "Suspense",
+              "стрим",
+              "streaming"
+            ],
+            "ask": "как Suspense и streaming влияют на порядок гидратации"
+          }
+        ],
+        "mustConcepts": [
+          "hydrateRoot",
+          "fiber",
+          "DOM",
+          "существующ",
+          "не пересозда",
+          "useEffect",
+          "JS bundle",
+          "бандл",
+          "Server Component",
+          "не попадает",
+          "браузер",
+          "'use client'",
+          "границ",
+          "boundary",
+          "Suspense",
+          "стрим",
+          "streaming",
+          "частичн",
+          "интерактив"
+        ],
+        "falseClaims": [
+          "hydration в Next.js пересоздаёт всё DOM дерево",
+          "код Server Components скачивается и выполняется в браузере",
+          "useEffect выполняется до hydration",
+          "Server Component code входит в client bundle",
+          "стриминг отменяет необходимость hydration"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use_csr",
+      "title": "Понимает когда CSR vs Server Components",
+      "expected": "Кандидат называет: CSR для user-triggered fetch, browser API, real-time UI; Server Components для SEO, статики и начальной загрузки данных; минимизировать `'use client'` на mobile.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use из таблицы ITLead — практический выбор",
+        "mustConcepts": [
+          "user-triggered",
+          "поиск",
+          "фильтр",
+          "пагинац",
+          "browser API",
+          "localStorage",
+          "WebSocket",
+          "canvas",
+          "real-time",
+          "чат",
+          "график",
+          "SEO",
+          "статик",
+          "Server Component",
+          "начальн данн",
+          "async fetch",
+          "bundle",
+          "mobile",
+          "минимиз"
+        ],
+        "falseClaims": [
+          "все данные нужно грузить через useEffect на клиенте",
+          "Server Components нельзя использовать для статического контента",
+          "browser API можно вызывать в Server Component",
+          "CSR всегда предпочтительнее для SEO-страниц"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes_csr",
+      "title": "Знает типичные ошибки CSR в Next.js",
+      "expected": "Кандидат называет: вся страница `'use client'`; window/Date/random в render; hydration mismatch; fetch без error handling; `'use client'` слишком высоко в layout; правильно — server fetch, useEffect после mount, deep boundary.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "production pitfalls из ITLead Common mistakes",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useEffect",
+              "window",
+              "mount"
+            ],
+            "ask": "как безопасно использовать window.innerWidth при SSR/CSR в Next.js"
+          },
+          {
+            "match": [
+              "mismatch",
+              "Date",
+              "Math.random"
+            ],
+            "ask": "типичные причины hydration mismatch и как их избежать"
+          },
+          {
+            "match": [
+              "layout",
+              "границ",
+              "bundle"
+            ],
+            "ask": "почему 'use client' на уровне layout раздувает client bundle"
+          }
+        ],
+        "mustConcepts": [
+          "вся страница",
+          "'use client'",
+          "без причин",
+          "window",
+          "useState",
+          "useEffect",
+          "mount",
+          "Date",
+          "Math.random",
+          "mismatch",
+          "несовпад",
+          "try/catch",
+          "ошибк",
+          "SWR",
+          "layout",
+          "границ",
+          "leaf",
+          "bundle size",
+          "server fetch",
+          "async Page"
+        ],
+        "falseClaims": [
+          "можно читать window в useState при server render",
+          "вся страница 'use client' — нормальный default в App Router",
+          "fetch в useEffect без обработки ошибок безопасен для UX",
+          "'use client' на layout не влияет на размер bundle",
+          "Date.now() в render безопасен для hydration"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "use_client_boundary",
+      "title": "Понимает границы 'use client' и propagation",
+      "expected": "Кандидат объясняет: `'use client'` распространяется на все импорты файла; границу ставят как можно глубже на leaf с state/events; dynamic `ssr: false` для browser-only библиотек.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "bundle impact и propagation — частый senior вопрос",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "импорт",
+              "propagat",
+              "распростран"
+            ],
+            "ask": "распространяется ли 'use client' на импортируемые модули"
+          },
+          {
+            "match": [
+              "dynamic",
+              "ssr: false",
+              "Monaco"
+            ],
+            "ask": "когда нужен dynamic import с ssr: false"
+          }
+        ],
+        "mustConcepts": [
+          "'use client'",
+          "распростран",
+          "propagat",
+          "импорт",
+          "import",
+          "глубок",
+          "deep",
+          "leaf",
+          "границ",
+          "boundary",
+          "bundle",
+          "state",
+          "событ",
+          "dynamic",
+          "ssr: false",
+          "Monaco",
+          "canvas",
+          "browser-only"
+        ],
+        "falseClaims": [
+          "'use client' действует только на один компонент без импортов",
+          "ssr: false рендерит компонент на сервере в Node.js",
+          "границу лучше ставить на layout для простоты",
+          "dynamic import всегда включает SSR по умолчанию в App Router"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "csr_data_and_ppr",
+      "title": "Знает CSR data fetching и partial prerendering",
+      "expected": "Кандидат сравнивает useEffect+fetch vs SWR/TanStack Query; упоминает partial prerendering: статическая оболочка + изолированная CSR-гидратация в Suspense без полной revalidation.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up вопросы ITLead: SWR vs useEffect, PPR v14+",
+        "mustConcepts": [
+          "useEffect",
+          "fetch",
+          "SWR",
+          "TanStack Query",
+          "кеш",
+          "stale-while-revalidate",
+          "dedup",
+          "refetch",
+          "partial prerendering",
+          "PPR",
+          "статическ",
+          "оболочк",
+          "Suspense",
+          "hole-punch",
+          "динамическ",
+          "slot",
+          "App Router",
+          "v14"
+        ],
+        "falseClaims": [
+          "useEffect+fetch всегда лучше SWR в production",
+          "partial prerendering убирает Client Components",
+          "PPR требует полной revalidation на каждый запрос",
+          "SWR нельзя использовать в Next.js App Router"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "CSR в Next.js — Client Component с 'use client' гидратируется поверх HTML от Server Component. Сервер отдаёт реальную разметку, hydrateRoot привязывает handlers, useEffect догружает данные. Это не CRA с пустым div.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для каталога — async Server Component с fetch на сервере. Поиск и фильтр — отдельный 'use client' leaf с useEffect. Recharts оборачиваю в dynamic(..., { ssr: false }). 'use client' держу на кнопке счётчика, не на layout.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "CRA: пустой root, SEO ноль. Next.js: h1 уже в HTML, ClientDashboard гидратируется, потом fetch в useEffect показывает User: John. Код Server Components в bundle не попадает.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Next.js CSR — это когда сервер шлёт только пустой div и React строит всё с нуля в браузере, как в Create React App.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Ставлю 'use client' на layout — так проще. window.innerWidth в useState норм для SSR. Mismatch в production не влияет на DOM.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Все данные гружу в useEffect на клиенте, Server Components не нужны. 'use client' не распространяется на импорты.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "csr_nextjs_definition",
+      "exampleType": "good",
+      "exampleText": "'use client' — Client Component гидратируется в браузере поверх server HTML, не чистый CSR.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "csr_nextjs_definition",
+      "exampleType": "good",
+      "exampleText": "ну csr в next — это когда клиентский кусок оживляет html с сервера, сервер всё равно первым отдал разметку",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "csr_nextjs_definition",
+      "exampleType": "bad",
+      "exampleText": "CSR в Next.js значит сервер не рендерит HTML, только JS bundle.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "nextjs_csr_vs_spa",
+      "exampleType": "good",
+      "exampleText": "CRA — пустой root, медленный FCP. Next.js — pre-rendered HTML, контент сразу, потом hydration.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "nextjs_csr_vs_spa",
+      "exampleType": "good",
+      "exampleText": "краулер видит html от server component, не ждёт выполнения всего js как в spa",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "nextjs_csr_vs_spa",
+      "exampleType": "bad",
+      "exampleText": "Next.js App Router и CRA одинаково показывают blank screen до загрузки JS.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "hydration_internal",
+      "exampleType": "good",
+      "exampleText": "hydrateRoot привязывает fiber к существующему DOM, useEffect после; Server Component code не в client bundle.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "hydration_internal",
+      "exampleType": "good",
+      "exampleText": "со Suspense браузер гидратирует куски по мере стрима, не ждёт весь ответ",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "hydration_internal",
+      "exampleType": "bad",
+      "exampleText": "hydration пересоздаёт DOM с нуля; Server Components скачиваются в браузер как обычный React.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use_csr",
+      "exampleType": "good",
+      "exampleText": "Поиск, WebSocket-чат, localStorage — 'use client'. SEO-лендинг и начальные данные — Server Component async fetch.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use_csr",
+      "exampleType": "good",
+      "exampleText": "фильтр по difficulty — csr в памяти, данные пришли props с сервера один раз",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use_csr",
+      "exampleType": "bad",
+      "exampleText": "Для блога и SEO всегда делаю всю страницу 'use client' с fetch в useEffect.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes_csr",
+      "exampleType": "good",
+      "exampleText": "Неправильно: 'use client' на всей Page с fetch. Правильно: async server Page с await fetch, без лишнего JS.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes_csr",
+      "exampleType": "good",
+      "exampleText": "width: useState(0) + useEffect setWidth(window.innerWidth) — не крашит server render",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes_csr",
+      "exampleType": "good",
+      "exampleText": "fetch в useEffect с try/catch и error state, иначе пользователь видит пустоту",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes_csr",
+      "exampleType": "bad",
+      "exampleText": "const [w] = useState(window.innerWidth) — нормальный паттерн для Next.js SSR.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "use_client_boundary",
+      "exampleType": "good",
+      "exampleText": "'use client' на leaf Counter, не на layout — весь subtree не уезжает в client bundle.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "use_client_boundary",
+      "exampleType": "good",
+      "exampleText": "dynamic(() => import Editor, { ssr: false }) для Monaco — только браузер",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "use_client_boundary",
+      "exampleType": "bad",
+      "exampleText": "'use client' влияет только на export default, импорты остаются server-only.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "csr_data_and_ppr",
+      "exampleType": "good",
+      "exampleText": "Разовый fetch — useEffect. Production с кешем — SWR stale-while-revalidate и refetch on focus.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "csr_data_and_ppr",
+      "exampleType": "good",
+      "exampleText": "PPR: статическая оболочка на deploy, client в Suspense гидратируется отдельно без блокировки статики",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "csr_data_and_ppr",
+      "exampleType": "bad",
+      "exampleText": "В production всегда useEffect+fetch, SWR не нужен. PPR отменяет hydration.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nextjs-how-client-side-rendering-csr-works-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/nextjs-how-client-side-rendering-csr-works-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/nextjs-how-client-side-rendering-csr-works-in-nextjs",
+    "difficulty": "SENIOR",
+    "titleEn": "How client-side rendering (CSR) works in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

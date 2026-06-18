@@ -1,0 +1,561 @@
+{
+  "topic": {
+    "code": "what_is_critical_rendering_path_crp_in_browser",
+    "name": "Critical Rendering Path (CRP) в браузере",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое Critical Rendering Path (CRP) в браузере и из каких шагов он состоит?",
+    "shortAnswer": "Critical Rendering Path (CRP) — последовательность шагов, которые браузер выполняет, чтобы превратить HTML, CSS и JavaScript в видимые пиксели на экране. Шаги: построение DOM → CSSOM → Render Tree → Layout → Paint → Composite. CSS и синхронный JS блокируют все последующие этапы; для FCP ниже 1.8s используй defer/async на скриптах и inline/preload критического CSS.",
+    "idealAnswer": "Critical Rendering Path (CRP) — цепочка от первого байта HTML до первого отрисованного кадра (First Contentful Paint). Цель оптимизации — минимизировать время до FCP; на мобильном Chrome ориентир — меньше 1.8s. Шесть шагов всегда в одном порядке: (1) DOM construction — HTML парсится побайтно в дерево узлов; pre-parser (Blink) параллельно подгружает CSS/JS; (2) CSSOM — CSS render-blocking по дизайну: без CSSOM браузер не знает стили узлов, каждый `<link rel=\"stylesheet\">` блокирует paint; `@import` ухудшает — серийная загрузка; (3) Render Tree — DOM + CSSOM, только видимые узлы с computed styles; `display: none` исключается, `visibility: hidden` остаётся; (4) Layout (Reflow) — размер и позиция каждого узла; чтение offsetWidth/getBoundingClientRect после мутации DOM форсирует синхронный reflow; (5) Paint — растеризация пикселей по слоям; (6) Composite — compositor thread собирает слои (transform, opacity) и отправляет на GPU; `transform: translateZ(0)` выносит элемент на отдельный слой и может пропустить paint при анимации. CRP ≠ полная загрузка страницы: CRP — только ресурсы для первого видимого кадра; below-fold картинки, lazy scripts и виджеты не входят. Chrome может нарисовать above-the-fold за ~100ms без блокировок; полная загрузка — 2+ секунды. Блокирующие ресурсы: CSS-файлы, синхронный `<script>` в head — каждый добавляет 200–500ms к FCP. async качает параллельно, но выполняет сразу по готовности (может прервать парсинг); defer — параллельная загрузка, выполнение после полного DOM (для app bundle). Оптимизация: preload critical CSS (<10KB inline), defer/async на JS, hero image с fetchpriority=\"high\", убрать @import (concat на build), minify. Типичные ошибки: sync script в head (1MB на 3G +1s FCP); @import в critical CSS; forced reflow в цикле (mutation + getBoundingClientRect каждую итерацию — 60fps→5fps); большой inline `<style>` 50KB; document.write() после load — полный пересчёт CRP и мигание экрана. CRP vs LCP: CRP — весь путь до первого кадра; LCP — Core Web Vital, время появления крупнейшего видимого элемента (>2.5s плохо); оптимизация CRP обычно улучшает LCP. Измерение: DevTools Performance — Recalculate Style, Layout, Paint; жёлтые пики — forced reflow. Next.js preload чанков, Gatsby gatsby-plugin-critical, CRA + critters для inline critical CSS.",
+    "maxScore": 10,
+    "skills": [
+      "javascript",
+      "css"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "crp_definition",
+      "title": "Понимает определение CRP и цель FCP",
+      "expected": "Кандидат объясняет: CRP — путь от первого байта HTML до первого painted frame; главная цель — минимизировать FCP (ориентир <1.8s на mobile); HTML/CSS/JS превращаются в пиксели.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — определение CRP и метрика FCP из TL;DR",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "CRP",
+              "critical rendering",
+              "критичн",
+              "FCP"
+            ],
+            "ask": "что такое CRP и зачем его оптимизируют — какая метрика главная"
+          }
+        ],
+        "mustConcepts": [
+          "CRP",
+          "critical rendering path",
+          "критичн",
+          "шаг",
+          "последователь",
+          "HTML",
+          "CSS",
+          "JavaScript",
+          "пиксел",
+          "первый байт",
+          "first paint",
+          "FCP",
+          "First Contentful Paint",
+          "1.8",
+          "видим",
+          "экран",
+          "оптимиз",
+          "минимиз"
+        ],
+        "falseClaims": [
+          "CRP включает загрузку всех ресурсов страницы включая below-fold",
+          "CRP заканчивается на DOMContentLoaded",
+          "FCP не связан с CRP",
+          "CRP — это только парсинг HTML без CSS и JS"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "crp_six_steps",
+      "title": "Знает шесть шагов CRP по порядку",
+      "expected": "Кандидат называет: DOM → CSSOM → Render Tree → Layout → Paint → Composite; кратко объясняет каждый: render tree только видимые узлы, layout — геометрия, paint — пиксели, composite — GPU-слои.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "шесть шагов — центральная теория ITLead, порядок критичен",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "crp_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "DOM",
+              "CSSOM",
+              "Render Tree",
+              "Layout",
+              "Paint",
+              "Composite"
+            ],
+            "ask": "перечисли шесть шагов CRP по порядку и что происходит на каждом"
+          },
+          {
+            "match": [
+              "display: none",
+              "visibility: hidden",
+              "render tree"
+            ],
+            "ask": "чем display:none и visibility:hidden отличаются в render tree"
+          }
+        ],
+        "mustConcepts": [
+          "DOM",
+          "CSSOM",
+          "Render Tree",
+          "render tree",
+          "Layout",
+          "Reflow",
+          "Paint",
+          "Composite",
+          "composite",
+          "шесть",
+          "порядок",
+          "display: none",
+          "visibility: hidden",
+          "видим",
+          "computed style",
+          "геометр",
+          "растериз",
+          "compositor",
+          "GPU",
+          "слой",
+          "transform",
+          "opacity"
+        ],
+        "falseClaims": [
+          "Layout и Paint всегда выполняются для transform-анимаций",
+          "Render tree содержит все DOM-узлы включая display:none",
+          "CSSOM строится после Paint",
+          "Composite идёт до Layout",
+          "DOM и CSSOM сливаются до построения CSSOM"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "blocking_resources",
+      "title": "Понимает render-blocking CSS и sync JS",
+      "expected": "Кандидат объясняет: CSS блокирует paint до готовности CSSOM; sync `<script>` останавливает парсинг HTML; `@import` — серийная загрузка; каждый блокирующий ресурс добавляет сотни ms к FCP.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "блокирующие ресурсы — ключевой механизм задержки CRP",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "render-blocking",
+              "блокир",
+              "stylesheet",
+              "script"
+            ],
+            "ask": "как CSS и синхронный script в head влияют на CRP"
+          },
+          {
+            "match": [
+              "@import",
+              "import",
+              "serial"
+            ],
+            "ask": "почему @import в CSS хуже обычного link rel=stylesheet"
+          }
+        ],
+        "mustConcepts": [
+          "render-blocking",
+          "блокир",
+          "CSS",
+          "CSSOM",
+          "stylesheet",
+          "link rel",
+          "script",
+          "синхрон",
+          "парсинг",
+          "останов",
+          "paint",
+          "@import",
+          "серийн",
+          "parallel",
+          "200",
+          "500",
+          "FCP",
+          "задерж",
+          "head"
+        ],
+        "falseClaims": [
+          "CSS не блокирует рендеринг — браузер рисует без стилей",
+          "async script в head всегда блокирует парсинг на всё время загрузки",
+          "@import загружается параллельно с родительским файлом без задержки",
+          "inline script в body никогда не блокирует парсинг"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "async_defer",
+      "title": "Отличает async от defer для CRP",
+      "expected": "Кандидат сравнивает: async — параллельная загрузка, выполнение сразу по готовности (может прервать парсинг); defer — параллельная загрузка, выполнение после полного DOM; defer для app bundle, async для analytics.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "async/defer — практический инструмент оптимизации CRP из ITLead examples",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "async",
+              "defer"
+            ],
+            "ask": "чем async отличается от defer в контексте CRP и когда что выбирать"
+          }
+        ],
+        "mustConcepts": [
+          "async",
+          "defer",
+          "параллел",
+          "загрузк",
+          "выполн",
+          "парсинг",
+          "DOM",
+          "прерв",
+          "analytics",
+          "app bundle",
+          "порядок",
+          "DOMContentLoaded",
+          "script tag",
+          "head",
+          "разблок"
+        ],
+        "falseClaims": [
+          "defer выполняет script до построения DOM",
+          "async гарантирует порядок выполнения скриптов как в документе",
+          "async и defer одинаково влияют на CRP",
+          "defer блокирует парсинг HTML на всё время загрузки script"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "crp_vs_full_load",
+      "title": "Отличает CRP от полной загрузки страницы",
+      "expected": "Кандидат объясняет: CRP — только ресурсы для первого видимого кадра; полная загрузка включает below-fold, lazy scripts, third-party; above-the-fold может отрисоваться за ~100ms без блокировок.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "различие CRP vs full load — частая путаница на middle",
+        "mustConcepts": [
+          "полная загруз",
+          "full load",
+          "first frame",
+          "первый кадр",
+          "above the fold",
+          "below the fold",
+          "lazy",
+          "third-party",
+          "виджет",
+          "100ms",
+          "2 сек",
+          "FCP",
+          "только видим",
+          "оптимиз"
+        ],
+        "falseClaims": [
+          "CRP ждёт загрузки всех изображений страницы",
+          "полная загрузка и CRP — одно и то же",
+          "lazy-loaded скрипты входят в CRP",
+          "CRP завершается только после window.onload"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки CRP",
+      "expected": "Кандидат называет: sync script в head; @import в critical CSS; forced reflow в цикле (mutation + layout read); большой inline style; document.write после load; правильно — batch mutations, defer/async, appendChild вместо document.write.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — production-паттерны dashboard/React portals",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "blocking_resources",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "reflow",
+              "getBoundingClientRect",
+              "offsetWidth",
+              "цикл"
+            ],
+            "ask": "почему чтение layout в цикле после mutation убивает FCP и fps"
+          },
+          {
+            "match": [
+              "document.write",
+              "appendChild"
+            ],
+            "ask": "чем document.write после load опасен для CRP"
+          }
+        ],
+        "mustConcepts": [
+          "sync script",
+          "head",
+          "@import",
+          "forced reflow",
+          "layout thrashing",
+          "getBoundingClientRect",
+          "offsetWidth",
+          "цикл",
+          "mutation",
+          "batch",
+          "inline style",
+          "50KB",
+          "document.write",
+          "appendChild",
+          "React portal",
+          "dashboard",
+          "60fps",
+          "5fps",
+          "critters",
+          "critical CSS"
+        ],
+        "falseClaims": [
+          "getBoundingClientRect после style.height в цикле не вызывает reflow",
+          "document.write безопасен после DOMContentLoaded",
+          "большой inline style не влияет на парсинг",
+          "sync script в head не блокирует DOM parsing",
+          "можно читать layout и писать стили в одной итерации без штрафа"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "crp_measurement_lcp",
+      "title": "Отличает CRP от LCP и знает измерение",
+      "expected": "Кандидат объясняет: CRP — путь до первого кадра; LCP — Core Web Vital, крупнейший видимый элемент (>2.5s плохо); DevTools Performance — Recalculate Style, Layout, Paint; оптимизация CRP улучшает LCP.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "CRP vs LCP и DevTools — follow-up из ITLead, бонус middle",
+        "mustConcepts": [
+          "LCP",
+          "Largest Contentful Paint",
+          "Core Web Vital",
+          "2.5",
+          "DevTools",
+          "Performance",
+          "Recalculate Style",
+          "Layout",
+          "Paint",
+          "web-vitals",
+          "Lighthouse",
+          "RUM",
+          "первый кадр",
+          "крупнейш"
+        ],
+        "falseClaims": [
+          "LCP и FCP измеряют одно и то же",
+          "CRP нельзя увидеть в DevTools Performance",
+          "оптимизация CRP никогда не влияет на LCP"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "CRP — цепочка от первого байта HTML до первого painted frame: DOM → CSSOM → Render Tree → Layout → Paint → Composite. CSS и sync script в head блокируют paint и парсинг. Для FCP <1.8s ставлю defer на app bundle, async на analytics, inline critical CSS above the fold.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "CRP — не вся страница, а только то, что нужно для первого видимого кадра. Below-fold картинки и lazy widgets не входят. Sync script на 3G может добавить секунду к FCP — defer решает. Forced reflow в цикле (style + getBoundingClientRect) — типичная боль дашбордов.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Render tree — видимые DOM-узлы со стилями; display:none вырезается. Composite на GPU для transform/opacity — анимация без layout/paint. @import в CSS — серийная загрузка, Lighthouse ругается; concat на build. CRP оптимизация обычно тянет LCP вниз.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "CRP — это когда браузер загружает все картинки и скрипты страницы. CSS не блокирует рендеринг, можно рисовать без CSSOM.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "async и defer одинаковые — оба не блокируют парсинг никогда. Layout и Paint всегда нужны для transform-анимаций.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Чтобы ускорить CRP, ставлю getBoundingClientRect в цикл после каждой mutation — так точнее layout. document.write после load безопаснее appendChild.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "crp_definition",
+      "exampleType": "good",
+      "exampleText": "CRP — путь HTML/CSS/JS → пиксели; цель — быстрый FCP, ориентир меньше 1.8s на mobile.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "crp_definition",
+      "exampleType": "good",
+      "exampleText": "ну критичный путь рендеринга — от первого байта html до первого кадра на экране, оптимизируем ради fcp",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "crp_definition",
+      "exampleType": "bad",
+      "exampleText": "CRP заканчивается когда все ресурсы страницы загружены включая lazy images.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "crp_six_steps",
+      "exampleType": "good",
+      "exampleText": "Шесть шагов: DOM, CSSOM, Render Tree, Layout, Paint, Composite. Render tree без display:none; composite собирает GPU-слои для transform.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "crp_six_steps",
+      "exampleType": "good",
+      "exampleText": "dom парсится, cssom блокирует пока css не готов, merge в render tree, layout считает размеры, paint пиксели, composite на gpu",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "crp_six_steps",
+      "exampleType": "bad",
+      "exampleText": "CRP: Paint → Layout → DOM → CSSOM — порядок не важен, браузер сам переставит.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "blocking_resources",
+      "exampleType": "good",
+      "exampleText": "Каждый link stylesheet блокирует paint до CSSOM; sync script в head стопорит HTML parser на download+execute. @import — serial fetch, удваивает CSS load time.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "blocking_resources",
+      "exampleType": "good",
+      "exampleText": "css render-blocking by design — без cssom не знаем стили. script без defer в head — парсинг стоит, fcp +200-500ms на ресурс",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "blocking_resources",
+      "exampleType": "bad",
+      "exampleText": "CSS загружается асинхронно и не влияет на first paint. @import быстрее чем несколько link тегов.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "async_defer",
+      "exampleType": "good",
+      "exampleText": "defer — качает параллельно, выполняет после полного DOM, порядок сохраняется; async — выполняет сразу по download, может прервать парсинг. App — defer, analytics — async.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "async_defer",
+      "exampleType": "good",
+      "exampleText": "defer для main bundle — dom готов когда скрипт бежит. async для gtag — dom не нужен",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "async_defer",
+      "exampleType": "bad",
+      "exampleText": "defer выполняет script до построения DOM, async гарантирует порядок скриптов в документе.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "crp_vs_full_load",
+      "exampleType": "good",
+      "exampleText": "CRP — только first visible frame; full page load ждёт below-fold, lazy scripts, widgets. Above-the-fold может быть за ~100ms если ничего не блокирует.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "crp_vs_full_load",
+      "exampleType": "good",
+      "exampleText": "crp не ждёт все hero-картинки — только то что для первого кадра. полная загрузка 2+ сек это другая история",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "crp_vs_full_load",
+      "exampleType": "bad",
+      "exampleText": "CRP и window.onload происходят одновременно — это одно и то же.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Плохо: for loop style.height + getBoundingClientRect каждую итерацию — forced reflow, fps падает. Хорошо: все mutations, потом все reads. Sync script 1MB в head на 3G — +1s FCP.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "document.write после load — пересчёт crp и мигание. inline 50kb style тормозит parser. @import в critical css — serial, лучше concat webpack",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Forced reflow в цикле не влияет на performance — браузер батчит автоматически всегда.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "crp_measurement_lcp",
+      "exampleType": "good",
+      "exampleText": "CRP — путь до первого кадра; LCP — когда крупнейший видимый блок появился (>2.5s плохо). Performance tab: Recalculate Style, Layout, Paint — жёлтые пики = reflow из JS.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "crp_measurement_lcp",
+      "exampleType": "good",
+      "exampleText": "lcp core web vital, crp оптимизация обычно улучшает lcp. web-vitals в rum, не только lighthouse",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "crp_measurement_lcp",
+      "exampleType": "bad",
+      "exampleText": "LCP и CRP — синонимы, измеряют время до первого байта HTML.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "what-is-critical-rendering-path-crp-in-browser",
+    "apiUrl": "https://api.itlead.org/api/questions/what-is-critical-rendering-path-crp-in-browser",
+    "pageUrl": "https://itlead.org/interview-questions/general/what-is-critical-rendering-path-crp-in-browser",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is critical rendering path (crp) in browser",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

@@ -1,0 +1,582 @@
+{
+  "topic": {
+    "code": "how_add_a_task_microtask_queue_queuemicrotask",
+    "name": "queueMicrotask и очередь микрозадач",
+    "skillCode": "javascript",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как добавить задачу в очередь микрозадач с помощью queueMicrotask?",
+    "shortAnswer": "`queueMicrotask(callback)` ставит колбек в очередь микрозадач: он выполнится после того, как текущий call stack опустошится, но до любых macrotask — даже `setTimeout(0)`. Микрозадачи дренируются полностью в порядке FIFO, в одной очереди с `Promise.then`.",
+    "idealAnswer": "`queueMicrotask(callback)` — встроенная функция JavaScript, которая планирует callback в microtask queue. Event loop обрабатывает эту очередь после завершения текущего синхронного кода (call stack пуст), но до следующей macrotask (`setTimeout`, события DOM, I/O). Порядок: синхронный код → все microtasks в FIFO → macrotask. В примере с `setTimeout(0)`, `Promise.then` и `queueMicrotask` вывод: sync start, sync end, queueMicrotask, Promise.then, setTimeout — потому что микрозадачи всегда раньше таймеров. `queueMicrotask` и `Promise.resolve().then()` делят одну очередь и один приоритет; разница в обёртке: `Promise.then` автоматически unwrap-ит возвращённые Promise и маршрутизирует rejection через `.catch`, а `queueMicrotask` — простой callback без Promise-механики; throw внутри callback — unhandled exception после текущего стека, внешний try/catch вокруг `queueMicrotask` не сработает. Когда использовать: batch DOM writes после синхронных мутаций состояния (один layout вместо нескольких); синхронизация реактивного состояния фреймворка до paint (Vue `nextTick`, React 18 scheduler для passive effects); post-sync cleanup без yield к macrotask queue; замена `setTimeout(0)` когда нужно «после текущей задачи» без 4ms floor браузера. Не для тяжёлых вычислений и I/O — это macrotasks или Web Workers. Event loop в V8: callback попадает в `MicrotaskQueue` (linked list), фаза `RunMicrotasks` дренирует очередь до пустоты, включая новые microtasks добавленные во время drain — только потом paint или следующая macrotask. Длинная или рекурсивная цепочка microtasks блокирует рендер: UI freeze, `setTimeout` не срабатывает. Типичные ошибки: ожидать что `setTimeout(0)` выполнится раньше microtask; рекурсивный `queueMicrotask` без base case — event loop никогда выходит из microtask phase; try/catch снаружи callback; в Node.js путать `process.nextTick` (выше приоритет) с `queueMicrotask` (WHATWG-совместимый, portable для browser+Node). Реальное использование: Vue 3 nextTick, React 18 scheduler, Angular Zone.js patch, Preact flushSync, Node undici response parsing.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "queue_microtask_definition",
+      "title": "Понимает queueMicrotask",
+      "expected": "Кандидат объясняет: `queueMicrotask(callback)` добавляет задачу в microtask queue; выполнение после опустошения call stack, до macrotasks (`setTimeout`, `setInterval`).",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — что делает API и где в event loop",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "queue_microtask_definition",
+            "oftenConfusedWith": [
+              "execution_order",
+              "event_loop_drain"
+            ],
+            "anchorTermsExpected": [
+              "queueMicrotask",
+              "microtask",
+              "микрозадач",
+              "call stack",
+              "macrotask",
+              "setTimeout"
+            ],
+            "anchorTermsWrongTopic": [
+              "queueMicrotask это macrotask",
+              "выполняется синхронно",
+              "заменяет Promise"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "queueMicrotask",
+              "microtask",
+              "микрозадач"
+            ],
+            "ask": "где в event loop выполняется callback из queueMicrotask — до или после setTimeout(0)"
+          }
+        ],
+        "mustConcepts": [
+          "queueMicrotask",
+          "microtask",
+          "микрозадач",
+          "очередь микрозадач",
+          "callback",
+          "колбек",
+          "call stack",
+          "стек",
+          "опустош",
+          "macrotask",
+          "макрозадач",
+          "setTimeout",
+          "setInterval",
+          "планир",
+          "отклады",
+          "встроенн",
+          "функци"
+        ],
+        "falseClaims": [
+          "queueMicrotask выполняется синхронно в том же стеке",
+          "queueMicrotask добавляет задачу в macrotask queue",
+          "queueMicrotask заменяет Promise и event loop",
+          "queueMicrotask работает только в браузере, не в Node.js"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "execution_order",
+      "title": "Знает порядок sync → microtasks → macrotasks",
+      "expected": "Кандидат описывает порядок: синхронный код → все microtasks в FIFO → macrotask; `queueMicrotask` перед `Promise.then` если зарегистрирован раньше; `setTimeout(0)` последний.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевой quick example из ITLead — порядок вывода",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "queue_microtask_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "sync",
+              "синхрон",
+              "FIFO",
+              "порядок"
+            ],
+            "ask": "порядок вывода для sync, queueMicrotask, Promise.then и setTimeout(0)"
+          }
+        ],
+        "mustConcepts": [
+          "синхрон",
+          "sync",
+          "FIFO",
+          "порядок",
+          "очередь",
+          "queueMicrotask",
+          "Promise.then",
+          "setTimeout",
+          "последн",
+          "перв",
+          "зарегистрир",
+          "дренир",
+          "спустош",
+          "Script start",
+          "Script end",
+          "микрозадач до",
+          "до macrotask"
+        ],
+        "falseClaims": [
+          "setTimeout(0) выполняется раньше microtasks",
+          "Promise.then всегда раньше queueMicrotask",
+          "микрозадачи и макрозадачи в одной очереди без приоритета",
+          "синхронный код выполняется после microtasks"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "vs_promise_then",
+      "title": "Отличает queueMicrotask от Promise.then",
+      "expected": "Кандидат объясняет: одна microtask queue и приоритет; `Promise.then` unwrap Promise и routing rejection; `queueMicrotask` — plain callback без Promise-обёртки; throw — unhandled exception, не rejected Promise.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Key difference из ITLead — обёртка, не приоритет",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Promise",
+              "then",
+              "rejection",
+              "throw"
+            ],
+            "ask": "чем queueMicrotask отличается от Promise.resolve().then() — приоритет и обработка ошибок"
+          }
+        ],
+        "mustConcepts": [
+          "Promise.then",
+          "Promise.resolve",
+          "одна очередь",
+          "same queue",
+          "приоритет",
+          "unwrap",
+          "разворач",
+          "rejection",
+          "отклон",
+          ".catch",
+          "plain callback",
+          "простой колбек",
+          "throw",
+          "unhandled",
+          "необработан",
+          "без Promise",
+          "обёртк"
+        ],
+        "falseClaims": [
+          "queueMicrotask имеет более высокий приоритет чем Promise.then",
+          "Promise.then и queueMicrotask в разных очередях",
+          "throw в queueMicrotask становится rejected Promise автоматически",
+          "внешний try/catch вокруг queueMicrotask ловит throw в callback"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда использовать queueMicrotask",
+      "expected": "Кандидат называет: batch DOM writes после sync state; framework state sync до paint; post-sync cleanup; замена setTimeout(0) без 4ms floor; не для heavy compute и I/O.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "When to use + real-world из ITLead",
+        "mustConcepts": [
+          "DOM",
+          "batch",
+          "группир",
+          "layout",
+          "paint",
+          "отрисовк",
+          "state",
+          "состоян",
+          "nextTick",
+          "Vue",
+          "React",
+          "scheduler",
+          "setTimeout(0)",
+          "4ms",
+          "yield",
+          "post-sync",
+          "cleanup",
+          "тяжёл",
+          "I/O",
+          "Web Worker",
+          "не подходит"
+        ],
+        "falseClaims": [
+          "queueMicrotask подходит для тяжёлых CPU вычислений",
+          "для I/O лучше queueMicrotask чем macrotask",
+          "setTimeout(0) всегда эквивалентен queueMicrotask",
+          "DOM можно обновлять синхронно на каждую мутацию без batching"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "event_loop_drain",
+      "title": "Понимает drain microtasks и блокировку paint",
+      "expected": "Кандидат объясняет: фаза RunMicrotasks дренирует очередь до пустоты, включая новые microtasks; только потом paint/macrotask; длинная цепочка блокирует UI и рендер.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "event loop mechanics + блокировка paint — senior depth",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "drain",
+              "дренир",
+              "paint",
+              "рендер",
+              "блокир"
+            ],
+            "ask": "блокирует ли queueMicrotask отрисовку браузера и почему"
+          },
+          {
+            "match": [
+              "MicrotaskQueue",
+              "RunMicrotasks",
+              "checkpoint"
+            ],
+            "ask": "что происходит если во время drain добавляются новые microtasks"
+          }
+        ],
+        "mustConcepts": [
+          "drain",
+          "дренир",
+          "спустош",
+          "до пуст",
+          "RunMicrotasks",
+          "microtask checkpoint",
+          "paint",
+          "отрисовк",
+          "рендер",
+          "блокир",
+          "freeze",
+          "завис",
+          "UI",
+          "новые microtask",
+          "во время drain",
+          "macrotask после",
+          "V8",
+          "MicrotaskQueue",
+          "event loop",
+          "цикл событий"
+        ],
+        "falseClaims": [
+          "microtasks не блокируют paint — браузер рисует между каждой microtask",
+          "event loop берёт одну microtask и сразу переходит к macrotask",
+          "queueMicrotask не влияет на отзывчивость UI",
+          "requestIdleCallback и queueMicrotask одно и то же"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с queueMicrotask",
+      "expected": "Кандидат называет: setTimeout раньше microtask — ошибка; рекурсивный queueMicrotask без exit — infinite drain; try/catch снаружи callback не ловит throw; polling через queueMicrotask вместо setInterval.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes + infinite trap из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "рекурс",
+              "infinite",
+              "бесконеч",
+              "poll"
+            ],
+            "ask": "почему рекурсивный queueMicrotask без base case зависает страницу"
+          },
+          {
+            "match": [
+              "try",
+              "catch",
+              "throw"
+            ],
+            "ask": "почему try/catch вокруг queueMicrotask не ловит throw внутри callback"
+          }
+        ],
+        "mustConcepts": [
+          "setTimeout перв",
+          "ошибка порядок",
+          "рекурс",
+          "бесконеч",
+          "base case",
+          "базов",
+          "счётчик",
+          "counter",
+          "paint freeze",
+          "завис",
+          "try/catch",
+          "снаружи",
+          "внутри callback",
+          "throw",
+          "асинхрон",
+          "polling",
+          "setInterval",
+          "guard",
+          "запобежник"
+        ],
+        "falseClaims": [
+          "V8 автоматически останавливает бесконечный queueMicrotask loop",
+          "try/catch вокруг queueMicrotask ловит ошибки callback",
+          "рекурсивный queueMicrotask безопасен для polling условий",
+          "setTimeout(0) и queueMicrotask взаимозаменяемы для polling"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "node_nexttick",
+      "title": "Знает process.nextTick vs queueMicrotask в Node",
+      "expected": "Кандидат объясняет: в Node.js `process.nextTick` выше приоритет и дренируется до queueMicrotask/Promise; в браузере nextTick нет; для cross-runtime — queueMicrotask по WHATWG spec.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Node vs browser priority — follow-up из ITLead",
+        "mustConcepts": [
+          "process.nextTick",
+          "nextTick",
+          "Node.js",
+          "выше приоритет",
+          "раньше",
+          "queueMicrotask",
+          "браузер",
+          "не существует",
+          "WHATWG",
+          "portable",
+          "переносим",
+          "cross-runtime",
+          "libuv",
+          "Promise.then",
+          "одинаков в браузере"
+        ],
+        "falseClaims": [
+          "process.nextTick существует в браузере",
+          "queueMicrotask в Node выполняется раньше process.nextTick",
+          "nextTick и queueMicrotask в разных приоритетах только в браузере",
+          "для Node-only кода queueMicrotask всегда лучше nextTick"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "queueMicrotask ставит колбек в microtask queue — после sync кода, до setTimeout. Sync → все microtasks FIFO (queueMicrotask и Promise.then в одной очереди) → macrotask. Для batch DOM: синхронно меняю state, один queueMicrotask на write. Не для тяжёлого CPU — блокирует paint.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В Vue nextTick и React scheduler используют microtasks чтобы DOM обновился после flush реактивности, но до paint. Вместо setTimeout(0) беру queueMicrotask — без 4ms delay. В Node nextTick раньше queueMicrotask; для isomorphic кода — только queueMicrotask.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "1, 4, 2, 3 — sync, потом microtask, потом timeout. Рекурсивный queueMicrotask без exit — event loop не выходит из microtask phase, UI freeze. try/catch оборачиваю внутри callback, не снаружи.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "queueMicrotask выполняется синхронно в том же стеке. setTimeout(0) всегда раньше microtasks. Promise.then в отдельной очереди с более низким приоритетом.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для polling условия кручу queueMicrotask рекурсивно — V8 сам остановит. try { queueMicrotask(() => throw) } catch — ошибка поймается. queueMicrotask не блокирует рендер.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В браузере process.nextTick и queueMicrotask — одно и то же. Для тяжёлого парсинга JSON на 100MB лучше queueMicrotask чем Worker.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "queue_microtask_definition",
+      "exampleType": "good",
+      "exampleText": "queueMicrotask(callback) — встроенная функция, callback в microtask queue после опустошения стека, до macrotasks.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "queue_microtask_definition",
+      "exampleType": "good",
+      "exampleText": "ну queueMicrotask — откладывает колбек в микрозадачи, выполнится раньше любого setTimeout",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "queue_microtask_definition",
+      "exampleType": "bad",
+      "exampleText": "queueMicrotask добавляет задачу в macrotask queue рядом с setTimeout.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "execution_order",
+      "exampleType": "good",
+      "exampleText": "sync 1, sync 2, microtask, promise, timeout — microtasks дренируются в FIFO до любого таймера.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "execution_order",
+      "exampleType": "good",
+      "exampleText": "queueMicrotask зарегистрирован до Promise.then — он первый в microtask queue, setTimeout всегда последний.",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "execution_order",
+      "exampleType": "bad",
+      "exampleText": "setTimeout(0) выполняется между sync кодом и Promise.then.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "vs_promise_then",
+      "exampleType": "good",
+      "exampleText": "Одна microtask queue — queueMicrotask и Promise.then с одинаковым приоритетом; Promise unwrap и .catch, queueMicrotask — plain callback.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "vs_promise_then",
+      "exampleType": "good",
+      "exampleText": "throw в queueMicrotask — unhandled exception, не rejected Promise; try/catch только внутри callback.",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "vs_promise_then",
+      "exampleType": "bad",
+      "exampleText": "queueMicrotask выше приоритет чем Promise.then — разные очереди.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Два count+=1 синхронно, один queueMicrotask на DOM write — один layout. Замена setTimeout(0) без 4ms floor.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Vue nextTick / React scheduler — microtask после flush state, до paint. CPU-heavy — Worker, не queueMicrotask.",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Для парсинга HTTP response на 50MB в undici лучше queueMicrotask чем microtask после I/O — нет, I/O это macrotask.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "event_loop_drain",
+      "exampleType": "good",
+      "exampleText": "RunMicrotasks дренирует очередь до пустоты, включая новые microtasks — только потом paint. Длинная цепочка freeze UI.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "event_loop_drain",
+      "exampleType": "good",
+      "exampleText": "микрозадачи до отрисовки — если крутить queueMicrotask бесконечно, paint не случится",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "event_loop_drain",
+      "exampleType": "bad",
+      "exampleText": "Браузер рисует между каждой microtask — drain не блокирует paint.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Рекурсивный queueMicrotask без counter — event loop stuck в microtask phase, setTimeout не fire, страница зависла.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Polling через queueMicrotask вместо setInterval — infinite trap; guard counter или setTimeout для yield.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "try { queueMicrotask(() => throw Error) } catch(e) — Caught. V8 прерывает infinite microtask loop автоматически.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "node_nexttick",
+      "exampleType": "good",
+      "exampleText": "Node: nextTick, queueMicrotask — nextTick первый. Браузер: только queueMicrotask. Cross-runtime — queueMicrotask по spec.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "node_nexttick",
+      "exampleType": "good",
+      "exampleText": "в node nextTick раньше, в chrome nextTick нет — для isomorphic беру queueMicrotask",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "node_nexttick",
+      "exampleType": "bad",
+      "exampleText": "process.nextTick доступен в Chrome и выполняется после queueMicrotask.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "how-to-add-a-task-to-microtask-queue-with-queuemicrotask",
+    "apiUrl": "https://api.itlead.org/api/questions/how-to-add-a-task-to-microtask-queue-with-queuemicrotask",
+    "pageUrl": "https://itlead.org/interview-questions/javascript/how-to-add-a-task-to-microtask-queue-with-queuemicrotask",
+    "difficulty": "SENIOR",
+    "titleEn": "How to add a task to microtask queue with queueMicrotask",
+    "categorySlug": "javascript",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

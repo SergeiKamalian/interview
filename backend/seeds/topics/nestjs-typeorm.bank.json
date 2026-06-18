@@ -1,0 +1,606 @@
+{
+  "topic": {
+    "code": "nestjs_typeorm",
+    "name": "Интеграция NestJS с TypeORM",
+    "skillCode": "nestjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как NestJS интегрируется с TypeORM?",
+    "shortAnswer": "Интеграция NestJS + TypeORM строится в три шага: один раз настраиваешь подключение через `TypeOrmModule.forRoot()`, регистрируешь сущности в feature-модуле через `TypeOrmModule.forFeature([Entity])`, затем внедряешь `Repository<Entity>` через `@InjectRepository()`. `synchronize: true` автоматически меняет схему БД при старте — допустимо в dev, опасно в production.",
+    "idealAnswer": "Пакет `@nestjs/typeorm` связывает слой БД с модульной системой NestJS. Глобальная настройка в AppModule: `TypeOrmModule.forRoot({ type, host, port, credentials, autoLoadEntities: true, synchronize: process.env.NODE_ENV !== 'production' })`. `autoLoadEntities: true` автоматически подхватывает все entity из `TypeOrmModule.forFeature()` без ручного списка в forRoot. В feature-модуле: `TypeOrmModule.forFeature([User])` регистрирует entity для DI. Сущности — TypeScript-классы с декораторами: `@Entity('users')`, `@PrimaryGeneratedColumn()`, `@Column()`, `@OneToMany`, `@CreateDateColumn()`. `select: false` на колонке исключает поле из SELECT, пока явно не вызовешь `.addSelect()` в query builder — типичный вопрос про password. Repository pattern: `@InjectRepository(User) private usersRepo: Repository<User>` в сервисе. `create(dto)` только создаёт объект entity, в БД ничего не пишет; `save()` делает INSERT или UPDATE. `find()`, `findOneBy()`, `delete()` — стандартные CRUD. Связи: `find({ relations: { posts: true } })` для простой загрузки; `createQueryBuilder` с `leftJoinAndSelect` для фильтрации, сортировки и решения N+1. Транзакции: инжектить `DataSource`, не repository; `dataSource.transaction(async manager => { ... })` — `manager` это EntityManager в контексте транзакции, при throw — rollback. Типичные ошибки: `synchronize: true` в production (TypeORM может удалить колонки с данными); забытый `forFeature()` → «No metadata found for User»; ожидание что `create()` сохранит в БД; обращение к `user.posts` без загрузки relations (TypeORM 0.3+ без implicit lazy loading); использование обычного repository внутри transaction вместо manager. Production: миграции вместо synchronize; soft delete через `@DeleteDateColumn()`; пагинация через `.skip()`/`.take()`; несколько БД — несколько `forRoot()` с разным `name` и `@InjectRepository(Entity, 'connectionName')`. `save()` vs `insert()`: save проверяет PK и делает UPDATE/INSERT с hooks; insert — всегда raw INSERT без lifecycle hooks.",
+    "maxScore": 10,
+    "skills": [
+      "nestjs",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "module_setup",
+      "title": "Знает настройку TypeOrmModule",
+      "expected": "Кандидат описывает: `TypeOrmModule.forRoot()` один раз в AppModule; `TypeOrmModule.forFeature([Entity])` в feature-модуле; `autoLoadEntities: true` подхватывает entity без ручного списка; `synchronize` только для dev.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро интеграции — forRoot + forFeature + autoLoadEntities",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "module_setup",
+            "oftenConfusedWith": [
+              "repository_pattern",
+              "synchronize_production"
+            ],
+            "anchorTermsExpected": [
+              "forRoot",
+              "forFeature",
+              "autoLoadEntities",
+              "AppModule"
+            ],
+            "anchorTermsWrongTopic": [
+              "forFeature заменяет forRoot",
+              "entities вручную в каждом модуле в forRoot"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "forRoot",
+              "forFeature",
+              "autoLoadEntities"
+            ],
+            "ask": "чем forRoot отличается от forFeature и зачем autoLoadEntities"
+          }
+        ],
+        "mustConcepts": [
+          "TypeOrmModule",
+          "forRoot",
+          "forFeature",
+          "autoLoadEntities",
+          "@nestjs/typeorm",
+          "AppModule",
+          "feature-модул",
+          "подключен",
+          "регистрац",
+          "entity",
+          "сущност",
+          "один раз",
+          "глобальн",
+          "imports",
+          "synchronize",
+          "dev"
+        ],
+        "falseClaims": [
+          "forFeature заменяет forRoot для подключения к БД",
+          "autoLoadEntities требует ручного списка entities в forRoot",
+          "TypeOrmModule.forRoot вызывают в каждом feature-модуле",
+          "forFeature регистрирует подключение к базе данных",
+          "без forRoot достаточно только forFeature для работы с БД"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "entity_definition",
+      "title": "Понимает определение entity",
+      "expected": "Кандидат объясняет: entity — класс с декораторами TypeORM; `@Entity` маппит на таблицу; `@Column`, `@PrimaryGeneratedColumn`, relation-декораторы; `select: false` исключает колонку из SELECT без явного addSelect.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовая схема entity из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "select: false",
+              "addSelect",
+              "password"
+            ],
+            "ask": "что делает select: false на колонке password и как получить поле в запросе"
+          }
+        ],
+        "mustConcepts": [
+          "@Entity",
+          "@Column",
+          "@PrimaryGeneratedColumn",
+          "@OneToMany",
+          "@CreateDateColumn",
+          "@UpdateDateColumn",
+          "entity",
+          "сущност",
+          "таблиц",
+          "декоратор",
+          "select: false",
+          "addSelect",
+          "password",
+          "маппинг",
+          "класс"
+        ],
+        "falseClaims": [
+          "select: false удаляет колонку из базы данных",
+          "entity — это интерфейс TypeScript без декораторов",
+          "password с select: false всегда возвращается в find()",
+          "@Entity автоматически создаёт миграции в production"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "repository_pattern",
+      "title": "Знает repository pattern и DI",
+      "expected": "Кандидат описывает: `@InjectRepository(Entity)` в конструкторе сервиса; `Repository<Entity>` с find/findOneBy/create/save/delete; `create()` только инстанцирует объект, `save()` пишет в БД.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "стандартный способ работы с БД в NestJS",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "module_setup",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "repository_pattern",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "InjectRepository",
+              "create",
+              "save",
+              "Repository"
+            ],
+            "anchorTermsWrongTopic": [
+              "create сразу INSERT",
+              "repository для транзакций"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "create",
+              "save",
+              "InjectRepository"
+            ],
+            "ask": "чем create() отличается от save() и когда данные попадают в БД"
+          }
+        ],
+        "mustConcepts": [
+          "@InjectRepository",
+          "Repository",
+          "create",
+          "save",
+          "find",
+          "findOneBy",
+          "delete",
+          "инстанц",
+          "INSERT",
+          "UPDATE",
+          "не сохран",
+          "не пишет",
+          "конструктор",
+          "сервис",
+          "типизирован"
+        ],
+        "falseClaims": [
+          "Repository.create() сразу выполняет INSERT в базу",
+          "save() только для UPDATE, INSERT делает insert() или create()",
+          "@InjectRepository работает без TypeOrmModule.forFeature",
+          "findOneBy возвращает массив сущностей"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "relations_query_builder",
+      "title": "Знает relations и query builder",
+      "expected": "Кандидат объясняет: `find({ relations: { posts: true } })` для простой загрузки связей; `createQueryBuilder` с `leftJoinAndSelect` для фильтрации и решения N+1; один запрос вместо загрузки в цикле.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "N+1 и query builder — ключевой middle паттерн",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "N+1",
+              "leftJoinAndSelect",
+              "query builder"
+            ],
+            "ask": "как избежать N+1 при загрузке связей user.posts"
+          },
+          {
+            "match": [
+              "relations",
+              "find"
+            ],
+            "ask": "когда достаточно find с relations, а когда нужен query builder"
+          }
+        ],
+        "mustConcepts": [
+          "relations",
+          "createQueryBuilder",
+          "leftJoinAndSelect",
+          "N+1",
+          "join",
+          "where",
+          "orderBy",
+          "take",
+          "skip",
+          "getMany",
+          "getManyAndCount",
+          "цикл",
+          "один запрос",
+          "round trip",
+          "загрузк",
+          "связ"
+        ],
+        "falseClaims": [
+          "find с relations всегда решает N+1 при любом объёме данных",
+          "createQueryBuilder не нужен если есть find",
+          "загрузка relations в цикле — нормальный production паттерн",
+          "leftJoinAndSelect делает отдельный запрос на каждую строку"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "transactions",
+      "title": "Понимает транзакции через DataSource",
+      "expected": "Кандидат описывает: инжект `DataSource`, не repository; `dataSource.transaction(async manager => ...)`; manager — EntityManager в контексте транзакции; throw → автоматический rollback; все операции через manager внутри callback.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "атомарные операции — важный middle сценарий",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.35
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "transactions",
+            "oftenConfusedWith": [
+              "repository_pattern"
+            ],
+            "anchorTermsExpected": [
+              "DataSource",
+              "transaction",
+              "manager",
+              "rollback"
+            ],
+            "anchorTermsWrongTopic": [
+              "repository внутри transaction",
+              "save в repository участвует в транзакции автоматически"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "DataSource",
+              "transaction",
+              "manager"
+            ],
+            "ask": "почему для транзакций используют DataSource и manager, а не repository"
+          }
+        ],
+        "mustConcepts": [
+          "DataSource",
+          "transaction",
+          "manager",
+          "EntityManager",
+          "rollback",
+          "атомар",
+          "throw",
+          "callback",
+          "не repository",
+          "контекст транзакц",
+          "decrement",
+          "save",
+          "create",
+          "одно соединен",
+          "вместе"
+        ],
+        "falseClaims": [
+          "инжектированный Repository автоматически участвует в dataSource.transaction",
+          "transaction можно обернуть вокруг usersRepo.save без DataSource",
+          "manager и repository — одно и то же вне транзакции",
+          "rollback нужно вызывать вручную при каждой ошибке в transaction callback"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "synchronize_production",
+      "title": "Понимает риск synchronize в production",
+      "expected": "Кандидат объясняет: `synchronize: true` автоматически меняет схему БД под entity при старте; в production может удалить или изменить колонки с реальными данными; в prod — миграции, synchronize только dev.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "критичная production-ошибка из ITLead Common mistakes",
+        "mustConcepts": [
+          "synchronize",
+          "production",
+          "миграц",
+          "схем",
+          "удал",
+          "колонк",
+          "dev",
+          "NODE_ENV",
+          "destructive",
+          "alter",
+          "drop",
+          "startup",
+          "entity definitions"
+        ],
+        "falseClaims": [
+          "synchronize: true безопасен в production если entity актуальны",
+          "миграции и synchronize делают одно и то же без разницы",
+          "synchronize никогда не удаляет колонки",
+          "в production можно включить synchronize для быстрого деплоя"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки TypeORM в NestJS",
+      "expected": "Кандидат называет: забытый forFeature → No metadata found; create() не сохраняет; relations без загрузки → пустой массив (0.3+ без lazy); repository вместо manager в transaction; save vs insert.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "пять типичных ошибок из ITLead Common mistakes",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "forFeature",
+              "No metadata"
+            ],
+            "ask": "что будет если забыть TypeOrmModule.forFeature в feature-модуле"
+          },
+          {
+            "match": [
+              "relations",
+              "lazy",
+              "undefined",
+              "пустой"
+            ],
+            "ask": "почему user.posts пустой без relations или query builder"
+          },
+          {
+            "match": [
+              "save",
+              "insert"
+            ],
+            "ask": "чем save() отличается от insert() в TypeORM"
+          }
+        ],
+        "mustConcepts": [
+          "forFeature",
+          "No metadata",
+          "create",
+          "save",
+          "relations",
+          "lazy loading",
+          "пустой массив",
+          "undefined",
+          "repository",
+          "manager",
+          "transaction",
+          "insert",
+          "lifecycle hooks",
+          "cascade",
+          "0.3"
+        ],
+        "falseClaims": [
+          "TypeORM 0.3+ автоматически подгружает relations при обращении к полю",
+          "forFeature не обязателен если entity объявлен в forRoot",
+          "insert() и save() полностью эквивалентны",
+          "No metadata found значит неверный SQL dialect",
+          "create() + await без save() сохраняет entity в БД"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "В AppModule — TypeOrmModule.forRoot с autoLoadEntities и synchronize только в dev. В UsersModule — forFeature([User]), в сервисе @InjectRepository(User). create(dto) строит объект, save() пишет в БД. Транзакции — DataSource.transaction и manager, не repository. В prod — миграции, synchronize выключен.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну forRoot один раз, forFeature в каждом модуле со своими entity. репозиторий инжектим, find/findOneBy для чтения. для постов юзера — leftJoinAndSelect в query builder, чтоб N+1 не ловить. заказ со списанием stock — dataSource.transaction, всё через manager.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Entity — класс с @Entity/@Column. password с select: false не попадёт в SELECT, для auth нужен addSelect. Пагинация — skip/take в query builder, getManyAndCount за один round trip. Несколько БД — forRoot с name и @InjectRepository(Entity, 'secondaryDb').",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "TypeOrmModule.forFeature подключает postgres, forRoot не нужен. create(dto) сразу INSERT. synchronize: true в production — норм, entity всегда актуальны.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В транзакции использую usersRepo.save — repository сам попадёт в контекст transaction. user.posts подгрузится автоматически при обращении, lazy loading в TypeORM 0.3 работает как раньше.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "autoLoadEntities требует перечислить все entity в forRoot вручную. insert() и save() делают одно и то же с hooks и cascade. forFeature можно не добавлять если entity в той же папке что сервис.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "module_setup",
+      "exampleType": "good",
+      "exampleText": "forRoot в AppModule — подключение и autoLoadEntities; forFeature([User]) в UsersModule регистрирует entity для DI.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "module_setup",
+      "exampleType": "good",
+      "exampleText": "один forRoot на всё приложение, в каждом feature forFeature со своими сущностями — не надо entities[] вручную в forRoot",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "module_setup",
+      "exampleType": "bad",
+      "exampleText": "forFeature заменяет forRoot — подключение к postgres настраиваю только в UsersModule.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "entity_definition",
+      "exampleType": "good",
+      "exampleText": "@Entity('users') маппит класс на таблицу; @Column({ select: false }) на password — в find не вернётся без addSelect в query builder.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "entity_definition",
+      "exampleType": "good",
+      "exampleText": "entity — обычный ts-класс с декораторами, OneToMany на posts, CreateDateColumn для createdAt",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "entity_definition",
+      "exampleType": "bad",
+      "exampleText": "select: false удаляет password из таблицы users в базе данных.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "repository_pattern",
+      "exampleType": "good",
+      "exampleText": "@InjectRepository(User) в конструкторе; create(dto) — объект в памяти; save(user) — INSERT или UPDATE в БД.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "repository_pattern",
+      "exampleType": "good",
+      "exampleText": "findAll — repo.find(), findOne — findOneBy({ id }), remove — delete(id). create не трогает базу пока save",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "repository_pattern",
+      "exampleType": "bad",
+      "exampleText": "await usersRepo.create(dto) — данные уже в postgres, save не обязателен.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "relations_query_builder",
+      "exampleType": "good",
+      "exampleText": "find({ relations: { posts: true } }) для простого кейса; для фильтра active + join — createQueryBuilder('user').leftJoinAndSelect('user.posts', 'post').where(...).getMany().",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "relations_query_builder",
+      "exampleType": "good",
+      "exampleText": "N+1 — не грузить posts в for по users; один leftJoinAndSelect вместо цикла с отдельными запросами",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "relations_query_builder",
+      "exampleType": "bad",
+      "exampleText": "Для каждого user в цикле вызываю find posts — это норм, TypeORM оптимизирует в один запрос автоматически.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "transactions",
+      "exampleType": "good",
+      "exampleText": "dataSource.transaction(async manager => { manager.create/save/decrement }) — один connection, throw откатывает всё.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "transactions",
+      "exampleType": "good",
+      "exampleText": "заказ + списание stock — только через manager внутри transaction, usersRepo.save сюда не подходит",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "transactions",
+      "exampleType": "bad",
+      "exampleText": "Внутри dataSource.transaction вызываю this.usersRepo.save — repository привязан к транзакции автоматически.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "synchronize_production",
+      "exampleType": "good",
+      "exampleText": "synchronize: process.env.NODE_ENV !== 'production' — в prod миграции, иначе TypeORM может drop колонку с данными.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "synchronize_production",
+      "exampleType": "good",
+      "exampleText": "synchronize true на dev удобно, на проде только миграции — один деплой мог бы снести колонку",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "synchronize_production",
+      "exampleType": "bad",
+      "exampleText": "synchronize: true в production безопасен — TypeORM только добавляет колонки, никогда не удаляет.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Без forFeature([User]) — InjectRepository падает No metadata found. user.posts без relations — пустой массив в 0.3+. save проверяет PK, insert — всегда raw INSERT без hooks.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "create только инстанс, save пишет. в транзакции manager, не repo. relations явно грузим или join",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "forFeature не нужен если autoLoadEntities true. user.posts подгрузится lazy при первом обращении как в старом TypeORM.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-typeorm",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-typeorm",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-typeorm",
+    "difficulty": "MIDDLE",
+    "titleEn": "How does NestJS integrate with TypeORM?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T14:30:00.000Z"
+  }
+}

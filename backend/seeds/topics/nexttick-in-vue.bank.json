@@ -1,0 +1,590 @@
+{
+  "topic": {
+    "code": "nexttick_in_vue",
+    "name": "nextTick в Vue.js",
+    "skillCode": "vue",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое nextTick в Vue.js и когда его использовать?",
+    "shortAnswer": "`nextTick` в Vue.js запускает ваш код после того, как DOM отразил последние изменения реактивного состояния. Vue батчит обновления DOM ради производительности: состояние меняется сразу, а DOM обновляется в следующем microtask. Используйте `nextTick`, когда нужно прочитать DOM, сфокусировать элемент или прокрутить страницу сразу после изменения state.",
+    "idealAnswer": "`nextTick` — утилита Vue, которая выполняет код после того, как DOM синхронизирован с последними реактивными изменениями. Реактивное значение доступно сразу после `count.value++`, но DOM ещё показывает старое содержимое до следующего flush планировщика. Vue не перерисовывает компонент мгновенно: watcher/computed ставят job в очередь, а в microtask (`queueMicrotask` / `Promise.resolve().then()`) вызывается `flushSchedulerQueue()` и один проход `patch()` обновляет DOM. Если в одной функции меняете пять ref — один reflow, не пять. Правило: сначала изменение state, затем `await nextTick()`, затем работа с DOM (focus, scroll, `getBoundingClientRect()`, инициализация Chart.js). `nextTick` — microtask до paint браузера; `setTimeout(fn, 0)` — macrotask после paint, возможен flash старого контента. Внутри `@vue/runtime-core` `nextTick` встаёт в ту же очередь flush или сразу после него — это точнее таймера. Типичные кейсы: autofocus input после `v-if`, scroll chat к последнему сообщению, измерение блока после toggle, third-party lib на свежем DOM. Ошибки: `await nextTick()` до изменения state (очередь пуста — resolve сразу); `await nextTick()` в цикле (Vue всё равно батчит — один nextTick в конце); двойной nextTick без новой реактивной цепочки (второй resolve мгновенно); nextTick в SSR без DOM (no-op в Nuxt — DOM-логику в `onMounted` + nextTick). `watchEffect` срабатывает до patch DOM — чтение DOM внутри оборачивайте в nextTick. Синтаксис: `nextTick(cb)` и `await nextTick()` эквивалентны по смыслу. В production: Element Plus позиционирует toast, Vuetify фокусирует menu, Quasar скроллит таблицу, Vitest `await nextTick()` синхронизирует DOM в тестах.",
+    "maxScore": 10,
+    "skills": [
+      "vue",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "nexttick_definition",
+      "title": "Понимает назначение nextTick",
+      "expected": "Кандидат объясняет: nextTick ждёт завершения DOM-обновления после reactive change; reactive state доступен сразу, DOM — на следующем tick; порядок: state → nextTick → DOM.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — что такое nextTick и базовое правило использования",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "nexttick_definition",
+            "oftenConfusedWith": [
+              "state_vs_dom_batching",
+              "nexttick_vs_settimeout"
+            ],
+            "anchorTermsExpected": [
+              "DOM обнов",
+              "реактив",
+              "state change",
+              "следующ",
+              "tick",
+              "await nextTick"
+            ],
+            "anchorTermsWrongTopic": [
+              "nextTick меняет state",
+              "DOM обновляется синхронно с ref",
+              "nextTick это setTimeout"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "nextTick",
+              "DOM",
+              "state"
+            ],
+            "ask": "почему после count.value++ ref уже 1, а textContent в DOM ещё старый и что делает nextTick"
+          }
+        ],
+        "mustConcepts": [
+          "nextTick",
+          "DOM обнов",
+          "реактив",
+          "reactive",
+          "state change",
+          "изменение состоян",
+          "следующ",
+          "tick",
+          "await nextTick",
+          "синхрониз",
+          "отразил",
+          "устарев",
+          "stale",
+          "state first",
+          "сначала state",
+          "потом DOM",
+          "утилит"
+        ],
+        "falseClaims": [
+          "nextTick меняет реактивное состояние",
+          "DOM обновляется синхронно сразу после ref.value++",
+          "nextTick нужен только в Options API, не в Composition API",
+          "nextTick гарантирует завершение CSS-анимации",
+          "без nextTick Vue никогда не обновляет DOM"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "state_vs_dom_batching",
+      "title": "Знает батчинг обновлений DOM",
+      "expected": "Кандидат объясняет: Vue ставит обновления в очередь планировщика; несколько изменений state в одной функции → один patch; один reflow вместо множества.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Why Vue batches — ключ к пониманию зачем nextTick",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "nexttick_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "batch",
+              "батч",
+              "очеред",
+              "queue"
+            ],
+            "ask": "сколько DOM-обновлений будет если в одном handler изменить пять ref"
+          }
+        ],
+        "mustConcepts": [
+          "batch",
+          "батч",
+          "очеред",
+          "queue",
+          "scheduler",
+          "планировщ",
+          "flush",
+          "patch",
+          "один проход",
+          "reflow",
+          "paint",
+          "60fps",
+          "не сразу",
+          "microtask",
+          "watcher",
+          "computed",
+          "несколько ref",
+          "одно обновлен"
+        ],
+        "falseClaims": [
+          "каждое изменение ref вызывает немедленный отдельный re-render DOM",
+          "Vue обновляет DOM синхронно в том же stack frame что и setter",
+          "батчинг работает только между разными компонентами, не в одной функции",
+          "nextTick отключает батчинг и форсирует немедленный patch"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "nexttick_vs_settimeout",
+      "title": "Отличает nextTick от setTimeout",
+      "expected": "Кандидат сравнивает: nextTick — microtask до paint; setTimeout(fn, 0) — macrotask после paint; для DOM после state nextTick быстрее и без flash старого контента.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "частый follow-up из ITLead — microtask vs macrotask",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "nexttick_vs_settimeout",
+            "oftenConfusedWith": [
+              "internal_scheduler"
+            ],
+            "anchorTermsExpected": [
+              "microtask",
+              "macrotask",
+              "paint",
+              "setTimeout",
+              "до перемальов"
+            ],
+            "anchorTermsWrongTopic": [
+              "setTimeout быстрее nextTick для DOM",
+              "nextTick это macrotask",
+              "разницы нет"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "setTimeout",
+              "microtask",
+              "macrotask"
+            ],
+            "ask": "почему setTimeout(0) может показать старый DOM на экране, а nextTick нет"
+          }
+        ],
+        "mustConcepts": [
+          "microtask",
+          "macrotask",
+          "setTimeout",
+          "nextTick",
+          "paint",
+          "перемальов",
+          "flash",
+          "миган",
+          "до paint",
+          "после paint",
+          "Promise.resolve",
+          "queueMicrotask",
+          "быстре",
+          "предсказу",
+          "event loop",
+          "DOM read"
+        ],
+        "falseClaims": [
+          "setTimeout(fn, 0) и nextTick выполняются в одной фазе event loop",
+          "nextTick это просто обёртка над setTimeout(0) без разницы",
+          "setTimeout быстрее nextTick для чтения DOM после state",
+          "nextTick выполняется после paint браузера",
+          "microtask и macrotask для DOM-read после Vue state эквивалентны"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Знает сценарии использования",
+      "expected": "Кандидат называет: focus после v-if, scroll к новому элементу, getBoundingClientRect после render, init third-party lib, classList animation после toggle; паттерн state → nextTick → DOM.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "When to use блок ITLead — практические кейсы middle",
+        "mustConcepts": [
+          "focus",
+          "фокус",
+          "v-if",
+          "scroll",
+          "прокрут",
+          "scrollHeight",
+          "scrollIntoView",
+          "getBoundingClientRect",
+          "измер",
+          "размер",
+          "third-party",
+          "Chart",
+          "classList",
+          "анимац",
+          "ref",
+          "template ref",
+          "условн",
+          "render",
+          "mount"
+        ],
+        "falseClaims": [
+          "nextTick нужен при каждом изменении любого ref без исключений",
+          "focus() работает сразу после push в массив без nextTick всегда",
+          "nextTick нужен только для Options API $refs",
+          "getBoundingClientRect не требует nextTick после v-if true"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "internal_scheduler",
+      "title": "Понимает внутренний планировщик Vue 3",
+      "expected": "Кандидат описывает: jobs в глобальной очереди, flushSchedulerQueue, patch компонентов, nextTick встаёт в ту же microtask-очередь flush или сразу после него; @vue/runtime-core.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "How it works internally — глубина middle+",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "flushSchedulerQueue",
+              "runtime-core",
+              "очеред"
+            ],
+            "ask": "куда попадает callback nextTick относительно flush DOM-патча"
+          }
+        ],
+        "mustConcepts": [
+          "scheduler",
+          "планировщ",
+          "flushSchedulerQueue",
+          "runtime-core",
+          "очеред",
+          "job",
+          "watcher",
+          "patch",
+          "queueMicrotask",
+          "Promise.resolve",
+          "microtask queue",
+          "flush",
+          "глобальн",
+          "компонент",
+          "DOM mutate",
+          "после flush",
+          "точн",
+          "не таймер"
+        ],
+        "falseClaims": [
+          "nextTick использует setInterval для ожидания DOM",
+          "Vue 3 обновляет DOM синхронно без scheduler queue",
+          "nextTick не связан с flush планировщика",
+          "flushSchedulerQueue выполняется в macrotask после paint"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки nextTick",
+      "expected": "Кандидат называет: nextTick до state change; await nextTick в цикле; лишний второй nextTick; nextTick в SSR без onMounted; объясняет почему каждая ошибка ломает ожидание.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes ITLead — частые баги в production",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "nexttick_definition",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "до state",
+              "before",
+              "цикл",
+              "loop"
+            ],
+            "ask": "почему await nextTick() перед state.value = x не помогает прочитать DOM"
+          },
+          {
+            "match": [
+              "двойн",
+              "double",
+              "второй"
+            ],
+            "ask": "когда второй подряд nextTick реально нужен"
+          }
+        ],
+        "mustConcepts": [
+          "до изменения state",
+          "пустая очеред",
+          "resolve сразу",
+          "цикл",
+          "loop",
+          "await в цикле",
+          "один nextTick в конце",
+          "двойной nextTick",
+          "второй resolve",
+          "SSR",
+          "no-op",
+          "onMounted",
+          "Nuxt",
+          "нет DOM",
+          "клиент",
+          "edge case",
+          "новая реактивн",
+          "второй flush"
+        ],
+        "falseClaims": [
+          "nextTick до state change ждёт будущее обновление автоматически",
+          "await nextTick в for-of даёт отдельный DOM patch на каждую итерацию",
+          "второй nextTick всегда обязателен после первого",
+          "nextTick в SSR на Nuxt обновляет virtual DOM на сервере",
+          "двойной nextTick нужен для любого v-if toggle"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "watch_watcheffect_ssr",
+      "title": "Связь с watchEffect, SSR и синтаксисом",
+      "expected": "Кандидат объясняет: watchEffect до patch DOM — DOM-read в nextTick; SSR — nextTick no-op, DOM в onMounted; nextTick(cb) vs await nextTick() эквивалентны.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up questions ITLead — watchEffect и SSR",
+        "mustConcepts": [
+          "watchEffect",
+          "watch",
+          "до patch",
+          "до DOM",
+          "синхрон",
+          "nextTick внутри",
+          "SSR",
+          "no-op",
+          "onMounted",
+          "клиент",
+          "Nuxt",
+          "callback",
+          "async await",
+          "nextTick(cb)",
+          "Vitest",
+          "тест",
+          "синхронизац DOM"
+        ],
+        "falseClaims": [
+          "watchEffect всегда видит уже обновлённый DOM",
+          "nextTick в SSR ждёт hydration на сервере",
+          "nextTick(cb) и await nextTick() работают в разных очередях event loop",
+          "onMounted не нужен если есть nextTick в SSR setup"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "После count.value++ ref уже 1, но p в DOM ещё «Count: 0». await nextTick() — flush завершён, textContent актуален. Vue батчит пять ref в одном handler в один patch. nextTick — microtask до paint; setTimeout(0) — после paint, возможен flash.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Добавил todo — push в массив, очистил input, await nextTick(), потом inputRef.focus(). Chat: push message, nextTick, scrollTo scrollHeight. v-if toggle — nextTick, getBoundingClientRect. В Nuxt DOM-логику в onMounted + nextTick, на SSR nextTick no-op.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "watchEffect на state — DOM ещё старый; чтение ref внутри nextTick. В Vitest после изменения props await nextTick() перед expect на DOM. Element Plus toast позиционирует после insert через nextTick.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "nextTick меняет reactive state и форсирует синхронный re-render. setTimeout(0) всегда лучше nextTick для DOM после ref.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "await nextTick() перед state.value = x — правильный порядок. В цикле await nextTick на каждой итерации даёт отдельный patch. В SSR nextTick обновляет DOM на сервере как на клиенте.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "После любого ref++ всегда нужны два nextTick подряд. watchEffect уже видит финальный DOM, nextTick внутри не нужен.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "nexttick_definition",
+      "exampleType": "good",
+      "exampleText": "nextTick — код после того как Vue пропатчил DOM под последний state; reactive value сразу, DOM на tick позже.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "nexttick_definition",
+      "exampleType": "good",
+      "exampleText": "ну сначала меняю ref, потом await nextTick(), потом лезу в dom — иначе stale textContent",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "nexttick_definition",
+      "exampleType": "bad",
+      "exampleText": "nextTick синхронно обновляет ref и DOM в одном кадре без очереди.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "state_vs_dom_batching",
+      "exampleType": "good",
+      "exampleText": "Пять ref++ в одном click handler — scheduler кладёт jobs в очередь, один flushSchedulerQueue, один reflow.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "state_vs_dom_batching",
+      "exampleType": "good",
+      "exampleText": "state мгновенно, dom в microtask — поэтому без nextTick ref уже новый, а разметка старая",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "state_vs_dom_batching",
+      "exampleType": "bad",
+      "exampleText": "Каждый count.value++ немедленно вызывает отдельный patch и reflow в том же синхронном стеке.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "nexttick_vs_settimeout",
+      "exampleType": "good",
+      "exampleText": "nextTick в microtask до paint — DOM уже новый до отрисовки. setTimeout(0) после paint — пользователь может увидеть старый Count: 0.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "nexttick_vs_settimeout",
+      "exampleType": "good",
+      "exampleText": "для focus после v-if беру nextTick, не setTimeout — быстрее и без мигания",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "nexttick_vs_settimeout",
+      "exampleType": "bad",
+      "exampleText": "setTimeout(fn, 0) и await nextTick() для Vue DOM-read после state дают одинаковый результат без разницы во времени paint.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "todos.push → await nextTick() → inputRef.focus(). messages.push → nextTick → scrollTo scrollHeight. visible=true → nextTick → getBoundingClientRect.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "данные в store → nextTick → new Chart(canvasRef) когда canvas уже в dom",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "nextTick нужен при каждом изменении computed и при любом v-model без исключений.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "internal_scheduler",
+      "exampleType": "good",
+      "exampleText": "watcher ставит job в queue, queueMicrotask вызывает flushSchedulerQueue и patch; nextTick callback после этого flush.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "internal_scheduler",
+      "exampleType": "good",
+      "exampleText": "nextTick не гадает таймером — стоит в той же microtask-очереди что flush в runtime-core",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "internal_scheduler",
+      "exampleType": "bad",
+      "exampleText": "Vue 3 nextTick реализован через requestAnimationFrame после paint.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "await nextTick() до state.value = x — очередь пуста, resolve сразу, DOM-read всё ещё stale. В цикле — все state changes, один nextTick в конце.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "второй nextTick нужен только если первый callback снова меняет reactive и ставит второй flush",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "await nextTick() в начале handler гарантирует что следующая строка state.value увидит обновлённый DOM.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "watch_watcheffect_ssr",
+      "exampleType": "good",
+      "exampleText": "watchEffect на flag — el.offsetHeight внутри nextTick, иначе pre-patch значение. SSR: onMounted + nextTick для focus.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "watch_watcheffect_ssr",
+      "exampleType": "good",
+      "exampleText": "nextTick(cb) или await nextTick() — одно и то же; в тестах vitest await nextTick после setProps",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "watch_watcheffect_ssr",
+      "exampleType": "bad",
+      "exampleText": "watchEffect выполняется после DOM patch, nextTick для DOM-read внутри не нужен. SSR nextTick ждёт client hydration на сервере.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nexttick-in-vue",
+    "apiUrl": "https://api.itlead.org/api/questions/nexttick-in-vue",
+    "pageUrl": "https://itlead.org/interview-questions/vue/nexttick-in-vue",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is nexttick in Vue.js?",
+    "categorySlug": "vue",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

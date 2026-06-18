@@ -1,0 +1,664 @@
+{
+  "topic": {
+    "code": "nestjs_graphql_integration",
+    "name": "GraphQL в NestJS",
+    "skillCode": "nestjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как построить GraphQL API с NestJS?",
+    "shortAnswer": "GraphQL API в NestJS собирают через @nestjs/graphql с Apollo driver: TypeScript-декораторы описывают схему, резолверы обрабатывают запросы и мутации. GraphQLModule.forRoot с autoSchemaFile генерирует schema.gql при code-first подходе. Для вложенных полей обязателен DataLoader в request-scoped провайдере — иначе N+1 убьёт производительность.",
+    "idealAnswer": "NestJS даёт first-class поддержку GraphQL через @nestjs/graphql и @nestjs/apollo на базе Apollo Server. Два подхода: code-first — TypeScript-классы с декораторами, NestJS генерирует schema.gql при старте; schema-first — пишете SDL (.graphql), NestJS генерирует TS-типы. Большинство команд выбирают code-first: типы и схема синхронизированы без лишних шагов. Schema-first — когда схема — контракт между командами или shared package в монорепо. Setup: npm install @nestjs/graphql @nestjs/apollo @apollo/server graphql; GraphQLModule.forRoot({ driver: ApolloDriver, autoSchemaFile: 'schema.gql', sortSchema: true, playground: true /* только dev */ }). autoSchemaFile: true — схема только в памяти. Типы: @ObjectType() + @Field() для возвращаемых типов; массивы и скаляры ID/Int указывают явно — TS alone не выводит GraphQL-типы. @InputType() для мутаций; PartialType импортировать из @nestjs/graphql, не из @nestjs/mapped-types — иначе @Field() не попадут в схему. Резолверы заменяют controllers: @Resolver(() => User) привязывает класс к типу (важно для @ResolveField); @Query, @Mutation, @Args, @Parent. @ResolveField выполняется для каждого объекта в результате — 50 users → 50 вызовов findByUserId = N+1. DataLoader батчит все .load(id) за один tick в один запрос; scope: Scope.REQUEST обязателен — singleton кеширует данные между запросами (утечка данных между пользователями). Аутентификация: guards работают, но getRequest() нужно переопределить через GqlExecutionContext.create(context).getContext().req — без этого JWT guard читает HTTP context, получает undefined, токен не проверяется без ошибки. Subscriptions: WebSocket, subscriptions: { 'graphql-ws': true }, PubSub + asyncIterator; in-memory PubSub ломается при нескольких инстансах — в prod graphql-redis-subscriptions. Типичные ошибки: PartialType из mapped-types; DataLoader без REQUEST scope; playground: true в prod; in-memory PubSub при scale-out. @Query — операция верхнего уровня, один раз на запрос; @ResolveField — поле конкретного типа, на каждый объект. 100 users + posts без DataLoader = 101 DB query; с DataLoader = 2.",
+    "maxScore": 10,
+    "skills": [
+      "nestjs",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "graphql_setup_approaches",
+      "title": "Понимает code-first vs schema-first и setup",
+      "expected": "Кандидат объясняет: code-first — декораторы → autoSchemaFile; schema-first — SDL → TS-типы; GraphQLModule + ApolloDriver; когда какой подход выбирают.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро — выбор подхода и базовая конфигурация модуля",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "graphql_setup_approaches",
+            "oftenConfusedWith": [
+              "graphql_types_decorators"
+            ],
+            "anchorTermsExpected": [
+              "code-first",
+              "schema-first",
+              "autoSchemaFile",
+              "ApolloDriver",
+              "GraphQLModule"
+            ],
+            "anchorTermsWrongTopic": [
+              "REST controller заменяет GraphQLModule",
+              "schema-first генерирует schema.gql из декораторов"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "code-first",
+              "schema-first"
+            ],
+            "ask": "когда выбрать code-first, а когда schema-first в NestJS GraphQL"
+          }
+        ],
+        "mustConcepts": [
+          "code-first",
+          "schema-first",
+          "GraphQLModule",
+          "ApolloDriver",
+          "autoSchemaFile",
+          "schema.gql",
+          "декоратор",
+          "@nestjs/graphql",
+          "@nestjs/apollo",
+          "Apollo Server",
+          "SDL",
+          "монорепо",
+          "контракт",
+          "sortSchema",
+          "playground",
+          "в памяти"
+        ],
+        "falseClaims": [
+          "schema-first и code-first дают одинаковый workflow без различий",
+          "GraphQLModule работает без указания driver",
+          "autoSchemaFile обязан быть строкой с путём — true нельзя",
+          "NestJS GraphQL не поддерживает генерацию схемы из TypeScript"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "graphql_types_decorators",
+      "title": "Знает @ObjectType, @Field и @InputType",
+      "expected": "Кандидат описывает: @ObjectType/@Field для output; @InputType для мутаций; явные типы для ID, Int, массивов; PartialType из @nestjs/graphql.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовые декораторы типов из ITLead setup",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "PartialType",
+              "@nestjs/graphql"
+            ],
+            "ask": "откуда импортировать PartialType для GraphQL и почему mapped-types не подходит"
+          }
+        ],
+        "mustConcepts": [
+          "@ObjectType",
+          "@Field",
+          "@InputType",
+          "ID",
+          "Int",
+          "nullable",
+          "массив",
+          "PartialType",
+          "@nestjs/graphql",
+          "CreateUserInput",
+          "UpdateUserInput",
+          "скаляр",
+          "явно",
+          "не выводит",
+          "TypeScript"
+        ],
+        "falseClaims": [
+          "NestJS автоматически выводит GraphQL-типы из TypeScript без @Field",
+          "PartialType из @nestjs/mapped-types сохраняет @Field для GraphQL",
+          "@ObjectType не нужен если класс уже есть в TypeScript",
+          "массивы Post[] выводятся без @Field(() => [Post])"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "resolvers_queries_mutations",
+      "title": "Понимает резолверы, @Query и @Mutation",
+      "expected": "Кандидат объясняет: @Resolver(() => Type) привязывает класс; @Query/@Mutation заменяют HTTP verbs; @Args для аргументов; name option для имени операции в схеме.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый паттерн резолверов из ITLead examples",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "graphql_setup_approaches",
+            "floorFraction": 0.4
+          }
+        ],
+        "mustConcepts": [
+          "@Resolver",
+          "@Query",
+          "@Mutation",
+          "@Args",
+          "резолвер",
+          "controller",
+          "name",
+          "findAll",
+          "createUser",
+          "UsersService",
+          "DI",
+          "inject",
+          "операц",
+          "метод",
+          "схем"
+        ],
+        "falseClaims": [
+          "резолверы — это обычные NestJS controllers с @Get",
+          "@Resolver без типа работает так же для @ResolveField",
+          "@Mutation и @Query можно использовать без @Resolver",
+          "name в @Query всегда равен имени метода и изменить нельзя"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "resolve_field_n1",
+      "title": "Понимает @ResolveField и проблему N+1",
+      "expected": "Кандидат объясняет: @ResolveField на поле типа; выполняется на каждый объект в результате; 50 users → 50 запросов posts; связь с DataLoader как решением.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "N+1 — ключевая production-проблема GraphQL",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "dataloader_batching",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "resolve_field_n1",
+            "oftenConfusedWith": [
+              "resolvers_queries_mutations"
+            ],
+            "anchorTermsExpected": [
+              "@ResolveField",
+              "N+1",
+              "@Parent",
+              "каждый объект",
+              "50"
+            ],
+            "anchorTermsWrongTopic": [
+              "@Query это то же что ResolveField",
+              "ResolveField выполняется один раз на запрос"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "@ResolveField",
+              "N+1"
+            ],
+            "ask": "чем @ResolveField отличается от @Query и почему возникает N+1"
+          },
+          {
+            "match": [
+              "100 пользов",
+              "posts",
+              "запрос"
+            ],
+            "ask": "сколько запросов к БД для 100 users с полем posts без DataLoader"
+          }
+        ],
+        "mustConcepts": [
+          "@ResolveField",
+          "@Parent",
+          "N+1",
+          "вложен",
+          "каждый объект",
+          "результат",
+          "findByUserId",
+          "50",
+          "100",
+          "101",
+          "batch",
+          "DataLoader",
+          "поле",
+          "тип",
+          "User",
+          "Post"
+        ],
+        "falseClaims": [
+          "@ResolveField выполняется один раз на GraphQL-запрос как @Query",
+          "N+1 не возникает при @ResolveField если используется ORM",
+          "@Parent передаёт весь GraphQL context а не родительский объект",
+          "50 users с posts всегда дают 2 запроса без DataLoader"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "dataloader_batching",
+      "title": "Знает DataLoader и Scope.REQUEST",
+      "expected": "Кандидат описывает: DataLoader батчит .load() за tick; batch-функция возвращает результаты в порядке id; @Injectable({ scope: Scope.REQUEST }); singleton кеширует между запросами — утечка данных.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "главная performance-оптимизация NestJS GraphQL",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Scope.REQUEST",
+              "singleton"
+            ],
+            "ask": "почему DataLoader обязан быть request-scoped, а не singleton"
+          },
+          {
+            "match": [
+              "batch",
+              "load"
+            ],
+            "ask": "как DataLoader превращает 100 вызовов load в один запрос к БД"
+          }
+        ],
+        "mustConcepts": [
+          "DataLoader",
+          "batch",
+          "load",
+          "Scope.REQUEST",
+          "request-scoped",
+          "singleton",
+          "кеш",
+          "утечк",
+          "пользовател",
+          "findByUserIds",
+          "порядок",
+          "userIds",
+          "tick",
+          "PostsLoader",
+          "2 запрос",
+          "400мс",
+          "40мс"
+        ],
+        "falseClaims": [
+          "DataLoader можно регистрировать как singleton без риска",
+          "request scope не нужен — DataLoader сам сбрасывает кеш",
+          "порядок результатов batch-функции не важен для DataLoader",
+          "DataLoader заменяет необходимость @ResolveField"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "graphql_auth_guard",
+      "title": "Понимает auth guards в GraphQL контексте",
+      "expected": "Кандидат объясняет: GqlExecutionContext.create(context).getContext().req; переопределение getRequest в GqlAuthGuard; без override guard проходит но токен не проверяется; @CurrentUser().",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "типичная скрытая ошибка auth в GraphQL",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "graphql_auth_guard",
+            "oftenConfusedWith": [
+              "resolvers_queries_mutations"
+            ],
+            "anchorTermsExpected": [
+              "GqlExecutionContext",
+              "getRequest",
+              "getContext().req",
+              "JWT"
+            ],
+            "anchorTermsWrongTopic": [
+              "switchToHttp().getRequest() работает в GraphQL",
+              "GraphQL не поддерживает guards"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "GqlExecutionContext",
+              "getRequest"
+            ],
+            "ask": "чем auth guard в GraphQL отличается от REST и что будет без getRequest override"
+          }
+        ],
+        "mustConcepts": [
+          "GqlExecutionContext",
+          "getRequest",
+          "getContext",
+          "req",
+          "AuthGuard",
+          "jwt",
+          "ExecutionContext",
+          "HTTP context",
+          "GraphQL context",
+          "GqlAuthGuard",
+          "UseGuards",
+          "CurrentUser",
+          "Bearer",
+          "Authorization",
+          "переопредел",
+          "токен"
+        ],
+        "falseClaims": [
+          "AuthGuard('jwt') в GraphQL работает без изменений как в REST",
+          "switchToHttp().getRequest() корректен для GraphQL резолверов",
+          "без getRequest override guard бросит явную ошибку",
+          "JWT strategy в GraphQL требует отдельный пакет"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "subscriptions_pubsub",
+      "title": "Знает subscriptions и PubSub",
+      "expected": "Кандидат описывает: WebSocket graphql-ws; PubSub publish/asyncIterator; filter на subscription; in-memory PubSub не работает при scale-out — Redis.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "бонус senior — subscriptions и масштабирование",
+        "mustConcepts": [
+          "Subscription",
+          "WebSocket",
+          "graphql-ws",
+          "PubSub",
+          "asyncIterator",
+          "publish",
+          "filter",
+          "Redis",
+          "graphql-redis-subscriptions",
+          "in-memory",
+          "инстанс",
+          "масштаб",
+          "чат",
+          "уведомлен"
+        ],
+        "falseClaims": [
+          "in-memory PubSub работает при нескольких серверах",
+          "subscriptions-transport-ws — рекомендуемый современный протокол",
+          "subscriptions не требуют отдельной конфигурации в GraphQLModule",
+          "PubSub из graphql-subscriptions готов к production cluster"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки NestJS GraphQL",
+      "expected": "Кандидат называет: PartialType из mapped-types; DataLoader без REQUEST; auth без getRequest; playground в prod; in-memory PubSub при scale-out.",
+      "score": 1,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes блок ITLead — частые production ловушки",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "playground",
+              "production"
+            ],
+            "ask": "почему playground: true опасен в production"
+          },
+          {
+            "match": [
+              "mapped-types",
+              "PartialType"
+            ],
+            "ask": "что сломается если PartialType импортировать из @nestjs/mapped-types"
+          }
+        ],
+        "mustConcepts": [
+          "PartialType",
+          "mapped-types",
+          "playground",
+          "production",
+          "getRequest",
+          "Scope.REQUEST",
+          "PubSub",
+          "in-memory",
+          "схема",
+          "утечк",
+          "кеш",
+          "guard",
+          "ошибк",
+          "типичн"
+        ],
+        "falseClaims": [
+          "playground в prod безопасен если URL не публичный",
+          "PartialType из mapped-types генерирует корректную GraphQL-схему",
+          "auth guard без getRequest всё равно валидирует Bearer token",
+          "singleton DataLoader безопасен если данные публичные"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Подключаю GraphQLModule с ApolloDriver и autoSchemaFile — code-first, схема из декораторов. Резолверы с @Query/@Mutation, вложенные posts через @ResolveField + DataLoader в Scope.REQUEST — без него N+1. Auth guard переопределяю getRequest через GqlExecutionContext, иначе JWT не читается.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Code-first когда одна команда контролирует API. Schema-first если схема — контракт с фронтом в монорепо. PartialType только из @nestjs/graphql. 100 users + posts: без DataLoader 101 query, с batch loader — 2. Subscriptions на graphql-ws, PubSub через Redis в prod.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "@ObjectType User с @Field(() => ID). UsersResolver: @Query users, @Mutation createUser. @ResolveField posts на каждого user — PostsLoader batchPosts.load(user.id). GqlAuthGuard на me() с @CurrentUser().",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "GraphQL в NestJS — это просто @Controller с @Post. PartialType из mapped-types норм. DataLoader singleton экономит память. AuthGuard('jwt') работает из коробки в резолверах.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "@ResolveField и @Query одно и то же — оба один раз на запрос. Playground в prod ок для дебага. In-memory PubSub масштабируется горизонтально.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "autoSchemaFile не нужен — NestJS сам выводит GraphQL из TypeScript типов. @Field опционален для string полей. N+1 решается включением eager loading в TypeORM без DataLoader.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "graphql_setup_approaches",
+      "exampleType": "good",
+      "exampleText": "Code-first: декораторы → schema.gql при старте. Schema-first: SDL файл → TS types. GraphQLModule.forRoot с ApolloDriver и autoSchemaFile.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "graphql_setup_approaches",
+      "exampleType": "good",
+      "exampleText": "беру code-first — типы и схема в одном месте. schema-first если фронт и бэк договариваются по .graphql заранее",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "graphql_setup_approaches",
+      "exampleType": "bad",
+      "exampleText": "Schema-first генерирует schema.gql из TypeScript декораторов при каждом запуске.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "graphql_types_decorators",
+      "exampleType": "good",
+      "exampleText": "@ObjectType User, @Field(() => ID) id, @Field(() => [Post]) posts. CreateUserInput @InputType. UpdateUserInput extends PartialType из @nestjs/graphql.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "graphql_types_decorators",
+      "exampleType": "good",
+      "exampleText": "массивы и ID явно в @Field — TS alone не хватит. partial update input через PartialType graphql пакета",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "graphql_types_decorators",
+      "exampleType": "bad",
+      "exampleText": "PartialType из @nestjs/mapped-types добавит @Field автоматически для GraphQL.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "resolvers_queries_mutations",
+      "exampleType": "good",
+      "exampleText": "@Resolver(() => User) — класс привязан к типу. @Query(() => [User], { name: 'users' }) findAll. @Mutation createUser(@Args('input') input).",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "resolvers_queries_mutations",
+      "exampleType": "good",
+      "exampleText": "резолвер вместо controller — @Query/@Mutation, бизнес-логика в UsersService через DI",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "resolvers_queries_mutations",
+      "exampleType": "bad",
+      "exampleText": "@Query можно повесить на обычный @Controller с @Get — NestJS сам разберётся.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "resolve_field_n1",
+      "exampleType": "good",
+      "exampleText": "@ResolveField posts(@Parent() user) — вызывается на каждого User в списке. 50 users = 50 findByUserId = N+1.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "resolve_field_n1",
+      "exampleType": "good",
+      "exampleText": "@Query users — один раз. @ResolveField posts — на каждый user в ответе, отсюда N+1 без бatching",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "resolve_field_n1",
+      "exampleType": "bad",
+      "exampleText": "@ResolveField выполняется один раз на GraphQL запрос, как top-level @Query.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "dataloader_batching",
+      "exampleType": "good",
+      "exampleText": "PostsLoader @Injectable({ scope: Scope.REQUEST }) — batchPosts.load(user.id) собирает id за tick, один findByUserIds.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "dataloader_batching",
+      "exampleType": "good",
+      "exampleText": "singleton DataLoader кеширует между запросами — user A видит posts user B. REQUEST scope сбрасывает каждый запрос",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "dataloader_batching",
+      "exampleType": "bad",
+      "exampleText": "DataLoader как singleton — норм, кеш ускоряет всех пользователей.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "graphql_auth_guard",
+      "exampleType": "good",
+      "exampleText": "GqlAuthGuard extends AuthGuard('jwt'), getRequest → GqlExecutionContext.create(context).getContext().req. @UseGuards на @Query me.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "graphql_auth_guard",
+      "exampleType": "good",
+      "exampleText": "без getRequest override guard молча пропускает — HTTP context пустой в GraphQL, JWT не читается",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "graphql_auth_guard",
+      "exampleType": "bad",
+      "exampleText": "В GraphQL AuthGuard('jwt') читает токен через switchToHttp().getRequest() без изменений.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "subscriptions_pubsub",
+      "exampleType": "good",
+      "exampleText": "subscriptions: { 'graphql-ws': true }. @Subscription messageAdded + pubSub.asyncIterator. publish после mutation. Prod — graphql-redis-subscriptions.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "subscriptions_pubsub",
+      "exampleType": "good",
+      "exampleText": "in-memory pubsub на двух инстансах — клиент на server B не получит event с server A, нужен redis",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "subscriptions_pubsub",
+      "exampleType": "bad",
+      "exampleText": "PubSub из graphql-subscriptions готов к кластеру из коробки.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "PartialType mapped-types — поля без @Field в схеме. Playground в prod открывает схему. DataLoader singleton — утечка кеша между users.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "три ловушки: wrong PartialType import, auth без gql context, playground true на проде",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Единственная типичная ошибка NestJS GraphQL — забыть npm install graphql.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-graphql-integration",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-graphql-integration",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-graphql-integration",
+    "difficulty": "SENIOR",
+    "titleEn": "How to build a GraphQL API with NestJS?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

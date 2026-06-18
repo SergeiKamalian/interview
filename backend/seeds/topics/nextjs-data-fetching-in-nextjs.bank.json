@@ -1,0 +1,567 @@
+{
+  "topic": {
+    "code": "nextjs_data_fetching_in_nextjs",
+    "name": "Получение данных в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как организовать получение данных в Next.js App Router? Чем новый подход отличается от Pages Router и какие стратегии кеширования использовать?",
+    "shortAnswer": "В App Router Server Components могут быть async — данные получают через await fetch или прямой доступ к БД на сервере, без getServerSideProps и getStaticProps. Next.js расширяет fetch: по умолчанию кеш, cache: 'no-store' для SSR на каждый запрос, next: { revalidate: N } для ISR. Независимые запросы — через Promise.all; для дедупликации — React.cache. Клиентский fetch — только в Client Components через useEffect или SWR.",
+    "idealAnswer": "В Next.js App Router получение данных происходит прямо в Server Components: компонент объявляют async и await-ят fetch или ORM-запрос на верхнем уровне — без getServerSideProps, getStaticProps и без useEffect на сервере. Next.js расширяет стандартный fetch: ответ кешируется по умолчанию (аналог SSG), cache: 'no-store' даёт свежие данные на каждый запрос (SSR), next: { revalidate: N } — stale-while-revalidate (ISR), next: { tags: ['...'] } + revalidateTag() — on-demand revalidation. Ключевой сдвиг: стратегия кеширования задаётся на уровне каждого fetch внутри страницы, а не на уровне всей page-функции — одна страница может смешивать статику и динамику. Последовательные await для независимых источников создают waterfall (200ms + 300ms = 500ms вместо 300ms) — независимые запросы собирают в Promise.all. Когда данные нужны в нескольких компонентах дерева, используют React.cache для дедупликации async-функции (в т.ч. Prisma) и preload-паттерн: void getData() запускает запрос раньше, await getData() позже получает уже in-flight результат. Медленные блоки оборачивают в Suspense — быстрый UI стримится сразу, медленный догоняет. Для интерактива (поиск, фильтры, пагинация по вводу пользователя) — Client Component с 'use client', useEffect или SWR/TanStack Query; начальные данные лучше загрузить на сервере и передать props. Типичные ошибки: забыть cache: 'no-store' для персональных данных (один кеш на всех пользователей); await fetch на верхнем уровне Client Component (SyntaxError — они не async); мутация объекта из кеша fetch (нужен structuredClone); time-based revalidate там, где нужны мгновенные обновления CMS (лучше tags + revalidateTag). Next.js автоматически дедуплирует идентичные fetch в рамках одного RSC-запроса; React.cache покрывает любые async-источники, не только fetch. Ошибка fetch в Server Component всплывает к ближайшему error.tsx.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "server_component_async",
+      "title": "Понимает async Server Components",
+      "expected": "Кандидат объясняет: в App Router Server Component может быть async, await fetch или db-запрос на верхнем уровне; getServerSideProps/getStaticProps не нужны; код выполняется на сервере, не попадает в клиентский бандл.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро App Router — прямой await в Server Component",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "server_component_async",
+            "oftenConfusedWith": [
+              "client_fetching"
+            ],
+            "anchorTermsExpected": [
+              "async",
+              "Server Component",
+              "await",
+              "сервер",
+              "без useEffect"
+            ],
+            "anchorTermsWrongTopic": [
+              "useEffect на сервере",
+              "getServerSideProps в App Router",
+              "Client Component async"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "async",
+              "Server Component",
+              "await"
+            ],
+            "ask": "чем App Router отличается от Pages Router в получении данных на странице"
+          }
+        ],
+        "mustConcepts": [
+          "async",
+          "Server Component",
+          "серверн",
+          "await",
+          "fetch",
+          "верхн",
+          "уровн",
+          "getServerSideProps",
+          "getStaticProps",
+          "не нужн",
+          "App Router",
+          "без useEffect",
+          "без useState",
+          "сервер",
+          "клиентск",
+          "бандл"
+        ],
+        "falseClaims": [
+          "в App Router всё ещё нужен getServerSideProps на каждой странице",
+          "Server Component может использовать useEffect для fetch",
+          "async Client Component — стандартный способ fetch в App Router",
+          "await fetch в Server Component выполняется в браузере"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "fetch_caching_modes",
+      "title": "Знает опции кеширования fetch",
+      "expected": "Кандидат перечисляет: кеш по умолчанию; cache: 'no-store' — свежие данные каждый запрос; next: { revalidate: N } — ISR stale-while-revalidate; tags + revalidateTag — on-demand; понимает риск кеша для персональных данных.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "главный механизм SSG/SSR/ISR в App Router",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "ssg_ssr_isr_mapping",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "fetch_caching_modes",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "no-store",
+              "revalidate",
+              "кеш",
+              "ISR",
+              "tags",
+              "revalidateTag"
+            ],
+            "anchorTermsWrongTopic": [
+              "revalidate и no-store одно и то же",
+              "кеш по умолчанию безопасен для профиля пользователя"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "revalidate",
+              "no-store",
+              "кеш"
+            ],
+            "ask": "разница между next.revalidate и cache: 'no-store'"
+          },
+          {
+            "match": [
+              "tags",
+              "revalidateTag"
+            ],
+            "ask": "когда tags + revalidateTag лучше time-based revalidate"
+          }
+        ],
+        "mustConcepts": [
+          "кеш",
+          "cache",
+          "по умолчанию",
+          "no-store",
+          "revalidate",
+          "ISR",
+          "stale-while-revalidate",
+          "SSR",
+          "свеж",
+          "кажд",
+          "запрос",
+          "tags",
+          "revalidateTag",
+          "on-demand",
+          "персональн",
+          "пользовател"
+        ],
+        "falseClaims": [
+          "cache: 'no-store' кеширует ответ на N секунд",
+          "revalidate и no-store дают одинаковое поведение",
+          "кеш по умолчанию безопасен для /api/user/{id}",
+          "revalidateTag работает только на клиенте",
+          "fetch в App Router не кешируется никогда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "ssg_ssr_isr_mapping",
+      "title": "Сопоставляет fetch с SSG/SSR/ISR",
+      "expected": "Кандидат объясняет миграцию с Pages Router: fetch без опций ≈ SSG; cache: 'no-store' ≈ getServerSideProps; next: { revalidate: N } ≈ ISR; стратегия на уровне каждого запроса, не всей страницы.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "маппинг из ITLead — bridge Pages → App Router",
+        "mustConcepts": [
+          "SSG",
+          "SSR",
+          "ISR",
+          "getStaticProps",
+          "getServerSideProps",
+          "revalidate",
+          "no-store",
+          "кажд",
+          "fetch",
+          "страниц",
+          "запрос",
+          "уровн",
+          "смешив",
+          "статик",
+          "динамик"
+        ],
+        "falseClaims": [
+          "в App Router нельзя смешать статику и динамику на одной странице",
+          "getServerSideProps — обязательный паттерн в App Router",
+          "ISR в App Router только через getStaticProps",
+          "одна страница — одна глобальная стратегия кеширования"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "parallel_fetching",
+      "title": "Избегает waterfall через Promise.all",
+      "expected": "Кандидат объясняет: последовательные await для независимых источников суммируют latency; Promise.all запускает параллельно; проверяет реальные зависимости между запросами.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "самая частая performance-ошибка в dashboard из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Promise.all",
+              "waterfall",
+              "последовательн"
+            ],
+            "ask": "почему три независимых await подряд дают 500ms вместо 300ms"
+          }
+        ],
+        "mustConcepts": [
+          "Promise.all",
+          "параллельн",
+          "последовательн",
+          "waterfall",
+          "независим",
+          "await",
+          "latency",
+          "задержк",
+          "dashboard",
+          "суммир",
+          "зависим",
+          "одновременн"
+        ],
+        "falseClaims": [
+          "Next.js автоматически параллелит все await в компоненте",
+          "waterfall не влияет на TTFB страницы",
+          "Promise.all нужен только на клиенте",
+          "последовательные await всегда быстрее параллельных"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "react_cache_preload",
+      "title": "Использует React.cache и preload",
+      "expected": "Кандидат объясняет: React.cache дедуплицирует async-функцию за один render (Prisma, не только fetch); preload через void getData() стартует запрос раньше; отличает от встроенной dedup fetch Next.js.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "preload + cache — продвинутый паттерн из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "React.cache",
+              "cache",
+              "дедупл"
+            ],
+            "ask": "чем React.cache отличается от встроенной дедупликации fetch в Next.js"
+          },
+          {
+            "match": [
+              "preload",
+              "void"
+            ],
+            "ask": "зачем вызывать preloadProblems() до await getProblems()"
+          }
+        ],
+        "mustConcepts": [
+          "React.cache",
+          "cache",
+          "дедупл",
+          "preload",
+          "void",
+          "in-flight",
+          "Prisma",
+          "async",
+          "функц",
+          "дерев",
+          "компонент",
+          "один render",
+          "fetch dedup",
+          "не только fetch"
+        ],
+        "falseClaims": [
+          "React.cache работает только с fetch",
+          "preload блокирует рендер до завершения запроса",
+          "Next.js dedup покрывает Prisma-запросы автоматически",
+          "React.cache кеширует между разными HTTP-запросами пользователей"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "streaming_suspense",
+      "title": "Стримит медленные данные через Suspense",
+      "expected": "Кандидат объясняет: async-подкомпонент в Suspense не блокирует остальную страницу; быстрый UI стримится сразу; fallback пока медленный fetch не завершился.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "streaming pattern из ITLead Reports example",
+        "mustConcepts": [
+          "Suspense",
+          "streaming",
+          "стрим",
+          "fallback",
+          "медленн",
+          "не блокир",
+          "async",
+          "компонент",
+          "boundary",
+          "отложен",
+          "быстр",
+          "UI"
+        ],
+        "falseClaims": [
+          "Suspense в Server Components работает только на клиенте",
+          "вся страница ждёт самый медленный fetch без Suspense",
+          "Suspense заменяет cache: 'no-store'",
+          "fallback рендерится только после hydration"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "client_fetching_and_pitfalls",
+      "title": "Знает клиентский fetch и типичные ошибки",
+      "expected": "Кандидат называет: Client Component + useEffect/SWR для поиска и фильтров; нельзя top-level await в 'use client'; не мутировать кешированный JSON; no-store для user data; structuredClone перед мутацией; error.tsx для ошибок fetch.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "client fetch + common mistakes из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "use client",
+              "useEffect",
+              "SWR"
+            ],
+            "ask": "когда клиентский fetch уместен вместо Server Component"
+          },
+          {
+            "match": [
+              "structuredClone",
+              "мутац",
+              "кеш"
+            ],
+            "ask": "почему data.push() после fetch опасен"
+          }
+        ],
+        "mustConcepts": [
+          "use client",
+          "Client Component",
+          "useEffect",
+          "SWR",
+          "TanStack Query",
+          "поиск",
+          "фильтр",
+          "интерактив",
+          "SyntaxError",
+          "не async",
+          "мутац",
+          "structuredClone",
+          "кеш",
+          "error.tsx",
+          "AbortController",
+          "props"
+        ],
+        "falseClaims": [
+          "Client Component может быть async с await fetch на верхнем уровне",
+          "можно безопасно мутировать результат fetch перед return",
+          "useEffect на сервере — нормальный способ fetch в App Router",
+          "SWR нужен для всех запросов включая статический блог"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "В App Router page — async Server Component: await fetch с next: { revalidate: 300 } для каталога, cache: 'no-store' для профиля. Три независимых источника — Promise.all. Медленный график в Suspense, поиск — отдельный Client Component с useEffect и AbortController.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Раньше getStaticProps на всю страницу, теперь каждый fetch сам решает: docs — дефолтный кеш, feed — no-store, prices — revalidate 60. getProblems обёрнут в React.cache, preload в начале page, await ниже — запрос уже летит. Персональные данные всегда no-store, иначе один юзер увидит чужой ответ из кеша.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Server Component async, Prisma findMany прямо в page — ORM не в бандле. Stripe analytics с revalidate 300 параллельно с db через Promise.all. CMS публикация — tags: ['content'] и revalidateTag в Server Action, не жду 5 минут stale.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В App Router всё ещё пишу getServerSideProps в page.tsx. Для user dashboard кеш по умолчанию — норм, Next.js сам разберётся. Client Component делаю async и await fetch сверху.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Три await подряд — getUser, getStats, getActivity — это ок, Next.js их параллелит автоматически. После fetch делаю data.push(item) прямо в компоненте, кеш один на всех.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "revalidate: 300 и cache: 'no-store' — одно и то же, оба всегда свежие данные. React.cache заменяет fetch dedup и кеширует между запросами разных пользователей.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "server_component_async",
+      "exampleType": "good",
+      "exampleText": "export default async function Page() { const data = await fetch(url).then(r => r.json()); return <ul>...</ul> } — без getServerSideProps, выполняется на сервере.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "server_component_async",
+      "exampleType": "good",
+      "exampleText": "ну в app router просто async page и await внутри — useEffect на сервере не нужен, getStaticProps убрали",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "server_component_async",
+      "exampleType": "bad",
+      "exampleText": "Server Component для данных — это useEffect + useState, как в Pages Router только без getServerSideProps.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "fetch_caching_modes",
+      "exampleType": "good",
+      "exampleText": "Документация — fetch без опций (SSG). Лента — cache: 'no-store'. Цены — next: { revalidate: 300 }. CMS — tags: ['problems'] + revalidateTag после publish.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "fetch_caching_modes",
+      "exampleType": "good",
+      "exampleText": "профиль юзера всегда no-store — иначе кешированный json уйдёт другому пользователю",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "fetch_caching_modes",
+      "exampleType": "bad",
+      "exampleText": "Для /api/user/42 достаточно fetch без опций — Next.js всё равно персонализирует ответ по cookie.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "ssg_ssr_isr_mapping",
+      "exampleType": "good",
+      "exampleText": "getStaticProps → дефолтный fetch; getServerSideProps → no-store; ISR revalidate → next: { revalidate: N }. На одной странице можно mix.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "ssg_ssr_isr_mapping",
+      "exampleType": "good",
+      "exampleText": "раньше режим на всю page, теперь каждый fetch сам выбирает ssg/ssr/isr",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "ssg_ssr_isr_mapping",
+      "exampleType": "bad",
+      "exampleText": "В App Router одна страница — только SSR или только SSG, смешать нельзя.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "parallel_fetching",
+      "exampleType": "good",
+      "exampleText": "const [user, stats, activity] = await Promise.all([getUser(), getStats(), getActivity()]) — 300ms вместо 500ms при независимых источниках.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "parallel_fetching",
+      "exampleType": "good",
+      "exampleText": "три await подряд на дашборде — классический waterfall, в проде даёт 3-4x slowdown",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "parallel_fetching",
+      "exampleType": "bad",
+      "exampleText": "Promise.all нужен только если запросы зависят друг от друга — для независимых лучше await по очереди.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "react_cache_preload",
+      "exampleType": "good",
+      "exampleText": "export const getProblems = cache(async () => fetch(...).then(r => r.json())); preloadProblems() = void getProblems() в начале page.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "react_cache_preload",
+      "exampleType": "good",
+      "exampleText": "React.cache для prisma — один запрос на render даже если getUser вызвали в header и sidebar",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "react_cache_preload",
+      "exampleType": "bad",
+      "exampleText": "React.cache — это замена next: { revalidate } для ISR между запросами разных пользователей.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "streaming_suspense",
+      "exampleType": "good",
+      "exampleText": "<QuickHeader /> рендерится сразу, <Suspense fallback={...}><SlowChart /></Suspense> стримится когда fetch готов.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "streaming_suspense",
+      "exampleType": "good",
+      "exampleText": "медленный analytics fetch не блокирует header — suspense boundary режет страницу",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "streaming_suspense",
+      "exampleType": "bad",
+      "exampleText": "Без Suspense Next.js всё равно отдаст HTML по частям — Suspense только для клиентского loading spinner.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "client_fetching_and_pitfalls",
+      "exampleType": "good",
+      "exampleText": "Поиск — 'use client', useEffect с AbortController при смене query. Начальный список — с сервера через props.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "client_fetching_and_pitfalls",
+      "exampleType": "good",
+      "exampleText": "после fetch клонирую structuredClone перед push — иначе мутирую shared cache",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "client_fetching_and_pitfalls",
+      "exampleType": "bad",
+      "exampleText": "'use client' + export default async function Search() { const data = await fetch(...) } — рабочий паттерн App Router.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nextjs-data-fetching-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/nextjs-data-fetching-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/nextjs-data-fetching-in-nextjs",
+    "difficulty": "MIDDLE",
+    "titleEn": "Data fetching in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

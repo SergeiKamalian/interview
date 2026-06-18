@@ -1,0 +1,669 @@
+{
+  "topic": {
+    "code": "usetransition_and_usedeferredvalue_in_react",
+    "name": "useTransition и useDeferredValue в React",
+    "skillCode": "react",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как работают хуки useTransition и useDeferredValue в React 18 и когда какой использовать?",
+    "shortAnswer": "useTransition и useDeferredValue — хуки React 18 для concurrent rendering: помечают обновления как несрочные, чтобы UI оставался отзывчивым. useTransition оборачивает сеттер состояния и возвращает [isPending, startTransition]. useDeferredValue откладывает re-render значения — удобно, когда значение приходит пропом от родителя.",
+    "idealAnswer": "React 18 ввёл concurrent rendering и два ключевых хука для несрочных обновлений: useTransition и useDeferredValue. useTransition помечает обновления состояния как низкоприоритетную работу, которую React может прервать; возвращает [isPending, startTransition]. В обработчике: setQuery(value) — срочно, коммитится до следующего paint; startTransition(() => setResults(heavyFilter(value))) — фоновая фильтрация, уступает вводу. isPending показывает индикатор загрузки только во время активного transition. useDeferredValue откладывает re-render значения до завершения срочных обновлений; возвращает отложенную копию. Нет встроенного isPending — устаревание детектируют сравнением query !== deferredQuery или opacity. Правило выбора: контролируешь сеттер — useTransition; получаешь значение пропом в дочернем компоненте — useDeferredValue. Типичные кейсы: поиск с тяжёлой client-side фильтрацией — useTransition на setResults; дочерний список по пропу query — useDeferredValue + useMemo на deferredQuery; переключение тяжёлых табов с disabled кнопками — useTransition с isPending. Внутри React 18 обновления идут по lanes: срочный ввод — SyncLane/DefaultLane, startTransition — TransitionLane с низким приоритетом. Scheduler вызывает shouldYield() после каждой единицы работы; при появлении срочного обновления низкоприоритетный render приостанавливается. useDeferredValue использует ту же систему lanes без сеттера: React рендерит с текущим и отложенным значением; отложенный render прерываем. Это fiber scheduler React, не requestIdleCallback. Типичные ошибки: оборачивать setQuery в startTransition — input лагает; использовать results.length === 0 вместо isPending для спиннера; думать, что useDeferredValue отменяет expensiveCompute — вычисление всё равно на каждом render, нужен useMemo на deferred; вложенные startTransition; игнор StrictMode double-invoke в dev. Standalone startTransition из react делает то же без isPending — для утилит вне компонента. useDeferredValue + Suspense: при suspended ресурсе показывается stale UI, не fallback — без flash спиннера на каждый символ. Реальные примеры: React DevTools фильтры, TanStack Query v5 refetch в transition, Next.js App Router deferred search, Vercel Commerce deferred query.",
+    "maxScore": 10,
+    "skills": [
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "concurrent_hooks_intro",
+      "title": "Понимает назначение хуков",
+      "expected": "Кандидат объясняет: React 18 concurrent rendering; хуки помечают обновления как несрочные, UI остаётся отзывчивым при тяжёлом рендере; оба требуют React 18 с concurrent rendering.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро — зачем нужны transition/deferred в React 18",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "concurrent_hooks_intro",
+            "oftenConfusedWith": [
+              "scheduler_lanes"
+            ],
+            "anchorTermsExpected": [
+              "concurrent",
+              "конкурент",
+              "несрочн",
+              "non-urgent",
+              "отзывчив",
+              "responsive",
+              "React 18"
+            ],
+            "anchorTermsWrongTopic": [
+              "debounce заменяет useTransition",
+              "Web Workers",
+              "requestIdleCallback это то же"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "concurrent",
+              "конкурент",
+              "несрочн"
+            ],
+            "ask": "зачем React 18 ввёл useTransition и useDeferredValue вместо обычного setState"
+          }
+        ],
+        "mustConcepts": [
+          "concurrent rendering",
+          "конкурентн",
+          "React 18",
+          "несрочн",
+          "non-urgent",
+          "low-priority",
+          "низкоприоритет",
+          "отзывчив",
+          "responsive",
+          "прерыва",
+          "interrupt",
+          "тяжёл",
+          "heavy render",
+          "createRoot",
+          "state update"
+        ],
+        "falseClaims": [
+          "useTransition заменяет debounce и throttle полностью",
+          "хуки работают в React 17 без createRoot",
+          "concurrent hooks делают рендер асинхронным в Web Worker",
+          "useDeferredValue ускоряет вычисления на CPU"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "use_transition_api",
+      "title": "Знает API useTransition",
+      "expected": "Кандидат описывает: [isPending, startTransition] = useTransition(); startTransition(() => setState(...)) помечает update несрочным; isPending true пока transition активен; срочный setQuery вне transition.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "основной API — startTransition + isPending",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "concurrent_hooks_intro",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "use_transition_api",
+            "oftenConfusedWith": [
+              "use_deferred_value_api",
+              "suspense_standalone"
+            ],
+            "anchorTermsExpected": [
+              "isPending",
+              "startTransition",
+              "useTransition",
+              "сеттер",
+              "setter"
+            ],
+            "anchorTermsWrongTopic": [
+              "useDeferredValue возвращает isPending",
+              "startTransition только из react без хука всегда лучше"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "isPending",
+              "startTransition",
+              "useTransition"
+            ],
+            "ask": "что возвращает useTransition и как правильно обернуть тяжёлый setState в поиске"
+          }
+        ],
+        "mustConcepts": [
+          "useTransition",
+          "isPending",
+          "startTransition",
+          "сеттер",
+          "setter",
+          "state update",
+          "обновлен",
+          "обёрт",
+          "wrap",
+          "loading",
+          "индикатор",
+          "spinner",
+          "Searching",
+          "Filtering",
+          "event handler",
+          "обработчик"
+        ],
+        "falseClaims": [
+          "useTransition возвращает только startTransition без isPending",
+          "isPending true когда results пустой массив",
+          "startTransition делает setState синхронным",
+          "useTransition можно вызывать вне компонента как хук"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "use_deferred_value_api",
+      "title": "Знает API useDeferredValue",
+      "expected": "Кандидат описывает: deferred = useDeferredValue(value); откладывает re-render значения; нет isPending — stale через query !== deferredQuery или opacity; часто с useMemo на deferred.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "второй ключевой API — defer value без сеттера",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "concurrent_hooks_intro",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "use_deferred_value_api",
+            "oftenConfusedWith": [
+              "use_transition_api"
+            ],
+            "anchorTermsExpected": [
+              "useDeferredValue",
+              "deferred",
+              "отложен",
+              "stale",
+              "устарев",
+              "проп",
+              "prop"
+            ],
+            "anchorTermsWrongTopic": [
+              "useDeferredValue имеет isPending",
+              "useDeferredValue оборачивает setState"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useDeferredValue",
+              "deferred",
+              "отложен"
+            ],
+            "ask": "как useDeferredValue откладывает re-render и как показать что UI устарел без isPending"
+          }
+        ],
+        "mustConcepts": [
+          "useDeferredValue",
+          "deferred",
+          "отложен",
+          "значен",
+          "value",
+          "re-render",
+          "рендер",
+          "stale",
+          "устарев",
+          "opacity",
+          "прозрачн",
+          "query !== deferred",
+          "useMemo",
+          "проп",
+          "prop",
+          "дочерн",
+          "child"
+        ],
+        "falseClaims": [
+          "useDeferredValue возвращает isPending",
+          "useDeferredValue отменяет expensiveCompute на каждом render",
+          "useDeferredValue требует доступ к сеттеру состояния",
+          "deferred значение всегда равно текущему сразу"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "transition_vs_deferred_choice",
+      "title": "Выбирает правильный хук",
+      "expected": "Кандидат сравнивает: useTransition — контролируешь сеттер, isPending, event handler; useDeferredValue — только значение/проп, дочерний компонент; таблица when to use из ITLead.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевое различие senior — setter vs prop",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "use_transition_api",
+            "floorFraction": 0.4
+          },
+          {
+            "checkpointKey": "use_deferred_value_api",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "transition_vs_deferred_choice",
+            "oftenConfusedWith": [
+              "use_transition_api",
+              "use_deferred_value_api"
+            ],
+            "anchorTermsExpected": [
+              "контролир",
+              "сеттер",
+              "проп",
+              "родител",
+              "дочерн",
+              "isPending"
+            ],
+            "anchorTermsWrongTopic": [
+              "всегда useDeferredValue проще",
+              "useTransition для пропов от родителя"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "сеттер",
+              "проп",
+              "родител"
+            ],
+            "ask": "дочерний ProductResults получает query пропом — useTransition или useDeferredValue и почему"
+          },
+          {
+            "match": [
+              "таб",
+              "tab",
+              "disabled",
+              "isPending"
+            ],
+            "ask": "переключение тяжёлых табов с disabled кнопками — какой хук и зачем isPending"
+          }
+        ],
+        "mustConcepts": [
+          "контролир",
+          "сеттер",
+          "setter",
+          "проп",
+          "prop",
+          "родител",
+          "parent",
+          "дочерн",
+          "child",
+          "isPending",
+          "спиннер",
+          "spinner",
+          "поиск",
+          "search",
+          "фильтр",
+          "filter",
+          "таб",
+          "tab",
+          "disabled",
+          "правило",
+          "rule"
+        ],
+        "falseClaims": [
+          "useDeferredValue лучше когда нужен спиннер",
+          "useTransition работает когда нет доступа к setState",
+          "оба хука взаимозаменяемы без разницы",
+          "useDeferredValue только для строк query"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: setQuery внутри startTransition; isPending vs пустой results; expensiveCompute не отменяется useDeferredValue; вложенные startTransition; StrictMode flicker в dev.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — частые code review failures",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "use_transition_api",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "setQuery",
+              "input",
+              "ввод",
+              "startTransition"
+            ],
+            "ask": "почему нельзя оборачивать setQuery в startTransition в поле поиска"
+          },
+          {
+            "match": [
+              "expensiveCompute",
+              "useMemo",
+              "useDeferredValue"
+            ],
+            "ask": "useDeferredValue(expensiveCompute(query)) — отменяет ли вычисление на каждом render"
+          },
+          {
+            "match": [
+              "isPending",
+              "results.length",
+              "пуст"
+            ],
+            "ask": "чем isPending отличается от проверки results.length === 0 для спиннера"
+          }
+        ],
+        "mustConcepts": [
+          "setQuery",
+          "input",
+          "ввод",
+          "внутри transition",
+          "снаружи",
+          "isPending",
+          "results.length",
+          "пуст",
+          "expensiveCompute",
+          "useMemo",
+          "не отменя",
+          "каждый render",
+          "вложен",
+          "nested",
+          "StrictMode",
+          "double-invoke",
+          "dev",
+          "production"
+        ],
+        "falseClaims": [
+          "setQuery в startTransition ускоряет ввод",
+          "useDeferredValue пропускает expensiveCompute до commit",
+          "isPending false когда results пустой — значит не ищем",
+          "вложенные startTransition повышают приоритет",
+          "StrictMode flicker isPending — баг в production"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "scheduler_lanes",
+      "title": "Понимает lanes и scheduler",
+      "expected": "Кандидат упоминает TransitionLane, SyncLane/DefaultLane для срочного ввода, shouldYield, fiber scheduler; не requestIdleCallback.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "внутренности React 18 — бонус senior из ITLead theory",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "lane",
+              "TransitionLane",
+              "shouldYield"
+            ],
+            "ask": "какие lane priorities использует scheduler для ввода и startTransition"
+          }
+        ],
+        "mustConcepts": [
+          "lane",
+          "lanes",
+          "TransitionLane",
+          "SyncLane",
+          "DefaultLane",
+          "IdleLane",
+          "shouldYield",
+          "scheduler",
+          "планировщик",
+          "fiber",
+          "приоритет",
+          "priority",
+          "прерыва",
+          "yield",
+          "reconciler"
+        ],
+        "falseClaims": [
+          "startTransition использует requestIdleCallback браузера",
+          "TransitionLane выше приоритета чем SyncLane",
+          "scheduler React 18 не прерывает low-priority render",
+          "useDeferredValue обходит lane system"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "suspense_standalone",
+      "title": "Знает Suspense и standalone startTransition",
+      "expected": "Кандидат упоминает: standalone startTransition без isPending для утилит; useDeferredValue + Suspense показывает stale UI вместо fallback; isPending долго true при цепочке transitions или ошибке.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "follow-up questions из ITLead — бонус",
+        "mustConcepts": [
+          "standalone",
+          "startTransition",
+          "import",
+          "react",
+          "без isPending",
+          "Suspense",
+          "stale UI",
+          "fallback",
+          "flash",
+          "спиннер",
+          "suspended",
+          "призупинен"
+        ],
+        "falseClaims": [
+          "useDeferredValue с Suspense всегда показывает fallback на каждый символ",
+          "standalone startTransition возвращает isPending",
+          "ошибка в transition callback не влияет на isPending"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "useTransition: setQuery срочно, startTransition(() => setResults(filter)) — input не лагает, isPending пока фильтр 10k элементов. useDeferredValue в дочернем: deferredQuery + useMemo, opacity когда query !== deferredQuery. Контролирую сеттер — transition; только проп — deferred.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В поиске по каталогу: input onChange setQuery сразу, тяжёлый filter в startTransition, isPending для «Фильтруем...». ProductResults получает query пропом — там useDeferredValue и useMemo на deferredQuery, без доступа к setQuery transition не вариант.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "React 18 lanes: ввод SyncLane, transition TransitionLane, scheduler shouldYield прерывает низкий приоритет. useDeferredValue не отменяет compute — expensiveCompute в useMemo по deferred. Standalone startTransition в утилите без isPending.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "useDeferredValue возвращает isPending и оборачивает setState. useTransition для дочернего компонента который только query проп получает. Оба хука делают debounce input.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "startTransition(() => setQuery(e.target.value)) — так input быстрее. Спиннер когда results.length === 0. useDeferredValue(heavyCalc(q)) не считает heavyCalc пока не commit.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Transition hooks работают в React 17. Scheduler через requestIdleCallback. Вложенные startTransition повышают приоритет таба.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "concurrent_hooks_intro",
+      "exampleType": "good",
+      "exampleText": "Concurrent rendering React 18 — несрочные обновления не блокируют ввод; useTransition и useDeferredValue помечают low-priority work.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "concurrent_hooks_intro",
+      "exampleType": "good",
+      "exampleText": "ну это чтобы при фильтрации 10к строк поле не тормозило — react прерывает тяжёлый рендер ради клавиатуры",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "concurrent_hooks_intro",
+      "exampleType": "bad",
+      "exampleText": "useTransition — это debounce из lodash, React 17 тоже поддерживает.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "use_transition_api",
+      "exampleType": "good",
+      "exampleText": "const [isPending, startTransition] = useTransition(); setQuery(v); startTransition(() => setResults(search(v))); {isPending && <p>Searching...</p>}",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "use_transition_api",
+      "exampleType": "good",
+      "exampleText": "isPending true пока transition render идёт — disabled на кнопках табов пока isPending",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "use_transition_api",
+      "exampleType": "bad",
+      "exampleText": "isPending проверяю через results.length === 0 — спиннер когда ничего не нашли.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "use_deferred_value_api",
+      "exampleType": "good",
+      "exampleText": "const deferredQuery = useDeferredValue(query); const isStale = query !== deferredQuery; useMemo filter по deferredQuery — re-render откладывается.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "use_deferred_value_api",
+      "exampleType": "good",
+      "exampleText": "в ProductResults только проп query — deferred + opacity 0.6 пока stale, без isPending",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "use_deferred_value_api",
+      "exampleType": "bad",
+      "exampleText": "useDeferredValue возвращает [isPending, deferred] как useTransition.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "transition_vs_deferred_choice",
+      "exampleType": "good",
+      "exampleText": "Свой setTab — useTransition + isPending disabled. Дочерний список по query пропу — useDeferredValue. Нужен спиннер — transition; только значение — deferred.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "transition_vs_deferred_choice",
+      "exampleType": "good",
+      "exampleText": "правило: контролируешь сеттер — transition; получаешь проп — deferred. AdminDashboard: setTab в transition, filter по deferredQuery.",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "transition_vs_deferred_choice",
+      "exampleType": "bad",
+      "exampleText": "Всегда useDeferredValue проще — transition никогда не нужен если есть проп.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Ошибка: startTransition(() => setQuery(v)) — input лагает. Правильно: setQuery снаружи, setResults внутри.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "useDeferredValue(expensiveCompute(q)) — compute всё равно каждый render; useMemo([deferredQuery]). StrictMode в dev мигает isPending — ок.",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "не вкладываю startTransition в startTransition — один outer transition",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "setQuery в transition — так React приоритизирует ввод. useDeferredValue отменяет тяжёлый filter пока печатаешь.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "scheduler_lanes",
+      "exampleType": "good",
+      "exampleText": "Ввод SyncLane/DefaultLane, startTransition TransitionLane ниже; shouldYield после fiber unit — срочное прерывает transition render.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "scheduler_lanes",
+      "exampleType": "good",
+      "exampleText": "это fiber scheduler react, не requestIdleCallback браузера",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "scheduler_lanes",
+      "exampleType": "bad",
+      "exampleText": "useTransition под капотом requestIdleCallback, TransitionLane самый высокий приоритет.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "suspense_standalone",
+      "exampleType": "good",
+      "exampleText": "import { startTransition } from 'react' в утилите — без isPending. Deferred + Suspense: stale list вместо fallback на каждый keystroke.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "suspense_standalone",
+      "exampleType": "good",
+      "exampleText": "isPending долго true если новый transition до завершения старого или ошибка в callback",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "suspense_standalone",
+      "exampleType": "bad",
+      "exampleText": "С Suspense deferred render всегда показывает fallback спиннер при каждом символе.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "usetransition-and-usedeferredvalue-in-react",
+    "apiUrl": "https://api.itlead.org/api/questions/usetransition-and-usedeferredvalue-in-react",
+    "pageUrl": "https://itlead.org/interview-questions/react/usetransition-and-usedeferredvalue-in-react",
+    "difficulty": "SENIOR",
+    "titleEn": "useTransition and useDeferredValue in React",
+    "categorySlug": "react",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

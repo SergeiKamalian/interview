@@ -1,0 +1,609 @@
+{
+  "topic": {
+    "code": "nuxt_plugins",
+    "name": "Плагины Nuxt",
+    "skillCode": "nuxt",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое plugins в Nuxt и как их правильно использовать?",
+    "shortAnswer": "Nuxt plugins — файлы в директории `plugins/`, которые выполняются один раз при старте приложения и регистрируют Vue-плагины или инжектируют глобальные хелперы. Для Vue-интеграций используй `vueApp.use()`, для доступа из компонентов — `return { provide: { ... } }` и `useNuxtApp()`. Суффиксы `.client.ts` и `.server.ts` ограничивают среду выполнения.",
+    "idealAnswer": "Nuxt plugins — файлы в `plugins/`, которые выполняются один раз при инициализации приложения до монтирования компонентов. Они регистрируют Vue-плагины через `nuxtApp.vueApp.use()`, инжектируют глобальные утилиты через `return { provide: { api } }` или настраивают сервисы (auth, analytics, API-клиенты), чтобы каждая страница имела доступ без повторных импортов. Плагины выполняются на фазе старта Nuxt, до гидратации; composables запускаются по требованию в `setup` компонента; middleware — на каждый роут. Когда что использовать: Vue-интеграция (toast, pinia, i18n) → plugin с `vueApp.use()`; глобальный API-клиент → plugin с `provide`; переиспользуемая логика без Vue-интеграции → composable; логика конкретного роута → middleware; браузерный код (analytics, localStorage) → `*.client.ts`; серверный код (БД) → `*.server.ts`. Nuxt сканирует `plugins/` на этапе сборки и выполняет файлы последовательно в алфавитном порядке; числовые префиксы (`01.auth.ts`, `02.api.ts`) задают порядок при зависимостях. Объект `provide` мержится в контекст `useNuxtApp()` через `app.provide()` — отсюда `$toast`, `$api` без явного импорта. Клиентские плагины запускаются после гидратации; серверные — на каждый запрос в Nitro. Nuxt 3.10+ поддерживает `parallel: true` в `defineNuxtPlugin` для независимых плагинов — ускоряет старт. Плагины могут быть async — Nuxt ждёт их перед рендерингом, поэтому держать их быстрыми. Типичные ошибки: browser-only код без `.client.ts` (двойной tracking, crash на `window`); неправильный порядок auth/api без numeric prefix; забытый `return { provide }`; fetch/`useAsyncData`/`useFetch` внутри plugin setup вне lifecycle компонента. Для SSR hydration: `.client.ts` для browser API; общий state между server/client — `useState()` внутри плагина, не plain variable. Примеры: vue-toastification, Pinia, Supabase client, Day.js, Sentry.",
+    "maxScore": 10,
+    "skills": [
+      "nuxt",
+      "vue",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "plugins_definition",
+      "title": "Понимает что такое Nuxt plugins",
+      "expected": "Кандидат объясняет: файлы в `plugins/`, выполняются один раз при старте до монтирования компонентов; регистрируют Vue-плагины или глобальные хелперы через `defineNuxtPlugin`.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — определение и роль plugins при инициализации",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "plugins_definition",
+            "oftenConfusedWith": [
+              "plugins_vs_composables_middleware",
+              "provide_and_vueapp_use"
+            ],
+            "anchorTermsExpected": [
+              "plugins/",
+              "defineNuxtPlugin",
+              "один раз",
+              "старт",
+              "инициализац",
+              "до монтирован"
+            ],
+            "anchorTermsWrongTopic": [
+              "plugins на каждый роут",
+              "plugins это middleware",
+              "plugins это composable"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "defineNuxtPlugin",
+              "plugins/",
+              "один раз",
+              "старт"
+            ],
+            "ask": "когда и сколько раз выполняется Nuxt plugin по сравнению с composable"
+          }
+        ],
+        "mustConcepts": [
+          "plugins/",
+          "defineNuxtPlugin",
+          "nuxtApp",
+          "один раз",
+          "старт",
+          "инициализац",
+          "до монтирован",
+          "до компонент",
+          "Vue-плагин",
+          "глобальн",
+          "хелпер",
+          "регистрац",
+          "startup",
+          "автоматическ",
+          "сканирует"
+        ],
+        "falseClaims": [
+          "plugins выполняются на каждый роут как middleware",
+          "plugins — это composables в папке plugins",
+          "plugins запускаются после монтирования каждого компонента",
+          "plugins нужно вручную импортировать в nuxt.config для каждой страницы",
+          "defineNuxtPlugin доступен только на клиенте"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "plugins_vs_composables_middleware",
+      "title": "Отличает plugins от composables и middleware",
+      "expected": "Кандидат сравнивает: plugins — один раз при старте; composables — по требованию в setup компонента; middleware — на каждый роут; знает когда что выбирать.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевое отличие из TL;DR ITLead — частый вопрос на middle",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "plugins_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "composable",
+              "middleware",
+              "роут",
+              "setup"
+            ],
+            "ask": "почему логику конкретного роута лучше в middleware, а не в plugin"
+          },
+          {
+            "match": [
+              "pinia",
+              "toast",
+              "i18n",
+              "vueApp.use"
+            ],
+            "ask": "когда нужен plugin вместо composable для глобальной Vue-интеграции"
+          }
+        ],
+        "mustConcepts": [
+          "composable",
+          "middleware",
+          "роут",
+          "setup",
+          "один раз",
+          "по требованию",
+          "на каждый роут",
+          "Vue-интеграц",
+          "vueApp.use",
+          "глобальн API",
+          "provide",
+          "логика компонента",
+          "route-specific",
+          "stateless",
+          "переиспольз"
+        ],
+        "falseClaims": [
+          "composables и plugins выполняются одинаково при старте",
+          "middleware подходит для глобальной регистрации toast",
+          "plugin — правильное место для проверки auth на конкретном роуте",
+          "composable можно вызывать при startup как plugin без ошибок контекста",
+          "plugins и middleware выполняются в одной фазе lifecycle"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "provide_and_vueapp_use",
+      "title": "Знает provide и vueApp.use()",
+      "expected": "Кандидат объясняет: `vueApp.use()` регистрирует Vue-плагин; `return { provide: { ... } }` инжектирует значение в контекст Nuxt; доступ через `useNuxtApp()` как `$api`, `$toast`.",
+      "score": 2.0,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "два основных API plugin — практический must-know для middle",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "provide",
+              "useNuxtApp",
+              "$api",
+              "$toast"
+            ],
+            "ask": "как expose API-клиент из plugin и прочитать его в компоненте"
+          },
+          {
+            "match": [
+              "vueApp.use",
+              "Toast",
+              "pinia",
+              "i18n"
+            ],
+            "ask": "чем vueApp.use() отличается от provide в одном plugin"
+          }
+        ],
+        "mustConcepts": [
+          "vueApp.use",
+          "provide",
+          "return { provide",
+          "useNuxtApp",
+          "$api",
+          "$toast",
+          "$supabase",
+          "инжект",
+          "контекст",
+          "app.provide",
+          "Vue-плагин",
+          "директив",
+          "компонент",
+          "глобальн install",
+          "merge",
+          "без импорта"
+        ],
+        "falseClaims": [
+          "provide и vueApp.use() делают одно и то же",
+          "useNuxtApp() требует явного import plugin в каждом компоненте",
+          "vueApp.use() инжектирует значения в useNuxtApp() автоматически",
+          "можно использовать provide без return в defineNuxtPlugin",
+          "provide доступен только на сервере"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "client_server_suffixes",
+      "title": "Понимает .client.ts и .server.ts",
+      "expected": "Кандидат объясняет: `.client.ts` — только браузер (analytics, window); `.server.ts` — только SSR/Nitro; без суффикса — оба окружения; client plugins после гидратации.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "SSR/client split — частая production-ошибка",
+        "probeConceptGroups": [
+          {
+            "match": [
+              ".client.ts",
+              "window",
+              "analytics",
+              "localStorage"
+            ],
+            "ask": "почему analytics plugin без .client.ts ломается на SSR"
+          },
+          {
+            "match": [
+              ".server.ts",
+              "Nitro",
+              "база данных",
+              "SSR"
+            ],
+            "ask": "когда нужен .server.ts вместо универсального plugin"
+          }
+        ],
+        "mustConcepts": [
+          ".client.ts",
+          ".server.ts",
+          "браузер",
+          "SSR",
+          "Nitro",
+          "window",
+          "localStorage",
+          "analytics",
+          "после гидратац",
+          "на каждый запрос",
+          "server-only",
+          "browser-only",
+          "двойной tracking",
+          "crash",
+          "useState"
+        ],
+        "falseClaims": [
+          ".client.ts выполняется и на сервере при SSR",
+          "window доступен в универсальном plugin без .client.ts",
+          "server plugins выполняются один раз при build",
+          ".server.ts plugins доступны только через import, не через useNuxtApp",
+          "суффикс .client.ts не нужен если код внутри if (process.client)"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "plugin_loading_order",
+      "title": "Знает порядок загрузки plugins",
+      "expected": "Кандидат объясняет: алфавитный порядок имён файлов; числовые префиксы `01.auth.ts` / `02.api.ts` для зависимостей; Nuxt регистрирует plugins автоматически при сборке.",
+      "score": 1.0,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый механизм порядка из ITLead follow-up",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "алфавит",
+              "01.auth",
+              "02.api",
+              "порядок"
+            ],
+            "ask": "как гарантировать что auth plugin выполнится до api plugin"
+          }
+        ],
+        "mustConcepts": [
+          "алфавит",
+          "alphabetical",
+          "порядок",
+          "01.auth",
+          "02.api",
+          "numeric prefix",
+          "числовой префикс",
+          "зависимост",
+          "auth",
+          "api",
+          "последовательно",
+          "build time",
+          "автоматическ",
+          "сканирует plugins/"
+        ],
+        "falseClaims": [
+          "порядок plugins задаётся только в nuxt.config plugins array",
+          "Nuxt выполняет plugins в порядке создания файлов по дате",
+          "api.ts всегда выполнится после auth.ts без переименования",
+          "порядок plugins случайный при каждом запуске",
+          "parallel: true меняет алфавитный порядок на произвольный без контроля"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с plugins",
+      "expected": "Кандидат называет: browser code без `.client.ts`; неправильный порядок auth/api; забытый `return { provide }`; fetch/useAsyncData/useFetch в plugin setup; plain variable вместо useState для SSR state.",
+      "score": 2.0,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — silent bugs в production",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "client_server_suffixes",
+            "floorFraction": 0.4
+          },
+          {
+            "checkpointKey": "provide_and_vueapp_use",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "provide",
+              "return",
+              "не exposed",
+              "не передаёт"
+            ],
+            "ask": "почему api объект в plugin не виден через useNuxtApp без return provide"
+          },
+          {
+            "match": [
+              "useAsyncData",
+              "useFetch",
+              "fetch",
+              "lifecycle"
+            ],
+            "ask": "почему data fetching в plugin setup — антипаттерн"
+          },
+          {
+            "match": [
+              "useState",
+              "hydration",
+              "plain variable"
+            ],
+            "ask": "как избежать hydration mismatch для shared state в plugin"
+          }
+        ],
+        "mustConcepts": [
+          "return { provide",
+          "забыт provide",
+          "useAsyncData",
+          "useFetch",
+          "fetch в plugin",
+          "lifecycle компонент",
+          "composable для данных",
+          "01.auth",
+          "02.api",
+          "неправильный порядок",
+          "analytics без client",
+          "double tracking",
+          "useState",
+          "hydration mismatch",
+          "plain variable",
+          "silent bug"
+        ],
+        "falseClaims": [
+          "useFetch работает в plugin setup так же как в компоненте",
+          "api объект автоматически попадает в useNuxtApp без return",
+          "auth и api могут быть в любом порядке — Nuxt сам разберётся",
+          "analytics.ts без суффикса безопасен если не трогать document",
+          "plain let state в plugin синхронизируется между server и client"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "parallel_async_plugins",
+      "title": "Знает async и parallel plugins",
+      "expected": "Кандидат упоминает: async callback в defineNuxtPlugin — Nuxt ждёт перед render; `parallel: true` (Nuxt 3.10+) для независимых plugins ускоряет старт.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "бонус middle — parallel и async из follow-up ITLead",
+        "mustConcepts": [
+          "async",
+          "await",
+          "parallel: true",
+          "Nuxt 3.10",
+          "независим",
+          "зависимост",
+          "старт",
+          "render",
+          "быстр",
+          "много plugins"
+        ],
+        "falseClaims": [
+          "async plugins не блокируют рендер",
+          "parallel: true выполняет plugins в обратном алфавитном порядке",
+          "parallel: true можно использовать для auth и api с зависимостью",
+          "все plugins всегда параллельны по умолчанию",
+          "async plugin выполняется на каждый компонент"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Nuxt plugins — файлы в plugins/, один раз при старте до монтирования. Toast регистрирую через vueApp.use в toast.client.ts, Supabase клиент — return { provide: { supabase } }, в компоненте const { $supabase } = useNuxtApp(). Composables — для логики на компонент, middleware — на роут.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для e-commerce: 01.auth.ts ставит токен в provide, 02.api.ts читает его и создаёт $fetch-клиент. Analytics только .client.ts — иначе двойной hit и crash на window. Pinia через plugin с vueApp.use один раз на весь SaaS dashboard.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "defineNuxtPlugin(async (nuxtApp) => { ... }) — Nuxt ждёт перед render, держу быстрым. Независимые Sentry и Day.js — parallel: true с 3.10, старт быстрее. Data fetching — в composable, не в plugin setup.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Plugins — это composables в папке plugins, выполняются в setup каждого компонента. Порядок задаётся порядком import на странице.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Analytics в plugins/analytics.ts без суффикса — window там норм, Nuxt сам не запустит на сервере. API объект в plugin автоматически в useNuxtApp без return provide.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "useFetch в defineNuxtPlugin для загрузки user — правильный паттерн, composable для этого не нужен. Auth plugin может идти после api.ts, Nuxt разрулит зависимости.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "plugins_definition",
+      "exampleType": "good",
+      "exampleText": "plugins/ + defineNuxtPlugin — один раз при инициализации, регистрирует toast или api до первого компонента.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "plugins_definition",
+      "exampleType": "good",
+      "exampleText": "ну плагин как наземная команда аэропорта — auth и api настроили до вылета, все страницы уже с сервисами",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "plugins_definition",
+      "exampleType": "bad",
+      "exampleText": "Nuxt plugin запускается на каждый переход между страницами как navigation guard.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "plugins_vs_composables_middleware",
+      "exampleType": "good",
+      "exampleText": "Toast/pinia — plugin один раз; useCart() — composable на компонент; проверка роли на /admin — middleware на роут.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "plugins_vs_composables_middleware",
+      "exampleType": "good",
+      "exampleText": "глобальный supabase client — plugin provide; форматирование даты в одной карточке — composable, не plugin",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "plugins_vs_composables_middleware",
+      "exampleType": "bad",
+      "exampleText": "Middleware лучше для vueApp.use(Toast), plugin — для redirect только на одной странице.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "provide_and_vueapp_use",
+      "exampleType": "good",
+      "exampleText": "vueApp.use(Toast) регистрирует Vue plugin; return { provide: { api } } даёт $api в useNuxtApp() — часто оба в одном файле.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "provide_and_vueapp_use",
+      "exampleType": "good",
+      "exampleText": "supabase plugin: createClient + provide supabase, в Login.vue $supabase.auth.signInWithout import файла plugin",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "provide_and_vueapp_use",
+      "exampleType": "bad",
+      "exampleText": "provide и vueApp.use — синонимы, оба только для директив Vue.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "client_server_suffixes",
+      "exampleType": "good",
+      "exampleText": "analytics.client.ts — window.analytics без SSR crash; db.server.ts — подключение к Postgres только в Nitro на запрос.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "client_server_suffixes",
+      "exampleType": "good",
+      "exampleText": "client plugin после гидратации; shared state — useState в plugin, не let x = null",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "client_server_suffixes",
+      "exampleType": "bad",
+      "exampleText": "plugins/analytics.ts с window.init() без .client.ts — Nuxt пропустит выполнение на сервере автоматически.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "plugin_loading_order",
+      "exampleType": "good",
+      "exampleText": "Nuxt сортирует plugins/ по алфавиту; 01.auth.ts до 02.api.ts — токен уже в provide когда api читает его.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "plugin_loading_order",
+      "exampleType": "good",
+      "exampleText": "алфавитный порядок, числа в начале имени файла — самый частый fix для auth/api багов в prod",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "plugin_loading_order",
+      "exampleType": "bad",
+      "exampleText": "api.ts всегда выполнится после auth.ts потому что auth короче по длине имени.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Wrong: api без return provide. Fix: return { provide: { api } }. Wrong: useFetch в plugin. Fix: composable с правильным request context.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "типичный prod баг: api.ts раньше auth.ts, токена нет — переименовал в 01/02 префиксы",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "const api = { getUser } в plugin достаточно — useNuxtApp сам найдёт локальную переменную api.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "parallel_async_plugins",
+      "exampleType": "good",
+      "exampleText": "async plugin — Nuxt await перед render; parallel: true для Sentry и dayjs без зависимостей — быстрее cold start.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "parallel_async_plugins",
+      "exampleType": "good",
+      "exampleText": "3.10 parallel только если plugins не ждут друг друга, auth+api — последовательно",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "parallel_async_plugins",
+      "exampleType": "bad",
+      "exampleText": "parallel: true на auth и api plugin — порядок токена не важен, Nuxt синхронизирует сам.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nuxt-plugins",
+    "apiUrl": "https://api.itlead.org/api/questions/nuxt-plugins",
+    "pageUrl": "https://itlead.org/interview-questions/nuxt/nuxt-plugins",
+    "difficulty": "MIDDLE",
+    "titleEn": "What are plugins in Nuxt?",
+    "categorySlug": "nuxt",
+    "syncedAt": "2026-06-18T15:00:00.000Z"
+  }
+}

@@ -1,0 +1,592 @@
+{
+  "topic": {
+    "code": "utility_type_pick_typescript",
+    "name": "Утилитный тип Pick в TypeScript",
+    "skillCode": "typescript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое утилитный тип Pick в TypeScript и как его использовать?",
+    "shortAnswer": "Утилитный тип `Pick<T, K>` выбирает из типа T только указанные ключи K и строит новый тип с этими полями и их исходными типами. Работает только на этапе компиляции — реальный JavaScript-объект не изменяется, для фильтрации в runtime нужна ручная проекция.",
+    "idealAnswer": "`Pick<T, K>` строит новый тип, выбирая из T только перечисленные ключи K и сохраняя их исходные типы; остальные поля отбрасываются. Аналогия: заказ из меню — получаешь ровно выбранные блюда с полными «рецептами», без лишнего. `Pick<User, 'id' | 'name'>` даёт `{ id: number; name: string }` — `email` и прочие ключи исчезают из типа. Ключи K должны существовать в T, иначе ошибка компиляции; широкий `string` как K не подходит — нужны строковые литералы или подмножество `keyof T`. Pick создаёт поверхностный подтип: копирует точные типы верхнего уровня без рекурсии во вложенные объекты. `Pick<T, 'address'>` сохраняет весь вложенный `address`; чтобы взять только `age` из `details`, нужен `Pick<User['details'], 'age'>`. Внутри Pick — mapped type: `type Pick<T, K extends keyof T> = { [P in K]: T[P] }`. Компилятор итерирует K, подставляет типы через indexed access; в JS ничего не остаётся — нулевая стоимость в runtime, emit идентичен аннотации `User` или `Pick<User, 'id'>`. Когда использовать: подмножество ответа API (убрать `passwordHash` из публичного профиля); пропсы React-компонента из 2–4 полей доменного типа; DTO частичного обновления; payload событий. Для 1–5 связанных ключей — Pick; если нужно исключить много полей — `Omit`; для трансформации типов — mapped type. Типичные ошибки: ожидание runtime-фильтрации — `const picked: Pick<User, 'id' | 'name'> = fullUser` компилируется, но лишние поля остаются в объекте; нужна ручная проекция `{ id: fullUser.id, name: fullUser.name }`. Опциональные свойства после Pick остаются опциональными — `Required<Pick<User, 'name'>>` если нужно обязательное. `Pick<User, keyof User>` эквивалентен `User`; `Pick<T, never>` — `{}`. На union `Pick<User | Admin, 'id' | 'name'>` распределяется по членам union. Реальные кейсы: React `Pick<User, 'id' | 'name'>` для карточки списка; NestJS DTO `Pick<User, 'name' | 'email'>`; Redux `Pick<Action, 'type' | 'payload'>`; tRPC inputs как `Pick<Entity, PublicKeys>`. Главная ловушка в командах: аннотируют return через Pick, но не проецируют объект — чувствительные поля уходят клиенту при корректном TypeScript-типе.",
+    "maxScore": 10,
+    "skills": [
+      "typescript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "pick_definition",
+      "title": "Понимает суть Pick",
+      "expected": "Кандидат объясняет: `Pick<T, K>` выбирает указанные ключи из T, сохраняет их типы, остальные поля исключаются из типа; ключи должны существовать в T.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "TL;DR ITLead — ядро middle-темы",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Pick",
+              "ключ",
+              "key",
+              "T",
+              "K"
+            ],
+            "ask": "что получится из `Pick<User, 'id' | 'name'>` если в User есть id, name, email, age"
+          }
+        ],
+        "mustConcepts": [
+          "Pick",
+          "утилитн",
+          "utility type",
+          "ключ",
+          "key",
+          "выбор",
+          "подмножеств",
+          "тип",
+          "T",
+          "K",
+          "поле",
+          "свойств",
+          "сохран",
+          "исходн",
+          "тип поля",
+          "исключ",
+          "отбрасыва",
+          "keyof",
+          "литерал",
+          "compile-time",
+          "компиляц"
+        ],
+        "falseClaims": [
+          "Pick удаляет поля из объекта в runtime",
+          "Pick может выбрать несуществующий ключ без ошибки",
+          "Pick меняет типы выбранных полей",
+          "Pick работает только с interface, не с type"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "shallow_subset",
+      "title": "Понимает поверхностный подтип",
+      "expected": "Кандидат объясняет: Pick копирует типы верхнего уровня без рекурсии; вложенный объект остаётся целиком; для полей внутри nested — `Pick<T['details'], 'age'>`.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Key difference — shallow subset из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "pick_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "shallow_subset",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "поверхност",
+              "shallow",
+              "вложен",
+              "nested",
+              "indexed access",
+              "T['details']"
+            ],
+            "anchorTermsWrongTopic": [
+              "Pick рекурсивно обрезает nested",
+              "один Pick достаёт age из details"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "вложен",
+              "nested",
+              "details",
+              "address"
+            ],
+            "ask": "чем `Pick<User, 'details'>` отличается от `Pick<User['details'], 'age'>`"
+          }
+        ],
+        "mustConcepts": [
+          "поверхност",
+          "shallow",
+          "подтип",
+          "верхн",
+          "уровен",
+          "вложен",
+          "nested",
+          "объект",
+          "целиком",
+          "рекурс",
+          "indexed access",
+          "T[P]",
+          "T['details']",
+          "age",
+          "address",
+          "цепочк",
+          "не обреза"
+        ],
+        "falseClaims": [
+          "Pick рекурсивно выбирает поля внутри вложенных объектов",
+          "`Pick<User, 'details'>` даёт только age",
+          "Pick меняет структуру nested-объекта",
+          "один вызов Pick обрезает все уровни вложенности"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "compile_time_runtime",
+      "title": "Отличает compile-time от runtime",
+      "expected": "Кандидат объясняет: Pick только на этапе типизации; присвоение полного объекта к Pick-типу компилируется, но лишние поля остаются в runtime; для проекции — ручной объект.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Runtime filtering misconception — критичная ловушка ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "pick_definition",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "runtime",
+              "фильтр",
+              "проекц",
+              "fullUser"
+            ],
+            "ask": "можно ли присвоить объект с secret полем к `Pick<User, 'id' | 'name'>` и останется ли secret в runtime"
+          }
+        ],
+        "mustConcepts": [
+          "compile-time",
+          "компиляц",
+          "runtime",
+          "выполнен",
+          "не фильтр",
+          "не удал",
+          "проекц",
+          "ручн",
+          "вручную",
+          "объект",
+          "лишн",
+          "поля",
+          "остают",
+          "type-check",
+          "проверк тип",
+          "erased",
+          "стира",
+          "нулев",
+          "zero cost"
+        ],
+        "falseClaims": [
+          "Pick удаляет свойства из объекта при выполнении",
+          "TypeScript в runtime отбрасывает лишние ключи",
+          "аннотация Pick гарантирует безопасный JSON-ответ",
+          "Pick генерирует код фильтрации в emit"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Знает когда использовать Pick",
+      "expected": "Кандидат называет: API public subset, React props из доменного типа, form DTO, event payload; 1–5 ключей; для многих исключений — Omit; не для трансформации типов.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "When to use — практические сценарии ITLead",
+        "mustConcepts": [
+          "API",
+          "ответ",
+          "публичн",
+          "passwordHash",
+          "React",
+          "пропс",
+          "props",
+          "компонент",
+          "DTO",
+          "форма",
+          "частичн",
+          "обновлен",
+          "payload",
+          "событ",
+          "Omit",
+          "1-5",
+          "связан",
+          "ключ",
+          "mapped type",
+          "синхрон",
+          "домен"
+        ],
+        "falseClaims": [
+          "Pick лучше Omit когда нужно исключить 10 полей",
+          "Pick трансформирует типы полей при выборе",
+          "Pick нужен только в React",
+          "ручной тип надёжнее Pick для синхронизации"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "mapped_type_internals",
+      "title": "Знает внутреннее определение Pick",
+      "expected": "Кандидат приводит `type Pick<T, K extends keyof T> = { [P in K]: T[P] }`; объясняет mapped type, indexed access, constraint K extends keyof T, полное стирание в JS.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "How TypeScript handles Pick — базовая механика",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "mapped type",
+              "[P in K]",
+              "keyof T"
+            ],
+            "ask": "как реализовать Pick с нуля через mapped type"
+          }
+        ],
+        "mustConcepts": [
+          "mapped type",
+          "отображаем",
+          "[P in K]",
+          "T[P]",
+          "indexed access",
+          "индексн",
+          "keyof T",
+          "K extends",
+          "constraint",
+          "ограничен",
+          "итерац",
+          "компилятор",
+          "erased",
+          "стира",
+          "emit",
+          "JavaScript",
+          "MyPick",
+          "реализ"
+        ],
+        "falseClaims": [
+          "Pick остаётся в скомпилированном JS как функция",
+          "K может быть любым string без keyof",
+          "Pick меняет emit по сравнению с исходным типом",
+          "внутри Pick runtime-проверка ключей"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с Pick",
+      "expected": "Кандидат называет: runtime filtering; широкий string как K; опциональные поля остаются optional (`Required<Pick<...>>`); nested через indexed access; забытая ручная проекция в API.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — частые ловушки middle+",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "compile_time_runtime",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "string",
+              "typeof key",
+              "литерал"
+            ],
+            "ask": "почему `Pick<User, typeof key>` падает если key объявлен как string"
+          },
+          {
+            "match": [
+              "optional",
+              "опциональн",
+              "Required"
+            ],
+            "ask": "останется ли name опциональным после `Pick<User, 'name'>` если в User name?: string"
+          }
+        ],
+        "mustConcepts": [
+          "runtime",
+          "фильтр",
+          "string",
+          "широк",
+          "литерал",
+          "typeof key",
+          "keyof",
+          "опциональн",
+          "optional",
+          "Required",
+          "вложен",
+          "indexed access",
+          "проекц",
+          "ручн",
+          "API",
+          "passwordHash",
+          "secret",
+          "чувствительн",
+          "ответ",
+          "забыва"
+        ],
+        "falseClaims": [
+          "широкий string подходит как K в Pick",
+          "Pick делает optional поля required автоматически",
+          "Pick<User, 'details'> извлекает только age из nested",
+          "достаточно аннотации return type без ручной проекции"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "pick_vs_alternatives",
+      "title": "Сравнивает Pick с Omit и edge cases",
+      "expected": "Кандидат различает Pick vs Omit (выбор vs исключение); `Pick<T, keyof T>` = T; `Pick<T, never>` = `{}`; Pick на union распределяется; синхронизация при изменении исходного типа.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Follow-up questions и Pick vs manual — бонус middle",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Omit",
+              "keyof User",
+              "never",
+              "union"
+            ],
+            "ask": "чем Pick отличается от Omit и что даст `Pick<User, keyof User>`"
+          }
+        ],
+        "mustConcepts": [
+          "Omit",
+          "исключ",
+          "выбор",
+          "keyof",
+          "keyof User",
+          "never",
+          "пуст",
+          "{}",
+          "union",
+          "распредел",
+          "distribut",
+          "синхрон",
+          "автомат",
+          "ручн",
+          "тип",
+          "переименован",
+          "обновл",
+          "эквивалент",
+          "User"
+        ],
+        "falseClaims": [
+          "Pick и Omit делают одно и то же",
+          "`Pick<T, keyof T>` даёт пустой тип",
+          "Pick на union берёт только ключи первого члена",
+          "ручной тип всегда синхронизируется с User без правок"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "`Pick<T, K>` выбирает указанные ключи и сохраняет их типы — `Pick<User, 'id' | 'name'>` даёт `{ id: number; name: string }`. Только compile-time: для API нужно вручную вернуть `{ id, name }`, иначе passwordHash останется в JSON.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для UserCard делаю `type UserCardProps = Pick<User, 'id' | 'name' | 'role'>` — пропсы синхронизированы с доменной моделью. Внутри Pick — `{ [P in K]: T[P] }`, в JS ничего не остаётся.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну pick — это выбор полей из типа. shallow — nested целиком, для age нужен Pick<User['details'], 'age'>. runtime не фильтрует, string как K не катит, для кучи исключений лучше Omit",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Pick удаляет лишние свойства из объекта при выполнении. Можно писать `Pick<User, string>` для динамического выбора ключей.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "`Pick<User, 'details'>` возвращает только age из вложенного объекта. После Pick все optional поля становятся required автоматически.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Pick и Omit — одно и то же с разными именами. `Pick<T, keyof T>` даёт пустой объект. Достаточно аннотировать return Pick без ручной проекции — TypeScript сам уберёт секреты.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "pick_definition",
+      "exampleType": "good",
+      "exampleText": "Pick строит тип из выбранных ключей T с их исходными типами; несуществующий ключ — ошибка компиляции.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "pick_definition",
+      "exampleType": "good",
+      "exampleText": "типа меню — заказал id и name, получил только их типы, email выпал из типа",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "pick_definition",
+      "exampleType": "bad",
+      "exampleText": "Pick меняет типы выбранных полей и работает в runtime как filter.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "shallow_subset",
+      "exampleType": "good",
+      "exampleText": "Pick shallow — `Pick<User, 'address'>` оставляет весь nested address; для street нужен отдельный Pick по `User['address']`.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "shallow_subset",
+      "exampleType": "good",
+      "exampleText": "верхний уровень только, внутрь не лезет — details целиком, age через Pick<User['details'], 'age'>",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "shallow_subset",
+      "exampleType": "bad",
+      "exampleText": "один Pick рекурсивно вырезает любые вложенные поля на всех уровнях.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "compile_time_runtime",
+      "exampleType": "good",
+      "exampleText": "`const picked: Pick<User, 'id' | 'name'> = fullUser` компилируется, но secret остаётся в объекте — нужна ручная проекция полей.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "compile_time_runtime",
+      "exampleType": "good",
+      "exampleText": "pick только type-check, в emit ноль разницы — sensitive fields уйдут клиенту если не собрать объект вручную",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "compile_time_runtime",
+      "exampleType": "bad",
+      "exampleText": "TypeScript в runtime отбрасывает поля не входящие в Pick при сериализации JSON.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "PublicProfile = Pick<User, 'id' | 'name' | 'email'> для API; UserCardProps из 3 полей; для 6+ исключений — Omit.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "NestJS update DTO, tRPC public keys, Redux action shape — pick 2-4 связанных поля, синхрон с доменом",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Всегда Pick даже когда нужно исключить 15 полей из большого типа.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "mapped_type_internals",
+      "exampleType": "good",
+      "exampleText": "`type Pick<T, K extends keyof T> = { [P in K]: T[P] }` — mapped type, K constrained, полностью erased в JS.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "mapped_type_internals",
+      "exampleType": "good",
+      "exampleText": "компилятор итерирует K, тянет T[P], в bundle никакого Pick — zero runtime cost",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "mapped_type_internals",
+      "exampleType": "bad",
+      "exampleText": "Pick остаётся в JS как helper-функция фильтрации ключей.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Ошибки: runtime filter; `key as string` для K; optional остаётся — `Required<Pick<User,'name'>>`; nested через indexed access; забытая проекция в getPublicProfile.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "const key = 'id' as string — Pick<User, typeof key> не взлетит. annotate return Pick но secret в response — классика",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Широкий string — нормальный K. Pick делает name required после выбора optional поля.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "pick_vs_alternatives",
+      "exampleType": "good",
+      "exampleText": "Pick выбирает, Omit исключает; `Pick<User, keyof User>` = User; `Pick<T, never>` = {}; union распределяется.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "pick_vs_alternatives",
+      "exampleType": "good",
+      "exampleText": "переименовал role в User — все Pick с role сразу красные, ручной тип бы пропустил",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "pick_vs_alternatives",
+      "exampleType": "bad",
+      "exampleText": "Pick<User | Admin, 'id'> работает только с User. Ручной тип надёжнее для синхронизации с доменом.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "utility-type-pick-in-typescript",
+    "apiUrl": "https://api.itlead.org/api/questions/utility-type-pick-in-typescript",
+    "pageUrl": "https://itlead.org/interview-questions/typescript/utility-type-pick-in-typescript",
+    "difficulty": "MIDDLE",
+    "titleEn": "Utility type pick in TypeScript",
+    "categorySlug": "typescript",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

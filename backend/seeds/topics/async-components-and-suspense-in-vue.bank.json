@@ -1,0 +1,570 @@
+{
+  "topic": {
+    "code": "async_components_and_suspense_in_vue",
+    "name": "Асинхронные компоненты и Suspense в Vue.js",
+    "skillCode": "vue",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работают асинхронные компоненты и Suspense в Vue.js?",
+    "shortAnswer": "Асинхронные компоненты через `defineAsyncComponent` и динамический `import()` выносят код в отдельные JS-чанки и загружают его по требованию, уменьшая начальный бандл. `<Suspense>` координирует UI: показывает слот `#fallback`, пока не выполнятся все pending promises от async-компонентов или `await` в `<script setup>`.",
+    "idealAnswer": "Async components и Suspense — два отдельных инструмента Vue 3 с разными задачами. `defineAsyncComponent` отвечает за сеть и code splitting: Vite/webpack кладёт компонент в отдельный JS-файл и подгружает его через dynamic `import()` при первом рендере — в крупных приложениях initial payload может сократиться на 50–90%. `<Suspense>` не знает про splitting: он сканирует дерево потомков на pending promises (от async-компонентов или `await` в setup) и держит `#fallback`, пока все promise не settle; внутри одного boundary нет частичного показа — ждёт самый медленный ребёнок. Базовый паттерн: `defineAsyncComponent(() => import('./Chart.vue'))` внутри `<Suspense>` с `#fallback`. Расширенная форма: `loader`, `loadingComponent`, `errorComponent`, `delay` (спиннер только после N ms — убирает flash на быстрых сетях), `timeout` (иначе на 3G spinner бесконечен). `await` в `<script setup>` без родительского Suspense — warning в dev и «зависший» компонент без UI. Vue Router: `RouterView v-slot` + `<component :is=\"Component\" />` в Suspense — route lazy `() => import('./View.vue')` без пустого экрана при навигации. Ошибки: Suspense сам не ловит — `onErrorCaptured` в обёртке или `errorComponent` в defineAsyncComponent; после деплоя с новыми chunk hash старый HTML даёт 404 без error state = тихая пустая страница. Типичные ошибки: `v-if` на `<Suspense>` (unmount и перезапуск всех promises), Suspense вокруг синхронных детей (лишний fallback flash), каскад вложенных boundary без плана, отсутствие timeout/errorComponent. SSR: dynamic import на сервере пропускается, компонент рендерится на клиенте, Suspense показывает fallback при hydration. Nuxt 3 оборачивает async layouts в Suspense; Quasar QPage интегрирует Suspense для панелей. Vue 3.4+: async setup через teleport — boundary должен оборачивать sender, не target.",
+    "maxScore": 10,
+    "skills": [
+      "vue",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "async_vs_suspense_split",
+      "title": "Разделяет async-компоненты и Suspense",
+      "expected": "Кандидат объясняет: defineAsyncComponent — code splitting и сеть (отдельные чанки, dynamic import); Suspense — координация loading UI (fallback до resolve всех promises); это разные задачи.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — главное разделение темы",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "async_vs_suspense_split",
+            "oftenConfusedWith": [
+              "suspense_mechanism",
+              "define_async_component"
+            ],
+            "anchorTermsExpected": [
+              "code splitting",
+              "dynamic import",
+              "fallback",
+              "pending promise",
+              "сеть",
+              "UI загрузк"
+            ],
+            "anchorTermsWrongTopic": [
+              "Suspense делает splitting",
+              "defineAsyncComponent показывает fallback",
+              "один инструмент для всего"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "defineAsyncComponent",
+              "Suspense",
+              "splitting"
+            ],
+            "ask": "чем defineAsyncComponent отличается от Suspense и зачем нужны оба"
+          }
+        ],
+        "mustConcepts": [
+          "defineAsyncComponent",
+          "Suspense",
+          "code splitting",
+          "dynamic import",
+          "чанк",
+          "bundle",
+          "сеть",
+          "network",
+          "fallback",
+          "loading UI",
+          "pending promise",
+          "разные задач",
+          "on demand",
+          "по требованию",
+          "initial payload",
+          "начальный бандл"
+        ],
+        "falseClaims": [
+          "Suspense выполняет code splitting сам",
+          "defineAsyncComponent показывает fallback без Suspense",
+          "async-компонент и Suspense решают одну и ту же проблему",
+          "Suspense уменьшает размер бандла",
+          "defineAsyncComponent координирует UI нескольких async-детей"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "define_async_component",
+      "title": "Знает defineAsyncComponent и dynamic import",
+      "expected": "Кандидат описывает: `defineAsyncComponent(() => import('./X.vue'))` создаёт отдельный чанк; Vite/webpack подгружает файл при первом mount компонента.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "базовый механизм lazy load из quick example",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "async_vs_suspense_split",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "import(",
+              "defineAsyncComponent",
+              "chunk"
+            ],
+            "ask": "когда именно загружается чанк Chart.vue и кто его создаёт"
+          }
+        ],
+        "mustConcepts": [
+          "defineAsyncComponent",
+          "import(",
+          "dynamic import",
+          "чанк",
+          "chunk",
+          "Vite",
+          "webpack",
+          "lazy",
+          "линив",
+          "mount",
+          "первый рендер",
+          "отдельный файл",
+          "JS bundle",
+          "on demand"
+        ],
+        "falseClaims": [
+          "defineAsyncComponent загружает все компоненты в initial bundle",
+          "dynamic import выполняется только на build time",
+          "чанк загружается до первого рендера компонента всегда",
+          "defineAsyncComponent работает без bundler code splitting"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "suspense_mechanism",
+      "title": "Понимает механизм Suspense",
+      "expected": "Кандидат объясняет: Suspense регистрирует pending promises от async-детей и await в setup; показывает #fallback до resolve всех; ждёт самого медленного; await без Suspense — warning и пустой UI.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "центральный механизм middle — pending promises и fallback",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "fallback",
+              "pending",
+              "await"
+            ],
+            "ask": "что Suspense делает с await в script setup и когда показывает fallback"
+          },
+          {
+            "match": [
+              "несколько",
+              "slowest",
+              "самый медлен"
+            ],
+            "ask": "как Suspense ведёт себя с несколькими async-детьми в одном boundary"
+          }
+        ],
+        "mustConcepts": [
+          "Suspense",
+          "#fallback",
+          "fallback",
+          "pending promise",
+          "await",
+          "script setup",
+          "resolve",
+          "settle",
+          "patch DOM",
+          "самый медлен",
+          "slowest",
+          "частичн",
+          "boundary",
+          "warning",
+          "без Suspense",
+          "невирешен"
+        ],
+        "falseClaims": [
+          "Suspense показывает каждого ребёнка сразу по готовности внутри одного boundary",
+          "await в setup работает без Suspense без последствий",
+          "fallback скрывается после первого resolved promise",
+          "Suspense отслеживает только defineAsyncComponent, не await в setup"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "define_async_options",
+      "title": "Знает опции defineAsyncComponent",
+      "expected": "Кандидат называет loader, loadingComponent, errorComponent, delay (anti-flash спиннера), timeout; объясняет зачем delay на быстрых сетях.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "options form из ITLead — delay/timeout UX",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "delay",
+              "loadingComponent",
+              "timeout"
+            ],
+            "ask": "зачем delay: 300 и чем loadingComponent отличается от Suspense fallback"
+          }
+        ],
+        "mustConcepts": [
+          "loader",
+          "loadingComponent",
+          "errorComponent",
+          "delay",
+          "timeout",
+          "спиннер",
+          "flash",
+          "быстр",
+          "соединен",
+          "per-component",
+          "опции",
+          "8 секунд",
+          "300ms"
+        ],
+        "falseClaims": [
+          "delay ускоряет загрузку чанка",
+          "timeout по умолчанию 8 секунд в Vue",
+          "loadingComponent и #fallback — одно и то же с одинаковыми опциями",
+          "errorComponent показывается автоматически без настройки при любой ошибке render"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "vue_router_suspense",
+      "title": "Знает паттерн Vue Router + Suspense",
+      "expected": "Кандидат описывает RouterView v-slot + component :is + Suspense с fallback; route components как () => import() для lazy chunks без blank screen при навигации.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "самый частый production-паттерн из ITLead",
+        "mustConcepts": [
+          "RouterView",
+          "v-slot",
+          "Component",
+          "component :is",
+          "lazy route",
+          "import(",
+          "навигац",
+          "PageLoading",
+          "route-level",
+          "blank screen",
+          "пустой экран",
+          "chunk",
+          "Vue Router"
+        ],
+        "falseClaims": [
+          "Suspense не нужен при lazy routes в Vue Router",
+          "RouterView автоматически показывает loading без Suspense",
+          "lazy route загружает все страницы в initial bundle"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "error_handling",
+      "title": "Знает обработку ошибок async/Suspense",
+      "expected": "Кандидат объясняет: Suspense не ловит ошибки; onErrorCaptured в обёртке или errorComponent; chunk 404 после деплоя; ошибка после resolve не возвращает fallback.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "production chunk 404 и onErrorCaptured из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "onErrorCaptured",
+              "errorComponent",
+              "404"
+            ],
+            "ask": "что покажет пользователь при 404 чанка после деплоя без errorComponent"
+          },
+          {
+            "match": [
+              "после resolve",
+              "throw",
+              "fallback"
+            ],
+            "ask": "вернётся ли Suspense в fallback если async-компонент упадёт после resolve"
+          }
+        ],
+        "mustConcepts": [
+          "onErrorCaptured",
+          "errorComponent",
+          "Suspense не ловит",
+          "chunk 404",
+          "hash filename",
+          "деплой",
+          "retry",
+          "повтор",
+          "blank page",
+          "пустая страница",
+          "bubble",
+          "сплыва",
+          "после resolve",
+          "не fallback"
+        ],
+        "falseClaims": [
+          "Suspense автоматически показывает error slot при падении чанка",
+          "ошибка после resolve снова включает #fallback",
+          "onErrorCaptured не нужен если есть Suspense",
+          "404 чанка Vue обрабатывает сам без errorComponent"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки async/Suspense",
+      "expected": "Кандидат называет: v-if на Suspense (restart promises), нет timeout на 3G, Suspense вокруг sync-компонентов, nested Suspense без плана, отсутствие errorComponent.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — частые production баги",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "define_async_options",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "v-if",
+              "Suspense",
+              "unmount"
+            ],
+            "ask": "почему v-if на Suspense перезапускает promises и как правильно"
+          },
+          {
+            "match": [
+              "sync",
+              "синхрон",
+              "overhead"
+            ],
+            "ask": "зачем не оборачивать синхронные компоненты в Suspense"
+          }
+        ],
+        "mustConcepts": [
+          "v-if на Suspense",
+          "v-if внутри",
+          "unmount",
+          "restart",
+          "перезапуск",
+          "timeout",
+          "3G",
+          "sync компонент",
+          "overhead",
+          "nested Suspense",
+          "вложен",
+          "один на route",
+          "errorComponent",
+          "каскад",
+          "flash fallback"
+        ],
+        "falseClaims": [
+          "v-if на Suspense безопасен и не сбрасывает loading",
+          "Suspense полезен всегда даже без async-детей",
+          "timeout не нужен — spinner сам исчезнет",
+          "много вложенных Suspense улучшают UX всегда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "defineAsyncComponent с import() выносит Chart.vue в отдельный чанк — грузится при mount. Suspense показывает «Loading chart...» в #fallback, пока promise не resolve. Это splitting (сеть) плюс координация UI — разные инструменты.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На роутере: RouterView slot + Suspense + lazy () => import('./View.vue') — при переходе PageLoading вместо белого экрана. defineAsyncComponent с delay: 300 — на быстром интернете спиннер не мигает. errorComponent обязателен: после деплоя старый HTML ловит 404 чанка.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Три async-панели в одном Suspense — чанки качаются параллельно, fallback держится до самого медленного. Нужна поштучная отрисовка — отдельный Suspense на каждую панель.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Suspense делает code splitting, defineAsyncComponent только рисует fallback. Достаточно одного из них.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Ставлю v-if на Suspense — при false он размонтируется, при true всё ок, promises не перезапускаются. await в setup без Suspense — просто warning, UI всё равно покажется.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Timeout не нужен, на 3G пользователь подождёт. Suspense сам поймает 404 чанка и покажет fallback снова.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "async_vs_suspense_split",
+      "exampleType": "good",
+      "exampleText": "Async — dynamic import и отдельный JS-файл; Suspense — единый fallback, пока все promises pending. Splitting без Suspense даёт пустой экран; Suspense без async почти бесполезен.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "async_vs_suspense_split",
+      "exampleType": "good",
+      "exampleText": "ну async режет бандл, suspense не даёт белый экран пока чанк летит — разные штуки",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "async_vs_suspense_split",
+      "exampleType": "bad",
+      "exampleText": "Suspense уменьшает initial bundle через import(), defineAsyncComponent управляет fallback slot.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "define_async_component",
+      "exampleType": "good",
+      "exampleText": "const AsyncChart = defineAsyncComponent(() => import('./Chart.vue')) — Vite создаёт chunk, fetch при первом рендере AsyncChart.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "define_async_component",
+      "exampleType": "good",
+      "exampleText": "HeavyModal через defineAsyncComponent — в бандл не попадает, первый клик «Open settings» триггерит import()",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "define_async_component",
+      "exampleType": "bad",
+      "exampleText": "defineAsyncComponent статически импортирует все .vue в main bundle при старте приложения.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "suspense_mechanism",
+      "exampleType": "good",
+      "exampleText": "UserProfile с await fetch в setup — Suspense показывает «Loading user...» до json(); без Suspense компонент висит пустым.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "suspense_mechanism",
+      "exampleType": "good",
+      "exampleText": "Chart, Table, Map параллельно — один fallback до resolve всех трёх; быстрый ждёт медленный",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "suspense_mechanism",
+      "exampleType": "bad",
+      "exampleText": "Suspense показывает Chart сразу, Table и Map догружаются в fallback по очереди внутри одного boundary.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "define_async_options",
+      "exampleType": "good",
+      "exampleText": "delay: 300 — спиннер только если чанк дольше 300ms; timeout: 8000 — ErrorDisplay вместо вечного loading.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "define_async_options",
+      "exampleType": "good",
+      "exampleText": "loadingComponent per-component с delay; #fallback Suspense — один на всю группу без timing опций",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "define_async_options",
+      "exampleType": "bad",
+      "exampleText": "#fallback Suspense поддерживает delay и timeout так же как loadingComponent.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "vue_router_suspense",
+      "exampleType": "good",
+      "exampleText": "RouterView v-slot=\"{ Component }\" → Suspense → component :is=\"Component\" + PageLoading fallback при lazy route import.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "vue_router_suspense",
+      "exampleType": "good",
+      "exampleText": "routes: { path: '/dash', component: () => import('./Dash.vue') } + Suspense в App — без белого экрана при переходе",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "vue_router_suspense",
+      "exampleType": "bad",
+      "exampleText": "Lazy routes в Vue Router сами показывают skeleton, Suspense для навигации не нужен.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "error_handling",
+      "exampleType": "good",
+      "exampleText": "onErrorCaptured return false + v-if error message; плюс errorComponent в defineAsyncComponent для 404 chunk после нового деплоя.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "error_handling",
+      "exampleType": "good",
+      "exampleText": "если компонент упал после resolve — в fallback Suspense не вернётся, только errorComponent или onErrorCaptured",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "error_handling",
+      "exampleType": "bad",
+      "exampleText": "Suspense перехватывает ошибки import() и автоматически показывает #fallback с текстом ошибки.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "v-if на AsyncComponent внутри Suspense, не на Suspense — иначе каждый toggle перезапускает все tracked promises.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "не оборачиваю sync header в Suspense — лишний flash fallback; один Suspense на route, не каскад из пяти",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Suspense v-if=\"isReady\" — правильный паттерн, inner v-if ломает loading state.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "async-components-and-suspense-in-vue",
+    "apiUrl": "https://api.itlead.org/api/questions/async-components-and-suspense-in-vue",
+    "pageUrl": "https://itlead.org/interview-questions/vue/async-components-and-suspense-in-vue",
+    "difficulty": "MIDDLE",
+    "titleEn": "async components and suspense in Vue.js",
+    "categorySlug": "vue",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

@@ -1,0 +1,506 @@
+{
+  "topic": {
+    "code": "immutability_react_state",
+    "name": "Иммутабельность состояния в React",
+    "skillCode": "react",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Почему в React состояние нужно обновлять иммутабельно и как правильно обновлять объекты и массивы в state?",
+    "shortAnswer": "React сравнивает state через `Object.is()` — по ссылке, а не по глубокому равенству. Прямая мутация оставляет ту же ссылку, React не видит изменения и пропускает re-render. Правильный паттерн — создавать новый объект или массив: spread для объектов, `map`/`filter`/spread для массивов.",
+    "idealAnswer": "Иммутабельность в React state означает создание новых объектов и массивов вместо изменения существующих. React хранит ссылку на state во внутреннем fiber tree и при каждом setState сравнивает `Object.is(prevState, nextState)`. Если ссылка та же — render function компонента пропускается. Поэтому `user.age = 26; setUser(user)` не работает: переменная user указывает на тот же объект в памяти. Правильно: `setUser({ ...user, age: 26 })` — spread создаёт новый объект с новой ссылкой, React ставит re-render в очередь. Этот же механизм лежит в основе React.memo, useMemo и useCallback — все они опираются на сравнение ссылок. Для объектов: одно поле — `{ ...obj, key: val }`; вложенный объект — spread на каждом уровне `{ ...state, user: { ...state.user, name: 'Bob' } }`. Spread поверхностный: вложенные объекты остаются общими ссылками, если их не скопировать отдельно. Для массивов: добавить — `[...items, newItem]`; удалить — `items.filter(...)`; заменить элемент — `items.map(...)`; сортировка — `[...arr].sort()`, не `arr.sort()`. Мутирующие методы push/pop/splice/reverse/sort меняют оригинал — их нельзя использовать перед setState. Самая коварная ошибка: `[...todos]; next[0].done = true` — массив новый, но объект внутри тот же; нужен map с `{ ...todo, done: true }`. setState асинхронен: после `setCount(count + 1)` переменная count ещё старая; если следующее значение зависит от предыдущего — `setCount(prev => prev + 1)`. Почему не deep equality: O(n) на каждое обновление vs O(1) для ссылок; новый объект явно сигнализирует «значение изменилось». Если мутировать state, но родитель вызвал re-render — компонент перерисуется со «сломанным» state: мутация изменила старый объект, fiber state не обновился. Для глубоко вложенного state — Immer (produce + draft Proxy): пишете как мутацию, получаете иммутабельный результат, копируются только изменённые ветки. Тот же принциим в Redux reducers, Zustand, React Query cache. React.memo на элементах списка выигрывает, когда неизменённые items сохраняют те же ссылки. При 10k элементов частые точечные обновления — нормализовать state в объект по id вместо массива.",
+    "maxScore": 10,
+    "skills": [
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "reference_comparison",
+      "title": "Понимает сравнение по ссылке",
+      "expected": "Кандидат объясняет: React использует Object.is() / сравнение ссылок, не deep equality; та же ссылка — re-render пропускается; новый объект — изменение зафиксировано.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ядро механизма React — Object.is и почему не deep compare",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Object.is",
+              "ссылк",
+              "reference"
+            ],
+            "ask": "как React понимает что state изменился и почему не deep equality"
+          }
+        ],
+        "mustConcepts": [
+          "Object.is",
+          "ссылк",
+          "reference",
+          "reference equality",
+          "не deep",
+          "глубок",
+          "re-render",
+          "пропуск",
+          "setState",
+          "fiber",
+          "O(1)",
+          "новый объект",
+          "новое послан",
+          "та же ссылка",
+          "React.memo",
+          "useMemo",
+          "useCallback"
+        ],
+        "falseClaims": [
+          "React сравнивает state глубоко по всем полям",
+          "setUser(user) после мутации поля всё равно вызовет re-render",
+          "изменение свойства объекта автоматически меняет ссылку",
+          "deep equality быстрее сравнения ссылок",
+          "Object.is и === всегда дают разный результат для объектов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "immutable_object_updates",
+      "title": "Обновляет объекты через spread",
+      "expected": "Кандидат показывает паттерн `{ ...obj, key: newValue }`; понимает что spread создаёт новый объект в памяти; знает правило «state.something = value — мутация».",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "базовый паттерн из TL;DR и quick example ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "reference_comparison",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "spread",
+              "...",
+              "новый объект"
+            ],
+            "ask": "почему setUser({ ...user, age: 26 }) работает, а user.age = 26; setUser(user) — нет"
+          }
+        ],
+        "mustConcepts": [
+          "spread",
+          "...",
+          "новый объект",
+          "новое послан",
+          "setUser",
+          "setState",
+          "мутац",
+          "user.age",
+          "ключ",
+          "поле",
+          "копир",
+          "shallow",
+          "поверхност"
+        ],
+        "falseClaims": [
+          "можно мутировать объект и передать его же в setState — React увидит новое значение поля",
+          "spread делает глубокое клонирование всех уровней",
+          "Object.assign всегда создаёт новую ссылку на корневой объект без мутации",
+          "удаление поля через delete obj.key безопасно для React state"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "immutable_array_operations",
+      "title": "Обновляет массивы без мутации",
+      "expected": "Кандидат называет: добавить — [...arr, item]; удалить — filter; заменить — map; sort — [...arr].sort(); не использует push/splice/pop/sort на оригинале.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "таблица immutable operations из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "push",
+              "filter",
+              "map",
+              "spread массив"
+            ],
+            "ask": "как добавить и удалить элемент массива в state без мутации"
+          }
+        ],
+        "mustConcepts": [
+          "map",
+          "filter",
+          "spread",
+          "...items",
+          "push",
+          "splice",
+          "pop",
+          "sort",
+          "reverse",
+          "новый массив",
+          "filter удал",
+          "map замен",
+          "sort коп",
+          "[...arr].sort"
+        ],
+        "falseClaims": [
+          "items.push(newItem); setItems(items) — корректный паттерн",
+          "arr.sort() без копии безопасен для React state",
+          "filter мутирует исходный массив",
+          "map всегда мутирует элементы на месте"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "nested_state_mistakes",
+      "title": "Обновляет вложенный state",
+      "expected": "Кандидат объясняет shallow spread; для вложенного поля создаёт новый объект на каждом изменённом уровне; знает ошибку setUser({ ...user, address: { city: 'NYC' } }) без spread address.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "common mistake #1 и #3 — nested object и shallow spread",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "immutable_object_updates",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "вложен",
+              "nested",
+              "address",
+              "preferences"
+            ],
+            "ask": "как обновить state.user.name или formData.preferences.notifications без мутации"
+          }
+        ],
+        "mustConcepts": [
+          "вложен",
+          "nested",
+          "shallow",
+          "поверхност",
+          "spread кажд",
+          "уровн",
+          "state.user",
+          "address",
+          "preferences",
+          "новый внешн",
+          "новый вложен",
+          "общая ссылка",
+          "drop пол",
+          "потеря пол"
+        ],
+        "falseClaims": [
+          "достаточно spread только верхнего уровня для любого nested update",
+          "state.user.name = 'Bob'; setState(state) обновит UI",
+          "spread автоматически клонирует все вложенные объекты",
+          "можно мутировать nested объект если outer object новый"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "array_item_mutation_trap",
+      "title": "Избегает мутации элементов массива",
+      "expected": "Кандидат знает ловушку: новый массив, но тот же объект внутри; правильно — map с `{ ...item, ...changes }`; понимает связь с React.memo на list items.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "sneakiest bug #4 из ITLead common mistakes",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "todos",
+              "next[0]",
+              "map",
+              "элемент массива"
+            ],
+            "ask": "почему [...todos]; next[0].done = true не обновит UI и как исправить"
+          }
+        ],
+        "mustConcepts": [
+          "новый массив",
+          "тот же объект",
+          "элемент",
+          "map",
+          "...todo",
+          "done",
+          "todos",
+          "ссылка элемента",
+          "React.memo",
+          "list item",
+          "неизменён",
+          "оригинальн ссылк"
+        ],
+        "falseClaims": [
+          "если массив новый — React всегда re-renderит все элементы списка",
+          "можно мутировать объект внутри скопированного массива — ссылка массива новая",
+          "spread массива автоматически клонирует объекты внутри",
+          "index assignment next[i].field = x безопасен после [...arr]"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "setstate_functional_updater",
+      "title": "Использует функциональный setState",
+      "expected": "Кандидат объясняет: setState асинхронен, переменная state после вызова ещё старая; для зависимости от prev — `setCount(prev => prev + 1)`.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "common mistake #5 — чтение state сразу после setState",
+        "mustConcepts": [
+          "функцион",
+          "updater",
+          "prev",
+          "prev =>",
+          "асинхрон",
+          "следующ",
+          "render",
+          "console.log",
+          "старое значение",
+          "батч",
+          "schedule"
+        ],
+        "falseClaims": [
+          "setCount(count + 1) сразу меняет переменную count",
+          "можно читать обновлённый state синхронно после setState",
+          "функциональный updater нужен только в class components",
+          "два setState подряд всегда видят второе обновление первого без updater"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "immer_and_ecosystem",
+      "title": "Знает Immer и экосистему",
+      "expected": "Кандидат упоминает Immer/produce для глубокого state; Redux reducers возвращают новый state; связь стабильных ссылок с React.memo; опционально нормализация по id.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "бонус — Immer, Redux, React Query, normalize by id",
+        "mustConcepts": [
+          "Immer",
+          "produce",
+          "draft",
+          "Proxy",
+          "Redux",
+          "reducer",
+          "Zustand",
+          "React Query",
+          "нормализ",
+          "id",
+          "стабильн ссылк"
+        ],
+        "falseClaims": [
+          "Immer мутирует state напрямую в production store",
+          "Redux reducer может мутировать action.payload state",
+          "Immer заменяет необходимость новых ссылок в React",
+          "React.memo не зависит от reference equality props"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "React сравнивает state через Object.is — по ссылке. user.age = 26; setUser(user) не сработает, потому что ссылка та же. Нужно setUser({ ...user, age: 26 }). Для массива — map/filter/spread, не push. Вложенное поле — spread на каждом уровне. Если count зависит от prev — setCount(c => c + 1).",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Короче: мутируешь объект — React думает ничего не изменилось. Всегда новый объект или массив. todos.map с {...todo} для одного элемента. Глубокий state — Immer produce. Redux reducer тоже только новый state возвращает.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Spread поверхностный: для preferences.notifications нужен новый preferences объект. [...todos] + todos[0].done = true — классическая ловушка, нужен map. React.memo на TodoItem выигрывает когда ссылки неизменённых todos те же.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "React сам сравнивает все поля объекта глубоко, можно спокойно делать state.user.name = 'Bob' и setState(state).",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "items.push(x); setItems(items) — норм, массив же обновился. После setCount(count+1) в console.log сразу новое значение.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Сделал const next = [...todos]; next[0].done = true — массив новый, значит React точно перерисует. Spread копирует вложенные объекты полностью.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "reference_comparison",
+      "exampleType": "good",
+      "exampleText": "Object.is(prev, next) — O(1). Та же ссылка после мутации — render skip. Deep equality было бы O(n) на каждый setState.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "reference_comparison",
+      "exampleType": "good",
+      "exampleText": "ну react смотрит ссылку а не значения внутри, поэтому setUser(user) после user.age=26 ничего не даёт",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "reference_comparison",
+      "exampleType": "bad",
+      "exampleText": "React diff-ит каждое поле state рекурсивно при каждом обновлении.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "immutable_object_updates",
+      "exampleType": "good",
+      "exampleText": "setUser({ ...user, age: 26 }) — новый объект, новая ссылка, re-render.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "immutable_object_updates",
+      "exampleType": "good",
+      "exampleText": "если пишешь state.x = y — это мутация, react не увидит",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "immutable_object_updates",
+      "exampleType": "bad",
+      "exampleText": "Можно менять поля объекта in-place — главное вызвать setState с тем же объектом.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "immutable_array_operations",
+      "exampleType": "good",
+      "exampleText": "Добавить: [...items, item]. Удалить: items.filter(i => i.id !== id). Сорт: [...items].sort(), не items.sort().",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "immutable_array_operations",
+      "exampleType": "good",
+      "exampleText": "push splice pop — мутируют, для state только map filter spread",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "immutable_array_operations",
+      "exampleType": "bad",
+      "exampleText": "items.push(newItem); setItems(items) — стандартный React паттерн добавления.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "nested_state_mistakes",
+      "exampleType": "good",
+      "exampleText": "setState({ ...state, user: { ...state.user, name: 'Bob' } }) — новый outer и nested.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "nested_state_mistakes",
+      "exampleType": "good",
+      "exampleText": "toggleNotifications: новый formData и новый preferences, не только верхний spread",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "nested_state_mistakes",
+      "exampleType": "bad",
+      "exampleText": "state.user.name = 'Bob'; setState(state) работает если user вложенный — React проверит имя.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "array_item_mutation_trap",
+      "exampleType": "good",
+      "exampleText": "setTodos(todos.map(t => t.id === id ? { ...t, done: true } : t)) — новый массив и новый объект todo.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "array_item_mutation_trap",
+      "exampleType": "good",
+      "exampleText": "[...todos] потом next[0].done=true — массив новый но todo[0] тот же, ui не обновится",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "array_item_mutation_trap",
+      "exampleType": "bad",
+      "exampleText": "Достаточно скопировать массив через spread — объекты внутри React считает новыми автоматически.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "setstate_functional_updater",
+      "exampleType": "good",
+      "exampleText": "setCount(prev => prev + 1) когда следующее значение зависит от предыдущего; count после setCount ещё старый.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "setstate_functional_updater",
+      "exampleType": "good",
+      "exampleText": "setState планирует update на следующий render, не меняет переменную синхронно",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "setstate_functional_updater",
+      "exampleType": "bad",
+      "exampleText": "После setCount(count+1) можно сразу console.log(count) и увидеть новое число.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "immer_and_ecosystem",
+      "exampleType": "good",
+      "exampleText": "Immer produce: пишешь draft.user.scores.push(x), на выходе новый immutable state без пяти уровней spread.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "immer_and_ecosystem",
+      "exampleType": "good",
+      "exampleText": "redux reducer возвращает новый state, immer для nested; memo на list item — старые ссылки не rerender",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "immer_and_ecosystem",
+      "exampleType": "bad",
+      "exampleText": "Immer позволяет мутировать React state напрямую без produce — это официальный паттерн.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "immutability-in-react-state",
+    "apiUrl": "https://api.itlead.org/api/questions/immutability-in-react-state",
+    "pageUrl": "https://itlead.org/interview-questions/react/immutability-in-react-state",
+    "difficulty": "MIDDLE",
+    "titleEn": "Immutability in React state",
+    "categorySlug": "react",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

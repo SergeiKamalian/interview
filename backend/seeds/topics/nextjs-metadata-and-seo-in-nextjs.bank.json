@@ -1,0 +1,595 @@
+{
+  "topic": {
+    "code": "nextjs_metadata_and_seo_in_nextjs",
+    "name": "Метаданные и SEO в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как устроены metadata и SEO в Next.js App Router?",
+    "shortAnswer": "Next.js metadata — встроенный API для генерации `<head>`-тегов (title, description, OpenGraph). Для статических страниц экспортируют объект `metadata`, для маршрутов с данными — async `generateMetadata`. Метаданные дочерней страницы автоматически мерджатся с layout и переопределяют поля родителя; OG-изображения должны быть абсолютными URL.",
+    "idealAnswer": "Metadata API в Next.js App Router — декларативный способ генерировать HTML `<head>` (title, description, OpenGraph, Twitter Cards) из Server Components. Статический вариант — `export const metadata: Metadata = { ... }` в `layout.tsx` или `page.tsx`: читается на build time (или один раз при SSR) без запросов к БД. Динамический — `export async function generateMetadata({ params, searchParams }): Promise<Metadata>`: выполняется на каждый запрос, может fetch из CMS/БД по slug. Root layout задаёт site-wide defaults (title template, description, OG siteName); каждый сегмент маршрута может override или extend — Next.js мерджит от root layout до текущей страницы, дочерние поля с тем же ключом заменяют родительские. Статика — фиксированные страницы, landing, docs index. Динамика — `[slug]/page.tsx` для блога, товаров, docs. Внутренний flow: App Router при server render сканирует каждый сегмент на `metadata`/`generateMetadata`, собирает цепочку, await для dynamic, инжектит в `<head>` через RSC. Fetch внутри `generateMetadata` дедуплицируется с page component в одном render cycle — один HTTP-запрос. Кеш: `fetch({ next: { revalidate: 3600 } })` или tag-based `revalidateTag`. OpenGraph и Twitter: social crawlers строят превью; OG image URL обязан быть absolute (`https://domain/og.png`), relative `/og.png` ломает LinkedIn/Facebook. Если `twitter` указан частично — Next.js наследует недостающее из `openGraph`. Title template в root: `title: { template: '%s | Site', default: 'Site' }` — `%s` подставляет child title. Sitemap и robots — не статические файлы, а `app/sitemap.ts` и `app/robots.ts`, auto-served на `/sitemap.xml` и `/robots.txt`. Типичные ошибки: (1) `metadata` в Client Component (`'use client'`) — silently ignored; (2) relative OG image; (3) `generateMetadata` без `Promise<Metadata>` — TypeScript не ловит ошибки; (4) blocking fetch без cache/revalidate — latency всего ответа; (5) dynamic routes без `alternates.canonical` — дубли URL с query split SEO. JSON-LD для rich snippets — не через metadata API, а `<script type=\"application/ld+json\">` в page component с `dangerouslySetInnerHTML`. Admin/internal — `robots: { index: false }`. Multilingual — `alternates.languages`. Multi-tenant: tenant id из `headers()`/`cookies()` в `generateMetadata`, `unstable_noStore()` opt-out cache, `fetch({ next: { tags: ['tenant-data'] } })`, никогда module-scope state между serverless invocations.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "react"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "metadata_api_definition",
+      "title": "Понимает Metadata API",
+      "expected": "Кандидат объясняет: встроенный API для `<head>` (title, description, OG); статический `metadata` export vs async `generateMetadata`; только Server Components.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — declarative head tags и два режима",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "metadata",
+              "generateMetadata",
+              "head"
+            ],
+            "ask": "чем отличается export metadata от generateMetadata по времени выполнения"
+          }
+        ],
+        "mustConcepts": [
+          "metadata",
+          "generateMetadata",
+          "head",
+          "title",
+          "description",
+          "OpenGraph",
+          "SEO",
+          "Server Component",
+          "статическ",
+          "динамическ",
+          "export",
+          "Metadata",
+          "App Router",
+          "декларатив",
+          "тег",
+          "серверн"
+        ],
+        "falseClaims": [
+          "metadata работает в Client Components с use client",
+          "generateMetadata выполняется только на build time",
+          "metadata API заменяет sitemap.xml",
+          "metadata и head tags настраиваются только через next/head в pages router",
+          "generateMetadata не может делать fetch"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "static_vs_dynamic_metadata",
+      "title": "Выбирает static vs dynamic metadata",
+      "expected": "Кандидат сравнивает: static — build/SSR без fetch; dynamic — per-request, slug/CMS; когда что применять (fixed vs [slug], e-commerce OG).",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевой trade-off timing vs live data из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "metadata_api_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "static_vs_dynamic_metadata",
+            "oftenConfusedWith": [
+              "metadata_inheritance"
+            ],
+            "anchorTermsExpected": [
+              "build time",
+              "per request",
+              "slug",
+              "fetch",
+              "CMS"
+            ],
+            "anchorTermsWrongTopic": [
+              "static metadata наследует layout",
+              "dynamic metadata только для API routes"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "slug",
+              "blog",
+              "product"
+            ],
+            "ask": "когда для страницы блога или товара нужен generateMetadata вместо static export"
+          }
+        ],
+        "mustConcepts": [
+          "static",
+          "статическ",
+          "dynamic",
+          "динамическ",
+          "build time",
+          "per request",
+          "на запрос",
+          "slug",
+          "CMS",
+          "fetch",
+          "блог",
+          "товар",
+          "fixed",
+          "фиксирован",
+          "layout.tsx",
+          "page.tsx",
+          "latency",
+          "задержк"
+        ],
+        "falseClaims": [
+          "static metadata всегда выполняется на каждый HTTP-запрос",
+          "generateMetadata нельзя использовать для e-commerce product pages",
+          "dynamic metadata не добавляет latency без кеширования",
+          "static и dynamic metadata нельзя комбинировать в одном приложении"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "metadata_inheritance",
+      "title": "Понимает наследование metadata",
+      "expected": "Кандидат объясняет: merge от root layout к page; child override полей с тем же ключом; layout defaults + page-specific title/description.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый механизм merge из follow-up ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "layout",
+              "override",
+              "merge",
+              "наслед"
+            ],
+            "ask": "что произойдёт если child page задаёт title, а layout — description и OG"
+          }
+        ],
+        "mustConcepts": [
+          "layout",
+          "page",
+          "merge",
+          "мердж",
+          "override",
+          "переопредел",
+          "наслед",
+          "root layout",
+          "child",
+          "дочерн",
+          "сегмент",
+          "ключ",
+          "default",
+          "site-wide",
+          "общие"
+        ],
+        "falseClaims": [
+          "child metadata полностью заменяет parent без merge",
+          "layout metadata игнорируется если page export metadata",
+          "merge работает только для title, не для openGraph",
+          "pages router и app router одинаково мерджат metadata"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "opengraph_twitter",
+      "title": "Знает OpenGraph и Twitter Cards",
+      "expected": "Кандидат называет openGraph/twitter поля; absolute URL для images; twitter наследует из openGraph; type article/website, card summary_large_image.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "частый production gotcha — relative OG URL",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "openGraph",
+              "OG",
+              "absolute",
+              "абсолют"
+            ],
+            "ask": "почему relative `/og.png` ломает превью в LinkedIn"
+          },
+          {
+            "match": [
+              "twitter",
+              "card"
+            ],
+            "ask": "что наследует twitter если указан только card"
+          }
+        ],
+        "mustConcepts": [
+          "openGraph",
+          "Open Graph",
+          "OG",
+          "twitter",
+          "Twitter Card",
+          "absolute URL",
+          "абсолютн",
+          "relative",
+          "относительн",
+          "images",
+          "изображен",
+          "crawler",
+          "краулер",
+          "preview",
+          "превью",
+          "summary_large_image",
+          "siteName",
+          "type",
+          "article",
+          "website",
+          "NEXT_PUBLIC_SITE_URL"
+        ],
+        "falseClaims": [
+          "relative path `/og.png` работает для Facebook и LinkedIn crawlers",
+          "openGraph images могут быть только на CDN без полного URL",
+          "twitter и openGraph полностью независимы без наследования",
+          "metadata API автоматически генерирует OG image из screenshot"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "sitemap_robots_templates",
+      "title": "Знает sitemap, robots и title template",
+      "expected": "Кандидат описывает app/sitemap.ts и app/robots.ts как routes; title template `%s | Site` и default; robots index false для admin.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "sitemap/robots/title template из ITLead examples",
+        "mustConcepts": [
+          "sitemap.ts",
+          "robots.ts",
+          "sitemap.xml",
+          "robots.txt",
+          "MetadataRoute",
+          "title template",
+          "шаблон",
+          "%s",
+          "default",
+          "allow",
+          "disallow",
+          "userAgent",
+          "index false",
+          "noindex",
+          "admin",
+          "lastModified",
+          "маршрут"
+        ],
+        "falseClaims": [
+          "sitemap.xml нужно класть в public/ как статический файл",
+          "title template работает только в pages router",
+          "robots.txt нельзя генерировать динамически в App Router",
+          "default title показывается когда child задаёт свой title"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "metadata_internals",
+      "title": "Понимает внутреннюю обработку metadata",
+      "expected": "Кандидат объясняет: scan сегментов при server render, await generateMetadata, fetch dedup с page, revalidate/revalidateTag для кеша.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "fetch dedup и caching — ключ к performance",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "dedup",
+              "дедупл",
+              "fetch"
+            ],
+            "ask": "generateMetadata и page оба вызывают getPost — сколько реальных HTTP-запросов"
+          },
+          {
+            "match": [
+              "revalidate",
+              "cache"
+            ],
+            "ask": "как не блокировать TTFB медленным API в generateMetadata"
+          }
+        ],
+        "mustConcepts": [
+          "server render",
+          "RSC",
+          "React Server Component",
+          "scan",
+          "сегмент",
+          "await",
+          "streaming",
+          "fetch dedup",
+          "дедупл",
+          "data cache",
+          "revalidate",
+          "revalidateTag",
+          "force-cache",
+          "ISR",
+          "render cycle",
+          "один запрос",
+          "инжект",
+          "head"
+        ],
+        "falseClaims": [
+          "generateMetadata и page component всегда делают два отдельных fetch",
+          "metadata обрабатывается на клиенте после hydration",
+          "fetch в generateMetadata не использует data cache Next.js",
+          "generateMetadata не блокирует streaming response"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки metadata/SEO",
+      "expected": "Кандидат называет: metadata в Client Component; relative OG; без Promise<Metadata>; blocking fetch без cache; нет alternates.canonical; JSON-LD через script в page, не metadata API.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — частые production баги",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "opengraph_twitter",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "use client",
+              "Client Component"
+            ],
+            "ask": "почему metadata export в use client файле игнорируется"
+          },
+          {
+            "match": [
+              "canonical",
+              "alternates"
+            ],
+            "ask": "зачем alternates.canonical на dynamic route с query params"
+          },
+          {
+            "match": [
+              "JSON-LD",
+              "json-ld",
+              "schema.org"
+            ],
+            "ask": "как добавить structured data если metadata API не поддерживает JSON-LD"
+          }
+        ],
+        "mustConcepts": [
+          "use client",
+          "Client Component",
+          "silently ignored",
+          "игнорир",
+          "relative OG",
+          "Promise<Metadata>",
+          "тип возврат",
+          "blocking fetch",
+          "revalidate",
+          "alternates.canonical",
+          "canonical",
+          "query params",
+          "дубли URL",
+          "JSON-LD",
+          "dangerouslySetInnerHTML",
+          "script",
+          "schema.org",
+          "rich snippets",
+          "unstable_noStore",
+          "multi-tenant"
+        ],
+        "falseClaims": [
+          "metadata в Client Component работает если export const metadata",
+          "metadata API напрямую поддерживает JSON-LD поля",
+          "canonical URL не нужен если title уникален",
+          "generateMetadata без типа Promise<Metadata> — только stylistic issue",
+          "slow fetch в generateMetadata не влияет на TTFB"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Metadata API генерит head из Server Components: static export для landing, generateMetadata для [slug] с fetch из CMS. Root layout — title template и OG defaults; child override title. OG images только absolute URL. Sitemap и robots — app/sitemap.ts и app/robots.ts.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Блог: generateMetadata тянет post по slug, тот же getPost в page — один fetch за render. fetch с revalidate 3600. Canonical на alternates. JSON-LD Article через script в page, не через metadata. Admin — robots index false.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну metadata — title и og для seo. статика в layout, динамика в slug page. og картинка только полный url иначе linkedin сломан. twitter подтягивает из opengraph если не указано",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Ставлю metadata в use client компонент — Next.js сам перенесёт в head. OG image `/banner.png` достаточно, crawlers знают мой домен.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "generateMetadata и page всегда два fetch — dedup нет. JSON-LD добавляю в metadata.openGraph. Canonical не нужен, Google сам разберёт query string.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Sitemap кладу в public/sitemap.xml вручную. Title template `%s` работает только в pages router _document.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "metadata_api_definition",
+      "exampleType": "good",
+      "exampleText": "Metadata — declarative API для title, description, OG в App Router; static export или async generateMetadata, только Server Components.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "metadata_api_definition",
+      "exampleType": "good",
+      "exampleText": "metadata object для фиксированных страниц, generateMetadata когда head зависит от slug и данных",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "metadata_api_definition",
+      "exampleType": "bad",
+      "exampleText": "Metadata настраивается через next/head в App Router page с use client.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "static_vs_dynamic_metadata",
+      "exampleType": "good",
+      "exampleText": "Static — build time, без fetch; generateMetadata — per request для blog/[slug], product pages с OG из CDN.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "static_vs_dynamic_metadata",
+      "exampleType": "good",
+      "exampleText": "landing и docs index — export metadata, статья по slug — generateMetadata с getPost",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "static_vs_dynamic_metadata",
+      "exampleType": "bad",
+      "exampleText": "generateMetadata нужен только для API routes, страницы всегда static metadata.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "metadata_inheritance",
+      "exampleType": "good",
+      "exampleText": "Root layout: description + OG siteName; child page: title override — merge, остальное наследуется.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "metadata_inheritance",
+      "exampleType": "good",
+      "exampleText": "layout задаёт template %s | Site, page title Knowledge Base → Knowledge Base | Site",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "metadata_inheritance",
+      "exampleType": "bad",
+      "exampleText": "Child metadata полностью затирает parent — description из layout пропадает всегда.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "opengraph_twitter",
+      "exampleType": "good",
+      "exampleText": "openGraph.images: [{ url: `${process.env.NEXT_PUBLIC_SITE_URL}/og.png`, width: 1200, height: 630 }]; twitter card summary_large_image.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "opengraph_twitter",
+      "exampleType": "good",
+      "exampleText": "relative /og.png на localhost ок, в linkedin битое превью — только absolute https url",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "opengraph_twitter",
+      "exampleType": "bad",
+      "exampleText": "openGraph: { images: '/og.png' } — crawlers подставят мой домен автоматически.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "sitemap_robots_templates",
+      "exampleType": "good",
+      "exampleText": "app/sitemap.ts возвращает MetadataRoute.Sitemap с url и lastModified; robots.ts disallow /api/, sitemap url.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "sitemap_robots_templates",
+      "exampleType": "good",
+      "exampleText": "title template в root layout, default для страниц без title, admin robots index false",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "sitemap_robots_templates",
+      "exampleType": "bad",
+      "exampleText": "robots.txt только static file в public, App Router sitemap.ts не поддерживает.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "metadata_internals",
+      "exampleType": "good",
+      "exampleText": "generateMetadata и BlogPost оба await getPost(slug) — Next dedup, один network call; revalidate 3600 в fetch.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "metadata_internals",
+      "exampleType": "good",
+      "exampleText": "App Router scan сегментов root→page, await dynamic metadata перед stream, inject head через RSC",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "metadata_internals",
+      "exampleType": "bad",
+      "exampleText": "Fetch в generateMetadata всегда отдельный от page — dedup не работает.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "'use client' + export metadata — ignored; fix: server page.tsx. Canonical alternates для /blog/post?ref=twitter. JSON-LD script в page.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "generateMetadata без Promise<Metadata> — ts не ловит поля; slow cms fetch — next revalidate или force-cache",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Metadata API поддерживает jsonLd поле — не нужен script tag. Client Component metadata работает в production.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nextjs-metadata-and-seo-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/nextjs-metadata-and-seo-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/nextjs-metadata-and-seo-in-nextjs",
+    "difficulty": "MIDDLE",
+    "titleEn": "Metadata and SEO in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

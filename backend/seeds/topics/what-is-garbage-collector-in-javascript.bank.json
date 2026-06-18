@@ -1,0 +1,565 @@
+{
+  "topic": {
+    "code": "what_is_garbage_collector_in_javascript",
+    "name": "Сборщик мусора в JavaScript",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое сборщик мусора (garbage collector) в JavaScript и как он определяет, какие объекты можно освободить?",
+    "shortAnswer": "Garbage collector — встроенная часть движка JavaScript (например, V8), которая автоматически находит и освобождает память объектов, недостижимых от корней программы (глобальная область, стек вызовов). V8 использует mark-and-sweep: обходит все достижимые объекты от корней и собирает остальные. Циклические ссылки в современных движках не вызывают утечек; реальные утечки — забытые таймеры, обработчики событий и растущие глобальные переменные.",
+    "idealAnswer": "Garbage collector (GC) — встроенный механизм движка JavaScript, который автоматически находит и освобождает память объектов, до которых больше нет доступа из активного кода. Разработчик не управляет памятью вручную — это делает движок (V8 в Chrome/Node.js). Критерий «мусора» — недостижимость от корней (roots): глобальный объект, текущий стек вызовов, активные хендлы. Если на объект нет пути ссылок от корней — он кандидат на сбор. V8 использует mark-and-sweep: фаза mark — обход всех ссылок от корней (свойства, замыкания, цепочки прототипов), пометка достижимых; фаза sweep — освобождение непомеченных. Ключевой принцип — reachability, а не подсчёт ссылок. Циклические ссылки (a.ref = b; b.ref = a) не вызывают утечек, если оба объекта недостижимы от корней — mark-and-sweep соберёт оба. Старые движки с reference counting имели проблему с циклами; V8 — нет. V8 делит heap на young generation (короткоживущие объекты, быстрые scavenge-проходы) и old generation (выжившие объекты, полный mark-and-sweep реже). С V8 7.4 маркирование инкрементальное — короткие паузы вместо длинного stop-the-world. Присвоение `obj = null` делает объект кандидатом на сбор, но GC запускается по своему расписанию — мгновенного освобождения нет. `delete obj.prop` удаляет ключ, но сам объект остаётся в heap. Реальные утечки памяти: setInterval без clearInterval (колбек и замыкания живут); event listeners на удалённых DOM-элементах; глобальные коллекции без ограничений (window.cache = []); detached DOM nodes — элемент убран из DOM, но JS-переменная держит ссылку. Профилактика: cleanup в useEffect (clearInterval, removeEventListener, AbortController); WeakMap для кешей с объектными ключами; ограничение размера кешей. В dev можно запустить Node с --expose-gc и вызвать global.gc(); в production принудительный GC недоступен. Отладка: heap snapshots в DevTools, сравнение Retained Size, process.memoryUsage() для трендов.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "gc_definition",
+      "title": "Понимает суть garbage collector",
+      "expected": "Кандидат объясняет: GC — встроенная часть движка, автоматически освобождает память недостижимых объектов; разработчик не управляет памятью вручную; критерий — reachability от корней.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — определение GC и автоматическое управление памятью",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "garbage collector",
+              "сборщик",
+              "GC",
+              "автомат"
+            ],
+            "ask": "что делает GC и почему разработчик не освобождает память вручную"
+          }
+        ],
+        "mustConcepts": [
+          "garbage collector",
+          "сборщик",
+          "GC",
+          "автомат",
+          "освобожд",
+          "памят",
+          "движок",
+          "V8",
+          "недостиж",
+          "корн",
+          "roots",
+          "heap",
+          "куч",
+          "reachability",
+          "достижим",
+          "вручную"
+        ],
+        "falseClaims": [
+          "в JavaScript нужно вручную вызывать free() для каждого объекта",
+          "GC удаляет объекты сразу после obj = null",
+          "garbage collector работает только в браузере, не в Node.js",
+          "GC освобождает память по количеству ссылок на объект"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "mark_and_sweep",
+      "title": "Знает алгоритм mark-and-sweep",
+      "expected": "Кандидат описывает: mark — обход всех ссылок от корней, пометка достижимых; sweep — освобождение непомеченных; принцип reachability, а не reference counting.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "mark-and-sweep — основной алгоритм V8 из Theory ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "gc_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "mark-and-sweep",
+              "mark",
+              "sweep",
+              "маркир"
+            ],
+            "ask": "как работают фазы mark и sweep в V8"
+          }
+        ],
+        "mustConcepts": [
+          "mark-and-sweep",
+          "mark",
+          "sweep",
+          "маркир",
+          "обход",
+          "корн",
+          "roots",
+          "помеч",
+          "достижим",
+          "reachability",
+          "reference counting",
+          "подсчёт ссылок",
+          "свойств",
+          "замыкан",
+          "прототип",
+          "непомеч"
+        ],
+        "falseClaims": [
+          "V8 использует только reference counting",
+          "mark-and-sweep считает количество ссылок на объект",
+          "sweep удаляет все объекты без исключения",
+          "mark phase не обходит замыкания и prototype chain"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "reachability_roots",
+      "title": "Понимает корни и обрыв ссылок",
+      "expected": "Кандидат называет корни: глобальный объект, стек вызовов, активные хендлы; obj = null обрывает последнюю ссылку — объект становится кандидатом на сбор.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый механизм из quick example ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "user = null",
+              "корн",
+              "roots",
+              "стек"
+            ],
+            "ask": "что происходит после user = null и почему объект становится мусором"
+          }
+        ],
+        "mustConcepts": [
+          "корн",
+          "roots",
+          "глобальн",
+          "стек вызов",
+          "call stack",
+          "хендл",
+          "handle",
+          "null",
+          "последн",
+          "ссылк",
+          "обрыв",
+          "кандидат",
+          "недостиж",
+          "глобальн объект",
+          "global"
+        ],
+        "falseClaims": [
+          "obj = null немедленно освобождает память",
+          "корни — только глобальные переменные, стек не учитывается",
+          "null удаляет объект из heap мгновенно",
+          "объект с хотя бы одной ссылкой от корня всегда собирается"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "circular_references",
+      "title": "Знает про циклические ссылки",
+      "expected": "Кандидат объясняет: циклические ссылки не вызывают утечек в современном V8; mark-and-sweep проверяет reachability от корней, а не считает ссылки; проблема была в старых reference-counting движках.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "частое заблуждение middle — циклы и утечки",
+        "mustConcepts": [
+          "циклич",
+          "circular",
+          "cycle",
+          "a.ref",
+          "b.ref",
+          "утеч",
+          "leak",
+          "reference counting",
+          "подсчёт",
+          "mark-and-sweep",
+          "достижим",
+          "корн",
+          "V8",
+          "стары",
+          "движк"
+        ],
+        "falseClaims": [
+          "циклические ссылки всегда вызывают memory leak в V8",
+          "mark-and-sweep не может собрать цикл из двух объектов",
+          "в JavaScript любой цикл a↔b живёт вечно",
+          "современные браузеры используюте только reference counting"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "memory_leak_sources",
+      "title": "Знает источники утечек памяти",
+      "expected": "Кандидат называет: setInterval без clearInterval; event listeners на удалённых элементах; глобальные коллекции без лимита; detached DOM nodes; упоминает WeakMap и cleanup в useEffect.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "production-утечки — ключевой блок ITLead Real-world usage",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "setInterval",
+              "clearInterval",
+              "таймер"
+            ],
+            "ask": "почему setInterval в request handler без clearInterval вызывает утечку"
+          },
+          {
+            "match": [
+              "WeakMap",
+              "window.cache",
+              "глобальн"
+            ],
+            "ask": "чем WeakMap лучше Map для object-keyed cache"
+          },
+          {
+            "match": [
+              "removeEventListener",
+              "detached",
+              "DOM"
+            ],
+            "ask": "как detached DOM node удерживает память"
+          }
+        ],
+        "mustConcepts": [
+          "setInterval",
+          "clearInterval",
+          "таймер",
+          "event listener",
+          "обработчик",
+          "removeEventListener",
+          "глобальн",
+          "window.cache",
+          "WeakMap",
+          "detached",
+          "DOM",
+          "утеч",
+          "leak",
+          "useEffect",
+          "cleanup",
+          "AbortController",
+          "замыкан",
+          "closure"
+        ],
+        "falseClaims": [
+          "GC собирает объекты даже если на них есть живая ссылка от setInterval",
+          "удаление элемента из DOM автоматически удаляет все listeners",
+          "глобальный массив без лимита не мешает GC",
+          "WeakMap удерживает ключи сильной ссылкой как обычная Map"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные заблуждения про GC",
+      "expected": "Кандидат различает: delete удаляет ключ, но не объект; obj = null делает кандидатом, но не мгновенно освобождает; нельзя форсировать GC в production; DevTools может показывать память до следующего цикла GC.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — delete, globals, immediate GC",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "memory_leak_sources",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "common_mistakes",
+            "oftenConfusedWith": [
+              "reachability_roots"
+            ],
+            "anchorTermsExpected": [
+              "delete",
+              "null",
+              "кандидат",
+              "расписан",
+              "мгновен"
+            ],
+            "anchorTermsWrongTopic": [
+              "delete освобождает heap",
+              "null сразу освобождает"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "delete",
+              "obj.prop"
+            ],
+            "ask": "освобождает ли delete obj.prop память объекта"
+          },
+          {
+            "match": [
+              "expose-gc",
+              "global.gc",
+              "DevTools"
+            ],
+            "ask": "можно ли форсировать GC в production браузере"
+          }
+        ],
+        "mustConcepts": [
+          "delete",
+          "ключ",
+          "свойств",
+          "null",
+          "кандидат",
+          "мгновен",
+          "расписан",
+          "schedule",
+          "expose-gc",
+          "global.gc",
+          "DevTools",
+          "heap snapshot",
+          "Retained Size",
+          "window.cache",
+          "неогранич",
+          "тренд"
+        ],
+        "falseClaims": [
+          "delete obj.prop освобождает весь объект из heap",
+          "obj = null немедленно уменьшает used memory в DevTools",
+          "в production можно вызвать global.gc() в браузере",
+          "один heap snapshot достаточен для диагностики утечки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "generational_gc",
+      "title": "Знает generational GC и инкрементальное маркирование",
+      "expected": "Кандидат упоминает young/old generation, scavenge vs full mark-and-sweep; инкрементальное маркирование с V8 7.4 сокращает длинные паузы; большинство объектов умирает в young generation.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Generational GC — бонус middle из Theory ITLead",
+        "mustConcepts": [
+          "young generation",
+          "old generation",
+          "молод",
+          "стар",
+          "поколен",
+          "scavenge",
+          "incremental",
+          "инкремент",
+          "stop-the-world",
+          "пауз",
+          "promot",
+          "продвиж",
+          "Orinoco",
+          "V8 7.4",
+          "короткожив",
+          "survivor"
+        ],
+        "falseClaims": [
+          "все объекты сразу попадают в old generation",
+          "incremental marking полностью убирает паузы GC",
+          "generational GC виден и управляется из JS-кода",
+          "scavenge — это полный mark-and-sweep всего heap"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "GC в V8 автоматически собирает недостижимые объекты. Mark-and-sweep: от корней (global, call stack) обходим все ссылки, помечаем достижимые, остальное освобождаем. user = null обрывает последнюю ссылку — объект кандидат, но GC запустится позже. Циклы a↔b без корневых ссылок не утекают. Реальные утечки — setInterval без clearInterval, listeners на detached DOM, window.cache без лимита.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В React в useEffect всегда cleanup: clearInterval, removeEventListener. Для метаданных к request-объекту — WeakMap, не Map: когда request = null, запись исчезает сама. Утечку на 50 MB/час нашёл через heap snapshots — interval в handler запроса без clear.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "delete obj.prop убирает ключ, но obj в heap живёт. Чтобы освободить — обнулить последнюю ссылку obj = null. В Node dev — --expose-gc и global.gc(); в prod GC по расписанию, тренды смотрю через process.memoryUsage().",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Garbage collector считает ссылки: если a.ref = b и b.ref = a — оба живут вечно, это memory leak. delete obj.prop сразу освобождает память объекта.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "После largeObj = null память мгновенно свободна в DevTools. В production вызываю global.gc() после каждого запроса в Express.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "setInterval можно не чистить — GC сам убьёт колбек когда компонент размонтируется. window.cache = [] растёт — GC соберёт старые элементы автоматически.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "gc_definition",
+      "exampleType": "good",
+      "exampleText": "GC — часть движка V8, автоматически освобождает память объектов, недостижимых от корней программы.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "gc_definition",
+      "exampleType": "good",
+      "exampleText": "ну сборщик мусора сам чистит heap — мы не делаем free(), движок решает что уже мусор",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "gc_definition",
+      "exampleType": "bad",
+      "exampleText": "В JavaScript память освобождается только при закрытии вкладки, GC не работает во время выполнения.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "mark_and_sweep",
+      "exampleType": "good",
+      "exampleText": "Mark phase: от roots обходим properties, closures, prototypes — помечаем достижимые. Sweep: всё непомеченное — в мусор.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "mark_and_sweep",
+      "exampleType": "good",
+      "exampleText": "mark-and-sweep смотрит reachability от корней, а не сколько ссылок на объект",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "mark_and_sweep",
+      "exampleType": "bad",
+      "exampleText": "V8 использует reference counting: когда счётчик ссылок = 0, объект удаляется.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "reachability_roots",
+      "exampleType": "good",
+      "exampleText": "let user = { name: 'Alice' }; user = null — последняя ссылка обрезана, объект недостижим от global и call stack.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "reachability_roots",
+      "exampleType": "good",
+      "exampleText": "корни — global object, стек вызовов, handles; нет пути от корня = garbage",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "reachability_roots",
+      "exampleType": "bad",
+      "exampleText": "user = null сразу удаляет объект из heap и память видна свободной в DevTools.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "circular_references",
+      "exampleType": "good",
+      "exampleText": "createCycle(): a.ref=b, b.ref=a, функция завершилась — ни a ни b не достижимы от roots, V8 соберёт оба.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "circular_references",
+      "exampleType": "good",
+      "exampleText": "циклы не утекают в v8 — mark-and-sweep проверяет достижимость, не считает ссылки",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "circular_references",
+      "exampleType": "bad",
+      "exampleText": "Любой цикл между двумя объектами — guaranteed memory leak в Chrome и Node.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "memory_leak_sources",
+      "exampleType": "good",
+      "exampleText": "setInterval в request handler без clearInterval — колбек и closure живут, сервис растёт на 50 MB/час.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "memory_leak_sources",
+      "exampleType": "good",
+      "exampleText": "WeakMap для per-request cache — ключи слабые, request = null и запись исчезает; обычная Map держала бы объект.",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "memory_leak_sources",
+      "exampleType": "bad",
+      "exampleText": "Элемент удалили из DOM — listener и handler автоматически собираются GC, removeEventListener не нужен.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "delete obj.prop удаляет ключ, obj остаётся в heap; для GC нужен obj = null на последнюю ссылку.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "largeObj = null — кандидат на сбор, но DevTools может показывать used memory ещё секунды; смотрю тренды snapshot, не один замер",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "delete obj.prop освобождает весь объект; window.cache растёт — GC периодически чистит старые push автоматически.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "generational_gc",
+      "exampleType": "good",
+      "exampleText": "Young generation — scavenge для короткоживущих; выжившие promoted в old generation с редким full mark-and-sweep.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "generational_gc",
+      "exampleType": "good",
+      "exampleText": "с v8 7.4 marking инкрементальный — короткие паузы вместо одного длинного stop-the-world",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "generational_gc",
+      "exampleType": "bad",
+      "exampleText": "Все новые объекты сразу в old generation, scavenge не используется в V8.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "what-is-garbage-collector-in-javascript",
+    "apiUrl": "https://api.itlead.org/api/questions/what-is-garbage-collector-in-javascript",
+    "pageUrl": "https://itlead.org/interview-questions/javascript/what-is-garbage-collector-in-javascript",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is garbage collector in JavaScript?",
+    "categorySlug": "javascript",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

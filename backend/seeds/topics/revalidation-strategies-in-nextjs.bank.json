@@ -1,0 +1,611 @@
+{
+  "topic": {
+    "code": "revalidation_strategies_nextjs",
+    "name": "Стратегии revalidation в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Какие стратегии revalidation доступны в Next.js и когда какую использовать?",
+    "shortAnswer": "Revalidation обновляет кешированные страницы без полной пересборки сайта. Time-based (`next: { revalidate: N }`) — stale-while-revalidate по таймеру для редко меняющихся данных; on-demand (`revalidatePath`, `revalidateTag`) — мгновенная инвалидация после мутаций. Для user-specific и real-time данных — dynamic rendering или `cache: 'no-store'`.",
+    "idealAnswer": "Revalidation в Next.js обновляет кешированные страницы свежими данными без полной пересборки сайта. Time-based revalidation (ISR): `fetch(url, { next: { revalidate: 3600 } })` — страница отдаётся из кеша мгновенно, после истечения TTL Next.js всё равно отдаёт stale-версию (stale-while-revalidate) и в фоне запускает Node.js worker для регенерации; следующий посетитель получит свежую версию. Важно: пользователь, который триггерит revalidation, всё ещё видит stale данные. On-demand revalidation пропускает таймер: `revalidatePath('/products')` или `revalidateTag('products')` помечают записи кеша как устаревшие сразу после webhook/Server Action; следующий запрос к пути запускает свежий fetch. `revalidateTag` даёт хирургический контроль — один тег покрывает несколько fetch на разных маршрутах. Когда что: блоги/docs — `revalidate: 86400`; e-commerce каталог — `revalidate: 300` + `revalidateTag('products')` из Shopify/Stripe webhook; live scores/курсы — `cache: 'no-store'` или `dynamic = 'force-dynamic'`; user dashboards — `noStore()` или per-request dynamic. Внутри: первый запрос генерирует HTML+JSON в `.next/cache` (или Vercel distributed cache); TTL expired → stale отдаётся сразу, фоновая регенерация атомарно подменяет запись. Data Cache (сервер) и Router Cache (браузер, до ~30 сек в Next.js 14) — разные слои: `revalidatePath('/products')` инвалидирует Data Cache, но Router Cache может остаться stale — fix `revalidatePath('/', 'layout')`. Типичные ошибки: (1) `searchParams` включает dynamic rendering — `export const revalidate` игнорируется; (2) нет фонового cron — без входящего трафика кеш остаётся stale бесконечно; (3) `revalidateTag` на fetch без `tags` — ничего не делает; (4) time-based и tag-based опции взаимоисключающи на одном fetch. App Router vs Pages Router: Pages — один ISR entry на path без тегов; App Router — Data Cache + Router Cache, `revalidateTag`, revalidation на уровне layout segment. Server Action: `revalidatePath` помечает stale сразу, но purge происходит после завершения action. Для cart count в nested layout — `{ tags: ['cart'] }` + `revalidateTag('cart')` лучше чем `revalidatePath('/', 'layout')`, который инвалидирует всё.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "react"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "revalidation_definition",
+      "title": "Понимает revalidation и stale-while-revalidate",
+      "expected": "Кандидат объясняет: revalidation обновляет кеш без полной пересборки; stale-while-revalidate — мгновенная отдача из кеша + фоновая регенерация; триггеривший пользователь всё ещё видит stale.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — что такое revalidation и SWR-поведение",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "revalidation_definition",
+            "oftenConfusedWith": [
+              "time_based_vs_on_demand",
+              "internal_cache_layers"
+            ],
+            "anchorTermsExpected": [
+              "revalidation",
+              "stale-while-revalidate",
+              "кеш",
+              "фонов",
+              "stale",
+              "следующ"
+            ],
+            "anchorTermsWrongTopic": [
+              "полная пересборка",
+              "revalidation это SSR",
+              "мгновенно свежие данные текущему пользователю"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "stale-while-revalidate",
+              "stale",
+              "фонов"
+            ],
+            "ask": "кто получает свежие данные после истечения TTL — текущий или следующий посетитель"
+          }
+        ],
+        "mustConcepts": [
+          "revalidation",
+          "повторн",
+          "валидац",
+          "кеш",
+          "stale-while-revalidate",
+          "stale",
+          "фонов",
+          "регенерац",
+          "без пересборк",
+          "без rebuild",
+          "следующ",
+          "посетител",
+          "TTL",
+          "кеширован",
+          "свеж",
+          "обновл"
+        ],
+        "falseClaims": [
+          "revalidation требует полной пересборки сайта",
+          "пользователь, триггеривший revalidation, сразу видит свежие данные",
+          "stale-while-revalidate блокирует ответ до завершения фонового fetch",
+          "revalidation и ISR — разные несвязанные механизмы",
+          "revalidation работает только на build time"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "time_based_vs_on_demand",
+      "title": "Отличает time-based от on-demand revalidation",
+      "expected": "Кандидат сравнивает: time-based — таймер `revalidate: N`, SWR по расписанию; on-demand — `revalidatePath`/`revalidateTag` сразу после мутации, без ожидания таймера.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевое различие стратегий из ITLead comparison table",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "revalidation_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "time_based_vs_on_demand",
+            "oftenConfusedWith": [
+              "on_demand_revalidation",
+              "when_to_use_strategies"
+            ],
+            "anchorTermsExpected": [
+              "time-based",
+              "on-demand",
+              "таймер",
+              "revalidatePath",
+              "revalidateTag",
+              "webhook"
+            ],
+            "anchorTermsWrongTopic": [
+              "on-demand ждёт таймер",
+              "time-based мгновенно инвалидирует"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "time-based",
+              "on-demand",
+              "таймер"
+            ],
+            "ask": "чем time-based ISR отличается от on-demand при изменении цены товара"
+          }
+        ],
+        "mustConcepts": [
+          "time-based",
+          "по времени",
+          "таймер",
+          "revalidate: N",
+          "on-demand",
+          "по требован",
+          "revalidatePath",
+          "revalidateTag",
+          "расписан",
+          "мгновен",
+          "инвалидац",
+          "webhook",
+          "мутац",
+          "без ожидан",
+          "TTL",
+          "ISR"
+        ],
+        "falseClaims": [
+          "time-based и on-demand решают одну задачу одинаково",
+          "on-demand revalidation ждёт истечения TTL",
+          "time-based мгновенно инвалидирует кеш при изменении данных",
+          "revalidatePath и revalidateTag — одно и то же",
+          "ISR не использует time-based revalidation"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "time_based_isr",
+      "title": "Знает time-based ISR через fetch",
+      "expected": "Кандидат показывает `fetch(url, { next: { revalidate: 3600 } })`; объясняет первый визит — live fetch, внутри TTL — кеш ~50ms, после TTL — stale + фоновая регенерация.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый механизм из quick example ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "revalidate: 3600",
+              "next: { revalidate"
+            ],
+            "ask": "что происходит при первом, втором и запросе после истечения TTL"
+          }
+        ],
+        "mustConcepts": [
+          "fetch",
+          "next: { revalidate",
+          "revalidate: 3600",
+          "revalidate: 86400",
+          "ISR",
+          "первый визит",
+          "кеш",
+          "50ms",
+          "час",
+          "день",
+          "фонов",
+          "регенерац",
+          "App Router",
+          "export const revalidate"
+        ],
+        "falseClaims": [
+          "revalidate в fetch работает только в Pages Router",
+          "первый визит всегда отдаётся из кеша",
+          "revalidate: 0 отключает все уровни кеша Next.js",
+          "export const revalidate переопределяет более короткий fetch revalidate вверх"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "on_demand_revalidation",
+      "title": "Знает revalidatePath и revalidateTag",
+      "expected": "Кандидат объясняет: `revalidatePath('/products')` инвалидирует кеш пути; `revalidateTag('products')` — все fetch с тегом; теги в `{ tags: ['products'] }`; webhook/Server Action как триггеры.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "on-demand path/tag — ключевой production-паттерн middle+",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "revalidateTag",
+              "tags"
+            ],
+            "ask": "как связать Stripe webhook с обновлением каталога через revalidateTag"
+          },
+          {
+            "match": [
+              "revalidatePath",
+              "layout"
+            ],
+            "ask": "когда нужен revalidatePath('/', 'layout') вместо revalidatePath('/products')"
+          },
+          {
+            "match": [
+              "Server Action",
+              "createPost"
+            ],
+            "ask": "когда revalidation срабатывает при вызове revalidateTag из Server Action"
+          }
+        ],
+        "mustConcepts": [
+          "revalidatePath",
+          "revalidateTag",
+          "next/cache",
+          "tags",
+          "тег",
+          "webhook",
+          "Server Action",
+          "инвалидац",
+          "featured-products",
+          "products",
+          "cart",
+          "layout",
+          "сегмент",
+          "маршрут",
+          "мутац",
+          "POST",
+          "api/revalidate"
+        ],
+        "falseClaims": [
+          "revalidateTag работает на любом fetch без указания tags",
+          "revalidatePath мгновенно пересобирает страницу синхронно в том же запросе",
+          "time-based revalidate и tags можно комбинировать на одном fetch",
+          "revalidateTag инвалидирует Router Cache в браузере навсегда",
+          "on-demand revalidation требует cron job"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use_strategies",
+      "title": "Выбирает стратегию под сценарий",
+      "expected": "Кандидат сопоставляет: блоги/docs — time-based; e-commerce — time-based + on-demand tag; real-time — no-store/force-dynamic; user data — noStore/dynamic; cart+products — tag-based.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use таблица из ITLead",
+        "mustConcepts": [
+          "блог",
+          "docs",
+          "SEO",
+          "e-commerce",
+          "каталог",
+          "цены",
+          "инвентар",
+          "live scores",
+          "курс",
+          "real-time",
+          "no-store",
+          "force-dynamic",
+          "dashboard",
+          "профиль",
+          "noStore",
+          "user-specific",
+          "cart",
+          "86400",
+          "300",
+          "5 минут"
+        ],
+        "falseClaims": [
+          "ISR подходит для user-specific dashboards",
+          "real-time данные кешируют с revalidate: 60",
+          "блог всегда требует on-demand revalidation",
+          "e-commerce каталог не нуждается в on-demand при изменении цены",
+          "no-store и force-dynamic дают одинаковую latency на высоком трафике"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки revalidation",
+      "expected": "Кандидат называет: searchParams отключает revalidate; нет трафика — кеш stale без cron; Router Cache vs Data Cache; revalidateTag без tags на fetch; time-based и tags взаимоисключающи.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — частые production-ловушки",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "searchParams",
+              "dynamic"
+            ],
+            "ask": "почему export const revalidate игнорируется при использовании searchParams"
+          },
+          {
+            "match": [
+              "cron",
+              "трафик",
+              "low-traffic"
+            ],
+            "ask": "что происходит с кешем на low-traffic странице после истечения TTL"
+          },
+          {
+            "match": [
+              "Router Cache",
+              "Data Cache"
+            ],
+            "ask": "почему после revalidatePath('/') пользователь может видеть stale layout в браузере"
+          }
+        ],
+        "mustConcepts": [
+          "searchParams",
+          "dynamic rendering",
+          "игнорир",
+          "cron",
+          "трафик",
+          "low-traffic",
+          "Router Cache",
+          "Data Cache",
+          "30 секунд",
+          "layout",
+          "revalidatePath('/', 'layout')",
+          "tags",
+          "без тег",
+          "взаимоисключ",
+          "noStore",
+          "фонов cron",
+          "входящ",
+          "запрос"
+        ],
+        "falseClaims": [
+          "revalidate работает вместе с searchParams в Next.js 14+",
+          "Next.js автоматически регенерирует страницы по cron без трафика",
+          "revalidatePath обновляет Router Cache в браузере мгновенно",
+          "можно вызвать revalidateTag('products') на fetch только с revalidate: 60 без tags",
+          "stale кеш на low-traffic странице сам обновится через час без посетителей"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "internal_cache_layers",
+      "title": "Понимает внутреннюю механику кеша",
+      "expected": "Кандидат описывает: `.next/cache`/Vercel cache; TTL check → stale отдаётся → фоновый worker; on-demand пропускает TTL; Data Cache vs Router Cache; App Router vs Pages Router (теги, layout segments).",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "how it works internally + App vs Pages — бонус middle",
+        "mustConcepts": [
+          ".next/cache",
+          "Vercel",
+          "distributed cache",
+          "HTML",
+          "JSON",
+          "worker",
+          "атомарн",
+          "Data Cache",
+          "Router Cache",
+          "Pages Router",
+          "App Router",
+          "layout segment",
+          "CDN",
+          "Cache-Control",
+          "HTTP",
+          "Node.js"
+        ],
+        "falseClaims": [
+          "Router Cache и Data Cache — один слой",
+          "Pages Router поддерживает revalidateTag",
+          "on-demand revalidation ждёт истечения TTL перед purge",
+          "revalidation в Next.js и stale-while-revalidate HTTP directive — одно и то же на одном уровне",
+          "фоновый worker запускается даже без входящих запросов после TTL"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Revalidation обновляет кеш без полной пересборки. Time-based: fetch с revalidate: 3600 — stale-while-revalidate, пользователь получает кеш мгновенно, фоновая регенерация для следующего. On-demand: webhook вызывает revalidateTag('products') — инвалидация сразу после изменения цены.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Блог — revalidate: 86400, дневная задержка ок. Каталог — revalidate: 300 как fallback + revalidateTag из Stripe webhook. Dashboard пользователя — noStore(), ISR не подходит. Cart count в header — tags: ['cart'] + revalidateTag после мутации, не revalidatePath('/', 'layout').",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Первый визит — live fetch в Data Cache. Внутри часа — ~50ms из кеша. После TTL — stale отдаётся сразу, worker регенерирует в фоне. revalidatePath инвалидирует Data Cache, но Router Cache в браузере может жить до 30 сек — нужен layout revalidation.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Revalidation — это полная пересборка сайта при каждом изменении. Пользователь, открывший страницу после TTL, сразу видит свежие данные, stale-while-revalidate блокирует ответ.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Ставлю export const revalidate = 3600 и searchParams в Page — ISR работает нормально. На low-traffic странице Next.js сам по cron обновляет кеш каждый час без посетителей.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "revalidateTag('products') сработает на любом fetch с revalidate: 60 без tags. Pages Router поддерживает теги так же как App Router. Router Cache и Data Cache — одно и то же.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "revalidation_definition",
+      "exampleType": "good",
+      "exampleText": "Revalidation — обновление кеша без rebuild; stale-while-revalidate отдаёт старую версию мгновенно, свежую получит следующий посетитель.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "revalidation_definition",
+      "exampleType": "good",
+      "exampleText": "ну revalidation — как кофейник: старый кофе ещё раздают, новый варят в фоне, текущий клиент не ждёт",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "revalidation_definition",
+      "exampleType": "bad",
+      "exampleText": "Revalidation пересобирает весь сайт и текущий пользователь сразу видит обновлённую страницу.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "time_based_vs_on_demand",
+      "exampleType": "good",
+      "exampleText": "Time-based — по таймеру revalidate: N для блогов; on-demand — revalidatePath/revalidateTag сразу после webhook при смене цены.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "time_based_vs_on_demand",
+      "exampleType": "good",
+      "exampleText": "доки — раз в сутки хватит time-based; цены в магазине — on-demand tag из stripe, таймер не ждём",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "time_based_vs_on_demand",
+      "exampleType": "bad",
+      "exampleText": "On-demand revalidation ждёт истечения TTL, time-based мгновенно инвалидирует при изменении данных.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "time_based_isr",
+      "exampleType": "good",
+      "exampleText": "fetch(url, { next: { revalidate: 3600 } }) — первый визит live, час из кеша, после TTL stale + фоновая регенерация.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "time_based_isr",
+      "exampleType": "good",
+      "exampleText": "блог revalidate: 86400 — дневная статья ок, страница грузится за 50ms из кеша",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "time_based_isr",
+      "exampleType": "bad",
+      "exampleText": "revalidate: 3600 означает что каждый пользователь после часа блокируется пока идёт fetch.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "on_demand_revalidation",
+      "exampleType": "good",
+      "exampleText": "fetch с tags: ['featured-products']; Stripe webhook POST /api/revalidate → revalidateTag('featured-products'); следующий визит /shop/products — свежие данные.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "on_demand_revalidation",
+      "exampleType": "good",
+      "exampleText": "createPost Server Action: db.insert + revalidateTag('posts') — все маршруты с тегом posts обновятся на следующем запросе",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "on_demand_revalidation",
+      "exampleType": "bad",
+      "exampleText": "revalidateTag('products') инвалидирует fetch без tags. revalidatePath синхронно пересобирает HTML в том же HTTP-запросе.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use_strategies",
+      "exampleType": "good",
+      "exampleText": "SEO лендинг — revalidate: 86400; каталог — 300 + tag webhook; курсы валют — no-store; профиль — noStore/dynamic.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_use_strategies",
+      "exampleType": "good",
+      "exampleText": "высокий трафик + полустатичные данные — revalidation лучше dynamic, 50ms vs 200-500ms",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use_strategies",
+      "exampleType": "bad",
+      "exampleText": "Для user dashboard беру ISR с revalidate: 60 — персональные данные кешируются нормально.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "searchParams делает страницу dynamic — export const revalidate игнорируется; либо убираю revalidate, либо noStore() явно.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "low-traffic: cron бьёт URL или on-demand webhook — без входящего запроса кеш stale навсегда",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "после revalidatePath('/') Data Cache свежий, но Router Cache до 30 сек — fix revalidatePath('/', 'layout')",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "fetch(url, { next: { revalidate: 60 } }) + revalidateTag('products') — оба работают на одном fetch одновременно.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "internal_cache_layers",
+      "exampleType": "good",
+      "exampleText": "HTML+JSON в .next/cache; TTL expired — stale сразу, worker регенерирует атомарно; Data Cache сервер, Router Cache браузер ~30 сек.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "internal_cache_layers",
+      "exampleType": "good",
+      "exampleText": "App Router — revalidateTag и layout segments; Pages Router — один ISR entry без тегов",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "internal_cache_layers",
+      "exampleType": "bad",
+      "exampleText": "После TTL Next.js сам запускает cron worker без входящих запросов. Pages Router поддерживает revalidateTag как App Router.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "revalidation-strategies-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/revalidation-strategies-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/revalidation-strategies-in-nextjs",
+    "difficulty": "MIDDLE",
+    "titleEn": "Revalidation strategies in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T16:30:00.000Z"
+  }
+}

@@ -1,0 +1,571 @@
+{
+  "topic": {
+    "code": "deploying_nextjs_applications",
+    "name": "Развёртывание Next.js приложений",
+    "skillCode": "nextjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как развернуть Next.js приложение в production? Какие есть варианты деплоя и когда какой выбирать?",
+    "shortAnswer": "Развёртывание Next.js сводится к трём основным путям: Vercel (managed, zero config), Docker с `output: 'standalone'` (self-hosted, полный SSR) или static export (без сервера, любой CDN). Для любого деплоя вне Vercel сначала добавь `output: 'standalone'` в `next.config.js`.",
+    "idealAnswer": "Развёртывание Next.js — это сборка приложения и размещение на инфраструктуре, способной отдавать статические страницы, SSR-маршруты и API endpoints. Vercel (платформа от создателей Next.js) автоматически разделяет hybrid output: SSG-страницы уходят на CDN edge, SSR и API routes выполняются как serverless functions — одна команда `vercel --prod`, HTTPS и preview URLs из коробки. Docker с `output: 'standalone'` упаковывает всё в один Node.js процесс (`server.js`) — полный контроль, но scaling, HTTPS и CDN на вас; multi-stage Dockerfile с standalone сжимает образ с ~1.2GB до 140–160MB. Static export генерирует plain HTML/CSS/JS без сервера — почти нулевая стоимость хостинга, но SSR и API routes полностью недоступны. Правило выбора: Vercel — скорость и zero ops; Docker — custom infra (Kubernetes, on-prem, Fly.io, EC2); static export — если server-side логики нет вообще (доки, блоги на S3/Netlify). `next build` сканирует `app/` или `pages/`, prerender SSG в `.next/static/`, SSR/API в `.next/server/app/`; standalone копирует минимальные зависимости в `.next/standalone/` для запуска без полного `node_modules`. Типичные ошибки Docker: без `output: 'standalone'` образ требует полный `.next` + `node_modules`; binding к `127.0.0.1` вместо `HOSTNAME=0.0.0.0` — контейнер «живой», но недоступен снаружи; забытый `NODE_ENV=production` — dev-режим в контейнере; `getServerSideProps` + static export — build падает, нужен `generateStaticParams` или server deploy. Edge Runtime на Vercel — V8 isolates глобально (~10ms latency), но без полного Node.js API (`fs`, `crypto`); Node crypto в Edge ломается — переход на Web Crypto API (`crypto.subtle`). ISR на Vercel revalidates через webhook в Edge cache — большинство пользователей получают cached response; SSR вызывает Lambda на каждый запрос с возможными cold starts. Node server через `npm start`/`pm2` работает, но для production предпочтительнее standalone.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "deploy_options_overview",
+      "title": "Знает три основных способа деплоя",
+      "expected": "Кандидат перечисляет Vercel (managed), Docker standalone (self-hosted SSR) и static export (без сервера); понимает trade-off zero ops vs контроль vs отсутствие server-side.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — три пути деплоя и базовое различие",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Vercel",
+              "Docker",
+              "static export",
+              "standalone"
+            ],
+            "ask": "чем Vercel отличается от Docker standalone и static export по инфраструктуре"
+          }
+        ],
+        "mustConcepts": [
+          "Vercel",
+          "Docker",
+          "standalone",
+          "static export",
+          "self-hosted",
+          "managed",
+          "zero ops",
+          "SSR",
+          "API routes",
+          "CDN",
+          "сервер",
+          "без сервера",
+          "Node.js",
+          "serverless",
+          "контейнер",
+          "статич"
+        ],
+        "falseClaims": [
+          "static export поддерживает SSR и API routes",
+          "Docker и Vercel дают одинаковый zero-config опыт",
+          "Vercel не поддерживает SSR",
+          "static export требует Node.js сервер",
+          "Docker всегда дешевле Vercel для любого проекта"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "vercel_hybrid_split",
+      "title": "Понимает как Vercel обрабатывает hybrid output",
+      "expected": "Кандидат объясняет: Vercel нативно разделяет SSG на CDN edge, SSR и API на serverless Lambdas; `vercel --prod` без дополнительного конфига; preview URLs и HTTPS включены.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Key difference — Vercel hybrid split из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "deploy_options_overview",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "vercel_hybrid_split",
+            "oftenConfusedWith": [
+              "deploy_options_overview",
+              "isr_vs_ssr_vercel"
+            ],
+            "anchorTermsExpected": [
+              "CDN edge",
+              "serverless",
+              "Lambda",
+              "SSG",
+              "SSR",
+              "vercel --prod"
+            ],
+            "anchorTermsWrongTopic": [
+              "Vercel запускает один Node процесс",
+              "static export на Vercel"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "CDN",
+          "edge",
+          "serverless",
+          "Lambda",
+          "SSG",
+          "SSR",
+          "API route",
+          "vercel --prod",
+          "preview",
+          "HTTPS",
+          "hybrid",
+          "статич",
+          "динамич",
+          "автоматич",
+          "разделя",
+          "next.config"
+        ],
+        "falseClaims": [
+          "Vercel деплоит всё как один monolith Node процесс",
+          "на Vercel нужен отдельный Dockerfile для SSR",
+          "Vercel не различает static и dynamic маршруты",
+          "vercel --prod требует ручной настройки CDN",
+          "SSG на Vercel не использует edge CDN"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "standalone_output",
+      "title": "Понимает output standalone и сборку next build",
+      "expected": "Кандидат объясняет: default build требует `node_modules` at runtime; standalone копирует минимум в `.next/standalone/` для `server.js`; multi-stage Docker ~1.2GB → 140–160MB; обязателен для Docker/Fly.io вне Vercel.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевой production-паттерн для self-hosted — standalone и build internals",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "standalone",
+              "server.js",
+              "next build"
+            ],
+            "ask": "чем standalone build отличается от default и что попадает в `.next/standalone/`"
+          },
+          {
+            "match": [
+              "multi-stage",
+              "1.2GB",
+              "150MB",
+              "Dockerfile"
+            ],
+            "ask": "почему multi-stage Docker с standalone сильно уменьшает образ"
+          }
+        ],
+        "mustConcepts": [
+          "output",
+          "standalone",
+          "server.js",
+          "next build",
+          ".next/standalone",
+          "node_modules",
+          "multi-stage",
+          "Dockerfile",
+          "1.2GB",
+          "150MB",
+          "140MB",
+          "160MB",
+          "runner",
+          "builder",
+          "минимальн",
+          "зависимост",
+          "runtime",
+          "SSG prerender",
+          ".next/static",
+          ".next/server"
+        ],
+        "falseClaims": [
+          "standalone не нужен для Docker деплоя",
+          "default build работает в контейнере без node_modules",
+          "standalone убирает SSR",
+          "multi-stage build не влияет на размер образа",
+          "standalone требует npm install на production сервере"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use_deploy",
+      "title": "Знает когда выбирать Vercel, Docker или static export",
+      "expected": "Кандидат называет сценарии: прототипы/landing → Vercel free tier; e-commerce/dashboard с SSR → Vercel или Docker standalone; K8s/on-prem → Docker; docs/блоги → static export на S3/Netlify; VPS → pm2, но лучше standalone.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "таблица When to use и Comparison Table из ITLead",
+        "mustConcepts": [
+          "прототип",
+          "landing",
+          "e-commerce",
+          "dashboard",
+          "Kubernetes",
+          "on-prem",
+          "EC2",
+          "Fly.io",
+          "S3",
+          "Netlify",
+          "GitHub Pages",
+          "документац",
+          "блог",
+          "VPS",
+          "pm2",
+          "free tier",
+          "preview URL",
+          "zero cost"
+        ],
+        "falseClaims": [
+          "static export подходит для e-commerce с SSR checkout",
+          "Docker всегда лучше Vercel для landing page",
+          "Vercel нельзя использовать для e-commerce",
+          "pm2 на VPS — лучший production паттерн чем standalone Docker",
+          "static export поддерживает API routes через CDN"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "docker_common_mistakes",
+      "title": "Знает типичные ошибки Docker-деплоя Next.js",
+      "expected": "Кандидат называет: без `output: 'standalone'`; binding `127.0.0.1` вместо `HOSTNAME=0.0.0.0`; отсутствие `NODE_ENV=production`; `getServerSideProps` + static export — несовместимы.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — частые production-блокеры",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "standalone_output",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "HOSTNAME",
+              "0.0.0.0",
+              "127.0.0.1",
+              "localhost"
+            ],
+            "ask": "почему контейнер запускается, но запросы снаружи timeout — и как исправить"
+          },
+          {
+            "match": [
+              "getServerSideProps",
+              "static export",
+              "generateStaticParams"
+            ],
+            "ask": "почему build падает при GSSP и static export одновременно"
+          }
+        ],
+        "mustConcepts": [
+          "standalone",
+          "HOSTNAME",
+          "0.0.0.0",
+          "127.0.0.1",
+          "localhost",
+          "PORT",
+          "NODE_ENV",
+          "production",
+          "getServerSideProps",
+          "static export",
+          "generateStaticParams",
+          "App Router",
+          "timeout",
+          "node_modules",
+          "server.js",
+          "Dockerfile",
+          "ENV"
+        ],
+        "falseClaims": [
+          "127.0.0.1 в Docker доступен снаружи контейнера",
+          "NODE_ENV=development безопасен в production контейнере",
+          "getServerSideProps работает со static export",
+          "без standalone Docker всегда работает если локально ок",
+          "HOSTNAME не влияет на binding standalone server.js"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "edge_runtime_limitations",
+      "title": "Понимает Edge Runtime и ограничения Node.js API",
+      "expected": "Кандидат объясняет: Edge — V8 isolates глобально, низкая latency; нет `fs`, Node `crypto`; Web Crypto API (`crypto.subtle`) работает; webhook signature validation — типичный gotcha.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Advanced Edge/crypto gotcha из ITLead examples",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Edge Runtime",
+              "crypto",
+              "Web Crypto"
+            ],
+            "ask": "почему Node crypto ломается на Edge и чем заменить для HMAC webhook"
+          },
+          {
+            "match": [
+              "Node.js runtime",
+              "cold start",
+              "latency"
+            ],
+            "ask": "trade-off Edge vs Node.js runtime на Vercel"
+          }
+        ],
+        "mustConcepts": [
+          "Edge Runtime",
+          "Edge Middleware",
+          "V8 isolate",
+          "Node.js runtime",
+          "crypto",
+          "Web Crypto",
+          "crypto.subtle",
+          "importKey",
+          "HMAC",
+          "webhook",
+          "fs",
+          "latency",
+          "10ms",
+          "cold start",
+          "Stripe",
+          "signature",
+          "route.ts",
+          "export const runtime"
+        ],
+        "falseClaims": [
+          "Edge Runtime имеет полный доступ к Node.js crypto",
+          "Node crypto работает на Edge без изменений",
+          "Edge Runtime медленнее Node.js runtime глобально",
+          "Web Crypto API недоступен в Edge Runtime",
+          "Edge Runtime поддерживает fs для чтения файлов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "isr_vs_ssr_vercel",
+      "title": "Отличает ISR от SSR на Vercel",
+      "expected": "Кандидат объясняет: ISR revalidates через webhook в Edge cache — большинство hit cached; SSR — Lambda на каждый request, cold starts на low-traffic; тяжёлые ML libs — split в отдельную функцию или external service.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Follow-up questions ISR/SSR и cold start — бонус middle",
+        "mustConcepts": [
+          "ISR",
+          "SSR",
+          "revalidate",
+          "webhook",
+          "Edge cache",
+          "Lambda",
+          "cold start",
+          "cached",
+          "request",
+          "timeout",
+          "15 second",
+          "reserved concurrency",
+          "background job"
+        ],
+        "falseClaims": [
+          "ISR вызывает Lambda на каждый запрос как SSR",
+          "SSR на Vercel всегда отдаёт из Edge cache без compute",
+          "cold start невозможен на Vercel SSR",
+          "ISR и SSR на Vercel работают идентично под нагрузкой"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Три пути: Vercel — zero ops, SSG на CDN, SSR/API на serverless. Вне Vercel — `output: 'standalone'` и multi-stage Docker (~150MB). Static export только если нет server-side логики. В Docker обязательно `HOSTNAME=0.0.0.0` и `NODE_ENV=production`.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для MVP — `vercel --prod`, preview на каждый PR. E-commerce на своём K8s — standalone Dockerfile, копирую `.next/standalone`, static и public отдельно. Доки — `output: 'export'` на S3. Edge webhook — только Web Crypto, не Node crypto.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "`next build` prerender SSG в static, SSR в server bundle. Standalone собирает минимальный runtime для `server.js` — без полного node_modules в контейнере. ISR на Vercel кеширует через Edge; SSR бьёт Lambda per request.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Static export — лучший выбор для dashboard с SSR и API routes. Docker деплой без standalone нормален, главное скопировать весь репозиторий в контейнер.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В Docker достаточно `CMD node server.js` без HOSTNAME — localhost и так доступен снаружи. GSSP и static export совместимы, Next сам решит.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Edge Runtime — это полный Node.js, можно импортировать crypto и fs. Vercel и Docker одинаково требуют ручной настройки CDN для каждого маршрута.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "deploy_options_overview",
+      "exampleType": "good",
+      "exampleText": "Vercel managed, Docker standalone self-hosted, static export без сервера — три базовых варианта с разным trade-off ops vs контроль.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "deploy_options_overview",
+      "exampleType": "good",
+      "exampleText": "ну vercel для скорости, docker если свой k8s, static export если чистая статика без api",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "deploy_options_overview",
+      "exampleType": "bad",
+      "exampleText": "Static export поддерживает getServerSideProps и API routes через CDN functions.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "vercel_hybrid_split",
+      "exampleType": "good",
+      "exampleText": "Vercel автоматически: SSG → CDN edge, SSR и API → serverless Lambdas; `vercel --prod` без Dockerfile.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "vercel_hybrid_split",
+      "exampleType": "good",
+      "exampleText": "vercel сам режет static/dynamic, https и preview urls из коробки",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "vercel_hybrid_split",
+      "exampleType": "bad",
+      "exampleText": "На Vercel всё крутится в одном long-running Node процессе как pm2.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "standalone_output",
+      "exampleType": "good",
+      "exampleText": "`output: 'standalone'` — `.next/standalone/` с server.js и минимальными deps; multi-stage Docker 1.2GB → ~150MB.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "standalone_output",
+      "exampleType": "good",
+      "exampleText": "default build ждёт node_modules на runtime, standalone — один каталог для fly.io/ec2",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "standalone_output",
+      "exampleType": "bad",
+      "exampleText": "Standalone не нужен — достаточно скопировать `.next` без server.js в runner stage.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use_deploy",
+      "exampleType": "good",
+      "exampleText": "Landing/prototype → Vercel free tier; e-commerce SSR → Vercel или Docker; docs → static export S3; on-prem monolith → Docker standalone на K8s.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use_deploy",
+      "exampleType": "good",
+      "exampleText": "внутренний admin на vps — pm2 ок для прототипа, в прод лучше standalone docker",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use_deploy",
+      "exampleType": "bad",
+      "exampleText": "Для Tailwind docs на S3 нужен Docker SSR — static export не подходит.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "docker_common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Без standalone — node_modules в образе; HOSTNAME=0.0.0.0 не 127.0.0.1; NODE_ENV=production; GSSP + export — migrate на generateStaticParams.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "docker_common_mistakes",
+      "exampleType": "good",
+      "exampleText": "контейнер up но timeout снаружи — почти всегда bind на localhost, фикс ENV HOSTNAME=0.0.0.0",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "docker_common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "NODE_ENV development в Dockerfile безопаснее — больше логов для отладки в production.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "edge_runtime_limitations",
+      "exampleType": "good",
+      "exampleText": "Edge — V8 isolates, ~10ms latency; Node crypto недоступен — Web Crypto subtle для HMAC webhook; fs тоже нет.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "edge_runtime_limitations",
+      "exampleType": "good",
+      "exampleText": "stripe webhook на edge — переписал на crypto.subtle.importKey/sign, работает и на node runtime потом",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "edge_runtime_limitations",
+      "exampleType": "bad",
+      "exampleText": "import crypto from 'crypto' работает на Edge Runtime без изменений.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "isr_vs_ssr_vercel",
+      "exampleType": "good",
+      "exampleText": "ISR — revalidate webhook, большинство из Edge cache; SSR — Lambda per request, cold start на редких маршрутах.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "isr_vs_ssr_vercel",
+      "exampleType": "good",
+      "exampleText": "тяжёлая ml lib на vercel — вынес inference наружу, cold start с 7s до 1.2s",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "isr_vs_ssr_vercel",
+      "exampleType": "bad",
+      "exampleText": "ISR и SSR на Vercel всегда вызывают Lambda на каждый запрос одинаково.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "deploying-nextjs-applications",
+    "apiUrl": "https://api.itlead.org/api/questions/deploying-nextjs-applications",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/deploying-nextjs-applications",
+    "difficulty": "MIDDLE",
+    "titleEn": "Deploying Next.js applications",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T16:30:00.000Z"
+  }
+}

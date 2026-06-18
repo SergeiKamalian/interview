@@ -1,0 +1,483 @@
+{
+  "topic": {
+    "code": "nodejs_commonjs_vs_esm",
+    "name": "CommonJS vs ES Modules в Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "В чём разница между CommonJS и ES Modules в Node.js и когда какую систему использовать?",
+    "shortAnswer": "CommonJS использует `require()` / `module.exports` и загружает модули синхронно в момент вызова `require()`. ES Modules — `import` / `export`, статическое разрешение импортов до запуска кода, tree-shaking и top-level `await`. Для новых проектов предпочтителен ESM; CJS остаётся уместен в legacy-коде и старых пакетах. CJS не может напрямую `require()` ESM-файл; ESM может импортировать CJS, но только default export.",
+    "idealAnswer": "Node.js поддерживает две модульные системы: CommonJS (CJS) — оригинальная серверная, и ES Modules (ESM) — современная, изначально браузерная. CJS: `require()` / `module.exports`, синхронная загрузка в runtime — файл читается в момент вызова `require()`. ESM: `import` / `export`, статическое разрешение до выполнения кода — все импорты известны до запуска, что даёт tree-shaking и top-level `await`. Ключевое отличие по времени загрузки: CJS читает по одному модулю по мере выполнения; ESM резолвит граф импортов заранее. У систем разные кеши модулей — один файл, загруженный и как CJS, и как ESM, даёт два разных экземпляра (источник subtle bugs при смешении). Node выбирает систему по расширению и `package.json`: `.cjs` — всегда CJS, `.mjs` — всегда ESM, `.js` — по полю `\"type\"` ближайшего `package.json` (по умолчанию `\"commonjs\"`). Interoperability: ESM импортирует CJS (только default export); CJS не может `require()` ESM — ошибка runtime; мост — динамический `await import()` (работает в обеих системах, но требует async-контекст). В ESM нет `__dirname`/`__filename` — восстанавливают через `import.meta.url`, `fileURLToPath`, `dirname`. Типичные ошибки: забытое расширение в ESM import (`./math.js` обязательно); `require()` в `.mjs`; добавление `\"type\":\"module\"` без переименования CJS-файлов в `.cjs`; разное поведение circular dependencies (CJS — partial export, ESM — live bindings). Когда ESM: новые пакеты/приложения, tree-shaking, alignment с браузером, Vite/React. Когда CJS: Node < 12, legacy Express, CLI для старого tooling. Dual-format: `\"exports\"` с `\"import\"` и `\"require\"` в `package.json`. TypeScript компилирует в CJS или ESM по `tsconfig` (`\"module\": \"CommonJS\"` vs `\"NodeNext\"`), синтаксис в исходниках выглядит как ESM в любом случае.",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "cjs_esm_syntax",
+      "title": "Знает синтаксис CJS и ESM",
+      "expected": "Кандидат называет: CJS — `require()` / `module.exports`; ESM — `import` / `export`; может показать side-by-side пример экспорта и импорта.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — синтаксис двух систем",
+        "mustConcepts": [
+          "CommonJS",
+          "CJS",
+          "ESM",
+          "ES Modules",
+          "require",
+          "module.exports",
+          "import",
+          "export",
+          "export default",
+          "синтаксис",
+          "named export",
+          "default export",
+          "экспорт",
+          "импорт",
+          "модуль"
+        ],
+        "falseClaims": [
+          "require и import взаимозаменяемы в любом файле",
+          "module.exports работает в .mjs",
+          "export default обязателен в CommonJS",
+          "ESM использует require по умолчанию"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "loading_sync_vs_static",
+      "title": "Понимает синхронную vs статическую загрузку",
+      "expected": "Кандидат объясняет: CJS читает файл в момент `require()`; ESM резолвит импорты статически до запуска кода; ESM даёт tree-shaking и top-level `await`.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевое отличие по времени загрузки из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "синхрон",
+              "runtime",
+              "статич",
+              "tree-shaking"
+            ],
+            "ask": "когда именно Node читает файл при require vs import"
+          }
+        ],
+        "mustConcepts": [
+          "синхрон",
+          "runtime",
+          "статич",
+          "до запуска",
+          "require вызов",
+          "tree-shaking",
+          "top-level await",
+          "бандлер",
+          "разреш",
+          "resolve",
+          "загрузк",
+          "момент",
+          "до выполнен",
+          "граф импорт"
+        ],
+        "falseClaims": [
+          "import загружается синхронно при каждой строке",
+          "CommonJS поддерживает tree-shaking из коробки",
+          "top-level await работает в CommonJS",
+          "обе системы резолвят импорты одинаково по времени"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "node_module_detection",
+      "title": "Знает как Node выбирает CJS или ESM",
+      "expected": "Кандидат описывает: `.cjs` → CJS, `.mjs` → ESM, `.js` → `\"type\"` в package.json (default commonjs); отдельные кеши модулей.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "правила .cjs/.mjs/type из ITLead",
+        "mustConcepts": [
+          ".cjs",
+          ".mjs",
+          ".js",
+          "type",
+          "module",
+          "commonjs",
+          "package.json",
+          "расширен",
+          "по умолчанию",
+          "кеш",
+          "cache",
+          "отдельн",
+          "singleton",
+          "два экземпляр"
+        ],
+        "falseClaims": [
+          "любой .js файл всегда ESM",
+          ".mjs можно require напрямую",
+          "type module влияет только на index.js",
+          "CJS и ESM делят один module cache"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "interoperability",
+      "title": "Понимает interoperability CJS ↔ ESM",
+      "expected": "Кандидат объясняет: ESM импортирует CJS (default only); CJS не может require ESM — ошибка; мост — `await import()`; одностороннее ограничение и async-контекст.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "частая production-проблема при смешении систем",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "require",
+              "ESM",
+              "dynamic import"
+            ],
+            "ask": "как CJS-файл загрузить ESM-only зависимость"
+          },
+          {
+            "match": [
+              "default export",
+              "named"
+            ],
+            "ask": "что получит ESM при import CJS с module.exports = { add }"
+          }
+        ],
+        "mustConcepts": [
+          "interoperability",
+          "совместим",
+          "default export",
+          "require ESM",
+          "ошибка",
+          "dynamic import",
+          "await import",
+          "async",
+          "односторон",
+          "CJS consumer",
+          "ESM-only",
+          "createRequire",
+          "не поддерж"
+        ],
+        "falseClaims": [
+          "require('./file.mjs') работает в CommonJS",
+          "ESM получает все named exports из CJS напрямую",
+          "dynamic import доступен только в ESM",
+          "CJS и ESM полностью симметричны при импорте"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "esm_dirname_and_meta",
+      "title": "Знает __dirname в ESM и import.meta",
+      "expected": "Кандидат объясняет: в ESM нет `__dirname`; восстанавливают через `import.meta.url`, `fileURLToPath`, `dirname`; упоминает top-level await как ESM-only фичу.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "миграционный boilerplate из ITLead",
+        "mustConcepts": [
+          "__dirname",
+          "__filename",
+          "import.meta.url",
+          "fileURLToPath",
+          "dirname",
+          "url",
+          "path",
+          "ESM",
+          "нет __dirname",
+          "восстан",
+          "миграц",
+          "top-level await"
+        ],
+        "falseClaims": [
+          "__dirname доступен в .mjs без дополнительного кода",
+          "import.meta.url это путь к package.json",
+          "fileURLToPath нужен только в браузере",
+          "top-level await работает в server.js без type module"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки CJS/ESM",
+      "expected": "Кандидат называет: обязательное расширение в ESM import; require в .mjs; `\"type\":\"module\"` без переименования в .cjs; разное поведение circular dependencies.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "расширен",
+              ".js",
+              "Cannot find module"
+            ],
+            "ask": "почему import from './math' падает в ESM, а require('./math') — нет"
+          },
+          {
+            "match": [
+              "type",
+              "module",
+              "require"
+            ],
+            "ask": "что сломается при добавлении type module без переименования CJS файлов"
+          }
+        ],
+        "mustConcepts": [
+          "расширен",
+          ".js",
+          "require в mjs",
+          "ReferenceError",
+          "type module",
+          "переимен",
+          ".cjs",
+          "circular",
+          "кругов",
+          "live bindings",
+          "partial export",
+          "createRequire",
+          "Cannot find module",
+          "обязательн"
+        ],
+        "falseClaims": [
+          "Node угадывает расширение в ESM как в require",
+          "require работает внутри .mjs по умолчанию",
+          "type module затрагивает только новые файлы",
+          "circular dependencies ведут себя одинаково в CJS и ESM"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда ESM, CJS или dual-format",
+      "expected": "Кандидат называет: новые проекты — ESM; legacy/Node<12 — CJS; постепенная миграция через ESM→CJS import; dual-format через exports в package.json; TypeScript module CommonJS vs NodeNext.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use и dual-format из ITLead",
+        "mustConcepts": [
+          "новый проект",
+          "ESM",
+          "legacy",
+          "миграц",
+          "dual-format",
+          "exports",
+          "main",
+          "Vite",
+          "Express",
+          "CLI",
+          "Node 12",
+          "TypeScript",
+          "NodeNext",
+          "CommonJS tsconfig",
+          "lodash",
+          "axios"
+        ],
+        "falseClaims": [
+          "все новые npm-пакеты должны быть только CJS",
+          "dual-format не нужен — все уже на ESM",
+          "Express нельзя перевести на ESM",
+          "TypeScript всегда компилирует в ESM"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "CommonJS — require/module.exports, файл читается в момент require. ESM — import/export, импорты резолвятся до запуска — tree-shaking и top-level await. Новый проект беру ESM; legacy Express постепенно мигрирую. CJS не может require .mjs — только await import().",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну cjs это require синхронно когда дошёл до строки, esm import заранее. .mjs всегда esm, .cjs всегда cjs, .js смотрит type в package.json. в esm __dirname через import.meta.url",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ESM import './math.js' — расширение обязательно. Dual-format пакет: exports с import и require. TypeScript module NodeNext → ESM на выходе.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "require и import одно и то же, можно require('./app.mjs') из CommonJS без проблем. Tree-shaking работает и в CommonJS.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Добавил type module — все .js стали ESM, но require в старых файлах всё равно работает. __dirname есть в любом .mjs.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "import { add } from './math' в Node ESM — норм, расширение не нужно. Top-level await в server.js без type module — ок.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "cjs_esm_syntax",
+      "exampleType": "good",
+      "exampleText": "CJS: const { add } = require('./math'); module.exports = { add }. ESM: export function add() {}; import { add } from './math.js'.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "cjs_esm_syntax",
+      "exampleType": "good",
+      "exampleText": "в cjs экспорт через module.exports, в esm через export и export default",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "cjs_esm_syntax",
+      "exampleType": "bad",
+      "exampleText": "В .mjs пишу module.exports = router — это стандартный ESM экспорт.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "loading_sync_vs_static",
+      "exampleType": "good",
+      "exampleText": "require читает файл когда выполняется строка; import резолвится до любого кода — бандлер знает зависимости заранее и может tree-shake.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "loading_sync_vs_static",
+      "exampleType": "good",
+      "exampleText": "esm даёт top-level await, cjs await только внутри async функции",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "loading_sync_vs_static",
+      "exampleType": "bad",
+      "exampleText": "Обе системы загружают модули одинаково — синхронно в runtime при первом обращении.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "node_module_detection",
+      "exampleType": "good",
+      "exampleText": ".cjs — CommonJS, .mjs — ESM, .js следует type в package.json; без type — commonjs по умолчанию.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "node_module_detection",
+      "exampleType": "good",
+      "exampleText": "один файл как cjs и esm — два разных кеша, два экземпляра модуля",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "node_module_detection",
+      "exampleType": "bad",
+      "exampleText": "Любой .js в Node 20 автоматически ESM без type module.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "interoperability",
+      "exampleType": "good",
+      "exampleText": "ESM: import pkg from './legacy.cjs' — только default. CJS: const m = await import('./esm.mjs') — единственный способ загрузить ESM.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "interoperability",
+      "exampleType": "good",
+      "exampleText": "require('./math.mjs') падает; dynamic import() работает и в cjs и в esm",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "interoperability",
+      "exampleType": "bad",
+      "exampleText": "Из CommonJS спокойно делаю const { add } = require('./utils.mjs') — named exports приходят как в ESM.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "esm_dirname_and_meta",
+      "exampleType": "good",
+      "exampleText": "const __filename = fileURLToPath(import.meta.url); const __dirname = dirname(__filename); — стандарт при миграции на ESM.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "esm_dirname_and_meta",
+      "exampleType": "good",
+      "exampleText": "в esm нет __dirname из коробки, только через import.meta.url",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "esm_dirname_and_meta",
+      "exampleType": "bad",
+      "exampleText": "__dirname и __filename доступны в любом ESM файле так же как в CommonJS.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "ESM: import from './user.js' с расширением. Перед type module переименовал require-файлы в .cjs. В .mjs require('fs') — ReferenceError, нужен import.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "circular require даёт partial export, esm live bindings — тайминг разный, лучше не полагаться на циклы",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "import './math' без .js — Node сам подставит расширение как при require.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Новый Vite/React — ESM. Старый Express — CJS или постепенно type module + .cjs для legacy. Публикуемый пакет — dual-format через exports.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "tsconfig module CommonJS для старого node, NodeNext для esm; esm-only пакет ломает cjs потребителей без await import",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "CommonJS устарел полностью — все проекты надо переписать на ESM за один день через type module без .cjs.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-commonjs-vs-esm",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-commonjs-vs-esm",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-commonjs-vs-esm",
+    "difficulty": "JUNIOR",
+    "titleEn": "CommonJS vs es modules in Node.js",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

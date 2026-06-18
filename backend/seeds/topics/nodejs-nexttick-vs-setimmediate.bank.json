@@ -1,0 +1,648 @@
+{
+  "topic": {
+    "code": "nodejs_nexttick_vs_setimmediate",
+    "name": "process.nextTick() vs setImmediate() в Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "В чём разница между process.nextTick() и setImmediate() в Node.js?",
+    "shortAnswer": "process.nextTick() ставит колбек в микротаск-очередь и выполняет его до перехода event loop к любой фазе; setImmediate() ждёт фазу check после poll (I/O). Рекурсивный nextTick голодит I/O и таймеры; setImmediate — нет. По умолчанию defer — setImmediate; nextTick только когда нужно выполнить до любого I/O в текущей итерации.",
+    "idealAnswer": "process.nextTick() и setImmediate() оба откладывают асинхронный колбек, но живут в разных местах движка и имеют разный приоритет. nextTick срабатывает сразу после опустошения текущего call stack, до того как event loop перейдёт к следующей фазе — V8 полностью дренирует nextTick-очередь (микротаски) перед uv_run(). setImmediate() регистрирует uv_check_t в libuv и выполняется только в фазе check, после poll (I/O). Приоритет: sync → nextTick → Promise.then() → setTimeout(0) / timers → setImmediate (check). nextTick технически не часть event loop — InternalCallbackScope сбрасывает очередь между любыми двумя libuv-колбеками. Рекурсивный nextTick блокирует I/O и таймеры (starvation); рекурсивный setImmediate уступает циклу. Когда nextTick: emit('ready') после конструктора EventEmitter, до любого I/O в текущем turn. Когда setImmediate: post-response cleanup в Express, defer process.exit после I/O, рекурсивный poll/retry, PM2 IPC. Типичные ошибки: nextTick(() => process.exit()) после fs.readFile — другие I/O не успевают; рекурсивный nextTick в poll-логике; ожидание что вложенный setImmediate из nextTick выполнится раньше внешнего — он пропускает текущую check-фазу. nextTick внутри setImmediate выполняется сразу после return setImmediate-колбека, до следующего setImmediate в очереди. В Node >= 11 setImmediate не обгоняет nextTick при вызове с top-level модуля. Диагностика starvation: clinic.js doctor, --trace-event-categories v8, счётчик глубины и switch на setImmediate после N итераций.",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "nexttick_setimmediate_core",
+      "title": "Понимает ключевую разницу nextTick и setImmediate",
+      "expected": "Кандидат объясняет: nextTick — микротаск до любой фазы event loop; setImmediate — только фаза check после poll; nextTick раньше setImmediate; рекурсивный nextTick голодит I/O, setImmediate — нет.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — разные фазы и приоритет",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "nexttick_setimmediate_core",
+            "oftenConfusedWith": [
+              "event_loop_phases",
+              "when_to_use"
+            ],
+            "anchorTermsExpected": [
+              "nextTick",
+              "setImmediate",
+              "микротаск",
+              "check",
+              "poll",
+              "раньше",
+              "starvation"
+            ],
+            "anchorTermsWrongTopic": [
+              "setImmediate быстрее nextTick",
+              "оба в одной фазе event loop",
+              "nextTick часть фазы check"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "nextTick",
+              "setImmediate",
+              "разниц"
+            ],
+            "ask": "где в event loop выполняется nextTick и где setImmediate"
+          }
+        ],
+        "mustConcepts": [
+          "nextTick",
+          "setImmediate",
+          "микротаск",
+          "check",
+          "poll",
+          "I/O",
+          "фаз",
+          "event loop",
+          "раньше",
+          "после",
+          "рекурсив",
+          "starvation",
+          "голод",
+          "блокир",
+          "defer",
+          "отлож"
+        ],
+        "falseClaims": [
+          "setImmediate всегда выполняется раньше nextTick",
+          "nextTick и setImmediate работают в одной фазе event loop",
+          "рекурсивный setImmediate блокирует I/O так же как nextTick",
+          "nextTick выполняется в фазе check",
+          "оба механизма одинаково уступают I/O"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "event_loop_phases",
+      "title": "Знает фазы event loop и приоритеты",
+      "expected": "Кандидат называет порядок: timers → poll (I/O) → check → close; nextTick между фазами; таблица приоритетов: nextTick > Promise > setTimeout(0) > setImmediate; sync код первым.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "таблица приоритетов и фазы libuv — ключ senior",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "nexttick_setimmediate_core",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "event_loop_phases",
+            "oftenConfusedWith": [
+              "nexttick_promise_order"
+            ],
+            "anchorTermsExpected": [
+              "timers",
+              "poll",
+              "check",
+              "close",
+              "Promise",
+              "setTimeout"
+            ],
+            "anchorTermsWrongTopic": [
+              "nextTick в фазе timers",
+              "setImmediate в микротаск-очереди"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "timers",
+              "poll",
+              "check",
+              "фаз"
+            ],
+            "ask": "в каком порядке идут фазы event loop и где setImmediate"
+          },
+          {
+            "match": [
+              "Promise",
+              "setTimeout",
+              "приоритет"
+            ],
+            "ask": "кто выполнится раньше: nextTick, Promise.then или setImmediate"
+          }
+        ],
+        "mustConcepts": [
+          "timers",
+          "poll",
+          "check",
+          "close",
+          "фаз",
+          "event loop",
+          "libuv",
+          "Promise",
+          "setTimeout",
+          "микротаск",
+          "приоритет",
+          "sync",
+          "синхрон",
+          "между фаз",
+          "I/O",
+          "опрос"
+        ],
+        "falseClaims": [
+          "setImmediate выполняется в микротаск-очереди вместе с Promise",
+          "nextTick — часть именованной фазы timers",
+          "setTimeout(0) всегда раньше setImmediate вне I/O-колбека",
+          "Promise.then выполняется после setImmediate",
+          "event loop начинается с фазы check"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "internal_implementation",
+      "title": "Понимает внутреннюю реализацию libuv и V8",
+      "expected": "Кандидат объясняет: setImmediate — uv_check_t, uv__run_check() после uv__io_poll(); nextTick — InternalCallbackScope, MicrotaskQueue в V8, обходит libuv; nextTick между любыми двумя libuv-колбеками.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "senior follow-up — libuv vs V8 dispatch",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "nexttick_setimmediate_core",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "libuv",
+              "uv_check",
+              "V8"
+            ],
+            "ask": "что в libuv обрабатывает setImmediate, а что в V8 обрабатывает nextTick"
+          },
+          {
+            "match": [
+              "InternalCallbackScope",
+              "MicrotaskQueue"
+            ],
+            "ask": "почему nextTick технически не часть event loop"
+          }
+        ],
+        "mustConcepts": [
+          "libuv",
+          "uv_check",
+          "uv__run_check",
+          "uv__io_poll",
+          "V8",
+          "InternalCallbackScope",
+          "MicrotaskQueue",
+          "микротаск",
+          "обходит libuv",
+          "не часть event loop",
+          "C++",
+          "колбек",
+          "границ",
+          "дренир",
+          "uv_run"
+        ],
+        "falseClaims": [
+          "nextTick регистрируется через uv_check_t в libuv",
+          "setImmediate обрабатывается V8 MicrotaskQueue",
+          "nextTick — именованная фаза event loop в libuv",
+          "InternalCallbackScope относится к setImmediate",
+          "libuv дренирует nextTick-очередь в фазе check"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Знает когда использовать nextTick vs setImmediate",
+      "expected": "Кандидат называет: nextTick — до I/O в текущем turn (EventEmitter emit после конструктора); setImmediate — yield к I/O/timers (Express cleanup, retry loops, process.exit defer); по умолчанию setImmediate.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "decision rule из ITLead when to use",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "EventEmitter",
+              "emit",
+              "конструктор"
+            ],
+            "ask": "зачем defer emit('ready') через nextTick в конструкторе"
+          },
+          {
+            "match": [
+              "Express",
+              "setImmediate",
+              "yield"
+            ],
+            "ask": "почему post-response cleanup лучше через setImmediate"
+          }
+        ],
+        "mustConcepts": [
+          "EventEmitter",
+          "emit",
+          "конструктор",
+          "слушат",
+          "Express",
+          "res.json",
+          "yield",
+          "I/O",
+          "retry",
+          "poll",
+          "по умолчанию",
+          "setImmediate",
+          "async_hooks",
+          "PM2",
+          "Hapi"
+        ],
+        "falseClaims": [
+          "nextTick — универсальный defer для любого async-кода",
+          "setImmediate нельзя использовать в Express handlers",
+          "EventEmitter всегда требует setImmediate для emit",
+          "retry-циклы безопасны с рекурсивным nextTick",
+          "nextTick лучше setImmediate для process.exit после I/O"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки и starvation",
+      "expected": "Кандидат называет: nextTick(() => process.exit()) после fs — другие I/O не выполнятся; рекурсивный nextTick в poll блокирует loop; depth 1k+ задерживает timers на 100ms+; nested setImmediate из nextTick пропускает текущую check-фазу.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — production pitfalls из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "nested_ordering",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "process.exit",
+              "readFile",
+              "nextTick"
+            ],
+            "ask": "почему nextTick(() => process.exit()) после fs.readFile опасен"
+          },
+          {
+            "match": [
+              "рекурсив",
+              "poll",
+              "starvation"
+            ],
+            "ask": "что случится при рекурсивном process.nextTick(poll)"
+          },
+          {
+            "match": [
+              "clinic",
+              "диагност",
+              "lag"
+            ],
+            "ask": "как диагностировать nextTick starvation в production"
+          }
+        ],
+        "mustConcepts": [
+          "process.exit",
+          "readFile",
+          "рекурсив",
+          "poll",
+          "starvation",
+          "голод",
+          "таймер",
+          "100ms",
+          "depth",
+          "глубин",
+          "clinic.js",
+          "trace-event",
+          "setImmediate",
+          "исправлен",
+          "замен",
+          "блокир"
+        ],
+        "falseClaims": [
+          "рекурсивный nextTick безопасен для poll-логики",
+          "process.exit в nextTick после I/O не обрезает pending I/O",
+          "6 nextTick не влияют на setImmediate в очереди",
+          "вложенный setImmediate из nextTick выполнится в текущей check-фазе",
+          "starvation от nextTick невозможен в production"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "nexttick_promise_order",
+      "title": "Понимает порядок nextTick и Promise.then()",
+      "expected": "Кандидат объясняет: оба в микротаск-очереди; nextTick дренируется первым, затем Promise; в одном turn nextTick перед Promise.then().",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "quick example ordering — базовый механизм",
+        "confusionPairs": [
+          {
+            "checkpointKey": "nexttick_promise_order",
+            "oftenConfusedWith": [
+              "event_loop_phases"
+            ],
+            "anchorTermsExpected": [
+              "Promise",
+              "nextTick",
+              "микротаск",
+              "перв",
+              "раньше"
+            ],
+            "anchorTermsWrongTopic": [
+              "Promise быстрее nextTick",
+              "Promise в фазе check"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "Promise",
+          "then",
+          "микротаск",
+          "очеред",
+          "nextTick",
+          "перв",
+          "раньше",
+          "дренир",
+          "один turn",
+          "итерац",
+          "resolve",
+          "sync",
+          "после sync"
+        ],
+        "falseClaims": [
+          "Promise.then выполняется раньше nextTick",
+          "Promise и nextTick в разных фазах event loop",
+          "порядок nextTick и Promise недетерминирован в Node 18",
+          "setImmediate выполняется между nextTick и Promise"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "nested_ordering",
+      "title": "Понимает вложенный порядок из I/O и nextTick",
+      "expected": "Кандидат объясняет: setImmediate из nextTick пропускает текущую check — outer раньше nested; nextTick из setImmediate выполняется сразу после return setImmediate-колбека; порядок детерминирован только из I/O-колбека.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Mistake 3 и follow-up — частая ловушка на собеседовании",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "вложен",
+              "nested",
+              "outer"
+            ],
+            "ask": "почему outer setImmediate выполнится раньше nested из nextTick"
+          },
+          {
+            "match": [
+              "nextTick",
+              "setImmediate",
+              "внутри"
+            ],
+            "ask": "что происходит при nextTick внутри setImmediate-колбека"
+          }
+        ],
+        "mustConcepts": [
+          "вложен",
+          "nested",
+          "outer",
+          "пропуск",
+          "check",
+          "следующ",
+          "цикл",
+          "I/O",
+          "колбек",
+          "детермин",
+          "порядок",
+          "сразу после",
+          "return"
+        ],
+        "falseClaims": [
+          "nested setImmediate из nextTick всегда выполняется раньше outer",
+          "nextTick из setImmediate ждёт следующей итерации event loop",
+          "порядок setImmediate и setTimeout(0) гарантирован вне I/O",
+          "из top-level модуля setImmediate может обогнать nextTick в Node 18"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "nextTick — микротаск до любой фазы, setImmediate — check после poll. Sync → nextTick → Promise → setImmediate. Рекурсивный nextTick голодит I/O; для retry — setImmediate. EventEmitter: nextTick для emit после конструктора.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "setImmediate по умолчанию для defer. nextTick только когда надо до I/O в этом turn — например emit('ready'). После fs.readFile process.exit в setImmediate, не в nextTick — иначе pending I/O не доживут.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "setImmediate — uv_check_t в libuv после poll. nextTick — V8 MicrotaskQueue через InternalCallbackScope, не часть event loop. Вложенный setImmediate из nextTick пропускает текущую check — outer первым.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "setImmediate быстрее nextTick, потому что check идёт раньше timers. Рекурсивный nextTick безопасен — event loop сам yield'ит.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "nextTick и setImmediate — одна очередь в libuv. Promise.then всегда после setImmediate.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "После readFile делаю process.nextTick(() => process.exit(0)) — это нормально, все I/O успеют. В poll-цикле nextTick(recurse) — правильный паттерн.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "nexttick_setimmediate_core",
+      "exampleType": "good",
+      "exampleText": "nextTick — до фаз event loop, setImmediate — check после I/O poll. nextTick раньше; рекурсивный nextTick блокирует I/O.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "nexttick_setimmediate_core",
+      "exampleType": "good",
+      "exampleText": "ну nextTick сразу после sync, setImmediate ждёт check — поэтому nextTick первым, а рекурсия nextTick — плохо",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "nexttick_setimmediate_core",
+      "exampleType": "bad",
+      "exampleText": "setImmediate и nextTick — синонимы, оба в фазе check после timers.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "event_loop_phases",
+      "exampleType": "good",
+      "exampleText": "Фазы: timers → poll → check → close. Приоритет: sync, nextTick, Promise, setTimeout(0), setImmediate.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "event_loop_phases",
+      "exampleType": "good",
+      "exampleText": "nextTick между фазами, не в timers. Promise после nextTick в микротасках.",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "event_loop_phases",
+      "exampleType": "bad",
+      "exampleText": "setImmediate в микротаск-очереди вместе с Promise, nextTick — фаза timers.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "internal_implementation",
+      "exampleType": "good",
+      "exampleText": "setImmediate — uv_check_t, uv__run_check после uv__io_poll. nextTick — InternalCallbackScope + V8 MicrotaskQueue, libuv не трогает.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "internal_implementation",
+      "exampleType": "good",
+      "exampleText": "nextTick между любыми двумя libuv-колбеками — поэтому docs пишут что он не часть event loop",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "internal_implementation",
+      "exampleType": "bad",
+      "exampleText": "nextTick регистрируется через uv_check_t так же как setImmediate.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "EventEmitter: nextTick(() => this.emit('ready')) — слушатель успеет .on(). Express cleanup — setImmediate. Retry loop — только setImmediate.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "по умолчанию setImmediate; nextTick только если надо до I/O в этом turn",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Везде nextTick — он универсальнее setImmediate для любого defer.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "fs.readFile → nextTick(process.exit) — другие fs-колбеки не выполнятся. Рекурсивный nextTick(poll) — starvation, switch на setImmediate.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "6 nextTick уже задерживают setImmediate в очереди; clinic.js doctor для диагностики loop lag",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Рекурсивный nextTick в poll безопасен — libuv сам прервёт цикл.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "nexttick_promise_order",
+      "exampleType": "good",
+      "exampleText": "sync → nextTick → Promise → setImmediate. Оба микротаска, но nextTick дренируется первым.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "nexttick_promise_order",
+      "exampleType": "good",
+      "exampleText": "Promise.then после nextTick в том же turn — видно в quick example ITLead",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "nexttick_promise_order",
+      "exampleType": "bad",
+      "exampleText": "Promise.then всегда раньше nextTick, потому что Promise — стандарт ECMAScript.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "nested_ordering",
+      "exampleType": "good",
+      "exampleText": "nextTick(() => setImmediate(nested)); setImmediate(outer) — outer первым: nested пропустил текущую check.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "nested_ordering",
+      "exampleType": "good",
+      "exampleText": "nextTick внутри setImmediate — сразу после return setImmediate-колбека, до следующего setImmediate в очереди",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "nested_ordering",
+      "exampleType": "bad",
+      "exampleText": "Nested setImmediate из nextTick всегда выполнится раньше outer — он же внутри.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-nexttick-vs-setimmediate",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-nexttick-vs-setimmediate",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-nexttick-vs-setimmediate",
+    "difficulty": "SENIOR",
+    "titleEn": "What is the difference between process.nextTick() and setImmediate()?",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

@@ -1,0 +1,524 @@
+{
+  "topic": {
+    "code": "nestjs_caching_strategies",
+    "name": "Стратегии кеширования в NestJS",
+    "skillCode": "nestjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как реализовать стратегии кеширования в NestJS?",
+    "shortAnswer": "В NestJS кеширование строится на `CacheModule` из `@nestjs/cache-manager`: результаты дорогих операций хранят в памяти или Redis. `CacheInterceptor` автоматически кеширует GET-ответы контроллера; `CACHE_MANAGER` даёт ручной get/set/del в сервисах. Один pod — in-memory; несколько pod или >1GB данных — Redis. После каждой записи инвалидируй кеш.",
+    "idealAnswer": "Кеширование в NestJS сохраняет результат дорогих операций (запросы к БД, вычисления) в быстрой памяти (RAM или Redis), чтобы повторные запросы не пересчитывали данные. Пакеты: `@nestjs/cache-manager`, `cache-manager`; для Redis — `cache-manager-redis-yet`, `redis`. Базовая настройка: `CacheModule.register({ isGlobal: true, ttl: 60000, max: 100 })` — `isGlobal` делает `CACHE_MANAGER` доступным во всех модулях без повторного импорта; `ttl` в миллисекундах; `max` — LRU eviction (дефолт 100, при тысячах ключей большинство запросов будут miss). Правило выбора store: один pod или dev — in-memory; несколько pod за load balancer или объём >1GB — Redis (in-memory не шарится между процессами). `CacheInterceptor` в цепочке interceptors кеширует GET без ручного кода: ключ = URL + query string с префиксом `nest:`; `/products?page=1` и `?page=2` — разные записи. `@CacheTTL(30000)` переопределяет TTL для метода; `@CacheKey('product-detail')` заменяет автоключ — ловушка на динамических маршрутах: все `:id` получат один кеш. Ручное управление через `@Inject(CACHE_MANAGER) private cache: Cache` — паттерн cache-aside: get → miss → запрос к источнику → set; при update/delete — `cache.del(key)`. Redis для multi-instance: `CacheModule.registerAsync` + `redisStore({ socket: { host, port, pingInterval: 30000, retryDelay: 100 }, ttl })` — без pingInterval/retryDelay сетевой сбой даёт тихие 500 до рестарта. Сравнение: in-memory — zero config, не персистентен, не distributed; Redis — persistence (AOF/RDB), cluster, microservices/K8s; Memcached — high-throughput legacy. Внутри: `CacheModule` оборачивает cache-manager v5+; interceptor на hit short-circuit handler, на miss — set с JSON.stringify. Типичные ошибки: фиксированный `@CacheKey` на `:id`; `@UseInterceptors(CacheInterceptor)` на уровне контроллера кеширует POST; BigInt/Date/circular refs ломают JSON.stringify; Redis без health-check; `ttl: 0` в некоторых версиях = «никогда не истекает». Не кешировать realtime (цены, чат) и endpoints где writes > reads. Real-world: e-commerce lists с TTL 60s + del при update inventory; GraphQL resolvers с `@CacheKey`; cross-service invalidation через Redis pub/sub; вместе с `@nestjs/throttler`. Cache stampede: mutex через SETNX в Redis. Инвалидация: ключи с префиксом `nest:` — del без префикса не сработает.",
+    "maxScore": 10,
+    "skills": [
+      "nestjs",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "caching_purpose_stores",
+      "title": "Понимает зачем кеш и выбор store",
+      "expected": "Кандидат объясняет: кеш пропускает повторные вычисления; in-memory — один pod, zero config; Redis — shared между pod, переживает рестарт; правило: один pod/dev = memory, несколько pod/>1GB = Redis; не кешировать realtime и write-heavy endpoints.",
+      "score": 1,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовое решение memory vs Redis из TL;DR ITLead",
+        "mustConcepts": [
+          "кеш",
+          "cache",
+          "in-memory",
+          "Redis",
+          "один pod",
+          "несколько pod",
+          "load balancer",
+          "shared",
+          "realtime",
+          "live prices",
+          "writes",
+          "reads",
+          "RAM",
+          "повторн",
+          "вычислен",
+          "skip"
+        ],
+        "falseClaims": [
+          "in-memory кеш шарится между pod в K8s",
+          "Redis нужен всегда даже для local dev",
+          "кеш подходит для live chat и цен в реальном времени",
+          "in-memory переживает рестарт процесса"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "cache_module_setup",
+      "title": "Знает настройку CacheModule",
+      "expected": "Кандидат описывает CacheModule.register/registerAsync: isGlobal, ttl в ms, max для LRU; пакеты @nestjs/cache-manager и cache-manager; понимает что max:100 при тысячах ключей даёт массовые miss.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро setup — isGlobal, ttl, max из quick setup",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "isGlobal",
+              "ttl",
+              "max"
+            ],
+            "ask": "зачем isGlobal, что делает max и ttl в CacheModule.register"
+          }
+        ],
+        "mustConcepts": [
+          "CacheModule",
+          "register",
+          "registerAsync",
+          "isGlobal",
+          "ttl",
+          "millisecond",
+          "max",
+          "LRU",
+          "eviction",
+          "@nestjs/cache-manager",
+          "cache-manager",
+          "CACHE_MANAGER",
+          "global",
+          "100",
+          "working set"
+        ],
+        "falseClaims": [
+          "ttl задаётся в секундах по умолчанию в NestJS",
+          "без isGlobal нужно импортировать CacheModule в каждый модуль — это ошибка",
+          "max не влияет на hit rate при большом числе ключей",
+          "CacheModule не требует установки cache-manager"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "cache_interceptor",
+      "title": "Знает CacheInterceptor и декораторы",
+      "expected": "Кандидат объясняет: CacheInterceptor кеширует GET автоматически; ключ из URL + query с префиксом nest:; @CacheTTL переопределяет TTL метода; @CacheKey заменяет автоключ — опасен на динамических маршрутах; interceptor только на GET методах.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "автокеш GET — основной middle паттерн",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "cache_interceptor",
+            "oftenConfusedWith": [
+              "cache_manager_manual",
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "CacheInterceptor",
+              "GET",
+              "URL",
+              "query",
+              "CacheTTL",
+              "CacheKey"
+            ],
+            "anchorTermsWrongTopic": [
+              "interceptor кеширует POST",
+              "CacheKey генерирует id автоматически на :id"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "CacheInterceptor",
+              "UseInterceptors"
+            ],
+            "ask": "как CacheInterceptor формирует ключ и что делает @CacheTTL"
+          },
+          {
+            "match": [
+              "CacheKey",
+              "product-detail",
+              ":id"
+            ],
+            "ask": "почему фиксированный @CacheKey на findOne(:id) — ловушка"
+          }
+        ],
+        "mustConcepts": [
+          "CacheInterceptor",
+          "UseInterceptors",
+          "GET",
+          "CacheTTL",
+          "CacheKey",
+          "URL",
+          "query string",
+          "nest:",
+          "автомат",
+          "override",
+          "endpoint",
+          "handler",
+          "interceptor chain",
+          "short-circuit",
+          "hit"
+        ],
+        "falseClaims": [
+          "CacheInterceptor кеширует POST и PATCH по умолчанию",
+          "CacheKey на findOne(:id) создаёт отдельный ключ для каждого id",
+          "CacheInterceptor включает method и body в ключ по умолчанию",
+          "@CacheTTL меняет TTL глобально для всего приложения"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "cache_manager_manual",
+      "title": "Понимает CACHE_MANAGER и cache-aside",
+      "expected": "Кандидат описывает inject CACHE_MANAGER; паттерн get → miss → DB → set; invalidation через del после write; динамические ключи типа product:${id}; cache-aside в сервисном слое.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ручной cache-aside и invalidation — production паттерн",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "CACHE_MANAGER",
+              "get",
+              "set",
+              "del"
+            ],
+            "ask": "опиши cache-aside flow и когда инвалидировать после update"
+          },
+          {
+            "match": [
+              "product:",
+              "динамическ",
+              "key"
+            ],
+            "ask": "как правильно формировать ключ для findOne по id"
+          }
+        ],
+        "mustConcepts": [
+          "CACHE_MANAGER",
+          "Inject",
+          "cache.get",
+          "cache.set",
+          "cache.del",
+          "cache-aside",
+          "miss",
+          "hit",
+          "invalidat",
+          "инвалидац",
+          "product:",
+          "динамическ",
+          "ключ",
+          "update",
+          "write",
+          "сервис"
+        ],
+        "falseClaims": [
+          "после update кеш обновляется автоматически без del",
+          "CACHE_MANAGER доступен без CacheModule",
+          "cache-aside всегда пишет в кеш до запроса к БД",
+          "del('users') удалит ключ nest:users без учёта префикса — всегда работает"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "redis_distributed",
+      "title": "Знает Redis для multi-instance",
+      "expected": "Кандидат описывает redisStore через registerAsync; shared cache между pod; pingInterval и retryDelay против silent 500; in-memory изолирован per process — два pod = два холодных кеша.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "K8s/microservices — ключевой trade-off ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "redisStore",
+              "registerAsync"
+            ],
+            "ask": "почему in-memory не работает за load balancer и как настроить Redis store"
+          },
+          {
+            "match": [
+              "pingInterval",
+              "retryDelay"
+            ],
+            "ask": "зачем pingInterval и retryDelay в redisStore"
+          }
+        ],
+        "mustConcepts": [
+          "redisStore",
+          "cache-manager-redis-yet",
+          "registerAsync",
+          "multi-instance",
+          "pod",
+          "load balancer",
+          "shared",
+          "pingInterval",
+          "retryDelay",
+          "keep-alive",
+          "connection drop",
+          "500",
+          "ioredis",
+          "distributed",
+          "изолирован"
+        ],
+        "falseClaims": [
+          "два NestJS pod автоматически делят in-memory кеш",
+          "Redis store не нужен в K8s если есть sticky sessions — все pod актуальны",
+          "без pingInterval Redis reconnect происходит прозрачно всегда",
+          "Memcached — единственный distributed store в NestJS"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки кеширования",
+      "expected": "Кандидат называет: фиксированный CacheKey на :id; interceptor на controller кеширует POST; BigInt/Date ломают JSON.stringify; Redis без health-check; ttl:0 = never expire; del без префикса nest:; cache stampede — mutex SETNX.",
+      "score": 2.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "advanced",
+        "weightRationale": "5 production mistakes из ITLead — критичные pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "cache_interceptor",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "BigInt",
+              "Date",
+              "serialize"
+            ],
+            "ask": "почему cache.set с Date и BigInt падает и как сериализовать"
+          },
+          {
+            "match": [
+              "stampede",
+              "thundering herd",
+              "SETNX"
+            ],
+            "ask": "что такое cache stampede и как mutex в Redis помогает"
+          },
+          {
+            "match": [
+              "Controller",
+              "Post",
+              "interceptor"
+            ],
+            "ask": "почему @UseInterceptors на controller опасен при POST"
+          }
+        ],
+        "mustConcepts": [
+          "CacheKey",
+          "фиксирован",
+          ":id",
+          "controller level",
+          "POST",
+          "mutation",
+          "BigInt",
+          "Date",
+          "JSON.stringify",
+          "instanceToPlain",
+          "pingInterval",
+          "ttl: 0",
+          "never expire",
+          "stampede",
+          "SETNX",
+          "mutex",
+          "nest:",
+          "префикс"
+        ],
+        "falseClaims": [
+          "JSON.stringify без проблем сериализует BigInt и circular refs",
+          "interceptor на controller кеширует только GET даже если висит на классе",
+          "ttl: 0 всегда означает не кешировать",
+          "cache stampede решается только увеличением TTL без блокировки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "CacheModule.register({ isGlobal: true, ttl: 60000, max: 200 }) — глобальный кеш. На GET /products вешаю CacheInterceptor + CacheTTL 30s: ключ из URL и query. Для findOne(:id) — CACHE_MANAGER в сервисе с ключом product:${id}, после PATCH — cache.del. В K8s три pod — redisStore с pingInterval, иначе каждый pod свой холодный in-memory.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Один инстанс на dev — memory, zero config. Прод в K8s — Redis через registerAsync. Cache-aside: get, miss — в БД, set. Update — сначала БД, потом del. Не кеширую live цены и чат. На controller interceptor не ставлю — только на GET методах.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "CacheInterceptor short-circuit на hit ~1ms vs DB ~80ms. @CacheKey('product-detail') на :id — ловушка: все id одна запись. Правильно — динамический ключ в сервисе. BigInt/Date — instanceToPlain перед set. Stampede — SETNX lock в Redis.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Ставлю @UseInterceptors(CacheInterceptor) на весь OrdersController — POST тоже кешируется, это норм. In-memory в K8s шарится между pod автоматически. @CacheKey('detail') на :id даёт отдельный кеш на каждый id.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "ttl: 0 — не кешировать. Redis без pingInterval сам переподключится. После update кеш сам обновится, del не нужен. JSON.stringify спокойно сериализует BigInt.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "CacheModule не нужен — достаточно глобального переменного объекта в Node. Realtime chat кеширую на 5 минут для скорости. del('users') удалит nest:users из Redis.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "caching_purpose_stores",
+      "exampleType": "good",
+      "exampleText": "Кеш — whiteboard с готовыми ответами: повторный запрос не идёт в БД. Один pod — memory; несколько pod за LB — Redis, иначе pod 1 warm, pod 2 cold.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "caching_purpose_stores",
+      "exampleType": "good",
+      "exampleText": "ну кеш чтобы не долбить бд каждый раз. dev — память, прод k8s — redis. live цены не кеширую",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "caching_purpose_stores",
+      "exampleType": "bad",
+      "exampleText": "In-memory в production K8s шарится между всеми replica — отдельный Redis не нужен.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "cache_module_setup",
+      "exampleType": "good",
+      "exampleText": "npm i @nestjs/cache-manager cache-manager. CacheModule.register({ isGlobal: true, ttl: 60000, max: 200 }) — max поднял с 100, иначе LRU выкидывает ключи при большом каталоге.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "cache_module_setup",
+      "exampleType": "good",
+      "exampleText": "isGlobal один раз в AppModule — везде inject CACHE_MANAGER без re-import",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "cache_module_setup",
+      "exampleType": "bad",
+      "exampleText": "ttl в CacheModule задаётся в секундах, 60 = минута.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "cache_interceptor",
+      "exampleType": "good",
+      "exampleText": "@Get() @UseInterceptors(CacheInterceptor) @CacheTTL(30000) — только этот GET, ключ /products?page=1 отдельно от page=2.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "cache_interceptor",
+      "exampleType": "good",
+      "exampleText": "interceptor сам ключ из url+query с nest:, CacheTTL переопределяет модульный ttl на метод",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "cache_interceptor",
+      "exampleType": "bad",
+      "exampleText": "@CacheKey('product-detail') на @Get(':id') — правильный паттерн, каждый id свой ключ.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "cache_manager_manual",
+      "exampleType": "good",
+      "exampleText": "const key = `product:${id}`; cached = await cache.get(key); if (cached) return; product = await db.findById(id); await cache.set(key, product, 60000). update — db.update then cache.del(key).",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "cache_manager_manual",
+      "exampleType": "good",
+      "exampleText": "cache-aside в сервисе: miss — фабрика в бд, set. invalidateMany через Promise.all на связанные ключи orders:summary и order:id",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "cache_manager_manual",
+      "exampleType": "bad",
+      "exampleText": "После PATCH профиля кеш сам синхронизируется — del не вызываю.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "redis_distributed",
+      "exampleType": "good",
+      "exampleText": "registerAsync + redisStore({ socket: { host, port, pingInterval: 30000, retryDelay: 100 }, ttl: 300000 }) — shared cache, reconnect при blip.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "redis_distributed",
+      "exampleType": "good",
+      "exampleText": "два pod in-memory — user A warm на pod1, user B cold на pod2, одна и та же query дважды. redis решает",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "redis_distributed",
+      "exampleType": "bad",
+      "exampleText": "Sticky sessions в K8s заменяют Redis — остальные 9 pod могут отдавать stale, это ок.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Ошибка: @CacheKey фиксированный на :id — все получают первый продукт. Fix: CACHE_MANAGER + product:${id}. Controller-level interceptor кеширует POST orders.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "set с BigInt падает — instanceToPlain. ttl:0 = never expire, RAM течёт. stampede — SETNX lock, остальные ждут или stale",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Redis host без pingInterval — при любом network blip Nest сам восстановит соединение без 500.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-caching-strategies",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-caching-strategies",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-caching-strategies",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to implement caching strategies in NestJS?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

@@ -1,0 +1,530 @@
+{
+  "topic": {
+    "code": "how_event_loop_works_in_nodejs",
+    "name": "Event Loop в Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Как работает Event Loop в Node.js?",
+    "shortAnswer": "Event Loop — механизм, который позволяет однопоточному Node.js обрабатывать параллельный I/O без блокировки: операции делегируются libuv и ОС, а callbacks проходят через шесть упорядоченных фаз (timers, pending, poll, check, close). Между каждым переходом фаз полностью выполняются микрозадачи: сначала `process.nextTick`, затем Promise.",
+    "idealAnswer": "Node.js однопоточный для JavaScript, но неблокирующий за счёт Event Loop. V8 выполняет синхронный код на main thread; при `fs.readFile` или сетевом запросе Node передаёт работу libuv — C-библиотеке, которая использует kernel async API (epoll/kqueue) для сети и thread pool (по умолчанию 4 потока, `UV_THREADPOOL_SIZE`) для файлов, DNS и crypto. Когда операция завершается, libuv ставит callback в очередь соответствующей фазы. Один полный цикл — tick. Шесть фаз в фиксированном порядке: timers (`setTimeout`/`setInterval`), pending callbacks (отложенные I/O с прошлого tick), idle/prepare (внутренние libuv), poll (новые I/O события и их callbacks; может ждать новые события), check (`setImmediate`), close (`socket.on('close')`). Между каждым переходом фаз Node дренирует микрозадачи: сначала `process.nextTick`, затем Promise `.then()` — nextTick не принадлежит ни одной фазе и выполняется «после текущей операции, до фаз». `setTimeout(fn, 0)` — не «сразу», а «в следующей фазе timers после 0ms»; под нагрузкой часто позже. Внутри I/O callback (фаза poll) `setImmediate` всегда раньше `setTimeout(fn, 0)`, потому что check следует прямо после poll в том же tick; снаружи I/O порядок не детерминирован — зависит от таймера. Блокировка main thread синхронным CPU (длинный for-loop, `fs.readFileSync`) останавливает весь цикл — другие запросы ждут. Рекурсивный `process.nextTick` «звёздит» loop: I/O, timers и setImmediate не продвигаются до конца рекурсии; для итераций лучше `setImmediate`. CPU-heavy задачи — `worker_threads`. Отличие от браузера: явные фазы check/close, `setImmediate` только в Node; браузер вставляет рендеринг между батчами задач. Production: Express handlers в poll, DB через libuv; Socket.io emits в check; PM2 cluster — отдельный процесс и loop на ядро.",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "event_loop_definition",
+      "title": "Понимает Event Loop и non-blocking I/O",
+      "expected": "Кандидат объясняет: Event Loop позволяет однопоточному Node.js обрабатывать concurrent I/O без блокировки main thread; работа делегируется libuv и ОС, callbacks выполняются когда готовы.",
+      "score": 2.0,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ядро TL;DR — single-threaded + non-blocking через делегирование I/O",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "event loop",
+              "цикл подий",
+              "non-blocking",
+              "неблокир"
+            ],
+            "ask": "как однопоточный Node.js обрабатывает тысячи соединений без блокировки"
+          }
+        ],
+        "mustConcepts": [
+          "event loop",
+          "цикл подий",
+          "однопоточ",
+          "single-thread",
+          "non-blocking",
+          "неблокир",
+          "I/O",
+          "libuv",
+          "main thread",
+          "главн поток",
+          "callback",
+          "делегир",
+          "offload",
+          "concurrent",
+          "параллель",
+          "tick",
+          "тик"
+        ],
+        "falseClaims": [
+          "Node.js многопоточный для каждого HTTP-запроса",
+          "Event Loop создаёт новый поток на каждый callback",
+          "синхронный код в Node.js всегда выполняется в worker thread",
+          "Event Loop это только браузерная концепция"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "six_phases",
+      "title": "Знает шесть фаз Event Loop",
+      "expected": "Кандидат перечисляет фазы в порядке: timers, pending callbacks, idle/prepare, poll, check, close; понимает роль poll (I/O) и check (setImmediate).",
+      "score": 2.0,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "шесть фаз — главный interview checklist из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "event_loop_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "timers",
+              "poll",
+              "check",
+              "close"
+            ],
+            "ask": "назови шесть фаз event loop в правильном порядке"
+          },
+          {
+            "match": [
+              "poll",
+              "setImmediate",
+              "check"
+            ],
+            "ask": "что происходит в фазе poll и что выполняется в check"
+          }
+        ],
+        "mustConcepts": [
+          "timers",
+          "setTimeout",
+          "setInterval",
+          "pending callbacks",
+          "idle",
+          "prepare",
+          "poll",
+          "check",
+          "close",
+          "setImmediate",
+          "фаз",
+          "tick",
+          "тик",
+          "I/O callback",
+          "socket.on close",
+          "порядок",
+          "шесть"
+        ],
+        "falseClaims": [
+          "setImmediate выполняется в фазе timers",
+          "poll всегда мгновенно завершается без ожидания",
+          "close callbacks выполняются перед poll",
+          "idle/prepare доступны для обычного JS-кода"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "microtask_priority",
+      "title": "Понимает микрозадачи и nextTick",
+      "expected": "Кандидат объясняет: между фазами дренируются nextTick (первым) и Promise microtasks; nextTick не принадлежит фазе и выполняется до них; рекурсивный nextTick блокирует продвижение loop.",
+      "score": 2.0,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "nextTick vs Promise — ключевый порядок выполнения",
+        "confusionPairs": [
+          {
+            "checkpointKey": "microtask_priority",
+            "oftenConfusedWith": [
+              "six_phases"
+            ],
+            "anchorTermsExpected": [
+              "nextTick",
+              "Promise",
+              "microtask",
+              "микрозадач",
+              "перед фаз",
+              "первым"
+            ],
+            "anchorTermsWrongTopic": [
+              "nextTick в фазе timers",
+              "Promise выполняется до nextTick"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "nextTick",
+              "Promise"
+            ],
+            "ask": "что выполнится раньше: process.nextTick или Promise.then после синхронного кода"
+          },
+          {
+            "match": [
+              "рекурсив",
+              "starvation",
+              "звёздит"
+            ],
+            "ask": "что будет если process.nextTick вызывает сам себя миллион раз"
+          }
+        ],
+        "mustConcepts": [
+          "microtask",
+          "микрозадач",
+          "process.nextTick",
+          "nextTick",
+          "Promise",
+          "then",
+          "между фаз",
+          "переход",
+          "drain",
+          "спустош",
+          "первым",
+          "до фаз",
+          "не принадлежит фаз",
+          "рекурсив",
+          "starvation",
+          "блокир loop"
+        ],
+        "falseClaims": [
+          "nextTick и Promise выполняются в одной фазе timers",
+          "Promise.then всегда раньше process.nextTick",
+          "микрозадачи выполняются только после всех шести фаз",
+          "рекурсивный nextTick безопасен для длинных итераций"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "libuv_basics",
+      "title": "Понимает роль libuv и thread pool",
+      "expected": "Кандидат объясняет: libuv делегирует сетевой I/O через kernel API; thread pool (4 по умолчанию) для fs, DNS, crypto; `UV_THREADPOOL_SIZE` меняет размер пула.",
+      "score": 1.0,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "libuv и thread pool — базовый building block из Theory",
+        "mustConcepts": [
+          "libuv",
+          "thread pool",
+          "пул поток",
+          "UV_THREADPOOL_SIZE",
+          "epoll",
+          "kqueue",
+          "kernel",
+          "ядро",
+          "сетев",
+          "network I/O",
+          "fs",
+          "файл",
+          "DNS",
+          "crypto",
+          "4 поток",
+          "по умолчанию"
+        ],
+        "falseClaims": [
+          "все I/O в Node.js идут через thread pool",
+          "сетевые запросы всегда блокируют main thread",
+          "libuv это npm-пакет не связанный с Node",
+          "thread pool по умолчанию 16 потоков"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "setimmediate_vs_settimeout",
+      "title": "Отличает setImmediate и setTimeout(0)",
+      "expected": "Кандидат объясняет: внутри I/O callback setImmediate (check) всегда раньше setTimeout(0) (timers следующего tick); снаружи I/O порядок не детерминирован; setTimeout(0) не «мгновенно».",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "senior trap из ITLead — детерминированный порядок внутри poll",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "setimmediate_vs_settimeout",
+            "oftenConfusedWith": [
+              "microtask_priority"
+            ],
+            "anchorTermsExpected": [
+              "setImmediate",
+              "setTimeout",
+              "внутри I/O",
+              "poll",
+              "check",
+              "следующий tick"
+            ],
+            "anchorTermsWrongTopic": [
+              "setImmediate всегда первым везде",
+              "setTimeout(0) мгновенно после sync"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "setImmediate",
+              "setTimeout",
+              "I/O"
+            ],
+            "ask": "внутри fs.readFile callback что выполнится раньше: setImmediate или setTimeout(fn, 0)"
+          }
+        ],
+        "mustConcepts": [
+          "setImmediate",
+          "setTimeout",
+          "check",
+          "timers",
+          "poll",
+          "I/O callback",
+          "внутри",
+          "снаружи",
+          "не детермин",
+          "следующий tick",
+          "0ms",
+          "не мгновен",
+          "всегда раньше",
+          "порядок"
+        ],
+        "falseClaims": [
+          "setImmediate всегда выполняется раньше setTimeout(0) в любом контексте",
+          "setTimeout(fn, 0) выполняется синхронно после текущего кода",
+          "setImmediate и setTimeout(0) в одной фазе",
+          "внутри I/O callback timers phase идёт перед check в том же tick"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с Event Loop",
+      "expected": "Кандидат называет: синхронный CPU блокирует loop; рекурсивный nextTick starves I/O; для тяжёлых задач — worker_threads; для итераций — setImmediate вместо nextTick.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Common mistakes из ITLead — production blockers",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "microtask_priority",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "for-loop",
+              "CPU",
+              "блокир",
+              "readFileSync"
+            ],
+            "ask": "что произойдёт с другими HTTP-запросами если handler считает сумму в for на миллиард"
+          },
+          {
+            "match": [
+              "worker_threads",
+              "setImmediate",
+              "nextTick"
+            ],
+            "ask": "как безопасно выполнить тяжёлую итерацию или CPU-задачу"
+          }
+        ],
+        "mustConcepts": [
+          "блокир",
+          "CPU",
+          "for-loop",
+          "цикл",
+          "readFileSync",
+          "worker_threads",
+          "Worker",
+          "рекурсив nextTick",
+          "starvation",
+          "setImmediate",
+          "итерац",
+          "freeze",
+          "замороз",
+          "другие запрос",
+          "main thread"
+        ],
+        "falseClaims": [
+          "длинный синхронный цикл не влияет на event loop",
+          "process.nextTick безопасен для миллионов рекурсивных вызовов",
+          "fs.readFileSync не блокирует loop потому что fs async",
+          "worker_threads не нужны — loop сам распараллелит CPU"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Event Loop — однопоточный JS, но I/O неблокирующий: libuv и ОС выполняют readFile/сеть, callbacks идут через фазы timers → pending → poll → check → close. Между фазами nextTick, потом Promise. Внутри I/O callback setImmediate раньше setTimeout(0). CPU-loop на main thread блокирует всё.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну loop как официант: кидает заказы в кухню libuv и обслуживает другие столы. шесть фаз на тик, микрозадачи между ними. nextTick рекурсия — плохо, setImmediate для итераций. тяжёлое — worker_threads.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Синхронный код сначала. nextTick и Promise — до фаз. setTimeout(0) — timers phase следующего tick. В fs.readFile callback poll закончился — check с setImmediate до timers. Thread pool libuv — файлы и DNS, сеть через epoll.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Node.js создаёт поток на каждый запрос. setTimeout(0) всегда выполняется сразу после console.log. setImmediate и setTimeout(0) везде в одном порядке.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Event Loop — это когда V8 компилирует TypeScript. process.nextTick выполняется в фазе timers. Рекурсивный nextTick — нормальный способ фоновой работы.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "for на миллиард в route handler не блокирует сервер — loop многопоточный. Все I/O идут через thread pool, сеть тоже.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "event_loop_definition",
+      "exampleType": "good",
+      "exampleText": "Однопоточный JS на main thread, I/O делегируется libuv — loop не ждёт диск/сеть, подхватывает callbacks когда готовы.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "event_loop_definition",
+      "exampleType": "good",
+      "exampleText": "loop позволяет тысячи соединений на одном потоке — неблокирующий I/O через ОС и libuv",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "event_loop_definition",
+      "exampleType": "bad",
+      "exampleText": "Node многопоточный для HTTP — на каждый connection новый thread от V8.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "six_phases",
+      "exampleType": "good",
+      "exampleText": "Шесть фаз: timers, pending callbacks, idle/prepare, poll, check, close. setTimeout в timers, setImmediate в check после poll.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "six_phases",
+      "exampleType": "good",
+      "exampleText": "poll — центр: I/O callbacks и ожидание новых событий; check — setImmediate; close — socket.on('close')",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "six_phases",
+      "exampleType": "bad",
+      "exampleText": "Фазы: poll, timers, check — порядок не важен, loop выбирает случайно.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "microtask_priority",
+      "exampleType": "good",
+      "exampleText": "После sync: nextTick первым, потом Promise.then, потом фазы. nextTick не в фазе — между операцией и loop.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "microtask_priority",
+      "exampleType": "good",
+      "exampleText": "рекурсивный nextTick миллион раз — I/O и timers не двигаются до конца, loop застрял",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "microtask_priority",
+      "exampleType": "bad",
+      "exampleText": "Promise.then всегда перед nextTick. Микрозадачи только после всех шести фаз tick.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "libuv_basics",
+      "exampleType": "good",
+      "exampleText": "libuv: сеть через epoll/kqueue, fs/DNS/crypto — thread pool 4 потоков, UV_THREADPOOL_SIZE увеличивает пул.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "libuv_basics",
+      "exampleType": "good",
+      "exampleText": "readFile не блокирует main — libuv thread pool; http запрос — kernel async, не thread pool",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "libuv_basics",
+      "exampleType": "bad",
+      "exampleText": "Все операции Node.js включая fetch идут через 4 потока thread pool.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "setimmediate_vs_settimeout",
+      "exampleType": "good",
+      "exampleText": "В fs.readFile callback: setImmediate (check) всегда до setTimeout(0) (timers следующего tick). Снаружи I/O — порядок не гарантирован.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "setimmediate_vs_settimeout",
+      "exampleType": "good",
+      "exampleText": "setTimeout(fn,0) не мгновенно — ждёт timers phase; под load приходит позже",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "setimmediate_vs_settimeout",
+      "exampleType": "bad",
+      "exampleText": "setImmediate всегда первым даже в main script без I/O. setTimeout(0) синхронный после текущей строки.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Тяжёлый for в Express handler блокирует все запросы — offload в worker_threads.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "фоновая рекурсия — setImmediate вместо nextTick, чтобы poll мог обрабатывать I/O между шагами",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "readFileSync в hot path ок — loop параллельный. Рекурсивный nextTick — recommended для batch jobs.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "how-event-loop-works-in-nodejs",
+    "apiUrl": "https://api.itlead.org/api/questions/how-event-loop-works-in-nodejs",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/how-event-loop-works-in-nodejs",
+    "difficulty": "JUNIOR",
+    "titleEn": "How the Event Loop works in Node.js",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T15:00:00.000Z"
+  }
+}

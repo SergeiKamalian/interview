@@ -1,0 +1,675 @@
+{
+  "topic": {
+    "code": "nodejs_process_management_pm2",
+    "name": "PM2 и управление процессами Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое PM2 и как управлять процессами Node.js в production?",
+    "shortAnswer": "PM2 — production process manager для Node.js: автоматически перезапускает упавшие приложения, распределяет нагрузку по ядрам CPU через cluster mode и сохраняет логи в файлы. В production для деплоя используй `pm2 reload`, а не `pm2 restart` — restart убивает всех воркеров сразу и обрывает активные соединения.",
+    "idealAnswer": "PM2 — менеджер процессов для Node.js в production: автоперезапуск при падении, кластеризация по ядрам CPU, персистентные логи и мониторинг. В отличие от `node server.js`, где один необработанный exception навсегда убивает процесс, один поток и логи теряются при рестарте, PM2 оборачивает приложение в supervisor: ловит exit signal, поднимает замену за миллисекунды и маршрутизирует трафик через несколько worker-инстансов на базе встроенного модуля `cluster`. Базовый запуск: `pm2 start server.js --name api -i max` — cluster mode на все ядра. PM2 работает как master-процесс Node.js, форкает детей через `child_process`, слушает exit codes и сигналы (SIGINT, uncaught exceptions); при ненулевом exit code — restart. Кластеризация делегируется модулю `cluster` — один worker на ядро (`os.cpus().length`). `pm2 reload` — zero-downtime: сначала поднимает новых workers, ждёт событие «listening» (HTTP server готов), затем SIGTERM старым и ждёт закрытия соединений. `pm2 restart` убивает всех workers одновременно — 5xx и обрыв соединений; в CI/CD всегда reload. Ecosystem file (`ecosystem.config.js`): `script`, `instances: 'max'`, обязательно `exec_mode: 'cluster'` (без него instances игнорируется!), `max_memory_restart`, `max_restarts`, `kill_timeout`, `env_production`. `pm2 start ecosystem.config.js --env production`, `pm2 save` + `pm2 startup` — автозапуск после reboot. Когда PM2: VPS/bare metal, Express/Fastify/NestJS за Nginx. Когда не PM2: local dev — nodemon; serverless (Lambda, Vercel) — платформа сама управляет процессами. Типичные ошибки: запуск без `--name`; `instances: 'max'` без `exec_mode: 'cluster'`; `pm2 restart` вместо reload в production; запуск от root; отсутствие `pm2-logrotate` (логи заполняют диск). В Docker — `pm2-runtime` для корректной обработки PID 1. При превышении `max_memory_restart` PM2 перезапускает конкретный worker. После `max_restarts` за окно приложение переходит в статус errored — PM2 прекращает попытки. PM2 отличает crash от graceful stop по exit code и тому, отправлял ли сам PM2 SIGTERM (`pm2 stop`).",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "pm2_definition",
+      "title": "Понимает назначение PM2",
+      "expected": "Кандидат объясняет: PM2 — production process manager для Node.js; автоперезапуск при crash, cluster mode по ядрам CPU, персистентные логи и мониторинг (`pm2 list`, `pm2 monit`).",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — что такое PM2 и зачем в production",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "pm2_definition",
+            "oftenConfusedWith": [
+              "pm2_vs_node",
+              "when_to_use_pm2"
+            ],
+            "anchorTermsExpected": [
+              "PM2",
+              "process manager",
+              "автоперезапуск",
+              "cluster",
+              "логи",
+              "мониторинг"
+            ],
+            "anchorTermsWrongTopic": [
+              "PM2 это bundler",
+              "PM2 заменяет Nginx",
+              "PM2 нужен в serverless"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "PM2",
+              "process manager",
+              "менеджер процесс"
+            ],
+            "ask": "что PM2 делает при падении Node-приложения и чем это лучше простого node server.js"
+          }
+        ],
+        "mustConcepts": [
+          "PM2",
+          "process manager",
+          "менеджер процесс",
+          "production",
+          "автоперезапуск",
+          "перезапуск",
+          "crash",
+          "падени",
+          "cluster",
+          "кластер",
+          "CPU",
+          "ядр",
+          "лог",
+          "мониторинг",
+          "pm2 list",
+          "pm2 monit",
+          "supervisor",
+          "supervise"
+        ],
+        "falseClaims": [
+          "PM2 нужен для локальной разработки вместо nodemon",
+          "PM2 полезен в serverless Lambda",
+          "PM2 заменяет reverse proxy вроде Nginx",
+          "PM2 только перезапускает процесс без кластеризации",
+          "PM2 это часть Node.js core"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "pm2_vs_node",
+      "title": "Отличает PM2 от node server.js",
+      "expected": "Кандидат сравнивает: `node server.js` — один процесс, crash убивает навсегда, один CPU core, stdout теряется; PM2 — supervisor, restart за миллисекунды, multi-core через cluster, логи в `~/.pm2/logs/`.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "key difference из ITLead — script vs service",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "pm2_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "pm2_vs_node",
+            "oftenConfusedWith": [
+              "cluster_mode",
+              "when_to_use_pm2"
+            ],
+            "anchorTermsExpected": [
+              "node server.js",
+              "один процесс",
+              "crash",
+              "supervisor",
+              "cluster",
+              "логи"
+            ],
+            "anchorTermsWrongTopic": [
+              "node server.js автоматически перезапускается",
+              "PM2 и node дают одинаковую утилизацию CPU"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "node server.js",
+              "без PM2",
+              "просто node"
+            ],
+            "ask": "что происходит при unhandled exception с node server.js и с PM2"
+          }
+        ],
+        "mustConcepts": [
+          "node server.js",
+          "node app.js",
+          "один процесс",
+          "один поток",
+          "crash",
+          "падени",
+          "unhandled",
+          "exception",
+          "supervisor",
+          "restart",
+          "перезапуск",
+          "CPU core",
+          "ядр",
+          "stdout",
+          "лог",
+          "~/.pm2/logs",
+          "сервис",
+          "script"
+        ],
+        "falseClaims": [
+          "node server.js автоматически перезапускается после crash",
+          "node server.js использует все ядра CPU по умолчанию",
+          "stdout логи node сохраняются после рестарта без PM2",
+          "PM2 и node server.js дают одинаковую отказоустойчивость",
+          "PM2 меняет код приложения при restart"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "cluster_mode",
+      "title": "Знает cluster mode и -i max",
+      "expected": "Кандидат объясняет: `-i max` или `instances: 'max'` — worker на каждое CPU ядро через модуль `cluster`; в ecosystem обязателен `exec_mode: 'cluster'`, иначе instances игнорируется и остаётся fork mode с одним инстансом.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "кластеризация — ключевая production-фича PM2",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "ecosystem_file",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "cluster",
+              "instances",
+              "-i max",
+              "exec_mode"
+            ],
+            "ask": "что делает `-i max` и зачем нужен exec_mode: 'cluster' в ecosystem file"
+          },
+          {
+            "match": [
+              "fork",
+              "fork mode",
+              "один инстанс"
+            ],
+            "ask": "что произойдёт если указать instances: 'max' без exec_mode: 'cluster'"
+          }
+        ],
+        "mustConcepts": [
+          "cluster",
+          "кластер",
+          "cluster mode",
+          "-i max",
+          "instances",
+          "max",
+          "exec_mode",
+          "fork",
+          "fork mode",
+          "worker",
+          "воркер",
+          "CPU",
+          "ядр",
+          "os.cpus",
+          "модуль cluster",
+          "multi-instance",
+          "несколько инстанс",
+          "8-core",
+          "один поток"
+        ],
+        "falseClaims": [
+          "instances: 'max' работает без exec_mode: 'cluster'",
+          "PM2 cluster mode не использует модуль cluster Node.js",
+          "fork mode создаёт worker на каждое ядро",
+          "-i max запускает один процесс на все ядра",
+          "PM2 cluster перезапускает все workers при падении одного"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "reload_vs_restart",
+      "title": "Различает pm2 reload и pm2 restart",
+      "expected": "Кандидат объясняет: `pm2 reload` — zero-downtime (новые workers → listening → SIGTERM старым → drain соединений); `pm2 restart` убивает всех workers сразу — downtime и 5xx; в production deploy всегда reload.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "главная production-ошибка из ITLead Common mistakes",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "reload_vs_restart",
+            "oftenConfusedWith": [
+              "pm2_internal_mechanics"
+            ],
+            "anchorTermsExpected": [
+              "pm2 reload",
+              "pm2 restart",
+              "zero-downtime",
+              "SIGTERM",
+              "listening",
+              "5xx"
+            ],
+            "anchorTermsWrongTopic": [
+              "restart и reload одинаковы",
+              "reload убивает всех workers сразу"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "reload",
+              "restart",
+              "zero-downtime",
+              "без простоя"
+            ],
+            "ask": "пошагово: как pm2 reload обеспечивает zero-downtime deploy"
+          },
+          {
+            "match": [
+              "CI/CD",
+              "deploy",
+              "production"
+            ],
+            "ask": "какую команду использовать в CI/CD pipeline и почему"
+          }
+        ],
+        "mustConcepts": [
+          "pm2 reload",
+          "pm2 restart",
+          "reload",
+          "restart",
+          "zero-downtime",
+          "без простоя",
+          "downtime",
+          "простой",
+          "SIGTERM",
+          "listening",
+          "готов",
+          "worker",
+          "воркер",
+          "drain",
+          "соединени",
+          "5xx",
+          "обрыв",
+          "CI/CD",
+          "deploy",
+          "production"
+        ],
+        "falseClaims": [
+          "pm2 reload и pm2 restart работают одинаково",
+          "pm2 restart безопасен для production deploy",
+          "pm2 reload убивает всех workers одновременно",
+          "zero-downtime возможен только с pm2 restart",
+          "reload не ждёт события listening перед SIGTERM"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "ecosystem_file",
+      "title": "Знает ecosystem file и persistence",
+      "expected": "Кандидат описывает ecosystem.config.js: name, script, instances, exec_mode, max_memory_restart, max_restarts, kill_timeout, env_production; `pm2 start ecosystem.config.js --env production`; `pm2 save` + `pm2 startup` для автозапуска после reboot.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовая конфигурация production deploy",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ecosystem",
+              "ecosystem.config",
+              "max_memory_restart"
+            ],
+            "ask": "ключевые поля ecosystem file и что делает max_memory_restart"
+          },
+          {
+            "match": [
+              "pm2 save",
+              "pm2 startup",
+              "reboot",
+              "systemd"
+            ],
+            "ask": "как сохранить список процессов PM2 между перезагрузками сервера"
+          }
+        ],
+        "mustConcepts": [
+          "ecosystem",
+          "ecosystem.config.js",
+          "script",
+          "dist",
+          "instances",
+          "exec_mode",
+          "max_memory_restart",
+          "max_restarts",
+          "kill_timeout",
+          "env_production",
+          "NODE_ENV",
+          "pm2 save",
+          "pm2 startup",
+          "systemd",
+          "reboot",
+          "перезагрузк",
+          "автозапуск",
+          "NestJS",
+          "TypeScript"
+        ],
+        "falseClaims": [
+          "pm2 save достаточно без pm2 startup для автозапуска после reboot",
+          "max_memory_restart перезапускает все workers при превышении лимита одним",
+          "ecosystem file не нужен для production",
+          "pm2 startup работает без pm2 save",
+          "env_production применяется без флага --env production"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки PM2",
+      "expected": "Кандидат называет: запуск без `--name`; `instances: 'max'` без `exec_mode: 'cluster'`; `pm2 restart` в deploy; запуск от root; отсутствие `pm2-logrotate`; в Docker — plain pm2 вместо `pm2-runtime`.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Common mistakes блок ITLead — половина жалоб на PM2",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "reload_vs_restart",
+            "floorFraction": 0.4
+          },
+          {
+            "checkpointKey": "cluster_mode",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "--name",
+              "без имени",
+              "pm2 list"
+            ],
+            "ask": "почему опасно запускать pm2 start app.js без --name"
+          },
+          {
+            "match": [
+              "root",
+              "pm2-logrotate",
+              "Docker",
+              "pm2-runtime"
+            ],
+            "ask": "риски запуска PM2 от root и best practice для Docker"
+          }
+        ],
+        "mustConcepts": [
+          "--name",
+          "имя",
+          "exec_mode",
+          "cluster",
+          "instances",
+          "pm2 restart",
+          "pm2 reload",
+          "root",
+          "привилег",
+          "pm2-logrotate",
+          "ротац",
+          "лог",
+          "100GB",
+          "диск",
+          "Docker",
+          "pm2-runtime",
+          "PID 1",
+          "zombie",
+          "max_restarts",
+          "errored",
+          "min_uptime"
+        ],
+        "falseClaims": [
+          "можно безопасно запускать PM2 от root в production",
+          "pm2-logrotate не нужен — логи сами ротируются",
+          "в Docker достаточно обычного pm2 start без pm2-runtime",
+          "имя процесса в PM2 не важно при нескольких сервисах",
+          "exec_mode можно не указывать при instances: max"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use_pm2",
+      "title": "Понимает когда использовать PM2",
+      "expected": "Кандидат называет: PM2 — VPS/bare metal, Express/Fastify/NestJS за Nginx; nodemon — local dev hot-reload; serverless (Lambda, Vercel) — PM2 не нужен; forever — legacy.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "when to use из таблицы ITLead — бонусный checkpoint",
+        "mustConcepts": [
+          "VPS",
+          "bare metal",
+          "Express",
+          "Fastify",
+          "NestJS",
+          "Nginx",
+          "nodemon",
+          "dev",
+          "разработк",
+          "serverless",
+          "Lambda",
+          "Vercel",
+          "forever",
+          "Next.js",
+          "self-hosted"
+        ],
+        "falseClaims": [
+          "PM2 нужен в serverless Lambda",
+          "nodemon лучше PM2 для production",
+          "PM2 заменяет Nginx routing",
+          "forever предпочтительнее PM2 для новых проектов",
+          "PM2 обязателен для любого Node.js приложения"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "PM2 — production process manager: автоперезапуск при crash, cluster на все ядра через `-i max`, логи в файлы. Деплой через `pm2 reload api` — zero-downtime: новые workers принимают трафик до завершения старых. Ecosystem file с `exec_mode: 'cluster'` обязателен, иначе instances игнорируется.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На VPS поднимаю NestJS: ecosystem.config.js → dist/main.js, instances max, cluster mode. После деплоя pm2 reload, не restart. pm2 save + pm2 startup чтобы после reboot всё само поднялось. Логи кручу через pm2-logrotate, не от root.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "node server.js — один процесс, упал и лёг навсегда. PM2 ловит exit, перезапускает за миллисекунды, pm2 monit показывает uptime и restarts. Для dev nodemon, для Lambda PM2 бессмысленен — платформа сама управляет.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "PM2 — это bundler для Node.js. В production всегда pm2 restart, reload то же самое. instances: max работает без exec_mode cluster.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Запускаю PM2 от root на production — так проще. Логи сами не растут, pm2-logrotate не нужен. В Docker просто pm2 start без pm2-runtime.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "PM2 нужен в Vercel serverless. nodemon для production кластеризации лучше PM2. node server.js автоматически использует все ядра CPU.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "pm2_definition",
+      "exampleType": "good",
+      "exampleText": "PM2 — process manager для production Node.js: restart при падении, cluster по CPU, логи и pm2 monit.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "pm2_definition",
+      "exampleType": "good",
+      "exampleText": "ну pm2 следит чтобы апи не лежало — упало, перезапустил, ещё и на все ядра размазал",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "pm2_definition",
+      "exampleType": "bad",
+      "exampleText": "PM2 — это npm-пакет для hot reload в dev, как nodemon только для React.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "pm2_vs_node",
+      "exampleType": "good",
+      "exampleText": "node server.js — один crash и процесс мёртв, один core, логи в stdout пропадают. PM2 — supervisor с restart и multi-core cluster.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "pm2_vs_node",
+      "exampleType": "good",
+      "exampleText": "без pm2 unhandled exception убивает навсегда, с pm2 через секунду новый worker",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "pm2_vs_node",
+      "exampleType": "bad",
+      "exampleText": "node server.js и PM2 одинаково перезапускаются при ошибке и используют все ядра.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "cluster_mode",
+      "exampleType": "good",
+      "exampleText": "pm2 start server.js -i max — worker на каждое CPU ядро через cluster module. В ecosystem обязательно exec_mode: 'cluster', иначе instances: max молча игнорируется.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "cluster_mode",
+      "exampleType": "good",
+      "exampleText": "на 8 ядрах без exec_mode cluster pm2 крутит один поток — классическая ловушка",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "cluster_mode",
+      "exampleType": "bad",
+      "exampleText": "instances: 'max' в fork mode создаёт worker на каждое ядро автоматически.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "reload_vs_restart",
+      "exampleType": "good",
+      "exampleText": "pm2 reload: новые workers → listening → SIGTERM старым → drain connections. pm2 restart убивает всех сразу — 5xx. В CI/CD только reload.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "reload_vs_restart",
+      "exampleType": "good",
+      "exampleText": "restart в проде — все коннекты рвутся, reload по одному воркеру без даунтайма",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "reload_vs_restart",
+      "exampleType": "bad",
+      "exampleText": "pm2 reload и pm2 restart делают одно и то же — просто разные названия.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "ecosystem_file",
+      "exampleType": "good",
+      "exampleText": "ecosystem.config.js: script dist/main.js, instances max, exec_mode cluster, max_memory_restart 1G. pm2 start --env production, pm2 save && pm2 startup.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "ecosystem_file",
+      "exampleType": "good",
+      "exampleText": "max_memory_restart перезапускает только жирный worker, остальные работают. save + startup — после reboot systemd поднимет pm2",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "ecosystem_file",
+      "exampleType": "bad",
+      "exampleText": "pm2 save alone достаточно — после reboot процессы сами поднимутся без pm2 startup.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Типичные ошибки: без --name в pm2 list каша; instances max без exec_mode cluster; restart в deploy; root; нет pm2-logrotate; Docker без pm2-runtime.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "видел как логи без ротации забили диск на 100GB — pm2 install pm2-logrotate с первого дня",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "exec_mode cluster не обязателен, instances max и так создаст 8 workers в fork mode.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "when_to_use_pm2",
+      "exampleType": "good",
+      "exampleText": "PM2 — VPS с Express/NestJS за Nginx. Dev — nodemon. Lambda/Vercel — PM2 не нужен, платформа управляет процессами.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "when_to_use_pm2",
+      "exampleType": "good",
+      "exampleText": "self-hosted next через pm2 start npm -- start, serverless на vercel — pm2 лишний",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "when_to_use_pm2",
+      "exampleType": "bad",
+      "exampleText": "PM2 обязателен для любого Node.js, включая AWS Lambda и local dev.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-process-management-pm2",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-process-management-pm2",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-process-management-pm2",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is PM2 and how to manage Node.js processes in production?",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

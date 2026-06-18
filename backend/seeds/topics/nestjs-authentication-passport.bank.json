@@ -1,0 +1,566 @@
+{
+  "topic": {
+    "code": "nestjs_authentication_passport",
+    "name": "Аутентификация с Passport в NestJS",
+    "skillCode": "nestjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как реализовать аутентификацию с Passport в NestJS?",
+    "shortAnswer": "В NestJS Passport подключают через @nestjs/passport: стратегии (JWT, local, OAuth2) содержат логику проверки в validate(), guards решают, когда её запускать. JwtStrategy регистрируют в AuthModule вместе с PassportModule и JwtModule, маршруты защищают @UseGuards(AuthGuard('jwt')). Результат validate() попадает в req.user.",
+    "idealAnswer": "NestJS интегрируется с Passport.js через пакет @nestjs/passport. Архитектура: стратегии отвечают на вопрос «как проверить» (подпись JWT, bcrypt-пароль), guards — «когда запускать проверку». Стратегия — Injectable-класс, расширяющий PassportStrategy(Strategy) с методом validate(); guard вызывает passport.authenticate('jwt'|'local') и результат validate() записывает в req.user. Пакеты: @nestjs/passport, passport-local, passport-jwt, @nestjs/jwt (+ типы). AuthModule импортирует PassportModule (без него guards падают в runtime), JwtModule.register({ secret, signOptions }), регистрирует AuthService, JwtStrategy, LocalStrategy. Local strategy — только на POST /login: super({ usernameField: 'email' }), validate(email, password) вызывает AuthService.validateUser с bcrypt.compare, при ошибке — UnauthorizedException, пароль из ответа убирают. JWT strategy — на всех защищённых маршрутах: ExtractJwt.fromAuthHeaderAsBearerToken(), secretOrKey из env, ignoreExpiration: false; validate(payload) возвращает { id: sub, email }. AuthService.login подписывает access_token и refresh_token через jwtService.sign. Контроллер: @UseGuards(AuthGuard('local')) на login → authService.login(req.user); @UseGuards(AuthGuard('jwt')) на profile → req.user. Глобальный паттерн: JwtAuthGuard extends AuthGuard('jwt'), Reflector проверяет @Public(), регистрация APP_GUARD в AppModule — все маршруты защищены по умолчанию. Когда что: stateless API/SPA/mobile — JWT; login — local + выдача JWT; social — passport-google-oauth20; микросервисы — custom API key strategy; простой session web без API — @nestjs/session без Passport. Типичные ошибки: забытый PassportModule; hardcoded JWT secret; validate() возвращает null без throw; ignoreExpiration: true в prod; local strategy на обычных API-запросах. Flow: POST /auth/login → LocalStrategy → bcrypt → tokens; GET /profile → Bearer → JwtStrategy → req.user или 401. Logout для stateless JWT: claim jti + blacklist в Redis с TTL, проверка в validate(). Расширение AuthGuard('jwt') позволяет override canActivate/handleRequest для ролей, @Public(), логирования без изменения контроллеров. Refresh token — отдельная именованная стратегия PassportStrategy(Strategy, 'refresh') с другим secret и экстрактором.",
+    "maxScore": 10,
+    "skills": [
+      "nestjs",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "passport_strategies_guards",
+      "title": "Разделяет стратегии и guards",
+      "expected": "Кандидат объясняет: стратегия содержит логику validate (JWT, пароль, OAuth); guard решает когда запускать passport.authenticate; результат validate() → req.user; разделение упрощает смену стратегий.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро архитектуры Passport в NestJS",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "passport_strategies_guards",
+            "oftenConfusedWith": [
+              "jwt_strategy",
+              "auth_controller_flow"
+            ],
+            "anchorTermsExpected": [
+              "стратег",
+              "guard",
+              "validate",
+              "req.user",
+              "passport.authenticate"
+            ],
+            "anchorTermsWrongTopic": [
+              "JwtService подписывает guard",
+              "guard содержит bcrypt"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "стратег",
+              "guard",
+              "validate"
+            ],
+            "ask": "чем стратегия отличается от guard и что происходит с return validate()"
+          }
+        ],
+        "mustConcepts": [
+          "Passport",
+          "стратег",
+          "guard",
+          "validate",
+          "req.user",
+          "passport.authenticate",
+          "AuthGuard",
+          "логик проверк",
+          "когда запуск",
+          "как провер",
+          "JWT",
+          "local",
+          "OAuth",
+          "разделен",
+          "Injectable",
+          "PassportStrategy"
+        ],
+        "falseClaims": [
+          "guard содержит логику проверки пароля или JWT",
+          "стратегия решает какие маршруты защищать",
+          "validate() не влияет на req.user",
+          "Passport и @nestjs/jwt — одно и то же",
+          "AuthGuard заменяет необходимость стратегии"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "module_setup",
+      "title": "Знает настройку AuthModule и пакетов",
+      "expected": "Кандидат перечисляет пакеты (@nestjs/passport, passport-jwt, passport-local, @nestjs/jwt), импорт PassportModule и JwtModule.register, регистрацию стратегий в providers; понимает что без PassportModule guards ломаются.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый setup из ITLead quick setup",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "PassportModule",
+              "imports"
+            ],
+            "ask": "какие модули и пакеты обязательны и что будет без PassportModule"
+          }
+        ],
+        "mustConcepts": [
+          "@nestjs/passport",
+          "passport-jwt",
+          "passport-local",
+          "@nestjs/jwt",
+          "PassportModule",
+          "JwtModule.register",
+          "providers",
+          "JwtStrategy",
+          "LocalStrategy",
+          "AuthService",
+          "imports",
+          "secret",
+          "expiresIn",
+          "без PassportModule",
+          "runtime"
+        ],
+        "falseClaims": [
+          "достаточно только @nestjs/jwt без @nestjs/passport",
+          "PassportModule не нужен если есть JwtModule",
+          "стратегии регистрируются только в controllers",
+          "passport-local нужен на каждом защищённом маршруте"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "local_strategy",
+      "title": "Понимает local strategy для login",
+      "expected": "Кандидат описывает LocalStrategy только на login: usernameField email, validate вызывает validateUser с bcrypt.compare, UnauthorizedException при неверных данных, пароль не возвращают в result.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "login flow и bcrypt — ключевой middle паттерн",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "auth_controller_flow",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "local",
+              "login",
+              "bcrypt"
+            ],
+            "ask": "где используется local strategy и как проверяется пароль"
+          }
+        ],
+        "mustConcepts": [
+          "local",
+          "LocalStrategy",
+          "passport-local",
+          "login",
+          "usernameField",
+          "email",
+          "validateUser",
+          "bcrypt",
+          "compare",
+          "UnauthorizedException",
+          "пароль",
+          "не возвращ",
+          "credentials",
+          "только login",
+          "endpoint"
+        ],
+        "falseClaims": [
+          "local strategy используют на всех API-маршрутах",
+          "validateUser должен возвращать пароль в объекте user",
+          "local strategy читает Bearer token из заголовка",
+          "bcrypt.compare не нужен — достаточно plain text сравнения"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "jwt_strategy",
+      "title": "Понимает JWT strategy для защищённых маршрутов",
+      "expected": "Кандидат описывает JwtStrategy: ExtractJwt.fromAuthHeaderAsBearerToken, secretOrKey из env, ignoreExpiration false, validate(payload) возвращает user object для req.user; 401 при missing/expired/tampered token.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "основной механизм защиты API middle+",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Bearer",
+              "ExtractJwt",
+              "payload"
+            ],
+            "ask": "как JWT strategy извлекает токен и что делает validate с payload"
+          },
+          {
+            "match": [
+              "ignoreExpiration",
+              "secretOrKey"
+            ],
+            "ask": "зачем ignoreExpiration false и откуда брать secret"
+          }
+        ],
+        "mustConcepts": [
+          "JwtStrategy",
+          "passport-jwt",
+          "ExtractJwt",
+          "fromAuthHeaderAsBearerToken",
+          "Bearer",
+          "Authorization",
+          "secretOrKey",
+          "JWT_SECRET",
+          "ignoreExpiration",
+          "payload",
+          "sub",
+          "validate",
+          "req.user",
+          "401",
+          "expired",
+          "signature"
+        ],
+        "falseClaims": [
+          "JWT strategy проверяет email и password из body",
+          "ignoreExpiration true — безопасный default для production",
+          "secretOrKey можно хардкодить в репозитории",
+          "validate() может вернуть null без последствий для UX ошибки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "auth_controller_flow",
+      "title": "Знает flow контроллера и выдачу токенов",
+      "expected": "Кандидат описывает: AuthGuard('local') на POST login → req.user от LocalStrategy → authService.login с jwtService.sign; AuthGuard('jwt') на profile → req.user от JwtStrategy; access_token и refresh_token в payload sub/email.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "связка controller → service → tokens из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "login",
+              "access_token",
+              "req.user"
+            ],
+            "ask": "что происходит от POST /login до выдачи access_token"
+          }
+        ],
+        "mustConcepts": [
+          "AuthController",
+          "UseGuards",
+          "AuthGuard",
+          "local",
+          "jwt",
+          "login",
+          "profile",
+          "req.user",
+          "authService.login",
+          "jwtService.sign",
+          "access_token",
+          "refresh_token",
+          "payload",
+          "sub",
+          "POST",
+          "GET"
+        ],
+        "falseClaims": [
+          "login endpoint защищают AuthGuard('jwt')",
+          "req.user заполняется контроллером вручную до validate",
+          "refresh_token выдают без JwtModule",
+          "profile доступен без Bearer token"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "global_jwt_guard",
+      "title": "Знает глобальный JWT guard и @Public()",
+      "expected": "Кандидат описывает JwtAuthGuard extends AuthGuard('jwt'), Reflector + isPublic metadata, APP_GUARD в AppModule; @Public() на login/health — защита всех маршрутов по умолчанию.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "production паттерн из ITLead global guard section",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "APP_GUARD",
+              "Public",
+              "Reflector"
+            ],
+            "ask": "как защитить все маршруты по умолчанию и открыть login"
+          }
+        ],
+        "mustConcepts": [
+          "глобальн",
+          "APP_GUARD",
+          "JwtAuthGuard",
+          "extends",
+          "AuthGuard",
+          "Reflector",
+          "Public",
+          "isPublic",
+          "canActivate",
+          "getAllAndOverride",
+          "AppModule",
+          "по умолчанию",
+          "open endpoint",
+          "health"
+        ],
+        "falseClaims": [
+          "нельзя применить JWT guard глобально в NestJS",
+          "@Public() работает без Reflector и metadata",
+          "глобальный guard заменяет необходимость JwtStrategy",
+          "APP_GUARD блокирует даже статические файлы без исключений в коде"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки Passport/JWT",
+      "expected": "Кандидат называет: забытый PassportModule; hardcoded secret; validate возвращает null без UnauthorizedException; ignoreExpiration true в prod; local strategy на обычных запросах; logout через jti blacklist в Redis.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes блок ITLead — частые production ловушки",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "PassportModule",
+              "secret",
+              "ignoreExpiration"
+            ],
+            "ask": "три самые частые ошибки при настройке Passport JWT"
+          },
+          {
+            "match": [
+              "logout",
+              "jti",
+              "blacklist",
+              "Redis"
+            ],
+            "ask": "как реализовать logout при stateless JWT"
+          }
+        ],
+        "mustConcepts": [
+          "PassportModule",
+          "hardcode",
+          "secret",
+          "process.env",
+          "null",
+          "UnauthorizedException",
+          "ignoreExpiration",
+          "local",
+          "не для API",
+          "logout",
+          "jti",
+          "blacklist",
+          "Redis",
+          "stateless",
+          "revoke",
+          "git log"
+        ],
+        "falseClaims": [
+          "stateless JWT можно отозвать без blacklist на сервере",
+          "validate может тихо вернуть null — это нормально",
+          "local strategy подходит для GET /profile с Bearer",
+          "JWT secret в коде безопасен если repo private"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Passport в NestJS: стратегии (JwtStrategy, LocalStrategy) реализуют validate(), guards через AuthGuard('jwt') вызывают passport.authenticate. AuthModule импортирует PassportModule и JwtModule, local только на login с bcrypt, JWT на остальные маршруты — Bearer в Authorization, результат validate() в req.user.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На login вешаю AuthGuard('local'), validateUser с bcrypt, login отдаёт access и refresh. Profile и API — AuthGuard('jwt'). Глобально APP_GUARD JwtAuthGuard + @Public() на auth/login. Secret из env, ignoreExpiration false. Logout — jti в Redis blacklist.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "JwtStrategy: ExtractJwt.fromAuthHeaderAsBearerToken, validate возвращает { id: payload.sub, email }. Guard триггерит стратегию, не наоборот. Без PassportModule в imports guards падают — типичная ошибка.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Guard проверяет пароль через bcrypt, стратегия только решает на каких URL включить auth. PassportModule не нужен если есть JwtModule.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "На все маршруты ставлю AuthGuard('local'), JWT secret хардкожу 'my-secret', ignoreExpiration true чтобы не мучиться с refresh в dev.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "validate в JwtStrategy возвращает null если user не найден — Passport сам разберётся. Logout для JWT — просто удалить token на клиенте, серверу нечего делать.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "passport_strategies_guards",
+      "exampleType": "good",
+      "exampleText": "Стратегия — validate и проверка credentials; guard — canActivate и выбор когда вызвать 'jwt'. Return validate() → req.user.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "passport_strategies_guards",
+      "exampleType": "good",
+      "exampleText": "ну guard как охрана на входе, стратегия — как сканер паспорта: guard решает пускать ли, стратегия читает документ",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "passport_strategies_guards",
+      "exampleType": "bad",
+      "exampleText": "@nestjs/jwt заменяет Passport — guards сами верифицируют Bearer без стратегий.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "module_setup",
+      "exampleType": "good",
+      "exampleText": "npm: @nestjs/passport passport passport-local passport-jwt @nestjs/jwt. AuthModule imports: PassportModule, JwtModule.register({ secret: env, expiresIn: '1h' }), providers: AuthService, JwtStrategy, LocalStrategy.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "module_setup",
+      "exampleType": "good",
+      "exampleText": "без PassportModule в imports стратегии не регистрируются — AuthGuard('jwt') падает в рантайме",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "module_setup",
+      "exampleType": "bad",
+      "exampleText": "Достаточно JwtModule.register — PassportModule опционален для JWT-only API.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "local_strategy",
+      "exampleType": "good",
+      "exampleText": "LocalStrategy super({ usernameField: 'email' }), validate → validateUser → bcrypt.compare, throw UnauthorizedException, пароль из result убираем.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "local_strategy",
+      "exampleType": "good",
+      "exampleText": "local только на POST login — body email/password, не на GET profile",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "local_strategy",
+      "exampleType": "bad",
+      "exampleText": "LocalStrategy на каждый protected route — читаем password из body на каждый запрос.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "jwt_strategy",
+      "exampleType": "good",
+      "exampleText": "JwtStrategy: jwtFromRequest ExtractJwt Bearer, secretOrKey process.env.JWT_SECRET, ignoreExpiration false, validate(payload) → { id: sub, email }.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "jwt_strategy",
+      "exampleType": "good",
+      "exampleText": "нет Bearer или просрочен — 401 до контроллера, validate не вызывается с валидным user",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "jwt_strategy",
+      "exampleType": "bad",
+      "exampleText": "secretOrKey: 'my-secret' в коде — норм для prod если repo private. ignoreExpiration true удобнее.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "auth_controller_flow",
+      "exampleType": "good",
+      "exampleText": "POST login: AuthGuard('local') → req.user → authService.login → { access_token, refresh_token }. GET profile: AuthGuard('jwt') → req.user.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "auth_controller_flow",
+      "exampleType": "good",
+      "exampleText": "payload sub + email, jwtService.sign для access и refresh с разным expiresIn",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "auth_controller_flow",
+      "exampleType": "bad",
+      "exampleText": "На login нужен AuthGuard('jwt') — сначала token, потом пароль.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "global_jwt_guard",
+      "exampleType": "good",
+      "exampleText": "JwtAuthGuard extends AuthGuard('jwt'), Reflector isPublic на handler/class, APP_GUARD в AppModule, @Public() на login и health.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "global_jwt_guard",
+      "exampleType": "good",
+      "exampleText": "override canActivate — если Public return true, иначе super.canActivate",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "global_jwt_guard",
+      "exampleType": "bad",
+      "exampleText": "Глобальный guard невозможен — @UseGuards на каждом методе обязателен всегда.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Ошибки: нет PassportModule, secret в git, validate null без throw, ignoreExpiration true в prod, local на API routes. Logout: jti blacklist Redis TTL.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "validate: if (!user) throw UnauthorizedException — не return null молча",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "JWT stateless — logout не нужен на бэке, достаточно localStorage.clear().",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-authentication-passport",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-authentication-passport",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-authentication-passport",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to implement authentication with Passport in NestJS?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

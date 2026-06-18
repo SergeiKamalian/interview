@@ -1,0 +1,642 @@
+{
+  "topic": {
+    "code": "nodejs_error_handling",
+    "name": "Шаблоны обработки ошибок в Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Какие паттерны обработки ошибок используются в Node.js для callback-, Promise- и async/await-кода?",
+    "shortAnswer": "В Node.js ошибки делятся на операционные (таймаут БД, файл не найден — обрабатываем и восстанавливаемся) и ошибки программиста (TypeError, баг — логируем и перезапускаем процесс). Callbacks — error-first: первый аргумент `err` или `null`. Promises — `.catch()`, async/await — `try/catch`. В Express нужен middleware с 4 аргументами `(err, req, res, next)` после всех роутов и обёртка `asyncHandler` для async-роутов. Ошибки из async-функций нужно перебрасывать (`throw err`), иначе caller получит `undefined`.",
+    "idealAnswer": "Правильная обработка ошибок критична в Node.js: необработанный сбой может уронить весь сервер. Две категории: операционные ошибки (ожидаемые — обрыв БД, невалидный ввод, ENOENT) — обрабатываем, возвращаем 404/422, retry; ошибки программиста (TypeError, баг в логике) — не «лечим» gracefully, логируем, завершаем процесс, PM2 перезапускает. Error-first callbacks: `(err, data) => { if (err) return; ... }` — всегда проверять `err` первым и делать `return`; без return код продолжит с `undefined`. Promises: rejection идёт по цепочке до `.catch()`; `.finally()` для cleanup. async/await — синтаксический сахар над Promise; один `try/catch` на все `await` или отдельные блоки для разных типов ошибок. Express: error middleware определяется сигнатурой из 4 параметров `(err, req, res, next)`, ставится последним; без `asyncHandler` (Promise.resolve(fn).catch(next)) rejection из async-роута не попадёт в error middleware. Кастомные классы (AppError, NotFoundError, ValidationError) несут statusCode; `Error.captureStackTrace` указывает стек на место throw. Глобальные обработчики: `unhandledRejection` — rejected Promise без `.catch()`; `uncaughtException` — синхронный throw вне try/catch; оба требуют `process.exit(1)` — после uncaughtException состояние процесса неопределено, продолжать опасно. Типичные ошибки: проглатывание ошибки в catch без re-throw; async-роут без asyncHandler; `Promise.all` когда нужен частичный результат — использовать `Promise.allSettled`; слишком широкий catch смешивает operational и programmer errors. Реальные паттерны: asyncHandler на каждом роуте + центральный error middleware; в БД-слое — маппинг кодов (Postgres 23505 → ValidationError); для параллельной загрузки опциональных данных — allSettled с fallback.",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "operational_vs_programmer",
+      "title": "Различает операционные и программистские ошибки",
+      "expected": "Кандидат объясняет: операционные — ожидаемые сбои (БД, ENOENT, невалидный ввод), от них восстанавливаются; программистские — баги (TypeError), их не обрабатывают gracefully, а логируют и перезапускают процесс.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — operational vs programmer из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "operational_vs_programmer",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "операцион",
+              "programmer",
+              "TypeError",
+              "ENOENT",
+              "восстан",
+              "перезапуск",
+              "PM2"
+            ],
+            "anchorTermsWrongTopic": [
+              "TypeError возвращаем 404",
+              "ENOENT перезапускаем сервер"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "операцион",
+              "operational",
+              "programmer",
+              "программист"
+            ],
+            "ask": "чем operational error отличается от programmer error и как реагировать на каждую"
+          },
+          {
+            "match": [
+              "TypeError",
+              "ENOENT",
+              "404"
+            ],
+            "ask": "TypeError в production — что делать; ENOENT при чтении конфига — что делать"
+          }
+        ],
+        "mustConcepts": [
+          "операцион",
+          "operational",
+          "programmer",
+          "программист",
+          "ожидаем",
+          "баг",
+          "TypeError",
+          "ENOENT",
+          "таймаут",
+          "БД",
+          "восстан",
+          "recover",
+          "404",
+          "retry",
+          "перезапуск",
+          "PM2",
+          "process.exit",
+          "gracefully",
+          "не восстанавл"
+        ],
+        "falseClaims": [
+          "TypeError можно обработать и продолжить работу сервера",
+          "ENOENT всегда требует process.exit",
+          "операционные и программистские ошибки обрабатываются одинаково",
+          "programmer error — это просто 500 без перезапуска",
+          "любую ошибку можно восстановить через try/catch"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "error_first_callbacks",
+      "title": "Знает error-first callbacks",
+      "expected": "Кандидат описывает конвенцию: первый аргумент `err` или `null`; проверять `err` первым и делать `return`; без return код продолжит с undefined data; упоминает err.code (ENOENT, EACCES).",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый паттерн fs/dns/crypto из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "error-first",
+              "err",
+              "callback"
+            ],
+            "ask": "что будет если не сделать return после if (err) в callback"
+          }
+        ],
+        "mustConcepts": [
+          "error-first",
+          "err",
+          "null",
+          "callback",
+          "колбек",
+          "первый аргумент",
+          "return",
+          "ENOENT",
+          "EACCES",
+          "err.code",
+          "undefined",
+          "fs.readFile",
+          "провер",
+          "обработ"
+        ],
+        "falseClaims": [
+          "в callback второй аргумент всегда err",
+          "можно использовать data без проверки err",
+          "error-first устарел и не встречается в Node core API",
+          "return после err не обязателен"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "promises_async_await",
+      "title": "Обрабатывает ошибки в Promise и async/await",
+      "expected": "Кандидат объясняет: rejection идёт по цепочке до `.catch()`; async/await — try/catch; один try/catch на все await или отдельные блоки; `.finally()` для cleanup; re-throw после логирования.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "основной modern-паттерн из quick example",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "operational_vs_programmer",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "try/catch",
+              "async",
+              "await"
+            ],
+            "ask": "один try/catch на всю async-функцию vs отдельные блоки — когда что"
+          },
+          {
+            "match": [
+              "re-throw",
+              "throw err",
+              "переброс"
+            ],
+            "ask": "зачем throw err после console.error в catch"
+          }
+        ],
+        "mustConcepts": [
+          "Promise",
+          "catch",
+          "rejection",
+          "async",
+          "await",
+          "try/catch",
+          "finally",
+          "re-throw",
+          "throw err",
+          "переброс",
+          "цепочк",
+          "chain",
+          "cleanup",
+          "логир",
+          "await в catch",
+          "синтаксический сахар"
+        ],
+        "falseClaims": [
+          "async/await использует другую модель ошибок чем Promise",
+          "finally выполняется только при успехе",
+          "catch в async-функции автоматически передаёт ошибку caller",
+          "не нужен try/catch если есть .catch на каждом await"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "express_error_middleware",
+      "title": "Настраивает Express error middleware и asyncHandler",
+      "expected": "Кандидат описывает: middleware с 4 аргументами `(err, req, res, next)` после всех роутов; Express определяет по `.length === 4`; asyncHandler оборачивает async-роуты через Promise.resolve(fn).catch(next); без обёртки rejection не попадёт в error handler.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "центральный production-паттерн Express из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "express_error_middleware",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "asyncHandler",
+              "4 параметр",
+              "next(err)",
+              "error middleware",
+              "последн"
+            ],
+            "anchorTermsWrongTopic": [
+              "обычный middleware с 3 параметрами ловит async ошибки",
+              "throw в async-роуте автоматически идёт в error middleware"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "asyncHandler",
+              "async route",
+              "async роут"
+            ],
+            "ask": "почему async (req,res) => await User.find() без обёртки не попадёт в error middleware"
+          },
+          {
+            "match": [
+              "4 параметр",
+              "err, req, res, next",
+              ".length"
+            ],
+            "ask": "как Express отличает error middleware от обычного"
+          }
+        ],
+        "mustConcepts": [
+          "Express",
+          "error middleware",
+          "4 параметр",
+          "err, req, res, next",
+          "asyncHandler",
+          "next(err)",
+          "next",
+          "catch(next)",
+          "Promise.resolve",
+          "последн",
+          "после роут",
+          "statusCode",
+          "unhandled rejection",
+          "async route",
+          "обёртк",
+          "централиз",
+          ".length"
+        ],
+        "falseClaims": [
+          "Express автоматически ловит throw из async-роутов",
+          "error middleware может стоять перед роутами",
+          "достаточно try/catch внутри каждого роута без центрального handler",
+          "middleware с 3 параметрами обрабатывает ошибки так же",
+          "next() без err передаёт ошибку в error pipeline"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "custom_error_classes",
+      "title": "Использует кастомные классы ошибок",
+      "expected": "Кандидат описывает AppError с statusCode; NotFoundError/ValidationError; `instanceof AppError` в middleware; `Error.captureStackTrace(this, this.constructor)` для стека от места throw.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "HTTP status + различение expected vs surprise",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "AppError",
+              "NotFoundError",
+              "statusCode"
+            ],
+            "ask": "зачем кастомный класс вместо new Error('not found')"
+          },
+          {
+            "match": [
+              "captureStackTrace",
+              "stack trace",
+              "стек"
+            ],
+            "ask": "что даёт Error.captureStackTrace в конструкторе AppError"
+          }
+        ],
+        "mustConcepts": [
+          "AppError",
+          "NotFoundError",
+          "ValidationError",
+          "statusCode",
+          "instanceof",
+          "captureStackTrace",
+          "stack trace",
+          "стек",
+          "extends Error",
+          "404",
+          "422",
+          "500",
+          "expected",
+          "ожидаем",
+          "constructor",
+          "throw site",
+          "место throw"
+        ],
+        "falseClaims": [
+          "new Error('not found') автоматически даёт HTTP 404",
+          "captureStackTrace не нужен — стек и так правильный",
+          "instanceof AppError бесполезен в error middleware",
+          "кастомные ошибки не должны наследовать Error"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "global_process_handlers",
+      "title": "Понимает unhandledRejection и uncaughtException",
+      "expected": "Кандидат различает: unhandledRejection — rejected Promise без catch; uncaughtException — sync throw вне try/catch; оба требуют process.exit(1); после uncaughtException состояние процесса неопределено — продолжать опасно.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "follow-up questions из ITLead — критично для production",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "unhandledRejection",
+              "uncaughtException"
+            ],
+            "ask": "чем unhandledRejection отличается от uncaughtException"
+          },
+          {
+            "match": [
+              "process.exit",
+              "exit(1)"
+            ],
+            "ask": "почему uncaughtException обязан вызывать process.exit(1)"
+          }
+        ],
+        "mustConcepts": [
+          "unhandledRejection",
+          "uncaughtException",
+          "process.on",
+          "process.exit",
+          "exit(1)",
+          "rejected Promise",
+          "без catch",
+          "синхронн",
+          "throw",
+          "состояние процесса",
+          "неопредел",
+          "corrupt",
+          "перезапуск",
+          "PM2",
+          "Node.js 15",
+          "логир"
+        ],
+        "falseClaims": [
+          "uncaughtException можно обработать и продолжить принимать запросы",
+          "unhandledRejection и uncaughtException — одно и то же",
+          "process.on('uncaughtException') делает сервер fault-tolerant",
+          "после uncaughtException состояние процесса остаётся корректным",
+          "process.exit не нужен при unhandledRejection"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки обработки",
+      "expected": "Кандидат называет: проглатывание ошибки в catch без re-throw; async-роут без asyncHandler; Promise.all вместо allSettled для частичных результатов; слишком широкий catch смешивает fetch и processData.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes блок ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "promises_async_await",
+            "floorFraction": 0.4
+          },
+          {
+            "checkpointKey": "express_error_middleware",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "allSettled",
+              "Promise.all",
+              "частичн"
+            ],
+            "ask": "когда Promise.allSettled вместо Promise.all"
+          },
+          {
+            "match": [
+              "проглаты",
+              "undefined",
+              "re-throw"
+            ],
+            "ask": "что получит caller если catch только console.error без throw"
+          }
+        ],
+        "mustConcepts": [
+          "проглаты",
+          "swallow",
+          "re-throw",
+          "undefined",
+          "asyncHandler",
+          "Promise.all",
+          "allSettled",
+          "частичн",
+          "fallback",
+          "широкий catch",
+          "TypeError",
+          "fetch",
+          "processData",
+          "fulfilled",
+          "rejected",
+          "status"
+        ],
+        "falseClaims": [
+          "console.error в catch достаточно — re-throw не нужен",
+          "Promise.all подходит когда каждый результат опционален",
+          "широкий try/catch вокруг fetch и processData — best practice",
+          "async-роут без asyncHandler работает так же как с обёрткой"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Операционные ошибки — таймаут БД, ENOENT — обрабатываем: 404, retry, fallback. Programmer errors — TypeError — логируем и process.exit, PM2 перезапустит. В Express: asyncHandler на каждый async-роут, центральный error middleware с 4 аргументами последним. Кастомные AppError/NotFoundError несут statusCode. unhandledRejection и uncaughtException — exit(1).",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На проекте все роуты через asyncHandler, один app.use((err,req,res,next) => ...) в конце. В сервисах try/catch с logger.error и throw err — иначе caller получит undefined. Для дашборда с тремя микросервисами — Promise.allSettled, каждая секция со своим fallback. ENOENT при конфиге — дефолты, TypeError — не маскируем под 500.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Callback fs.readFile: if (err) return. Promise chain до .catch. async/await — try/catch, throw err после лога. Express знает error handler по 4 параметрам. captureStackTrace чтобы стек показывал место throw, не конструктор.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "TypeError в production ловлю try/catch и возвращаю 200 с пустым объектом — сервер продолжает работать. uncaughtException просто логирую без exit.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Async-роуты Express сами передают rejection в error middleware — asyncHandler не нужен. Promise.all для дашборда где каждый блок опционален — если один упал, остальные тоже не показываем.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В catch только console.error — caller получит undefined, но это нормально. Error middleware ставлю первым middleware до роутов.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "operational_vs_programmer",
+      "exampleType": "good",
+      "exampleText": "ENOENT при чтении config.json — operational: верну дефолтный конфиг. TypeError при обращении к undefined — programmer: лог, exit, рестарт.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "operational_vs_programmer",
+      "exampleType": "good",
+      "exampleText": "ну operational — ожидаемое, 404/retry; programmer — баг в коде, не лечим, pm2 поднимет",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "operational_vs_programmer",
+      "exampleType": "bad",
+      "exampleText": "Любую ошибку обрабатываю gracefully и продолжаю сервер — и TypeError, и ENOENT одинаково.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "error_first_callbacks",
+      "exampleType": "good",
+      "exampleText": "fs.readFile(path, (err, data) => { if (err) { log err.code; return; } parse(data); }) — без return data будет undefined.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "error_first_callbacks",
+      "exampleType": "good",
+      "exampleText": "error-first: первый аргумент err или null, ENOENT/EACCES смотрю в err.code",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "error_first_callbacks",
+      "exampleType": "bad",
+      "exampleText": "В callback сразу JSON.parse(data) — err проверю потом если что.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "promises_async_await",
+      "exampleType": "good",
+      "exampleText": "async loadUser: try { user = await db.find(); throw NotFound if !user; } catch { logger.error; throw err; } — один catch на все await.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "promises_async_await",
+      "exampleType": "good",
+      "exampleText": "fetchUser().then(enrich).catch(log).finally(metrics) — rejection скипает then до catch",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "promises_async_await",
+      "exampleType": "bad",
+      "exampleText": "В async catch только console.error — caller получит undefined, ошибка исчезнет.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "express_error_middleware",
+      "exampleType": "good",
+      "exampleText": "asyncHandler(fn) => (req,res,next) => Promise.resolve(fn(req,res,next)).catch(next). Error middleware (err,req,res,next) последний — status err.statusCode || 500.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "express_error_middleware",
+      "exampleType": "good",
+      "exampleText": "express смотрит fn.length === 4 — это error handler. next(err) пропускает обычные middleware",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "express_error_middleware",
+      "exampleType": "bad",
+      "exampleText": "app.get('/user', async (req,res) => { await User.find(); }) — rejection сам дойдёт до error middleware.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "custom_error_classes",
+      "exampleType": "good",
+      "exampleText": "class NotFoundError extends AppError { constructor(r) { super(`${r} not found`, 404); } } middleware: if (err instanceof AppError) status = err.statusCode.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "custom_error_classes",
+      "exampleType": "good",
+      "exampleText": "captureStackTrace(this, constructor) — стек с места throw, не из AppError constructor",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "custom_error_classes",
+      "exampleType": "bad",
+      "exampleText": "throw new Error('not found') — Express сам поставит 404 по тексту сообщения.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "global_process_handlers",
+      "exampleType": "good",
+      "exampleText": "unhandledRejection — promise без catch. uncaughtException — sync throw вне try. Оба: log + process.exit(1). После uncaughtException состояние heap/connections может быть битым.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "global_process_handlers",
+      "exampleType": "good",
+      "exampleText": "process.on uncaughtException не делает сервер отказоустойчивым — только скрывает краш, exit и рестарт правильнее",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "global_process_handlers",
+      "exampleType": "bad",
+      "exampleText": "На uncaughtException логирую и продолжаю обрабатывать запросы — process.exit не нужен.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Dashboard: allSettled([orders, profile, notifications]) — каждый fulfilled/rejected отдельно, errors массив для клиента.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "отдельный try/catch на fetchData, processData снаружи — широкий catch не проглотит TypeError из бага",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Promise.all для трёх опциональных сервисов — один упал, весь дашборд 500.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-error-handling",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-error-handling",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-error-handling",
+    "difficulty": "MIDDLE",
+    "titleEn": "Error handling patterns in Node.js",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T15:00:00.000Z"
+  }
+}

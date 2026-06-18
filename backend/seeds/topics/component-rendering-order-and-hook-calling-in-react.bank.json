@@ -1,0 +1,628 @@
+{
+  "topic": {
+    "code": "component_rendering_order_hook_calling_react",
+    "name": "Порядок рендеринга компонентов и вызов хуков в React",
+    "skillCode": "react",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как React определяет порядок рендеринга компонентов и вызов хуков? Почему порядок хуков нельзя менять между рендерами?",
+    "shortAnswer": "React обходит дерево компонентов в глубину: сначала родитель, затем рекурсивно дети, потом соседи. Хуки внутри каждого компонента выполняются синхронно при вызове функции компонента; React идентифицирует их по индексу вызова в связанном списке Fiber, а не по имени — поэтому количество и порядок вызовов должны быть одинаковыми на каждом рендере.",
+    "idealAnswer": "При каждом обновлении React обходит дерево компонентов depth-first (сверху вниз, в глубину): родитель рендерится первым, затем каждый ребёнок до конца поддерева, и только потом следующий sibling. Пример: App → Header → Main → Sidebar → Content → Footer. Если ChildA медленный, он блокирует ChildB и SiblingB — console.log в начале каждой функции компонента показывает точный порядок обхода. У каждого Fiber есть свой связанный список состояний хуков: три хука в компоненте хранятся на позициях 0, 1, 2. При re-render React повторяет вызовы в том же порядке и читает предыдущие значения по индексу — имена не участвуют. Если на одном рендере пропустить хук на позиции 1, следующий хук окажется на позиции 0 и React прочитает чужое состояние — ошибка «Rendered fewer/more hooks than expected» или тихий баг. Правило: условная логика внутри хука, никогда вокруг него; хуки не в циклах; ранний return только после всех хуков; кастомные хуки — те же правила на верхнем уровне. Хуки делятся на две фазы: во время render синхронно — useState, useReducer, useContext, useRef, useMemo, useCallback; после render — useLayoutEffect (после мутации DOM, до paint браузера, для измерений и layout без мерцания) и useEffect (после paint, для fetch, подписок, таймеров). Cleanup при unmount — в обратном порядке: сначала дети, потом родители. Практика: логи для лишних re-render; React.memo для изоляции поддеревьев; useLayoutEffect вместо useEffect при flicker размеров/позиции. Next.js SSR/hydration требует совпадения порядка на сервере и клиенте — mismatch хуков даёт hydration errors. TanStack Query useQuery и Redux useSelector тоже зависят от стабильной позиции вызова. React 18 concurrent mode может приостанавливать render, но внутри одного render pass порядок компонентов и хуков идентичен прежним версиям. Stale closure в useCallback — отдельная ловушка: callback захватывает переменные рендера, без правильных deps остаётся старый state.",
+    "maxScore": 10,
+    "skills": [
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "render_order_depth_first",
+      "title": "Понимает depth-first порядок рендеринга",
+      "expected": "Кандидат объясняет: React обходит дерево сверху вниз в глубину; родитель → дети рекурсивно → siblings; Parent → A → B → Sibling; медленный ребёнок блокирует соседей.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — depth-first обход дерева компонентов",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "render_order_depth_first",
+            "oftenConfusedWith": [
+              "hook_phases_timing"
+            ],
+            "anchorTermsExpected": [
+              "depth-first",
+              "в глубину",
+              "родитель",
+              "дети",
+              "sibling",
+              "сосед",
+              "Parent",
+              "обход дерева"
+            ],
+            "anchorTermsWrongTopic": [
+              "breadth-first",
+              "сначала все siblings",
+              "effects рендерятся первыми"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Parent",
+              "Sibling",
+              "Child"
+            ],
+            "ask": "какой порядок рендеринга для Parent с A и B, затем Sibling"
+          }
+        ],
+        "mustConcepts": [
+          "depth-first",
+          "в глубину",
+          "сверху вниз",
+          "родитель",
+          "parent",
+          "ребёнок",
+          "child",
+          "sibling",
+          "сосед",
+          "поддерево",
+          "обход дерева",
+          "рекурсив",
+          "Parent",
+          "блокир",
+          "console.log",
+          "порядок рендер"
+        ],
+        "falseClaims": [
+          "React рендерит все siblings параллельно до детей",
+          "breadth-first обход — порядок React",
+          "Sibling рендерится до завершения поддерева Parent",
+          "порядок рендеринга случаен между обновлениями",
+          "effects выполняются до render дочерних компонентов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "hook_index_linked_list",
+      "title": "Знает как React хранит состояние хуков",
+      "expected": "Кандидат объясняет: у каждого Fiber свой linked list хуков; идентификация по индексу вызова (позиция 0, 1, 2), не по имени; при re-render тот же порядок — те же слоты; смена количества хуков ломает state.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевой механизм Rules of Hooks — индекс в linked list",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "render_order_depth_first",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "hook_index_linked_list",
+            "oftenConfusedWith": [
+              "hook_rules_violations"
+            ],
+            "anchorTermsExpected": [
+              "индекс",
+              "позици",
+              "linked list",
+              "Fiber",
+              "не по имени",
+              "call order"
+            ],
+            "anchorTermsWrongTopic": [
+              "React находит хук по useState",
+              "имя переменной определяет слот",
+              "хуки хранятся глобально"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useState",
+              "if",
+              "услов"
+            ],
+            "ask": "почему нельзя вызывать useState внутри if — что происходит с индексами"
+          }
+        ],
+        "mustConcepts": [
+          "linked list",
+          "связанный список",
+          "Fiber",
+          "файбер",
+          "индекс",
+          "позици",
+          "call index",
+          "не по имени",
+          "порядок вызова",
+          "слот",
+          "position 0",
+          "re-render",
+          "повтор",
+          "предыдущ",
+          "state",
+          "useState",
+          "useRef"
+        ],
+        "falseClaims": [
+          "React идентифицирует хуки по имени переменной",
+          "useState и useRef можно менять местами без последствий",
+          "хуки хранятся в одном глобальном объекте на приложение",
+          "порядок хуков важен только в dev mode",
+          "React сопоставляет хуки по строке 'useState'"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "hook_phases_timing",
+      "title": "Различает фазы выполнения хуков",
+      "expected": "Кандидат называет: during render — useState/useReducer/useContext/useRef/useMemo/useCallback синхронно; useLayoutEffect — после DOM, до paint; useEffect — после paint; cleanup children before parents.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "useLayoutEffect vs useEffect и cleanup order — частый follow-up",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useLayoutEffect",
+              "useEffect",
+              "paint"
+            ],
+            "ask": "чем useLayoutEffect отличается от useEffect по времени и когда брать layout без flicker"
+          },
+          {
+            "match": [
+              "cleanup",
+              "unmount",
+              "размонт"
+            ],
+            "ask": "в каком порядке cleanup при unmount — дети или родители первыми"
+          }
+        ],
+        "mustConcepts": [
+          "during render",
+          "во время render",
+          "синхрон",
+          "useState",
+          "useReducer",
+          "useContext",
+          "useRef",
+          "useMemo",
+          "useCallback",
+          "useLayoutEffect",
+          "useEffect",
+          "DOM",
+          "paint",
+          "отрисов",
+          "браузер",
+          "fetch",
+          "подписк",
+          "cleanup",
+          "unmount",
+          "дети",
+          "родител",
+          "обратный порядок",
+          "мерцан",
+          "flicker"
+        ],
+        "falseClaims": [
+          "useEffect выполняется до commit фазы",
+          "useLayoutEffect срабатывает после paint браузера",
+          "cleanup родителя всегда раньше детей",
+          "useMemo выполняется после paint",
+          "все хуки асинхронны и ждут idle"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "hook_rules_violations",
+      "title": "Знает типичные нарушения Rules of Hooks",
+      "expected": "Кандидат называет: условный вызов хука, хук в цикле/map, early return до хуков; правильно — условие внутри useEffect, один useState/useReducer на массив, хуки до return null.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — conditional, loop, early return",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "hook_index_linked_list",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "forEach",
+              "map",
+              "цикл",
+              "items.length"
+            ],
+            "ask": "почему useState внутри map по items ломается при изменении длины списка"
+          },
+          {
+            "match": [
+              "return null",
+              "early return",
+              "ранн"
+            ],
+            "ask": "можно ли return null до useState — что случится при смене props"
+          }
+        ],
+        "mustConcepts": [
+          "условн",
+          "if",
+          "цикл",
+          "loop",
+          "forEach",
+          "map",
+          "early return",
+          "ранн",
+          "return null",
+          "Rendered fewer hooks",
+          "Rendered more hooks",
+          "внутри хука",
+          "не вокруг",
+          "useReducer",
+          "массив",
+          "items.length",
+          "стабильн",
+          "количество хуков",
+          "GoodList",
+          "BadList"
+        ],
+        "falseClaims": [
+          "useState в if допустим если ветка стабильна",
+          "хук в map нормален для списка элементов",
+          "early return до хуков безопасен при !user",
+          "React пересчитает индексы хуков автоматически при пропуске",
+          "условие вокруг useEffect эквивалентно условию вокруг useState"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "custom_hooks_top_level",
+      "title": "Понимает правила кастомных хуков",
+      "expected": "Кандидат объясняет: custom hook — функция, вызывающая другие хуки; только top level; условие внутри useEffect, не условный useState внутри useData; useQuery/useSelector — та же механика позиции.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "useData паттерн и экосистема TanStack/Redux",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useData",
+              "custom hook",
+              "кастом"
+            ],
+            "ask": "как правильно skip fetch в custom hook когда id пустой"
+          }
+        ],
+        "mustConcepts": [
+          "custom hook",
+          "кастомн",
+          "useData",
+          "top level",
+          "верхн",
+          "уровень",
+          "useQuery",
+          "useSelector",
+          "TanStack",
+          "Redux",
+          "useEffect",
+          "внутри",
+          "не return до хуков",
+          "переиспольз",
+          "та же механик",
+          "позици"
+        ],
+        "falseClaims": [
+          "в custom hook можно if (!id) return до useState",
+          "custom hooks освобождены от Rules of Hooks",
+          "useQuery можно вызывать внутри цикла по ключам",
+          "кастомный хук не считается хуком для React"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "debugging_perf_apply",
+      "title": "Применяет знание для отладки и производительности",
+      "expected": "Кандидат называет: console.log в начале компонента для порядка re-render; React.memo для изоляции поддеревьев; useLayoutEffect против flicker; DevTools Profiler; SSR/hydration mismatch при нарушении порядка.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "When to apply — debugging, memo, Next.js hydration",
+        "mustConcepts": [
+          "console.log",
+          "re-render",
+          "лишн",
+          "React.memo",
+          "memo",
+          "каскад",
+          "поддерев",
+          "Profiler",
+          "DevTools",
+          "Next.js",
+          "hydration",
+          "гидрат",
+          "SSR",
+          "useLayoutEffect",
+          "flicker",
+          "мерцан",
+          "отлад",
+          "производительн"
+        ],
+        "falseClaims": [
+          "React.memo меняет порядок рендеринга дерева",
+          "Profiler показывает только время effects",
+          "нарушение порядка хуков не влияет на hydration",
+          "console.log меняет порядок хуков"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "cleanup_concurrent_react18",
+      "title": "Знает cleanup и React 18 concurrent",
+      "expected": "Кандидат объясняет: cleanup reverse mount order; concurrent может pause render, но порядок компонентов/хуков в одном pass тот же; stale closure в useCallback — deps или ref.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up senior про stale closures + React 18 Q&A",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "concurrent",
+              "React 18",
+              "pause"
+            ],
+            "ask": "меняется ли depth-first порядок в concurrent mode внутри одного render pass"
+          },
+          {
+            "match": [
+              "stale closure",
+              "useCallback",
+              "deps"
+            ],
+            "ask": "почему useCallback держит старые значения items после сокращения списка"
+          }
+        ],
+        "mustConcepts": [
+          "cleanup",
+          "reverse",
+          "обратн",
+          "mount",
+          "unmount",
+          "дети",
+          "родител",
+          "concurrent",
+          "React 18",
+          "pause",
+          "render pass",
+          "один проход",
+          "порядок не меня",
+          "stale closure",
+          "замыкан",
+          "useCallback",
+          "dependency",
+          "deps",
+          "ref",
+          "список",
+          "items"
+        ],
+        "falseClaims": [
+          "concurrent mode меняет порядок depth-first обхода",
+          "useCallback всегда видит актуальный state без deps",
+          "cleanup выполняется parent-first",
+          "React 18 рендерит хуки в произвольном порядке"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "React идёт depth-first: Parent, потом ChildA, ChildB, и только потом Sibling. Хуки в Child — useState на позиции 0, useRef на 1; React читает state по индексу в linked list Fiber. useEffect после paint, useLayoutEffect до paint. Хуки всегда на top level — if вокруг useState ломает индексы.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для отладки лишних re-render ставлю log в начале каждого компонента — вижу App → Header → Main → Sidebar. Списки: один useReducer на selected ids, не useState в map. UserDashboard: все хуки до if (!userId) return null. Flicker размеров — useLayoutEffect вместо useEffect.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Parent → A → B → Sibling — React не начнёт Sibling пока не закончит поддерево Parent. При unmount cleanup снизу вверх: дети раньше родителя. React 18 concurrent может прервать render, но в одном pass порядок тот же. useCallback без deps на items — stale closure.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "React рендерит breadth-first: сначала все siblings на уровне, потом детей. Хуки React находит по имени переменной count и ref.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "useState в if (show) нормально — React сам перенумерует слоты. Early return до хуков безопасен, если user null. useEffect и useLayoutEffect выполняются до первого paint одинаково.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В map по items делаю useState на каждый элемент — так проще. Custom hook useData может return null до useState если id пустой. Concurrent React 18 меняет порядок render на случайный.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "render_order_depth_first",
+      "exampleType": "good",
+      "exampleText": "Depth-first: App → Header → Main → Sidebar → Content → Footer. SiblingB ждёт пока Parent и все его дети не отрендерятся.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "render_order_depth_first",
+      "exampleType": "good",
+      "exampleText": "ну сначала родитель, потом вглубь детей, потом сосед — Parent A B потом Sibling",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "render_order_depth_first",
+      "exampleType": "bad",
+      "exampleText": "React рендерит все компоненты одного уровня параллельно, depth-first только для effects.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "hook_index_linked_list",
+      "exampleType": "good",
+      "exampleText": "У каждого Fiber linked list хуков: позиция 0 — useState, 1 — useRef. Re-render — те же индексы, не имена.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "hook_index_linked_list",
+      "exampleType": "good",
+      "exampleText": "React не знает что это useState — только что первый вызов хука в этом компоненте, второй вызов и т.д.",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "hook_index_linked_list",
+      "exampleType": "bad",
+      "exampleText": "Можно менять порядок useState и useRef между рендерами — React сопоставит по имени setCount.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "hook_phases_timing",
+      "exampleType": "good",
+      "exampleText": "useState/useMemo — синхронно в render. useLayoutEffect — после DOM до paint. useEffect — после paint для fetch.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "hook_phases_timing",
+      "exampleType": "good",
+      "exampleText": "Child render → Child hooks done → browser paint → Child effect. Cleanup при unmount: child effect cleanup раньше parent.",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "hook_phases_timing",
+      "exampleType": "bad",
+      "exampleText": "useEffect всегда раньше useLayoutEffect и оба до commit. useMemo выполняется после paint в idle.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "hook_rules_violations",
+      "exampleType": "good",
+      "exampleText": "Bad: useState в if (show). Good: useState всегда, show ? div : null. BadList: useState в map — GoodList: один useReducer для selected map.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "hook_rules_violations",
+      "exampleType": "good",
+      "exampleText": "if (!user) return null до хуков — на следующем рендере с user хуки сдвинутся, crash или wrong state. Хуки сначала, return потом.",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "hook_rules_violations",
+      "exampleType": "bad",
+      "exampleText": "Rendered more hooks — это warning, React продолжит с правильным state. useState в forEach по items — рекомендуемый паттерн для списков.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "custom_hooks_top_level",
+      "exampleType": "good",
+      "exampleText": "useData: useState(null) всегда; if (id) fetch в useEffect. useQuery на top level — cache key от стабильной позиции.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "custom_hooks_top_level",
+      "exampleType": "good",
+      "exampleText": "кастомный хук = обычные хуки внутри функции, те же rules — не в цикле и не под if",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "custom_hooks_top_level",
+      "exampleType": "bad",
+      "exampleText": "function useData(id) { if (!id) return null; const [d] = useState(null) } — нормально для optional id.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "debugging_perf_apply",
+      "exampleType": "good",
+      "exampleText": "console.log в начале функции — вижу кто лишний re-render. React.memo на Sidebar если props не менялись. Next.js hydration ломается если порядок хуков разный на сервере и клиенте.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "debugging_perf_apply",
+      "exampleType": "good",
+      "exampleText": "Profiler показывает порядок и duration каждого компонента. Мерцание height — useLayoutEffect measure до paint.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "debugging_perf_apply",
+      "exampleType": "bad",
+      "exampleText": "React.memo меняет hook order. Hydration mismatch не связан с Rules of Hooks.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "cleanup_concurrent_react18",
+      "exampleType": "good",
+      "exampleText": "Unmount: cleanup children before parents. React 18 concurrent pause render, но depth-first в одном pass тот же. useCallback без item.id в deps — stale handlers.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "cleanup_concurrent_react18",
+      "exampleType": "good",
+      "exampleText": "concurrent не меняет последовательность Parent A B Sibling внутри одного прохода — только может прервать и начать заново",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "cleanup_concurrent_react18",
+      "exampleType": "bad",
+      "exampleText": "React 18 рендерит хуки в обратном порядке. Cleanup parent всегда первый. useCallback не нуждается в dependency array.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "component-rendering-order-and-hook-calling-in-react",
+    "apiUrl": "https://api.itlead.org/api/questions/component-rendering-order-and-hook-calling-in-react",
+    "pageUrl": "https://itlead.org/interview-questions/react/component-rendering-order-and-hook-calling-in-react",
+    "difficulty": "MIDDLE",
+    "titleEn": "component rendering order and hook calling in React",
+    "categorySlug": "react",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

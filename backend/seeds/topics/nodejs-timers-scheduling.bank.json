@@ -1,0 +1,601 @@
+{
+  "topic": {
+    "code": "nodejs_timers_scheduling",
+    "name": "Таймеры и планирование в Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работают таймеры и планирование в Node.js?",
+    "shortAnswer": "Таймеры Node.js планируют колбеки на фазы event loop, а не на точное астрономическое время. Четыре функции: setTimeout, setInterval, setImmediate, process.nextTick. Микрозадачи (nextTick, Promise) всегда выполняются до таймерных колбеков. setImmediate — фаза check после poll; setTimeout(fn, 0) — фаза timers. Таймеры гарантируют минимальную задержку, не точную.",
+    "idealAnswer": "Таймеры Node.js — функции планирования кода на конкретные фазы event loop, а не на точное wall-clock время. Четыре основные: setTimeout, setInterval, setImmediate, process.nextTick. process.nextTick и resolved Promises — микрозадачи: выполняются до любых I/O-колбеков. Очередь микрозадач дренируется полностью перед переходом event loop к следующей фазе — это правило неизменно. process.nextTick технически не часть event loop: Node дренирует nextTick-очередь после каждой операции до возврата контроля libuv; рекурсивный nextTick полностью блокирует I/O. Promise.then — microtask queue, после nextTick; с Node.js 11+ микрозадачи флашатся между каждым колбеком event loop, не только между фазами. setTimeout(fn, delay) — фаза timers; delay=0 даёт минимум ~1ms, точное время зависит от длительности текущей фазы и разрешения таймера ОС. setImmediate — фаза check после poll; внутри I/O-колбека setImmediate всегда раньше setTimeout(fn, 0); вне I/O порядок недетерминирован. setInterval — повторные setTimeout, но не учитывает время выполнения колбека; под нагрузкой интервалы дрейфят, следующий таймер отсчитывается от планирования, не от завершения. Таймеры — минимальный порог, не точный тик: при блокировке event loop синхронным кодом таймер срабатывает поздно; синхронный блок не прерывается. libuv при отсутствии работы вычисляет ближайший таймер и блокирует poll на это время на уровне ОС — setTimeout(fn, 1000) не крутит CPU. timers/promises (Node 15+): awaitable setTimeout, setImmediate с AbortSignal — чистая отмена без ручного clearTimeout. Типичные ошибки: setTimeout для daily report в production (рестарт, блокировка loop, дрейф часов) — node-cron или message queue; рекурсивный nextTick голодит I/O — setImmediate для defer; setInterval с async callback — дрейф и наложение — рекурсивный setTimeout после завершения; предполагать setTimeout(0) всегда перед setImmediate вне I/O. Паттерны: debounce clearTimeout+setTimeout; exponential backoff рекурсивный setTimeout; CPU chunking setImmediate между итерациями; request timeout AbortController+setTimeout; graceful shutdown setTimeout(process.exit) после SIGTERM.",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "scheduling_functions_overview",
+      "title": "Знает четыре функции планирования",
+      "expected": "Кандидат называет setTimeout, setInterval, setImmediate, process.nextTick; объясняет что таймеры привязаны к фазам event loop, не к точному астрономическому времени.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — четыре функции и связь с event loop",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "setTimeout",
+              "setInterval",
+              "setImmediate",
+              "nextTick"
+            ],
+            "ask": "перечисли четыре функции планирования в Node.js и их роль"
+          }
+        ],
+        "mustConcepts": [
+          "setTimeout",
+          "setInterval",
+          "setImmediate",
+          "nextTick",
+          "process.nextTick",
+          "четыре",
+          "планир",
+          "event loop",
+          "цикл событий",
+          "фаз",
+          "не точн",
+          "минимум",
+          "задержк",
+          "отлож",
+          "defer",
+          "schedule"
+        ],
+        "falseClaims": [
+          "в Node.js только setTimeout и setInterval",
+          "таймеры Node гарантируют точное астрономическое время",
+          "setImmediate и setTimeout работают одинаково",
+          "process.nextTick — часть фазы timers event loop"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "event_loop_timer_phases",
+      "title": "Понимает фазы event loop для таймеров",
+      "expected": "Кандидат объясняет: setTimeout — фаза timers; setImmediate — check после poll; setInterval как повторный setTimeout; nextTick вне фаз event loop, дренируется между операциями.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "как каждый таймер подключается к фазе — ключ ITLead theory",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "scheduling_functions_overview",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "timers",
+              "check",
+              "poll"
+            ],
+            "ask": "в какой фазе event loop выполняются setTimeout и setImmediate"
+          },
+          {
+            "match": [
+              "setInterval",
+              "повтор",
+              "setTimeout"
+            ],
+            "ask": "как setInterval связан с setTimeout и почему дрейфит под нагрузкой"
+          }
+        ],
+        "mustConcepts": [
+          "timers",
+          "фаза таймер",
+          "check",
+          "фаза проверк",
+          "poll",
+          "I/O",
+          "setTimeout",
+          "setImmediate",
+          "setInterval",
+          "повтор",
+          "nextTick",
+          "не часть",
+          "libuv",
+          "между фаз",
+          "дрейф",
+          "drift",
+          "планир",
+          "не заверш"
+        ],
+        "falseClaims": [
+          "setImmediate выполняется в фазе timers",
+          "setTimeout выполняется в фазе check",
+          "setInterval учитывает время выполнения callback при планировании следующего тика",
+          "nextTick — обычная фаза event loop как timers"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "microtask_execution_order",
+      "title": "Понимает порядок микрозадач и таймеров",
+      "expected": "Кандидат объясняет: nextTick и Promise — микрозадачи, выполняются до таймерных колбеков; очередь микрозадач дренируется полностью; Node 11+ flush между каждым колбеком.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "quick example ITLead — nextTick, Promise перед setTimeout/setImmediate",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "start",
+              "end",
+              "nextTick",
+              "Promise"
+            ],
+            "ask": "порядок вывода: sync, nextTick, Promise, setTimeout(0), setImmediate"
+          }
+        ],
+        "mustConcepts": [
+          "microtask",
+          "микрозадач",
+          "nextTick",
+          "Promise",
+          "Promise.then",
+          "до таймер",
+          "до I/O",
+          "drain",
+          "вычищ",
+          "полностью",
+          "sync",
+          "синхрон",
+          "start end",
+          "Node 11",
+          "между колбек",
+          "очеред"
+        ],
+        "falseClaims": [
+          "setTimeout(0) выполняется до nextTick",
+          "Promise.then выполняется после setImmediate",
+          "микрозадачи выполняются по одной за цикл",
+          "микрозадачи и таймеры в одной очереди без приоритета"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "nexttick_vs_setimmediate",
+      "title": "Отличает nextTick от setImmediate",
+      "expected": "Кандидат объясняет: nextTick до любой фазы event loop, дренирует очередь; setImmediate в check после poll; рекурсивный nextTick голодит I/O; для defer — setImmediate.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "follow-up Q ITLead — misleading names, starvation",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "nexttick_vs_setimmediate",
+            "oftenConfusedWith": [
+              "timeout_vs_immediate_order"
+            ],
+            "anchorTermsExpected": [
+              "nextTick",
+              "setImmediate",
+              "check",
+              "poll",
+              "starvation",
+              "I/O"
+            ],
+            "anchorTermsWrongTopic": [
+              "setImmediate быстрее nextTick",
+              "nextTick в фазе check"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "nextTick",
+              "setImmediate",
+              "рекурсив"
+            ],
+            "ask": "почему рекурсивный nextTick блокирует I/O и чем заменить"
+          },
+          {
+            "match": [
+              "misleading",
+              "назв",
+              "immediate"
+            ],
+            "ask": "почему setImmediate называется immediate, но nextTick выполняется раньше"
+          }
+        ],
+        "mustConcepts": [
+          "nextTick",
+          "setImmediate",
+          "check",
+          "poll",
+          "раньше",
+          "после I/O",
+          "рекурсив",
+          "starvation",
+          "голод",
+          "блокир I/O",
+          "defer",
+          "отлож",
+          "очеред nextTick",
+          "не часть loop",
+          "setImmediate безопас",
+          "yield"
+        ],
+        "falseClaims": [
+          "setImmediate всегда выполняется раньше nextTick",
+          "рекурсивный nextTick не блокирует I/O",
+          "nextTick и setImmediate в одной фазе event loop",
+          "setImmediate дренирует очередь до I/O как nextTick"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "timeout_vs_immediate_order",
+      "title": "Знает порядок setTimeout(0) и setImmediate",
+      "expected": "Кандидат объясняет: внутри I/O-колбека setImmediate всегда перед setTimeout(0); вне I/O порядок недетерминирован; delay 0 ≈ 1ms; не писать код зависящий от порядка.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up Q ITLead — OS timer resolution",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "setTimeout(0)",
+              "setImmediate",
+              "недетермин",
+              "A B"
+            ],
+            "ask": "почему порядок setTimeout(0) и setImmediate непредсказуем вне I/O callback"
+          }
+        ],
+        "mustConcepts": [
+          "setTimeout(0)",
+          "setImmediate",
+          "недетермин",
+          "непредсказ",
+          "внутри I/O",
+          "вне I/O",
+          "1ms",
+          "один мс",
+          "OS",
+          "разрешен",
+          "timer resolution",
+          "A B",
+          "B A",
+          "не гарант",
+          "не полаг"
+        ],
+        "falseClaims": [
+          "setTimeout(0) всегда выполняется перед setImmediate",
+          "setImmediate всегда выполняется перед setTimeout(0) в любом контексте",
+          "setTimeout(fn, 0) означает нулевую задержку без минимума 1ms",
+          "порядок гарантирован спецификацией вне I/O"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "timer_accuracy_drift",
+      "title": "Понимает точность таймеров и дрейф",
+      "expected": "Кандидат объясняет: таймеры — минимальная задержка, не гарантия; блокировка loop откладывает срабатывание; setInterval дрейфит при долгом callback; рекурсивный setTimeout после завершения.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Timer accuracy и setInterval drift из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "100ms",
+              "101",
+              "минимум"
+            ],
+            "ask": "почему setTimeout(100) может сработать через 115ms"
+          },
+          {
+            "match": [
+              "setInterval",
+              "async",
+              "дрейф",
+              "рекурсив"
+            ],
+            "ask": "почему setInterval с async callback дрейфит и как заменить"
+          }
+        ],
+        "mustConcepts": [
+          "минимум",
+          "не гарант",
+          "не точн",
+          "блокир",
+          "event loop",
+          "синхрон",
+          "дрейф",
+          "drift",
+          "setInterval",
+          "не ждёт",
+          "рекурсив setTimeout",
+          "chain",
+          "цепоч",
+          "после заверш",
+          "Date.now",
+          "нагрузк",
+          "load"
+        ],
+        "falseClaims": [
+          "setTimeout гарантирует точное wall-clock время",
+          "setInterval ждёт завершения callback перед следующим тиком",
+          "синхронный блок можно прервать таймером",
+          "setInterval с async callback не дрейфит"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с таймерами Node",
+      "expected": "Кандидат называет: daily job через setTimeout в production; рекурсивный nextTick; setInterval с async; предполагать порядок setTimeout/setImmediate; для cron — node-cron или queue.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production gotchas",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "nexttick_vs_setimmediate",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "daily",
+              "24",
+              "cron",
+              "report"
+            ],
+            "ask": "почему setTimeout для daily report в production ненадёжен"
+          },
+          {
+            "match": [
+              "nextTick",
+              "loop",
+              "рекурсив"
+            ],
+            "ask": "что делает рекурсивный process.nextTick с I/O"
+          }
+        ],
+        "mustConcepts": [
+          "node-cron",
+          "message queue",
+          "очеред",
+          "cron",
+          "daily report",
+          "рестарт",
+          "restart",
+          "рекурсив nextTick",
+          "starvation",
+          "setInterval async",
+          "дрейф",
+          "setTimeout chain",
+          "не полаг",
+          "порядок",
+          "production",
+          "billing",
+          "traffic spike"
+        ],
+        "falseClaims": [
+          "setTimeout на 24 часа надёжен для production cron",
+          "рекурсивный nextTick безопасен для defer",
+          "setInterval с await processQueue не дрейфит",
+          "порядок setTimeout и setImmediate всегда одинаковый"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Четыре функции: setTimeout, setInterval, setImmediate, process.nextTick. nextTick и Promise — микрозадачи, всегда до таймеров. setTimeout — фаза timers, setImmediate — check после poll. Таймеры — минимальная задержка: при блокировке loop срабатывают поздно. setInterval дрейфит — для async polling рекурсивный setTimeout после await.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В Express retry с exponential backoff: await new Promise(r => setTimeout(r, 2**attempt * 1000)). CPU-чанки 100k элементов — setImmediate между чанками, HTTP не стоит. Daily report — node-cron, не setTimeout(24h). Рекурсивный nextTick в poll — starvation, заменяю на setImmediate.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "start → end → nextTick → Promise → setTimeout/setImmediate (порядок последних двух вне I/O не гарантирован). timers/promises с AbortSignal — await sleep(2000, { signal }) без ручного clearTimeout.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "setTimeout(fn, 0) всегда перед setImmediate. setInterval ждёт завершения async callback. Рекурсивный nextTick — нормальный defer, I/O не блокируется.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Таймеры Node гарантируют точное время. Daily billing через setTimeout(86400000) — production-ready. nextTick и setImmediate в одной фазе timers.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Promise.then выполняется после setTimeout(0). libuv не спит между таймерами — CPU крутится на setTimeout(1000).",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "scheduling_functions_overview",
+      "exampleType": "good",
+      "exampleText": "setTimeout, setInterval, setImmediate, process.nextTick — планирование на фазы event loop, не на точные часовые тики.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "scheduling_functions_overview",
+      "exampleType": "good",
+      "exampleText": "четыре штуки: timeout interval immediate nextTick — все про отложенный колбек, но в разных местах loop",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "scheduling_functions_overview",
+      "exampleType": "bad",
+      "exampleText": "В Node только setTimeout и setInterval, nextTick — браузерный API.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "event_loop_timer_phases",
+      "exampleType": "good",
+      "exampleText": "setTimeout — timers phase; setImmediate — check после poll; setInterval — повторный setTimeout без учёта длительности callback.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "event_loop_timer_phases",
+      "exampleType": "good",
+      "exampleText": "immediate в check, timeout в timers, nextTick вообще вне фаз — дренируется между операциями",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "event_loop_timer_phases",
+      "exampleType": "bad",
+      "exampleText": "setImmediate регистрируется в фазе timers, setTimeout в check.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "microtask_execution_order",
+      "exampleType": "good",
+      "exampleText": "start, end, nextTick, Promise — микрозадачи дренируются полностью до setTimeout и setImmediate.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "microtask_execution_order",
+      "exampleType": "good",
+      "exampleText": "nextTick первый микротаск, потом promise.then, таймеры только после drain microtasks",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "microtask_execution_order",
+      "exampleType": "bad",
+      "exampleText": "setTimeout(0) выполняется между console.log start и end.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "nexttick_vs_setimmediate",
+      "exampleType": "good",
+      "exampleText": "nextTick — до любой фазы loop, рекурсивный nextTick голодит I/O; setImmediate — check после poll, безопаснее для defer.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "nexttick_vs_setimmediate",
+      "exampleType": "good",
+      "exampleText": "process.nextTick(loop) — сеть мёртва; setImmediate(loop) — loop уступает I/O",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "nexttick_vs_setimmediate",
+      "exampleType": "bad",
+      "exampleText": "setImmediate быстрее nextTick, потому что назван immediate.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "timeout_vs_immediate_order",
+      "exampleType": "good",
+      "exampleText": "Внутри fs.readFile callback: setImmediate всегда B, setTimeout(0) A. Top-level: A B или B A — не писать код зависящий от порядка.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "timeout_vs_immediate_order",
+      "exampleType": "good",
+      "exampleText": "delay 0 ≈ 1ms min — OS resolution решает кто первый вне I/O",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "timeout_vs_immediate_order",
+      "exampleType": "bad",
+      "exampleText": "setTimeout(fn, 0) всегда первый, setImmediate всегда второй — гарантировано везде.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "timer_accuracy_drift",
+      "exampleType": "good",
+      "exampleText": "Запрос 100ms — факт 101–115ms; sync блок откладывает таймер. setInterval async 200ms callback + 1000ms interval → реальный gap 800ms.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "timer_accuracy_drift",
+      "exampleType": "good",
+      "exampleText": "async polling — setTimeout внутри callback после await, не setInterval",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "timer_accuracy_drift",
+      "exampleType": "bad",
+      "exampleText": "setTimeout(100) всегда ровно 100ms независимо от load. setInterval ждёт await перед следующим тиком.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "sendDailyReport через setTimeout(24h) — рестарт и blocked loop ломают; node-cron или Bull queue.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "billing sync setTimeout — дрейф после traffic spike; recursive nextTick в poll — starvation",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "setInterval(async () => await processQueue(), 1000) — надёжный polling без дрейфа. Daily cron через setTimeout ок.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-timers-scheduling",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-timers-scheduling",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-timers-scheduling",
+    "difficulty": "MIDDLE",
+    "titleEn": "How do Timers and scheduling work in Node.js?",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

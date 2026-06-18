@@ -1,0 +1,638 @@
+{
+  "topic": {
+    "code": "vue_router_basics",
+    "name": "Vue Router: маршрутизация и navigation guards",
+    "skillCode": "vue",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работает Vue Router: маршрутизация и navigation guards?",
+    "shortAnswer": "Vue Router сопоставляет URL-пути компонентам Vue и управляет навигацией через guards — код, который выполняется до, во время или после смены маршрута. В Vue Router 4 из guard достаточно вернуть значение (`return '/login'`) вместо вызова `next()`. Порядок: `beforeEach` → `beforeEnter` → загрузка async-компонентов → `beforeResolve` → commit → `afterEach`.",
+    "idealAnswer": "Vue Router — официальная библиотека маршрутизации для Vue.js: сопоставляет URL-пути компонентам, обеспечивает навигацию и поддерживает guards для контроля доступа. Без guards роутер пассивен — URL меняется, компонент подменяется. Guards превращают это в активное управление потоком: ставят навигацию на паузу, выполняют код и продолжают только при разрешении — нужно для auth, прав доступа и prefetch данных до рендера. Настройка: `createRouter({ history: createWebHistory(), routes })` — маршруты с `path`, `component` (часто lazy `() => import()`), `meta`, `children` для вложенных layout. Три типа guards: глобальные (`router.beforeEach`, `router.beforeResolve`, `router.afterEach`) — на каждую навигацию; per-route (`beforeEnter` в конфиге маршрута) — логика одного маршрута без засорения глобального guard; in-component (`onBeforeRouteLeave`, `onBeforeRouteUpdate`) — блокировка ухода с несохранённой формы. Порядок выполнения: 1) `router.beforeEach` (глобальный); 2) `beforeEnter` целевого маршрута; 3) разрешение async-компонентов (dynamic import); 4) `router.beforeResolve` (глобальный, после загрузки компонентов); 5) commit навигации, URL меняется; 6) `router.afterEach` (глобальный). `beforeEach` — дешёвые редиректы и auth до загрузки компонентов. `beforeResolve` — prefetch данных, привязанных к компоненту, который уже подтверждён. `afterEach` — аналитика после успешной навигации. Meta-поля: произвольные данные в `meta` маршрута, читаются в guards через `to.meta.field`; meta родителя доступна дочерним через `to.matched`. Типичный auth guard: `meta: { requiresAuth: true }` + `beforeEach` с редиректом на `/login?redirect=to.fullPath`. Vue Router 4: return-стиль вместо `next()` — `return '/login'` или `return { path, query }`. Async guards: вернуть Promise — router дождётся. Типичные ошибки: двойной вызов `next()` без return в callback-стиле; wildcard `/:pathMatch(.*)*` не последним — перехватывает все пути; `afterEach` логирует просмотр при отменённой навигации (`next(false)`) — проверять `to.fullPath !== from.fullPath`; тяжёлые API в `beforeEach` вместо `beforeResolve` — компонент мигает до редиректа. Вложенные маршруты: parent layout + `children`, `meta` на parent распространяется на children. Реальный контекст: Nuxt 3 — `defineNuxtRouteMiddleware`, SSR читает cookies через `useRequestHeaders()`, клиент — `localStorage`; Pinia auth store в `beforeEach`; при logout во время async guard — `AbortController` и повторная проверка `isLoggedIn` после await.",
+    "maxScore": 10,
+    "skills": [
+      "vue",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "router_definition",
+      "title": "Понимает роль Vue Router и guards",
+      "expected": "Кандидат объясняет: Vue Router сопоставляет URL компонентам; guards — код до/во время/после навигации для auth, прав и prefetch; без guards роутинг пассивен.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — URL→компонент и зачем нужны guards",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "router_definition",
+            "oftenConfusedWith": [
+              "guard_types",
+              "router_setup"
+            ],
+            "anchorTermsExpected": [
+              "Vue Router",
+              "URL",
+              "компонент",
+              "guard",
+              "навигац",
+              "auth",
+              "редирект"
+            ],
+            "anchorTermsWrongTopic": [
+              "Vuex store",
+              "Pinia только для state",
+              "router заменяет компоненты без URL"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "guard",
+              "охран",
+              "навигац"
+            ],
+            "ask": "чем guards отличаются от «просто смены компонента по URL»"
+          }
+        ],
+        "mustConcepts": [
+          "Vue Router",
+          "маршрутизац",
+          "URL",
+          "path",
+          "компонент",
+          "guard",
+          "охран",
+          "навигац",
+          "auth",
+          "редирект",
+          "доступ",
+          "prefetch",
+          "пассивн",
+          "активн",
+          "flow control",
+          "официальн"
+        ],
+        "falseClaims": [
+          "Vue Router только меняет URL без привязки к компонентам",
+          "guards выполняются только после рендера компонента",
+          "без guards можно надёжно блокировать навигацию при auth",
+          "Vue Router не поддерживает lazy-loaded компоненты",
+          "guards — это middleware Express, не часть Vue Router"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "guard_types",
+      "title": "Знает три типа navigation guards",
+      "expected": "Кандидат перечисляет: глобальные (`beforeEach`, `beforeResolve`, `afterEach`); per-route (`beforeEnter`); in-component (`onBeforeRouteLeave`, `onBeforeRouteUpdate`).",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "три типа guards — ключевая структура ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "router_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "guard_types",
+            "oftenConfusedWith": [
+              "guard_execution_order",
+              "guard_use_cases"
+            ],
+            "anchorTermsExpected": [
+              "beforeEach",
+              "beforeEnter",
+              "onBeforeRouteLeave",
+              "глобальн",
+              "per-route",
+              "компонент"
+            ],
+            "anchorTermsWrongTopic": [
+              "beforeMount Vue lifecycle",
+              "onMounted как guard",
+              "middleware NestJS"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "beforeEnter",
+              "per-route",
+              "маршрут"
+            ],
+            "ask": "когда логику кладут в beforeEnter, а не в глобальный beforeEach"
+          },
+          {
+            "match": [
+              "onBeforeRouteLeave",
+              "несохран",
+              "форма"
+            ],
+            "ask": "зачем onBeforeRouteLeave внутри компонента с формой"
+          }
+        ],
+        "mustConcepts": [
+          "beforeEach",
+          "beforeResolve",
+          "afterEach",
+          "beforeEnter",
+          "onBeforeRouteLeave",
+          "onBeforeRouteUpdate",
+          "глобальн",
+          "per-route",
+          "маршрут",
+          "компонент",
+          "router instance",
+          "конфиг маршрута",
+          "несохран",
+          "форма",
+          "confirm"
+        ],
+        "falseClaims": [
+          "beforeEnter — глобальный guard на router",
+          "onBeforeRouteLeave регистрируется в router/index.ts",
+          "afterEach может отменить навигацию",
+          "in-component guards заменяют beforeEach для auth",
+          "только beforeEach существует в Vue Router 4"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "guard_execution_order",
+      "title": "Знает порядок выполнения guards",
+      "expected": "Кандидат называет последовательность: `beforeEach` → `beforeEnter` → async component resolution → `beforeResolve` → commit → `afterEach`; понимает зачем `beforeResolve` после загрузки компонентов.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "порядок guards — частый вопрос middle, влияет на prefetch и редиректы",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "guard_types",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "beforeResolve",
+              "beforeEach",
+              "порядок"
+            ],
+            "ask": "полный порядок guards от клика по ссылке до afterEach"
+          },
+          {
+            "match": [
+              "async",
+              "Promise",
+              "dynamic import"
+            ],
+            "ask": "где в цепочке выполняется lazy import компонента"
+          }
+        ],
+        "mustConcepts": [
+          "beforeEach",
+          "beforeEnter",
+          "beforeResolve",
+          "afterEach",
+          "порядок",
+          "последователь",
+          "async component",
+          "dynamic import",
+          "lazy",
+          "commit",
+          "навигац",
+          "разрешен",
+          "загрузк",
+          "компонент",
+          "Promise",
+          "await"
+        ],
+        "falseClaims": [
+          "afterEach выполняется до beforeEach",
+          "beforeResolve запускается до загрузки async-компонента",
+          "beforeEnter идёт после afterEach",
+          "порядок guards произвольный и не документирован",
+          "async import выполняется после afterEach"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "route_meta",
+      "title": "Использует meta-поля маршрутов",
+      "expected": "Кандидат объясняет: `meta` в конфиге маршрута; чтение `to.meta.field` в guards; meta родителя доступна через `to.matched` для вложенных маршрутов.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "meta — стандартный паттерн auth/roles из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "meta",
+              "requiresAuth",
+              "to.meta"
+            ],
+            "ask": "как передать requiresAuth в guard через конфиг маршрута"
+          },
+          {
+            "match": [
+              "to.matched",
+              "children",
+              "вложен"
+            ],
+            "ask": "как meta родительского dashboard распространяется на children"
+          }
+        ],
+        "mustConcepts": [
+          "meta",
+          "to.meta",
+          "requiresAuth",
+          "role",
+          "конфиг",
+          "маршрут",
+          "to.matched",
+          "children",
+          "вложен",
+          "родитель",
+          "дочерн",
+          "layout",
+          "fullPath",
+          "query"
+        ],
+        "falseClaims": [
+          "meta доступна только в beforeEnter, не в beforeEach",
+          "to.meta не видит meta родительского маршрута",
+          "meta нельзя использовать для auth",
+          "requiresAuth — встроенное поле Vue Router, не нужно объявлять",
+          "meta читается только в компоненте, не в guards"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "guard_use_cases",
+      "title": "Выбирает правильный guard для задачи",
+      "expected": "Кандидат сопоставляет: `beforeEach` — auth и редиректы; `beforeResolve` — prefetch данных компонента; `afterEach` — аналитика; `beforeEnter` — проверка роли одного маршрута; return-стиль Vue Router 4 вместо `next()`.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use each guard — TL;DR из ITLead",
+        "confusionPairs": [
+          {
+            "checkpointKey": "guard_use_cases",
+            "oftenConfusedWith": [
+              "guard_execution_order",
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "beforeEach auth",
+              "beforeResolve prefetch",
+              "afterEach analytics",
+              "return"
+            ],
+            "anchorTermsWrongTopic": [
+              "afterEach для блокировки",
+              "beforeEach для analytics",
+              "next() обязателен в Vue Router 4"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "beforeEach",
+          "auth",
+          "редирект",
+          "beforeResolve",
+          "prefetch",
+          "данные",
+          "afterEach",
+          "аналитик",
+          "beforeEnter",
+          "роль",
+          "admin",
+          "return",
+          "next",
+          "Vue Router 4",
+          "redirect",
+          "fullPath"
+        ],
+        "falseClaims": [
+          "тяжёлый API prefetch всегда в beforeEach — это best practice",
+          "afterEach отменяет навигацию при ошибке auth",
+          "в Vue Router 4 обязательно вызывать next() в каждом guard",
+          "beforeResolve подходит только для глобальной аналитики",
+          "auth guard лучше в afterEach после рендера"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки Vue Router guards",
+      "expected": "Кандидат называет: двойной `next()` без return; wildcard `/:pathMatch(.*)*` не последним; `afterEach` при отменённой навигации; API в `beforeEach` вместо `beforeResolve`; stale auth после async await при logout.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — production pitfalls middle",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "next",
+              "двойн",
+              "return"
+            ],
+            "ask": "почему next('/login') без return ломает навигацию"
+          },
+          {
+            "match": [
+              "pathMatch",
+              "wildcard",
+              "NotFound"
+            ],
+            "ask": "почему wildcard маршрут должен быть последним в массиве routes"
+          },
+          {
+            "match": [
+              "afterEach",
+              "next(false)",
+              "аналитик"
+            ],
+            "ask": "почему afterEach может залогировать просмотр несуществующей страницы"
+          }
+        ],
+        "mustConcepts": [
+          "next",
+          "двойн",
+          "return",
+          "early return",
+          "pathMatch",
+          "wildcard",
+          "NotFound",
+          "последн",
+          "afterEach",
+          "next(false)",
+          "отмен",
+          "аналитик",
+          "fullPath",
+          "beforeEach",
+          "beforeResolve",
+          "prefetch",
+          "мига",
+          "flash",
+          "AbortController",
+          "logout",
+          "stale",
+          "await"
+        ],
+        "falseClaims": [
+          "wildcard можно ставить первым — порядок routes не важен",
+          "next() можно вызывать дважды без последствий",
+          "afterEach не вызывается при отменённой навигации",
+          "beforeEach — правильное место для prefetch данных компонента",
+          "async guard после logout всегда видит актуальный auth без перепроверки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "router_setup",
+      "title": "Настраивает createRouter и маршруты",
+      "expected": "Кандидат описывает: `createRouter` + `createWebHistory()`; массив `routes` с path/component; lazy import; вложенные `children` с layout; wildcard 404 последним.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "quick example из ITLead — базовая настройка router",
+        "mustConcepts": [
+          "createRouter",
+          "createWebHistory",
+          "createWebHashHistory",
+          "routes",
+          "path",
+          "component",
+          "import",
+          "lazy",
+          "dynamic",
+          "children",
+          "layout",
+          "router-view",
+          "router-link",
+          "export default router",
+          "index.ts"
+        ],
+        "falseClaims": [
+          "createRouter не нужен — достаточно массива routes в main.ts",
+          "lazy import несовместим с Vue Router",
+          "children требуют отдельный createRouter на каждый layout",
+          "createWebHistory работает только в hash-режиме",
+          "router-view не нужен для вложенных маршрутов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Vue Router мапит URL на компоненты. Guards — beforeEach для auth (return '/login?redirect=' + to.fullPath), beforeResolve для prefetch, afterEach для analytics. Порядок: beforeEach → beforeEnter → lazy import → beforeResolve → commit → afterEach. Wildcard /:pathMatch(.*)* — всегда последний.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На dashboard вешаю meta requiresAuth, в beforeEach проверяю Pinia auth store. Для /admin — beforeEnter с async fetchUser и проверкой isAdmin. Уход с формы — onBeforeRouteLeave с confirm. Vue Router 4: return вместо next(), без двойного next().",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "createRouter + createWebHistory, routes с () => import для code splitting. Вложенный /dashboard с layout и children settings/profile — meta на parent, одна проверка в beforeEach через to.matched.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Guards — это lifecycle hooks компонента. afterEach блокирует неавторизованных. Wildcard ставлю первым, чтобы 404 ловилось раньше. В Vue Router 4 next() обязателен в каждом beforeEach.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Тяжёлый fetch профиля в beforeEach — best practice. afterEach не срабатывает при next(false). meta.requiresAuth встроено в router и не нужно объявлять в routes.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "beforeResolve идёт до beforeEach. onBeforeRouteLeave регистрирую глобально в router/index. Порядок guards не документирован — зависит от версии Vue.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "router_definition",
+      "exampleType": "good",
+      "exampleText": "Vue Router: URL → компонент. Guards паузят навигацию для auth, прав и загрузки данных до рендера.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "router_definition",
+      "exampleType": "good",
+      "exampleText": "ну роутер связывает путь и vue-компонент, guards как охрана на входе — без токена не пустит на dashboard",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "router_definition",
+      "exampleType": "bad",
+      "exampleText": "Vue Router только history API, компоненты меняются через Vuex mutations.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "guard_types",
+      "exampleType": "good",
+      "exampleText": "Глобальные: beforeEach/beforeResolve/afterEach на router. Per-route: beforeEnter в config. In-component: onBeforeRouteLeave для несохранённой формы.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "guard_types",
+      "exampleType": "good",
+      "exampleText": "auth в глобальном beforeEach, проверка админа только на /admin через beforeEnter, confirm при уходе — onBeforeRouteLeave внутри формы",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "guard_types",
+      "exampleType": "bad",
+      "exampleText": "onBeforeRouteLeave объявляется в router/index.ts рядом с beforeEach. afterEach отменяет навигацию.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "guard_execution_order",
+      "exampleType": "good",
+      "exampleText": "beforeEach → beforeEnter → dynamic import → beforeResolve → URL меняется → afterEach. Prefetch после того как компонент точно грузится.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "guard_execution_order",
+      "exampleType": "good",
+      "exampleText": "сначала глобальный beforeEach редирект, потом beforeEnter маршрута, потом lazy chunk, потом beforeResolve с api, в конце afterEach трекает pageview",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "guard_execution_order",
+      "exampleType": "bad",
+      "exampleText": "afterEach первый, beforeResolve до lazy import, beforeEnter после commit.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "route_meta",
+      "exampleType": "good",
+      "exampleText": "meta: { requiresAuth: true, role: 'user' } в route; в beforeEach читаю to.meta.requiresAuth; children наследуют через to.matched.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "route_meta",
+      "exampleType": "good",
+      "exampleText": "meta на parent /dashboard — одна проверка покрывает settings и profile без дублирования на каждом child",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "route_meta",
+      "exampleType": "bad",
+      "exampleText": "to.meta видит только текущий leaf route, parent meta недоступна. requiresAuth — reserved keyword router.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "guard_use_cases",
+      "exampleType": "good",
+      "exampleText": "beforeEach — быстрый auth redirect; beforeResolve — fetch данных страницы; afterEach — analytics; Vue Router 4 return '/login' без next().",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "guard_use_cases",
+      "exampleType": "good",
+      "exampleText": "редирект с сохранением redirect query в beforeEach, тяжёлый api только в beforeResolve чтобы не мигал компонент",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "guard_use_cases",
+      "exampleType": "bad",
+      "exampleText": "Аналитику в beforeEach, prefetch в afterEach, auth проверяю после рендера в mounted.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "if (!auth) next('/login') без return — оба next() выполнятся. Fix: return next('/login') или return '/login' в VR4.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "wildcard первым — /users/:id никогда не матчится. afterEach при next(false) — проверяю to.fullPath !== from.fullPath перед track.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Двойной next() — норма. Wildcard в любом месте массива. API в beforeEach не вызывает flash компонента.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "router_setup",
+      "exampleType": "good",
+      "exampleText": "createRouter({ history: createWebHistory(), routes: [{ path: '/', component: () => import('./Home.vue') }, { path: '/:pathMatch(.*)*', component: NotFound }] })",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "router_setup",
+      "exampleType": "good",
+      "exampleText": "dashboard layout с children и router-view, lazy import на каждый view, 404 wildcard в конце массива",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "router_setup",
+      "exampleType": "bad",
+      "exampleText": "Вложенные маршруты требуют второй createRouter. Lazy import ломает navigation guards.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "vue-router-basics",
+    "apiUrl": "https://api.itlead.org/api/questions/vue-router-basics",
+    "pageUrl": "https://itlead.org/interview-questions/vue/vue-router-basics",
+    "difficulty": "MIDDLE",
+    "titleEn": "Vue router: routing and navigation guards",
+    "categorySlug": "vue",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

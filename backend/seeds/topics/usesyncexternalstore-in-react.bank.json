@@ -1,0 +1,636 @@
+{
+  "topic": {
+    "code": "usesyncexternalstore_in_react",
+    "name": "useSyncExternalStore в React",
+    "skillCode": "react",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое useSyncExternalStore в React и когда его использовать?",
+    "shortAnswer": "useSyncExternalStore — хук React 18+ для подписки на внешние источники данных (browser API, сторонние store, глобальные переменные) с гарантией одного атомарного snapshot на весь render pass, что предотвращает tearing при concurrent rendering.",
+    "idealAnswer": "useSyncExternalStore — хук React 18 для подписки на данные вне системы состояния React: browser API (navigator.onLine, matchMedia, window.innerWidth), сторонние store без React-биндингов (Zustand v4+, Redux DevTools), любые мутабельные значения, которые меняются без участия React. Три аргумента: subscribe (регистрация listener + cleanup), getSnapshot (чистое синхронное чтение текущего значения), getServerSnapshot (опционально, безопасное значение для SSR). React вызывает getSnapshot один раз за render pass и переиспользует результат для всего дерева — все компоненты видят одно и то же значение, без смешения старого и нового. Проблема tearing: при concurrent rendering React может приостановить и возобновить render; прямое чтение navigator.onLine в разных частях дерева в одном commit может дать разные значения — UI показывает оба состояния сразу. useSyncExternalStore фиксирует атомарный snapshot. Когда subscribe callback срабатывает, React планирует re-render через scheduler. getSnapshot должен быть чистой функцией: возвращать примитивы или стабильные ссылки; новый объект на каждый вызов ({ count }) → бесконечные re-render; мутации внутри getSnapshot → бесконечные циклы. subscribe обязан возвращать cleanup — иначе listeners накапливаются. Без getServerSnapshot — crash на сервере и hydration mismatch (window undefined). Для useState/useReducer хук не нужен — React уже управляет ими без tearing. Отличие от useEffect+useState: эффект отстаёт на один render, возможен flash; useSyncExternalStore читает синхронно в render. На SSR всегда передавать server-safe default. При startTransition обновления внешнего store через useSyncExternalStore React обрабатывает синхронно, чтобы не допустить tearing, даже прерывая transition. Реальные примеры: Zustand v4+, TanStack Query (focus/blur), responsive hooks с media queries, Framer Motion (pointer APIs).",
+    "maxScore": 10,
+    "skills": [
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "hook_definition",
+      "title": "Понимает назначение useSyncExternalStore",
+      "expected": "Кандидат объясняет: хук React 18 для подписки на внешние store вне React; три аргумента subscribe/getSnapshot/getServerSnapshot; один атомарный snapshot на render pass для всего дерева.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — внешние store и атомарный snapshot",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "hook_definition",
+            "oftenConfusedWith": [
+              "three_arguments",
+              "when_to_use"
+            ],
+            "anchorTermsExpected": [
+              "useSyncExternalStore",
+              "внешн",
+              "external",
+              "subscribe",
+              "getSnapshot",
+              "snapshot",
+              "render pass",
+              "атомарн"
+            ],
+            "anchorTermsWrongTopic": [
+              "это замена useState",
+              "только для Redux",
+              "только SSR хук"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useSyncExternalStore",
+              "внешн",
+              "external store"
+            ],
+            "ask": "зачем React 18 добавил useSyncExternalStore и что такое внешний store"
+          }
+        ],
+        "mustConcepts": [
+          "useSyncExternalStore",
+          "React 18",
+          "внешн",
+          "external",
+          "store",
+          "сховищ",
+          "subscribe",
+          "getSnapshot",
+          "getServerSnapshot",
+          "snapshot",
+          "render pass",
+          "атомарн",
+          "один раз",
+          "весь render",
+          "дерев",
+          "browser API",
+          "сторонн",
+          "глобальн"
+        ],
+        "falseClaims": [
+          "useSyncExternalStore заменяет useState для любого состояния",
+          "хук нужен только для SSR",
+          "React читает внешний store на каждом дочернем компоненте заново без кеша",
+          "useSyncExternalStore работает только с Redux"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "tearing_concept",
+      "title": "Понимает tearing в concurrent React",
+      "expected": "Кандидат объясняет: tearing — разные части одного render читают внешнее значение в разные моменты и показывают несогласованный UI; в sync React render не прерывается; concurrent может pause/resume; хук фиксирует один snapshot.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевая мотивация хука — tearing при concurrent",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "hook_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "tearing_concept",
+            "oftenConfusedWith": [
+              "hydration_mismatch",
+              "internals_flow"
+            ],
+            "anchorTermsExpected": [
+              "tearing",
+              "разрыв",
+              "несогласован",
+              "concurrent",
+              "pause",
+              "resume",
+              "один commit"
+            ],
+            "anchorTermsWrongTopic": [
+              "tearing это hydration mismatch",
+              "tearing только в StrictMode"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "tearing",
+              "разрыв",
+              "несогласован"
+            ],
+            "ask": "что такое tearing и почему прямое чтение navigator.onLine в render опасно при concurrent"
+          },
+          {
+            "match": [
+              "concurrent",
+              "pause",
+              "resume",
+              "scheduler"
+            ],
+            "ask": "почему в синхронном React tearing не возникает, а в concurrent — может"
+          }
+        ],
+        "mustConcepts": [
+          "tearing",
+          "разрыв",
+          "несогласован",
+          "concurrent",
+          "конкурентн",
+          "pause",
+          "resume",
+          "приостанов",
+          "scheduler",
+          "navigator.onLine",
+          "один commit",
+          "разные значения",
+          "атомарн",
+          "snapshot",
+          "sync React",
+          "синхронн render"
+        ],
+        "falseClaims": [
+          "tearing возникает и в классическом синхронном React при любом чтении store",
+          "tearing — это то же самое, что hydration mismatch",
+          "useSyncExternalStore убирает необходимость concurrent mode",
+          "tearing возможен только с Redux"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "three_arguments",
+      "title": "Знает три аргумента хука",
+      "expected": "Кандидат описывает: subscribe — listener + cleanup; getSnapshot — чистое чтение; getServerSnapshot — server-safe default без browser API.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый API из quick example ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "subscribe",
+              "getSnapshot",
+              "getServerSnapshot"
+            ],
+            "ask": "что делает каждый из трёх аргументов useSyncExternalStore"
+          }
+        ],
+        "mustConcepts": [
+          "subscribe",
+          "getSnapshot",
+          "getServerSnapshot",
+          "cleanup",
+          "listener",
+          "слушател",
+          "чистое чтение",
+          "pure",
+          "SSR",
+          "сервер",
+          "window",
+          "default",
+          "третий аргумент",
+          "колбек"
+        ],
+        "falseClaims": [
+          "getServerSnapshot обязателен даже для client-only хуков без SSR",
+          "subscribe не должен возвращать функцию очистки",
+          "getSnapshot может мутировать store при чтении",
+          "getSnapshot вызывается только один раз за всё время жизни компонента"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда использовать и когда нет",
+      "expected": "Кандидат называет: browser API, media queries, viewport, сторонние store без React-биндингов, глобальные мутабельные значения; не использовать для useState/useReducer — React уже без tearing.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use / skip из ITLead таблицы",
+        "mustConcepts": [
+          "browser API",
+          "online",
+          "offline",
+          "matchMedia",
+          "media query",
+          "innerWidth",
+          "viewport",
+          "Zustand",
+          "Redux",
+          "сторонн",
+          "глобальн",
+          "useState",
+          "useReducer",
+          "не нужен",
+          "skip",
+          "вне React"
+        ],
+        "falseClaims": [
+          "useSyncExternalStore нужен для любого локального состояния компонента",
+          "useState в concurrent React вызывает tearing",
+          "Zustand v4+ не использует useSyncExternalStore",
+          "хук только для сетевого статуса online/offline"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "internals_flow",
+      "title": "Понимает внутренний механизм",
+      "expected": "Кандидат объясняет: getSnapshot один раз за render pass и кеш; subscribe callback планирует re-render; стабильный callback ref — подписки не накапливаются; на сервере getServerSnapshot вместо getSnapshot.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "how it works internally — senior depth",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "three_arguments",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "кеш",
+              "cache",
+              "один раз",
+              "render pass"
+            ],
+            "ask": "сколько раз React вызывает getSnapshot за один render и почему все дети видят одно значение"
+          },
+          {
+            "match": [
+              "subscribe",
+              "re-render",
+              "scheduler"
+            ],
+            "ask": "что происходит когда внешний store меняется и срабатывает subscribe callback"
+          }
+        ],
+        "mustConcepts": [
+          "getSnapshot",
+          "один раз",
+          "render pass",
+          "кеш",
+          "cache",
+          "переиспольз",
+          "дочерн",
+          "subscribe",
+          "re-render",
+          "scheduler",
+          "стабильн",
+          "callback",
+          "не накаплива",
+          "getServerSnapshot",
+          "сервер",
+          "window недоступ"
+        ],
+        "falseClaims": [
+          "каждый компонент вызывает getSnapshot независимо без общего snapshot",
+          "subscribe callback вызывает setState напрямую внутри render",
+          "на сервере выполняется getSnapshot с window",
+          "подписки дублируются при каждом re-render без стабильного ref"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: новый объект в getSnapshot → infinite re-render; мутация в getSnapshot; отсутствие cleanup в subscribe; пропуск getServerSnapshot → crash/hydration mismatch; использование для plain React state.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production footguns",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "новый объект",
+              "reference",
+              "референс",
+              "примитив"
+            ],
+            "ask": "почему getSnapshot не должен возвращать { count: store.count } на каждый вызов"
+          },
+          {
+            "match": [
+              "cleanup",
+              "removeEventListener",
+              "memory leak"
+            ],
+            "ask": "что будет если subscribe не вернёт cleanup для resize listener"
+          },
+          {
+            "match": [
+              "getServerSnapshot",
+              "hydration",
+              "window.innerWidth"
+            ],
+            "ask": "почему useSyncExternalStore с window.innerWidth без третьего аргумента ломает SSR"
+          }
+        ],
+        "mustConcepts": [
+          "новый объект",
+          "референс",
+          "reference",
+          "бесконечн",
+          "infinite",
+          "re-render",
+          "примитив",
+          "мемоиз",
+          "мутац",
+          "side effect",
+          "чистая функция",
+          "cleanup",
+          "removeEventListener",
+          "memory leak",
+          "getServerSnapshot",
+          "hydration mismatch",
+          "useState",
+          "useReducer"
+        ],
+        "falseClaims": [
+          "React сравнивает snapshot по deep equality, новый объект каждый раз — норма",
+          "можно мутировать store внутри getSnapshot для ленивой инициализации",
+          "cleanup в subscribe опционален — React сам снимает listeners",
+          "getServerSnapshot можно опустить если приложение только CSR"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "ssr_transitions_realworld",
+      "title": "SSR, transitions и реальные библиотеки",
+      "expected": "Кандидат упоминает: getServerSnapshot для server-safe default; отличие от useEffect+useState (лаг на render, flash); startTransition — store updates синхронны против tearing; Zustand v4+, TanStack Query, Framer Motion.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up questions + real-world usage — senior bonus",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useEffect",
+              "useState",
+              "flash",
+              "лаг"
+            ],
+            "ask": "чем useSyncExternalStore лучше пары useEffect + useState для online status"
+          },
+          {
+            "match": [
+              "startTransition",
+              "transition",
+              "синхронн"
+            ],
+            "ask": "как обновления external store ведут себя внутри startTransition"
+          }
+        ],
+        "mustConcepts": [
+          "getServerSnapshot",
+          "SSR",
+          "hydration",
+          "useEffect",
+          "useState",
+          "flash",
+          "лаг",
+          "один render",
+          "startTransition",
+          "transition",
+          "синхронн",
+          "Zustand",
+          "TanStack Query",
+          "Redux",
+          "Framer Motion",
+          "media query",
+          "focus",
+          "blur"
+        ],
+        "falseClaims": [
+          "useEffect+useState даёт тот же синхронный snapshot что useSyncExternalStore",
+          "startTransition откладывает external store updates как обычный setState",
+          "Zustand v4 не использует useSyncExternalStore под капотом",
+          "getServerSnapshot можно заменить suppressHydrationWarning"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "useSyncExternalStore подписывает компонент на внешний store: subscribe вешает listener с cleanup, getSnapshot читает navigator.onLine один раз за render pass — все дети видят одно значение, tearing нет. Третий аргумент () => true — server default. Для useState хук не нужен.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для responsive layout делаю useIsMobile через matchMedia + useSyncExternalStore: getSnapshot возвращает .matches примитив, getServerSnapshot () => false чтобы не было hydration mismatch. В getSnapshot никогда не возвращаю новый объект — только boolean. Zustand v4 так же строит подписки.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Tearing при concurrent: дерево читает onLine в разные моменты pause/resume — UI показывает online и offline сразу. useSyncExternalStore фиксирует атомарный snapshot. В отличие от useEffect+setState нет лага на один render и flash баннера.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "useSyncExternalStore — замена useState для любого счётчика. getSnapshot возвращает { count: store.count } каждый раз — React сам разберётся по значению поля.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Tearing — это когда сервер и клиент рендерят разный HTML. useSyncExternalStore нужен только при SSR, для CSR можно читать window напрямую в render.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "subscribe просто addEventListener без return cleanup — React при unmount всё снимет. getServerSnapshot не нужен если деплоим только SPA без Next.js.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "hook_definition",
+      "exampleType": "good",
+      "exampleText": "useSyncExternalStore — React 18 хук для внешних store: subscribe, getSnapshot, опционально getServerSnapshot; один snapshot на весь render pass.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "hook_definition",
+      "exampleType": "good",
+      "exampleText": "ну это хук чтобы читать данные вне react — zustand, navigator, глобалки — и чтобы все в одном render видели одно значение",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "hook_definition",
+      "exampleType": "bad",
+      "exampleText": "useSyncExternalStore — обёртка над useReducer для глобального состояния, заменяет Context API.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "tearing_concept",
+      "exampleType": "good",
+      "exampleText": "Tearing: concurrent React pause/resume — одна ветка прочитала onLine=true, другая false в одном commit. useSyncExternalStore блокирует один snapshot на render.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "tearing_concept",
+      "exampleType": "good",
+      "exampleText": "в синхронном react render не прерывается — tearing невозможен; в concurrent может — поэтому прямое чтение внешнего store опасно",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "tearing_concept",
+      "exampleType": "bad",
+      "exampleText": "Tearing — warning при hydration mismatch из-за Date в render. useSyncExternalStore его исправляет через suppressHydrationWarning.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "three_arguments",
+      "exampleType": "good",
+      "exampleText": "subscribe: addEventListener + return removeEventListener. getSnapshot: () => navigator.onLine чистое чтение. getServerSnapshot: () => true для SSR.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "three_arguments",
+      "exampleType": "good",
+      "exampleText": "третий аргумент — дефолт на сервере где нет window, иначе упадёт или hydration сломается",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "three_arguments",
+      "exampleType": "bad",
+      "exampleText": "getSnapshot должен вызывать store.subscribe внутри себя. subscribe не возвращает cleanup — React сам управляет.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Browser API, matchMedia, Zustand без биндингов — useSyncExternalStore. Локальный счётчик в useState — не нужен, React уже без tearing.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "tanstack query на focus/blur window, framer motion на pointer api — типичные кейсы внешнего store",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Любой useState в React 18 concurrent надо оборачивать в useSyncExternalStore иначе tearing гарантирован.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "internals_flow",
+      "exampleType": "good",
+      "exampleText": "React вызывает getSnapshot один раз за render pass, кеширует — все потомки одно значение. Store change → subscribe cb → scheduler re-render.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "internals_flow",
+      "exampleType": "good",
+      "exampleText": "callback subscribe стабилен между renders — подписки не копятся. на сервере getServerSnapshot вместо getSnapshot",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "internals_flow",
+      "exampleType": "bad",
+      "exampleText": "Каждый компонент с useSyncExternalStore заново читает store в getSnapshot без общего кеша React.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "getSnapshot: () => ({ count }) — новый объект каждый вызов, reference change → infinite re-render. Возвращаю примитив count.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "resize listener без cleanup — на каждый mount ещё listener, memory leak и двойные cb. subscribe обязан return () => remove.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "window.innerWidth без getServerSnapshot — crash SSR и hydration mismatch. Третий аргумент () => 1024.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "В getSnapshot делаю store.init() для ленивой загрузки — side effect при чтении нормальная практика.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "ssr_transitions_realworld",
+      "exampleType": "good",
+      "exampleText": "useEffect+useState для online: один render с устаревшим значением, flash баннера. useSyncExternalStore — синхронно в render. startTransition: store update всё равно синхронный против tearing.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "ssr_transitions_realworld",
+      "exampleType": "good",
+      "exampleText": "zustand v4 под капотом useSyncExternalStore, redux devtools snapshots, tanstack query window focus",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "ssr_transitions_realworld",
+      "exampleType": "bad",
+      "exampleText": "startTransition откладывает обновления Zustand store как обычный setState — tearing возможен внутри transition.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "usesyncexternalstore-in-react",
+    "apiUrl": "https://api.itlead.org/api/questions/usesyncexternalstore-in-react",
+    "pageUrl": "https://itlead.org/interview-questions/react/usesyncexternalstore-in-react",
+    "difficulty": "SENIOR",
+    "titleEn": "What is useSyncExternalStore in React?",
+    "categorySlug": "react",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

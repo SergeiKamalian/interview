@@ -1,0 +1,556 @@
+{
+  "topic": {
+    "code": "nextjs_error_handling_in_nextjs",
+    "name": "Обработка ошибок в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как устроена обработка ошибок в Next.js App Router? Какие файлы используются и когда применять error.tsx, not-found.tsx и global-error.tsx?",
+    "shortAnswer": "В App Router файлы error.tsx создают React Error Boundary на уровне каждого сегмента маршрута: runtime-ошибка в сегменте показывает fallback UI, а родительские layout (navbar, sidebar) остаются. error.tsx всегда client component ('use client'); ошибки всплывают к ближайшему родительскому error.tsx. Для отсутствующих ресурсов — notFound() и not-found.tsx (404), для сбоев root layout — global-error.tsx.",
+    "idealAnswer": "Next.js App Router использует файловую систему для обработки ошибок: error.tsx, not-found.tsx и global-error.tsx автоматически создают React Error Boundaries на уровне сегментов маршрута — сбой в одной части не роняет всё приложение. Каждый сегмент может иметь свой error.tsx: ошибка в /dashboard/users показывает UI только этого сегмента, navbar и sidebar остаются. error.tsx перехватывает runtime-краши в page.tsx и дочерних компонентах; not-found.tsx обрабатывает отсутствующие ресурсы через notFound() из next/navigation с корректным статусом 404. error.tsx обязан быть client component ('use client') — Error Boundaries требуют React state. Пропсы: error (Error & { digest?: string }) и reset() — reset перерендеривает только этот сегмент, не всё приложение. Ошибки всплывают: нет локального error.tsx → родительский сегмент → root → global-error.tsx или 500. Важно: error.tsx НЕ ловит ошибки из layout.tsx того же сегмента — boundary монтируется внутри layout. Для ошибок layout нужен error.tsx на уровень выше или global-error.tsx. global-error.tsx заменяет весь root layout и должен включать <html> и <body>; в dev Next.js показывает свой overlay, в production — ваш компонент. error.digest — хеш стек-трейса на сервере; клиент видит только digest, не полный stack — безопасно для логирования (Sentry, Vercel Logs). Server Actions: error.tsx их не перехватывает — возвращайте { error: '...' } из action, UI показывает состояние сам. API route handlers (app/api/route.ts): стандартный try/catch, error.tsx их не затрагивает. Типичные ошибки: забыть 'use client'; throw new Error вместо notFound() для missing data (500 вместо 404, плохо для SEO); хранить retry state вокруг reset() — reset перемонтирует сегмент и сбрасывает локальный state; не добавлять app/error.tsx и app/global-error.tsx как safety net. Порядок: layout → error (ловит children) → loading → not-found → page. При SSR/RSC сервер рендерит fallback boundary и отдаёт санитизированный payload; digest связывает client ID с server trace.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "segment_error_boundary",
+      "title": "Понимает error.tsx на уровне сегмента",
+      "expected": "Кандидат объясняет: error.tsx в папке сегмента создаёт segment-scoped Error Boundary; ошибка в page/children показывает fallback, shell (navbar, sidebar) остаётся; ошибки всплывают к родительскому error.tsx.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро App Router error handling — изоляция по сегментам",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "segment_error_boundary",
+            "oftenConfusedWith": [
+              "layout_global_errors"
+            ],
+            "anchorTermsExpected": [
+              "сегмент",
+              "error.tsx",
+              "boundary",
+              "всплыв",
+              "bubble",
+              "shell",
+              "navbar"
+            ],
+            "anchorTermsWrongTopic": [
+              "белый экран на всё приложение",
+              "Pages Router один crash",
+              "error.tsx ловит layout"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "сегмент",
+              "error.tsx",
+              "bubble",
+              "всплыв"
+            ],
+            "ask": "что происходит при ошибке в /dashboard/users, если error.tsx только в app/dashboard/"
+          }
+        ],
+        "mustConcepts": [
+          "error.tsx",
+          "сегмент",
+          "route segment",
+          "Error Boundary",
+          "fallback",
+          "shell",
+          "navbar",
+          "sidebar",
+          "всплыв",
+          "bubble",
+          "родительск",
+          "page.tsx",
+          "children",
+          "изоляц",
+          "не роняет всё приложение",
+          "App Router"
+        ],
+        "falseClaims": [
+          "ошибка в одном сегменте всегда роняет всё приложение",
+          "error.tsx работает только на root уровне",
+          "Pages Router и App Router одинаково изолируют ошибки",
+          "error.tsx перехватывает ошибки из layout того же сегмента"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "error_vs_not_found",
+      "title": "Отличает error.tsx от not-found.tsx",
+      "expected": "Кандидат сравнивает: error.tsx — runtime crash (500); notFound() + not-found.tsx — отсутствующий ресурс (404); throw new Error для missing data — плохо для SEO.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "404 vs 500 — критично для production и SEO",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "error_vs_not_found",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "notFound",
+              "404",
+              "not-found.tsx",
+              "runtime",
+              "500"
+            ],
+            "anchorTermsWrongTopic": [
+              "throw для missing post",
+              "error.tsx для 404"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "notFound",
+              "404",
+              "not-found"
+            ],
+            "ask": "пост не найден в /posts/[id] — notFound() или throw new Error?"
+          }
+        ],
+        "mustConcepts": [
+          "notFound",
+          "not-found.tsx",
+          "next/navigation",
+          "404",
+          "500",
+          "runtime",
+          "crash",
+          "отсутствующ",
+          "missing resource",
+          "SEO",
+          "throw new Error",
+          "статус",
+          "error.tsx"
+        ],
+        "falseClaims": [
+          "throw new Error для missing post — правильный способ 404",
+          "not-found.tsx ловит runtime exceptions",
+          "error.tsx возвращает статус 404",
+          "500 и 404 одинаково для поисковиков"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "use_client_requirement",
+      "title": "Знает что error.tsx — client component",
+      "expected": "Кандидат объясняет: error.tsx всегда с 'use client'; Error Boundaries требуют state; без директивы — build error.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "обязательное правило из ITLead quick example",
+        "mustConcepts": [
+          "use client",
+          "'use client'",
+          "client component",
+          "Server Component",
+          "Error Boundary",
+          "state",
+          "build error",
+          "без исключений",
+          "обязательн"
+        ],
+        "falseClaims": [
+          "error.tsx может быть Server Component",
+          "use client опционален для error.tsx",
+          "Error Boundary работает без client directive"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "reset_digest",
+      "title": "Понимает reset() и error.digest",
+      "expected": "Кандидат описывает: reset() перерендеривает только сегмент; digest — хеш stack trace для логирования без утечки server internals; reset уничтожает локальный state сегмента.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "props error/reset и digest из ITLead example",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "digest",
+              "reset",
+              "Sentry"
+            ],
+            "ask": "зачем error.digest и что делает reset() при retry"
+          }
+        ],
+        "mustConcepts": [
+          "reset",
+          "digest",
+          "error.message",
+          "хеш",
+          "stack trace",
+          "логирован",
+          "Sentry",
+          "Vercel Logs",
+          "санитиз",
+          "перерендер",
+          "только сегмент",
+          "локальный state",
+          "перемонтир"
+        ],
+        "falseClaims": [
+          "reset() перезагружает всё приложение с полной навигацией",
+          "digest содержит полный server stack на клиенте",
+          "можно хранить счётчик retry в useState рядом с reset без потери"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "layout_global_errors",
+      "title": "Знает global-error и ошибки layout",
+      "expected": "Кандидат объясняет: error.tsx не ловит layout того же сегмента; global-error.tsx для root layout с <html><body>; в dev — overlay, в production — custom UI.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "layout boundary limitation — частая production-ловушка",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "segment_error_boundary",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "layout",
+              "global-error",
+              "html",
+              "body"
+            ],
+            "ask": "ошибка в app/dashboard/layout.tsx — поймает ли app/dashboard/error.tsx?"
+          }
+        ],
+        "mustConcepts": [
+          "layout.tsx",
+          "global-error.tsx",
+          "root layout",
+          "html",
+          "body",
+          "не ловит layout",
+          "родительск сегмент",
+          "boundary внутри layout",
+          "dev overlay",
+          "production",
+          "заменяет root layout",
+          "auth provider",
+          "theme provider"
+        ],
+        "falseClaims": [
+          "error.tsx в том же сегменте ловит ошибки layout.tsx",
+          "global-error.tsx не нужен html и body",
+          "global-error.tsx виден в dev mode вместо overlay",
+          "root layout ошибки ловит обычный error.tsx"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "server_actions_api",
+      "title": "Знает Server Actions и API routes",
+      "expected": "Кандидат объясняет: error.tsx не перехватывает Server Actions — return { error }; API routes — try/catch в handler; UI сам показывает ошибку action.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Server Actions pattern из ITLead advanced example",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Server Action",
+              "return",
+              "error"
+            ],
+            "ask": "форма с updateProfile упала в БД — throw или return { error }?"
+          }
+        ],
+        "mustConcepts": [
+          "Server Action",
+          "use server",
+          "return error",
+          "throw",
+          "не перехватывает",
+          "error.tsx не ловит",
+          "API route",
+          "route.ts",
+          "try/catch",
+          "handler",
+          "formData",
+          "UI state",
+          "revalidatePath"
+        ],
+        "falseClaims": [
+          "error.tsx автоматически ловит ошибки Server Actions",
+          "можно throw из Server Action и ждать error.tsx",
+          "error.tsx работает для app/api/route.ts"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: нет root error.tsx/global-error; throw вместо notFound; retry state с reset; ожидание catch layout в том же сегменте.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production pitfalls",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "root error",
+              "global-error",
+              "safety net"
+            ],
+            "ask": "минимальный набор error handling на старте проекта"
+          },
+          {
+            "match": [
+              "retries",
+              "useState",
+              "reset"
+            ],
+            "ask": "почему счётчик retry в useState теряется при reset()"
+          }
+        ],
+        "mustConcepts": [
+          "app/error.tsx",
+          "app/global-error.tsx",
+          "safety net",
+          "корнев",
+          "throw vs notFound",
+          "500 SEO",
+          "retries",
+          "useState",
+          "reset уничтожает state",
+          "layout ошибка",
+          "родительский error",
+          "production"
+        ],
+        "falseClaims": [
+          "достаточно error.tsx только в глубоких сегментах",
+          "notFound и throw дают одинаковый UX и статус",
+          "reset сохраняет локальный state компонентов сегмента"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "В App Router кладу error.tsx рядом с page.tsx сегмента — runtime crash показывает fallback, navbar из root layout остаётся. Для отсутствующего поста вызываю notFound(), не throw — 404 и not-found.tsx. error.tsx всегда 'use client'. Server Action при ошибке БД возвращает { error: '...' }, форма показывает сообщение сама.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Ошибка в /shop/abc — app/shop/error.tsx с reset(). Товара нет — notFound() → 404. digest логирую в Sentry. Root layout упал — global-error.tsx с html/body. error.tsx в dashboard не ловит crash в dashboard/layout — нужен parent error или global.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Сегментный boundary как автомат на этаже: сбой в users не трогает sidebar. reset() ререндерит только сегмент. Без локального error.tsx ошибка всплывает к app/error.tsx. Минимум — app/error.tsx + app/global-error.tsx как финальный catch.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "error.tsx может быть Server Component — Next сам разберётся. Пост не найден — throw new Error, error.tsx покажет 404. Server Action кидаю throw, error.tsx поймает. API route ошибки тоже ловит error.tsx.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "error.tsx в app/dashboard/ ловит ошибки из dashboard/layout.tsx того же сегмента. global-error.tsx в dev сразу виден пользователю. digest на клиенте содержит полный server stack.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Достаточно error.tsx только в глубоких роутах, root не нужен. Счётчик retry в useState рядом с reset() — нормальный паттерн. 500 для missing blog post — ок для SEO.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "segment_error_boundary",
+      "exampleType": "good",
+      "exampleText": "app/dashboard/error.tsx ловит crash в /dashboard/* — shell с navbar остаётся, ошибка изолирована по сегменту.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "segment_error_boundary",
+      "exampleType": "good",
+      "exampleText": "ну если в users упало — покажется error этого сегмента, а не белый экран на всё приложение, всплывает к родителю если своего error нет",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "segment_error_boundary",
+      "exampleType": "bad",
+      "exampleText": "Любая ошибка в App Router всегда убивает весь shell как в старом Pages Router.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "error_vs_not_found",
+      "exampleType": "good",
+      "exampleText": "Invalid ID — throw, поймает error.tsx (runtime). Продукт не найден — notFound(), статус 404 и not-found.tsx.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "error_vs_not_found",
+      "exampleType": "good",
+      "exampleText": "для missing post только notFound(), throw даст 500 и плохой seo",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "error_vs_not_found",
+      "exampleType": "bad",
+      "exampleText": "if (!post) throw new Error('not found') — правильный 404 в Next.js.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "use_client_requirement",
+      "exampleType": "good",
+      "exampleText": "'use client' в первой строке error.tsx — Error Boundary требует client state, иначе build error.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "use_client_requirement",
+      "exampleType": "good",
+      "exampleText": "error.tsx без use client не соберётся — boundary всегда клиентский",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "use_client_requirement",
+      "exampleType": "bad",
+      "exampleText": "error.tsx можно писать как async Server Component — Next обернёт сам.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "reset_digest",
+      "exampleType": "good",
+      "exampleText": "reset() ререндерит только сегмент; error.digest — хеш для Sentry без утечки server stack на клиент.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "reset_digest",
+      "exampleType": "good",
+      "exampleText": "кнопка retry вызывает reset — не full page reload, только этот route segment",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "reset_digest",
+      "exampleType": "bad",
+      "exampleText": "digest показывает полный stack trace пользователю в production — это фича для дебага.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "layout_global_errors",
+      "exampleType": "good",
+      "exampleText": "Crash в dashboard/layout.tsx не поймает dashboard/error.tsx — boundary внутри layout; нужен parent error или global-error.tsx с html+body.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "layout_global_errors",
+      "exampleType": "good",
+      "exampleText": "global-error заменяет root layout целиком; в dev видим overlay, кастомный UI — в production build",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "layout_global_errors",
+      "exampleType": "bad",
+      "exampleText": "error.tsx в том же сегменте ловит throw из layout.tsx — boundary выше layout.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "server_actions_api",
+      "exampleType": "good",
+      "exampleText": "updateProfile: catch → return { error: 'Failed' }; форма читает result.error. API route — try/catch в handler, error.tsx не участвует.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "server_actions_api",
+      "exampleType": "good",
+      "exampleText": "server action упал — не throw, а { error } в ответе, ui сам рисует красный текст",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "server_actions_api",
+      "exampleType": "bad",
+      "exampleText": "Бросаю throw из Server Action — сработает ближайший error.tsx сегмента.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "На старте добавляю app/error.tsx и app/global-error.tsx. Не кладу useState retries рядом с reset — reset перемонтирует сегмент.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "типичный косяк — throw вместо notFound для 404 и надежда что error.tsx поймает layout в том же сегменте",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Root error.tsx не нужен — достаточно error только в feature-папках. reset() сохраняет весь локальный state.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nextjs-error-handling-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/nextjs-error-handling-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/nextjs-error-handling-in-nextjs",
+    "difficulty": "MIDDLE",
+    "titleEn": "Error handling in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

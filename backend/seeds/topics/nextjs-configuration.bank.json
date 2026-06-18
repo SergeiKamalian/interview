@@ -1,0 +1,596 @@
+{
+  "topic": {
+    "code": "nextjs_configuration",
+    "name": "Настройка Next.js (next.config.js)",
+    "skillCode": "nextjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как устроен next.config.js в Next.js и какие ключевые опции вы используете в production?",
+    "shortAnswer": "next.config.js — Node.js-модуль в корне проекта, который Next.js читает один раз при запуске (require) и применяет на этапе сборки: оптимизация изображений, rewrites/redirects, HTTP-заголовки, env и формат деплоя. Изменения требуют перезапуска dev-сервера; значения из env встраиваются в бандл на build time, а не вычисляются на каждый запрос.",
+    "idealAnswer": "next.config.js (или next.config.mjs / next.config.ts с Next.js 14.2+) — главный конфиг Next.js в корне проекта. CLI вызывает require() один раз за сессию dev или build, валидирует экспорт и передаёт значения в SWC/Webpack и server runtime. Hot reload следит за файлом и перезапускает dev-сервер при изменениях — без рестарта новые remotePatterns или rewrites не подхватятся. Ключ images: remotePatterns (не deprecated domains) задаёт protocol, hostname, pathname для внешних CDN; minimumCacheTTL, formats avif/webp. Redirect отправляет браузер на новый URL со status code; rewrite проксирует запрос без смены URL в адресной строке — типичный паттерн API proxy (/api/:path* → backend), держит ключи на сервере и обходит CORS. headers() добавляет X-Frame-Options, CSP, HSTS глобально или per-route. output: 'standalone' — минимальный Docker-образ; output: 'export' — полностью статический сайт. env: { KEY: process.env.KEY } инлайнит значения через DefinePlugin в клиентский бандл на build time — секреты туда нельзя; серверные переменные читают через process.env в server components/API routes; NEXT_PUBLIC_ — для клиента. basePath префиксует все маршруты (/my-app/about); next/image учитывает basePath, сырой <img src=\"/logo.png\"> — нет. Типичные ошибки: правка конфига без restart; DB_PASS в env; hostname: '*' в remotePatterns; async module.exports в CJS .js; typescript.ignoreBuildErrors: true в production. Turbopack (Next.js 15) игнорирует большинство webpack-ключей — кастомные лоадеры через turbo.rules. В монорепо общий конфиг выносят в пакет и spread: import base from '@acme/next-config'.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "config_definition",
+      "title": "Понимает назначение next.config.js",
+      "expected": "Кандидат объясняет: next.config.js — конфиг в корне, Next.js читает один раз при startup/build через require; настраивает bundling, routing, images, deployment; изменения требуют перезапуска dev-сервера.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — что это за файл и когда применяется",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "config_definition",
+            "oftenConfusedWith": [
+              "config_loading",
+              "when_to_use"
+            ],
+            "anchorTermsExpected": [
+              "next.config",
+              "require",
+              "build time",
+              "перезапуск",
+              "корень проекта"
+            ],
+            "anchorTermsWrongTopic": [
+              "конфиг читается на каждый запрос",
+              "next.config это middleware",
+              "env вычисляется per request"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "next.config",
+              "require",
+              "startup"
+            ],
+            "ask": "когда Next.js читает next.config.js и нужен ли restart после правок"
+          }
+        ],
+        "mustConcepts": [
+          "next.config",
+          "next.config.js",
+          "next.config.mjs",
+          "next.config.ts",
+          "корень проекта",
+          "require",
+          "startup",
+          "build time",
+          "сборк",
+          "один раз",
+          "перезапуск",
+          "restart",
+          "dev server",
+          "next dev",
+          "next build",
+          "module.exports",
+          "конфигурац"
+        ],
+        "falseClaims": [
+          "next.config.js читается на каждый HTTP-запрос",
+          "изменения конфига подхватываются hot reload без restart",
+          "next.config.js выполняется в браузере",
+          "конфиг влияет только на production build, не на dev"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "redirects_rewrites",
+      "title": "Отличает redirects от rewrites",
+      "expected": "Кандидат объясняет: redirect меняет URL в браузере со status code; rewrite проксирует запрос прозрачно; rewrite для API proxy без CORS и с ключами на сервере.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "API proxy через rewrites — главный production-паттерн из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "config_definition",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "rewrite",
+              "redirect",
+              "proxy"
+            ],
+            "ask": "чем redirect отличается от rewrite и когда нужен API proxy"
+          },
+          {
+            "match": [
+              "CORS",
+              "api/:path",
+              "destination"
+            ],
+            "ask": "как rewrite решает CORS при вызове внешнего API с клиента"
+          }
+        ],
+        "mustConcepts": [
+          "redirect",
+          "rewrite",
+          "редirect",
+          "rewrite",
+          "source",
+          "destination",
+          "permanent",
+          "status code",
+          "прокси",
+          "proxy",
+          "URL не меня",
+          "браузер",
+          "CORS",
+          "API proxy",
+          "api/:path",
+          "ключ",
+          "сервер",
+          "async redirects",
+          "async rewrites"
+        ],
+        "falseClaims": [
+          "rewrite меняет URL в адресной строке как redirect",
+          "redirect и rewrite делают одно и то же",
+          "rewrite не подходит для проксирования API",
+          "CORS можно решить только на backend без rewrites"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "images_remote_patterns",
+      "title": "Настраивает images.remotePatterns",
+      "expected": "Кандидат знает: images.remotePatterns вместо deprecated domains; фильтры protocol, hostname, pathname; ** для поддоменов; minimumCacheTTL, formats avif/webp.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "remotePatterns vs domains — частый вопрос middle",
+        "confusionPairs": [
+          {
+            "checkpointKey": "images_remote_patterns",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "remotePatterns",
+              "domains",
+              "deprecated",
+              "hostname",
+              "pathname"
+            ],
+            "anchorTermsWrongTopic": [
+              "domains предпочтительнее remotePatterns",
+              "hostname * разрешён"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "remotePatterns",
+              "domains"
+            ],
+            "ask": "чем remotePatterns лучше deprecated domains"
+          }
+        ],
+        "mustConcepts": [
+          "images",
+          "remotePatterns",
+          "domains",
+          "deprecated",
+          "устарел",
+          "protocol",
+          "hostname",
+          "pathname",
+          "port",
+          "CDN",
+          "next/image",
+          "оптимизац",
+          "minimumCacheTTL",
+          "avif",
+          "webp",
+          "formats",
+          "**.example.com",
+          "поддомен"
+        ],
+        "falseClaims": [
+          "images.domains предпочтительнее remotePatterns в Next.js 13+",
+          "remotePatterns не поддерживает pathname фильтр",
+          "можно указать hostname: '*' для всех доменов",
+          "next/image работает с любыми URL без конфига"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "env_and_secrets",
+      "title": "Правильно работает с env-переменными",
+      "expected": "Кандидат объясняет: env key инлайнит в клиентский бандл через DefinePlugin на build time; секреты только через process.env в server components; NEXT_PUBLIC_ для публичных клиентских значений.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "утечка секретов через env — критичная production-ошибка",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "env",
+              "NEXT_PUBLIC",
+              "DefinePlugin"
+            ],
+            "ask": "почему DB_PASS нельзя класть в env key конфига"
+          },
+          {
+            "match": [
+              "build time",
+              "клиент",
+              "server component"
+            ],
+            "ask": "когда использовать NEXT_PUBLIC_ vs process.env в server component"
+          }
+        ],
+        "mustConcepts": [
+          "env",
+          "NEXT_PUBLIC",
+          "DefinePlugin",
+          "build time",
+          "сборк",
+          "инлайн",
+          "клиент",
+          "бандл",
+          "bundle",
+          "секрет",
+          "secret",
+          "DB_PASS",
+          "process.env",
+          "server component",
+          "API route",
+          "сервер",
+          "не per request",
+          "фиксир"
+        ],
+        "falseClaims": [
+          "env key безопасен для паролей БД — они только на сервере",
+          "process.env в клиентском компоненте видит все серверные секреты",
+          "env значения пересчитываются на каждый запрос",
+          "NEXT_PUBLIC_ нужен для всех переменных включая секреты"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "output_headers",
+      "title": "Знает output и security headers",
+      "expected": "Кандидат называет: output standalone для Docker, export для статики; headers() для X-Frame-Options, HSTS, CSP; basePath для subdirectory hosting.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "деплой и безопасность — практический middle навык",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "standalone",
+              "Docker",
+              "export"
+            ],
+            "ask": "когда output standalone vs export"
+          },
+          {
+            "match": [
+              "basePath",
+              "public",
+              "logo.png"
+            ],
+            "ask": "почему basePath ломает сырой img src без префикса"
+          }
+        ],
+        "mustConcepts": [
+          "output",
+          "standalone",
+          "export",
+          "Docker",
+          "статик",
+          "S3",
+          "headers",
+          "X-Frame-Options",
+          "HSTS",
+          "CSP",
+          "nosniff",
+          "basePath",
+          "assetPrefix",
+          "поддиректор",
+          "Nginx",
+          "public",
+          "next/image",
+          "async headers"
+        ],
+        "falseClaims": [
+          "output export поддерживает SSR API routes",
+          "standalone включает весь node_modules в образ",
+          "basePath автоматически префиксует сырой img src",
+          "security headers можно задать только в middleware, не в config"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "config_loading",
+      "title": "Понимает загрузку и форматы конфига",
+      "expected": "Кандидат описывает: require() при startup; CJS module.exports по умолчанию; next.config.ts с типами с 14.2+; async export только в ESM/mjs, не в CJS .js; Turbopack игнорирует webpack keys.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "механизм загрузки из ITLead How Next.js loads",
+        "mustConcepts": [
+          "require",
+          "module.exports",
+          "CJS",
+          "ESM",
+          "next.config.mjs",
+          "next.config.ts",
+          "TypeScript",
+          "14.2",
+          "async export",
+          "синхрон",
+          "Turbopack",
+          "turbo.rules",
+          "webpack",
+          "SWC",
+          "hot reload",
+          "DefinePlugin"
+        ],
+        "falseClaims": [
+          "module.exports = async () => ({}) работает в любом next.config.js",
+          "Turbopack использует все webpack loader keys из конфига",
+          "next.config.ts не поддерживает type checking",
+          "конфиг не валидируется при экспорте"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки конфигурации",
+      "expected": "Кандидат называет: правка без restart dev; секреты в env; hostname * в remotePatterns; ignoreBuildErrors true в production; async CJS export.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Common mistakes блок ITLead — бонусный checkpoint",
+        "mustConcepts": [
+          "перезапуск",
+          "restart",
+          "remotePatterns",
+          "hostname",
+          "wildcard",
+          "ignoreBuildErrors",
+          "typescript",
+          "production",
+          "async",
+          "CommonJS",
+          "секрет",
+          "env",
+          "Turbopack",
+          "turbo"
+        ],
+        "falseClaims": [
+          "ignoreBuildErrors true безопасен в production",
+          "hostname * принимается в remotePatterns",
+          "конфиг подхватывается без restart при Turbopack",
+          "DB_PASS в env key не попадает в клиентский JS"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "next.config.js Next.js читает один раз через require при next dev/build. images.remotePatterns для CDN, rewrites проксируют /api на backend без CORS. env инлайнит в клиент — секреты только в process.env на сервере. После правки конфига — restart dev-сервера.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для Shopify: remotePatterns на cdn.shopify.com, rewrite /api → Storefront API, output standalone под Docker. HSTS в headers только в production. basePath /shop — next/image сам добавляет префикс, сырой img — нет.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "redirect permanent для старых URL блога; rewrite для API proxy — браузер видит /api/products, Next.js шлёт на api.example.com. NEXT_PUBLIC_API_URL для клиента, DB connection string — server component без env key.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "next.config.js перечитывается на каждый запрос, hot reload подхватывает remotePatterns без restart. DB_PASS кладу в env key — он же только на сервере.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "rewrite и redirect одно и то же — оба меняют URL в браузере. images.domains лучше remotePatterns. ignoreBuildErrors true в prod чтобы быстрее деплоить.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "remotePatterns hostname: '*' для всех CDN. module.exports = async () => ({}) в next.config.js — стандартный паттерн. output export для приложения с SSR API routes.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "config_definition",
+      "exampleType": "good",
+      "exampleText": "next.config.js в корне — Node module, require один раз за build/dev session, задаёт images, rewrites, output.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "config_definition",
+      "exampleType": "good",
+      "exampleText": "ну конфиг как панель приборов — настроил раз, каждая сборка использует; поменял — перезапусти next dev",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "config_definition",
+      "exampleType": "bad",
+      "exampleText": "next.config.js — runtime middleware, выполняется на каждый HTTP-запрос в Edge.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "redirects_rewrites",
+      "exampleType": "good",
+      "exampleText": "redirect /old-blog → /blog со 301; rewrite /api/:path* → backend — URL в браузере не меняется, CORS не нужен.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "redirects_rewrites",
+      "exampleType": "good",
+      "exampleText": "прокси через rewrite — ключ API остаётся на сервере Next, клиент бьёт в same-origin /api",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "redirects_rewrites",
+      "exampleType": "bad",
+      "exampleText": "rewrite меняет адресную строку как redirect 302.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "images_remote_patterns",
+      "exampleType": "good",
+      "exampleText": "remotePatterns: protocol https, hostname cdn.shopify.com, pathname /** — domains deprecated с Next.js 13.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "images_remote_patterns",
+      "exampleType": "good",
+      "exampleText": "**.example.com для поддоменов, formats avif/webp, minimumCacheTTL 60",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "images_remote_patterns",
+      "exampleType": "bad",
+      "exampleText": "images.domains: ['*'] — так проще разрешить все CDN.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "env_and_secrets",
+      "exampleType": "good",
+      "exampleText": "env key → DefinePlugin → строка в клиентском бандле на build time. DB_PASS читаю process.env только в server component.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "env_and_secrets",
+      "exampleType": "good",
+      "exampleText": "NEXT_PUBLIC_SITE_URL для клиента; API secret — без NEXT_PUBLIC_, без env key в конфиге",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "env_and_secrets",
+      "exampleType": "bad",
+      "exampleText": "env: { DB_PASS: process.env.DB_PASS } безопасно — webpack не отдаст это в браузер.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "output_headers",
+      "exampleType": "good",
+      "exampleText": "output standalone для Docker — минимальный образ; headers X-Frame-Options DENY глобально; HSTS только isProd.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "output_headers",
+      "exampleType": "good",
+      "exampleText": "basePath /my-app — маршруты с префиксом; next/image ок, <img src=\"/logo.png\"> сломается без basePath",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "output_headers",
+      "exampleType": "bad",
+      "exampleText": "output export — полноценный SSR с dynamic API routes на Vercel.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "config_loading",
+      "exampleType": "good",
+      "exampleText": "CLI require next.config.js → SWC/Webpack; next.config.ts с NextConfig типом с 14.2; async export в .mjs, не в CJS .js.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "config_loading",
+      "exampleType": "good",
+      "exampleText": "Turbopack игнорит webpack loaders — кастом через turbo.rules",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "config_loading",
+      "exampleType": "bad",
+      "exampleText": "module.exports = async () => fetchConfig() — стандарт для next.config.js в CJS.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "добавил remotePatterns — картинки не грузятся пока не restart next dev; hostname * Next.js 13+ reject.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "ignoreBuildErrors true в prod — плохая идея, типы сломаны но build проходит",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "конфиг меняю на лету — Turbopack подхватит без restart; секреты в env key не попадут в bundle.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nextjs-configuration",
+    "apiUrl": "https://api.itlead.org/api/questions/nextjs-configuration",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/nextjs-configuration",
+    "difficulty": "MIDDLE",
+    "titleEn": "Configuring Next.js (next.config.js)",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

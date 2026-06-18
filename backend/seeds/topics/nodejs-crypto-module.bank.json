@@ -1,0 +1,610 @@
+{
+  "topic": {
+    "code": "nodejs_crypto_module",
+    "name": "Модуль crypto в Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как использовать модуль crypto в Node.js для хеширования и шифрования?",
+    "shortAnswer": "Встроенный модуль `crypto` даёт хеширование и шифрование через OpenSSL без внешних пакетов. Для одностороннего дайджеста — `createHash`; для паролей — `pbkdf2` или `scrypt` с солью; для обратимого шифрования — `createCipheriv` с AES-256-GCM, свежим IV и ключом из env.",
+    "idealAnswer": "Модуль `crypto` в Node.js — встроенная криптография на базе OpenSSL: хеширование, шифрование, HMAC и криптографически стойкая случайность без npm-зависимостей. Хеширование — одностороннее преобразование: данные на входе, фиксированный дайджест на выходе, исходник восстановить нельзя — только сравнить. Шифрование — обратимое: ключ (и IV) запирает и открывает данные. Правило: хешируй то, что нужно только проверять (пароли); шифруй то, что нужно прочитать обратно (токены, payload сессии). `createHash('sha256').update(data).digest('hex')` — checksums и целостность; для паролей plain SHA-256 недостаточен — нужны PBKDF2 или scrypt с random salt (`crypto.randomBytes(16)`), хранить `salt:hash`; OWASP рекомендует ~310 000 итераций PBKDF2 для SHA-512; scrypt memory-hard и сложнее для GPU/ASIC. AES требует секретный ключ (32 байта для AES-256) и IV — не секретный, но уникальный на каждый вызов encrypt; повтор IV с тем же ключом ломает конфиденциальность. AES-256-GCM предпочтительнее CBC: GCM шифрует и аутентифицирует (16-byte auth tag), при подмене ciphertext бросает ошибку; CBC только шифрует без проверки целостности. `createHmac('sha256', secret)` — MAC для webhook-подписей (GitHub, Stripe); plain `createHash` как MAC уязвим к length extension. Сравнение HMAC/хешей — только `crypto.timingSafeEqual()`, не `===` (timing attack). Безопасные токены — `crypto.randomBytes(32).toString('hex')` или `crypto.randomUUID()`; `Math.random()` для security запрещён — детерминирован и предсказуем. Внутри Node: hashing через OpenSSL напрямую; PBKDF2/scrypt в libuv thread pool (не блокируют event loop в async-версии); AES с AES-NI; `randomBytes` читает OS CSPRNG (`/dev/urandom`). Типичные ошибки: пароль без соли; `pbkdf2Sync` на main thread под нагрузкой; фиксированный/zero IV; deprecated `createCipher` вместо `createCipheriv`; `===` для сравнения подписей. Для больших файлов — streams: `createReadStream().pipe(cipher).pipe(createWriteStream())`, IV prepended к output.",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "hash_vs_encrypt",
+      "title": "Отличает хеширование от шифрования",
+      "expected": "Кандидат объясняет: хеш — односторонний дайджест для сравнения/верификации; шифрование — обратимо с ключом и IV; пароли хешируют, секреты для чтения — шифруют.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — one-way vs reversible, когда что применять",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "хеш",
+              "шифр",
+              "односторон",
+              "обратим"
+            ],
+            "ask": "чем хеширование отличается от шифрования и что выбрать для пароля vs session token"
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "hash_vs_encrypt",
+            "oftenConfusedWith": [
+              "password_hashing",
+              "aes_gcm_encryption"
+            ],
+            "anchorTermsExpected": [
+              "односторон",
+              "обратим",
+              "verify",
+              "сравн",
+              "ключ",
+              "IV",
+              "парол",
+              "токен"
+            ],
+            "anchorTermsWrongTopic": [
+              "пароль шифруют AES",
+              "хеш можно расшифровать",
+              "createHash для session payload"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "хеш",
+          "hash",
+          "шифр",
+          "encrypt",
+          "односторон",
+          "обратим",
+          "reversible",
+          "дайджест",
+          "digest",
+          "сравн",
+          "verify",
+          "парол",
+          "токен",
+          "session",
+          "ключ",
+          "IV",
+          "createHash",
+          "createCipheriv"
+        ],
+        "falseClaims": [
+          "хеш можно расшифровать обратно",
+          "шифрование подходит для хранения паролей вместо хеша",
+          "createHash и createCipheriv решают одну задачу",
+          "для паролей достаточно encrypt с ключом в env"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "createHash_usage",
+      "title": "Знает createHash для дайджестов",
+      "expected": "Кандидат описывает createHash('sha256').update().digest('hex') для checksums/integrity; понимает фиксированный размер выхода; не использует MD5/SHA-1 для паролей.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый API из quick example ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "createHash",
+              "sha256",
+              "digest"
+            ],
+            "ask": "как получить SHA-256 hex-дайджест строки через crypto"
+          }
+        ],
+        "mustConcepts": [
+          "createHash",
+          "sha256",
+          "update",
+          "digest",
+          "hex",
+          "checksum",
+          "целостност",
+          "фиксирован",
+          "64 hex",
+          "MD5",
+          "SHA-1",
+          "OpenSSL",
+          "require('crypto')"
+        ],
+        "falseClaims": [
+          "createHash возвращает исходные данные",
+          "MD5 безопасен для паролей",
+          "SHA-1 рекомендуется для password storage",
+          "digest('hex') обязательно base64"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "password_hashing",
+      "title": "Хеширует пароли через PBKDF2/scrypt с солью",
+      "expected": "Кандидат называет pbkdf2 или scrypt с random salt; хранит salt:hash; async версию вместо pbkdf2Sync; ~310k итераций; scrypt memory-hard; plain SHA-256 без соли — ошибка.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "password storage — ключевой middle+ сценарий из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "pbkdf2",
+              "scrypt",
+              "salt",
+              "соль"
+            ],
+            "ask": "как правильно хешировать и проверять пароль с солью в Node.js"
+          },
+          {
+            "match": [
+              "pbkdf2Sync",
+              "async",
+              "event loop"
+            ],
+            "ask": "почему pbkdf2Sync опасен под нагрузкой и что использовать вместо"
+          }
+        ],
+        "mustConcepts": [
+          "pbkdf2",
+          "scrypt",
+          "salt",
+          "соль",
+          "randomBytes",
+          "salt:hash",
+          "310000",
+          "итерац",
+          "OWASP",
+          "rainbow table",
+          "memory-hard",
+          "pbkdf2Sync",
+          "async",
+          "event loop",
+          "sha512",
+          "verify"
+        ],
+        "falseClaims": [
+          "createHash('sha256') достаточно для паролей",
+          "соль не нужна если пароль сложный",
+          "pbkdf2Sync безопасен при 100 concurrent logins",
+          "один salt на всё приложение нормален",
+          "scrypt и pbkdf2 — одно и то же по скорости атаки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "aes_gcm_encryption",
+      "title": "Шифрует через AES-256-GCM с ключом и IV",
+      "expected": "Кандидат описывает createCipheriv('aes-256-gcm', key, iv); fresh IV каждый раз; ключ 32 байта из env; auth tag; GCM vs CBC; IV хранят с ciphertext.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "AES-GCM + IV — ядро reversible encryption из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "GCM",
+              "CBC",
+              "auth tag",
+              "IV"
+            ],
+            "ask": "почему AES-256-GCM лучше CBC для session token и что делает auth tag"
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "aes_gcm_encryption",
+            "oftenConfusedWith": [
+              "hash_vs_encrypt"
+            ],
+            "anchorTermsExpected": [
+              "createCipheriv",
+              "aes-256-gcm",
+              "IV",
+              "auth tag",
+              "getAuthTag",
+              "setAuthTag"
+            ],
+            "anchorTermsWrongTopic": [
+              "createCipher deprecated",
+              "фиксированный IV",
+              "CBC проверяет целостность"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "createCipheriv",
+          "createDecipheriv",
+          "aes-256-gcm",
+          "aes-256-cbc",
+          "ключ",
+          "32 байт",
+          "256-bit",
+          "IV",
+          "initialization vector",
+          "randomBytes(16)",
+          "auth tag",
+          "getAuthTag",
+          "setAuthTag",
+          "GCM",
+          "CBC",
+          "целостност",
+          "tamper",
+          "session",
+          "env"
+        ],
+        "falseClaims": [
+          "можно переиспользовать один IV с тем же ключом",
+          "CBC автоматически обнаруживает подмену ciphertext",
+          "createCipher — современная альтернатива createCipheriv",
+          "IV нужно держать в секрете как ключ",
+          "auth tag опционален при GCM"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "hmac_timing_safe",
+      "title": "Использует HMAC и timingSafeEqual",
+      "expected": "Кандидат объясняет createHmac для webhook MAC; отличие от createHash (length extension); timingSafeEqual вместо === при сравнении подписей.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "HMAC + timing attack — production webhook pattern",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "createHmac",
+              "timingSafeEqual",
+              "webhook"
+            ],
+            "ask": "как проверить HMAC-SHA256 подпись GitHub webhook без timing attack"
+          },
+          {
+            "match": [
+              "createHash",
+              "createHmac",
+              "length extension"
+            ],
+            "ask": "чем createHmac отличается от createHash для аутентификации сообщения"
+          }
+        ],
+        "mustConcepts": [
+          "createHmac",
+          "HMAC",
+          "sha256",
+          "секрет",
+          "secret key",
+          "timingSafeEqual",
+          "timing attack",
+          "===",
+          "webhook",
+          "GitHub",
+          "Stripe",
+          "x-hub-signature",
+          "length extension",
+          "raw body",
+          "express.raw"
+        ],
+        "falseClaims": [
+          "createHash с секретом в update заменяет HMAC",
+          "=== безопасен для сравнения HMAC hex-строк",
+          "express.json() подходит для проверки webhook signature",
+          "timingSafeEqual работает со строками разной длины без проверки",
+          "HMAC можно расшифровать обратно"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "secure_random",
+      "title": "Генерирует криптостойкую случайность",
+      "expected": "Кандидат называет crypto.randomBytes и randomUUID; CSPRNG из OS; Math.random не для security; randomBytes(32) для токенов.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "randomBytes vs Math.random из TL;DR",
+        "mustConcepts": [
+          "randomBytes",
+          "randomUUID",
+          "CSPRNG",
+          "/dev/urandom",
+          "CryptGenRandom",
+          "Math.random",
+          "детермин",
+          "токен",
+          "32 байт",
+          "hex",
+          "OpenSSL",
+          "безопасн",
+          "seed"
+        ],
+        "falseClaims": [
+          "Math.random() подходит для session token",
+          "Date.now() достаточно для уникального id",
+          "randomBytes блокирует event loop навсегда",
+          "uuid v4 из crypto.randomUUID не криптостойкий"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки crypto в Node.js",
+      "expected": "Кандидат называет: пароль без соли; pbkdf2Sync на main thread; zero/reused IV; createCipher deprecated; === для HMAC; streams для больших файлов.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Common mistakes блок ITLead — salt, IV, sync, timing",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "соль",
+              "salt",
+              "rainbow"
+            ],
+            "ask": "что не так с createHash('sha256') на пароле без соли"
+          },
+          {
+            "match": [
+              "IV",
+              "Buffer.alloc",
+              "zero"
+            ],
+            "ask": "почему фиксированный IV ломает AES"
+          },
+          {
+            "match": [
+              "stream",
+              "pipe",
+              "10 GB",
+              "памят"
+            ],
+            "ask": "как шифровать большой файл без OOM через streams"
+          }
+        ],
+        "mustConcepts": [
+          "без соли",
+          "rainbow table",
+          "pbkdf2Sync",
+          "event loop",
+          "DoS",
+          "reuse IV",
+          "Buffer.alloc(16, 0)",
+          "createCipher",
+          "createCipheriv",
+          "deprecated",
+          "timingSafeEqual",
+          "===",
+          "stream",
+          "pipe",
+          "createReadStream",
+          "prepend IV",
+          "express.raw",
+          "JSON.parse до verify"
+        ],
+        "falseClaims": [
+          "соль можно один раз сгенерировать на приложение",
+          "zero IV безопасен если ключ секретный",
+          "createCipher всё ещё рекомендуется в Node 20",
+          "можно сравнивать HMAC через localeCompare",
+          "большой файл шифруют через cipher.update всего файла в память"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Пароли — pbkdf2 с random salt, храню salt:hash, async чтобы не блокировать loop. Session payload — AES-256-GCM: ключ из env, fresh IV каждый раз, auth tag в токене. Webhook — createHmac + timingSafeEqual по raw body.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "createHash('sha256') — только checksums, не пароли. Хеш односторонний — сравниваю digest; шифрование обратимое — createCipheriv если нужно прочитать token обратно. Токены — randomBytes(32), не Math.random.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "GCM лучше CBC: auth tag ловит подмену ciphertext. IV не секрет, но уникален на encrypt. pbkdf2Sync на login под нагрузкой — DoS, беру crypto.pbkdf2 callback.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Пароль шифрую AES с ключом в коде — потом расшифровываю при логине. IV один на всё приложение в константе.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "SHA-256 пароля без соли — быстро и достаточно. HMAC сравниваю через ===, webhook body парсю express.json() до проверки подписи.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Session token генерю Math.random().toString(36). createCipher удобнее createCipheriv — IV сам выведется из ключа.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "hash_vs_encrypt",
+      "exampleType": "good",
+      "exampleText": "Хеш — meat grinder: steak in, burger out, назад нельзя. Шифр — lockbox: ключ открывает. Пароль verify через hash, session data — encrypt если читать обратно.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "hash_vs_encrypt",
+      "exampleType": "good",
+      "exampleText": "ну хеш только сравниваешь digest, шифр — recover plaintext с key+IV",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "hash_vs_encrypt",
+      "exampleType": "bad",
+      "exampleText": "Хеш и шифрование одно и то же — оба через crypto, можно расшифровать digest.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "createHash_usage",
+      "exampleType": "good",
+      "exampleText": "crypto.createHash('sha256').update('data').digest('hex') — 64 hex символа, для ETag/checksum.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "createHash_usage",
+      "exampleType": "good",
+      "exampleText": "sha256 дайджест фиксированный размер, сравниваю строки digest при verify файла",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "createHash_usage",
+      "exampleType": "bad",
+      "exampleText": "createHash('md5') — лучший выбор для password storage в 2026.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "password_hashing",
+      "exampleType": "good",
+      "exampleText": "salt = randomBytes(16).toHex, pbkdf2(password, salt, 310000, 64, 'sha512', cb) → store salt:hash; verify — тот же salt и timingSafeEqual.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "password_hashing",
+      "exampleType": "good",
+      "exampleText": "scrypt memory-hard — GPU сложнее брутфорсить чем plain sha256; соль у каждого юзера своя",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "password_hashing",
+      "exampleType": "bad",
+      "exampleText": "Два юзера с password123 — один sha256 hash на всех, rainbow table ок.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "aes_gcm_encryption",
+      "exampleType": "good",
+      "exampleText": "iv = randomBytes(16); cipher = createCipheriv('aes-256-gcm', SECRET_KEY, iv); return iv:ciphertext:getAuthTag(); decrypt setAuthTag — tamper throws.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "aes_gcm_encryption",
+      "exampleType": "good",
+      "exampleText": "GCM auth tag 16 байт — CBC только encrypt без integrity check",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "aes_gcm_encryption",
+      "exampleType": "bad",
+      "exampleText": "const iv = Buffer.alloc(16, 0) — один IV на все сессии, ключ в repo.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "hmac_timing_safe",
+      "exampleType": "good",
+      "exampleText": "expected = 'sha256=' + createHmac('sha256', secret).update(rawBody).digest('hex'); timingSafeEqual(Buffer.from(expected), Buffer.from(sig)).",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "hmac_timing_safe",
+      "exampleType": "good",
+      "exampleText": "createHmac не length extension как createHash; webhook — express.raw не json",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "hmac_timing_safe",
+      "exampleType": "bad",
+      "exampleText": "if (receivedHmac === expectedHmac) — норм, разница в наносекундах не важна.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "secure_random",
+      "exampleType": "good",
+      "exampleText": "API token: crypto.randomBytes(32).toString('hex') — OS CSPRNG, не Math.random.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "secure_random",
+      "exampleType": "good",
+      "exampleText": "randomUUID для id где нужен uuid v4 из crypto",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "secure_random",
+      "exampleType": "bad",
+      "exampleText": "Безопасный reset token: Math.random() + Date.now().",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Ошибки: sha256 password без salt; pbkdf2Sync на login; zero IV; createCipher deprecated; === для HMAC; 10GB file — streams pipe cipher.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "100 concurrent login с pbkdf2Sync — очередь запросов, async pbkdf2 в thread pool",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "IV можно переиспользовать если ciphertext разный; createCipher быстрее и безопаснее createCipheriv.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-crypto-module",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-crypto-module",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-crypto-module",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to use the Crypto module in Node.js for hashing and encryption?",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

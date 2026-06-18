@@ -1,0 +1,657 @@
+{
+  "topic": {
+    "code": "mapped_types_typescript",
+    "name": "Mapped types в TypeScript",
+    "skillCode": "typescript",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое mapped types в TypeScript и как работает синтаксис `[K in keyof T]`?",
+    "shortAnswer": "Mapped types создают новый тип, перебирая каждый ключ существующего типа и применяя трансформацию к типу значения. Синтаксис `[K in keyof T]` итерирует union ключей `T`; модификаторы `?` и `readonly` (и их снятие через `-`) меняют optional/readonly, а клауза `as` (TS 4.1+) фильтрует или переименовывает ключи.",
+    "idealAnswer": "Mapped types в TypeScript — это «map() для типов»: новый object type строится перебором каждого ключа исходного типа с трансформацией типа значения. Базовый синтаксис: `{ [K in keyof T]: NewValueType }` — `K` пробегает union ключей `T`, для каждого подставляется новый тип значения. Работает только на этапе компиляции, runtime-кода не генерируется. В отличие от простого type alias или intersection, mapped type реактивен к источнику: добавили поле в `User` — оно автоматически появится в производном типе. Модификаторы: `[K in keyof T]?: T[K]` ≈ `Partial<T>`; `readonly [K in keyof T]: T[K]` ≈ `Readonly<T>`; `[K in keyof T]-?: T[K]` ≈ `Required<T>`; `-readonly [K in keyof T]: T[K]` снимает readonly (паттерн `Mutable<T>`). Префикс `-` снимает модификатор. Key remapping (TypeScript 4.1+): `{ [K in keyof T as NewKey]: T[K] }` — conditional в `as` может вернуть `never` (ключ удаляется) или template literal (переименование). Пример фильтра event handlers: `[K in keyof T as K extends \\`on${string}\\` ? K : never]: T[K]`. Гомоморфный mapped type — маппинг напрямую по `keyof T`: TypeScript сохраняет исходные `readonly` и `?`, если явно не переопределить тип значения. Маппинг по произвольному union вроде `[K in string]` не гомоморфен и модификаторы не наследует. Компилятор разворачивает mapped type подстановкой каждого ключа из union в mapping clause; результат кешируется per instantiation. Типичные ошибки: index signature исчезает после маппинга — нужен intersect с исходной index signature; явный тип значения (`string` вместо `T[K]`) снимает `readonly`; shallow `Partial<T[K]>` не рекурсивен — нужен conditional `DeepPartial`; переименование ключей без `as` невозможно — только смена типов значений. Stdlib: `Partial`, `Required`, `Readonly`, `Pick`, `Record` — mapped types под капотом. Практика: React `ComponentProps`, TanStack Query optional keys, tRPC shapes, Zod `.partial()`. Комбинируют с conditional: `{ [K in keyof T]: T[K] extends string ? Uppercase<T[K]> : T[K] }`. `Diff<T, U>` через key remapping: `{ [K in keyof T as K extends U ? never : K]: T[K] }` — гомоморфно сохраняет модификаторы.",
+    "maxScore": 10,
+    "skills": [
+      "typescript",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "mapped_syntax",
+      "title": "Понимает синтаксис mapped types",
+      "expected": "Кандидат объясняет: `{ [K in keyof T]: NewValueType }` перебирает union ключей T и задаёт новый тип значения для каждого; compile-time, без runtime.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — синтаксис [K in keyof T] из TL;DR ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "mapped_syntax",
+            "oftenConfusedWith": [
+              "mapped_vs_alias",
+              "modifier_syntax"
+            ],
+            "anchorTermsExpected": [
+              "keyof",
+              "K in",
+              "перебор",
+              "ключ",
+              "union",
+              "compile",
+              "компил"
+            ],
+            "anchorTermsWrongTopic": [
+              "runtime map",
+              "Object.keys",
+              "conditional type"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "K in keyof",
+              "перебор",
+              "ключ"
+            ],
+            "ask": "что делает `[K in keyof User]: boolean` для `{ name: string; age: number }`"
+          }
+        ],
+        "mustConcepts": [
+          "mapped",
+          "мапован",
+          "K in keyof",
+          "keyof",
+          "перебор",
+          "итерац",
+          "union ключ",
+          "NewValueType",
+          "трансформ",
+          "compile time",
+          "компил",
+          "без runtime",
+          "стира",
+          "object type",
+          "объектн",
+          "Flags",
+          "BooleanUser"
+        ],
+        "falseClaims": [
+          "mapped types выполняются в runtime через Object.keys",
+          "[K in keyof T] — это обычный цикл JavaScript",
+          "mapped types меняют только имена ключей, не типы значений",
+          "keyof T возвращает массив строк в runtime"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "mapped_vs_alias",
+      "title": "Отличает mapped type от alias и intersection",
+      "expected": "Кандидат объясняет: alias переименовывает без трансформации; intersection добавляет поля; mapped type системно трансформирует каждое свойство и реагирует на изменения источника.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "реактивность к source type — ключевое отличие из ITLead Key difference",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "mapped_syntax",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "mapped_vs_alias",
+            "oftenConfusedWith": [
+              "mapped_syntax",
+              "when_to_use"
+            ],
+            "anchorTermsExpected": [
+              "alias",
+              "intersection",
+              "реактив",
+              "источник",
+              "автомат",
+              "добавил поле"
+            ],
+            "anchorTermsWrongTopic": [
+              "mapped это alias",
+              "intersection трансформирует значения"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "alias",
+          "type alias",
+          "intersection",
+          "пересеч",
+          "реактив",
+          "источник",
+          "source",
+          "автомат",
+          "подхват",
+          "добавил поле",
+          "системн",
+          "трансформ",
+          "каждое свойство",
+          "generic utility",
+          "утилит"
+        ],
+        "falseClaims": [
+          "type alias и mapped type решают одну задачу",
+          "intersection системно меняет тип каждого значения",
+          "mapped type не реагирует на новые поля в исходном типе",
+          "plain alias автоматически трансформирует value types"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "modifier_syntax",
+      "title": "Знает модификаторы ? и readonly",
+      "expected": "Кандидат перечисляет паттерны Partial/Required/Readonly/Mutable: `?`, `readonly`, `-?`, `-readonly`; префикс `-` снимает модификатор.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "четыре базовых паттерна модификаторов — центр senior mapped types",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Partial",
+              "?",
+              "optional"
+            ],
+            "ask": "как mapped type реализует Partial<T> через модификатор ?"
+          },
+          {
+            "match": [
+              "-readonly",
+              "Mutable",
+              "Required",
+              "-?"
+            ],
+            "ask": "чем `-readonly [K in keyof T]` отличается от `readonly [K in keyof T]`"
+          }
+        ],
+        "mustConcepts": [
+          "Partial",
+          "Required",
+          "Readonly",
+          "Mutable",
+          "optional",
+          "?",
+          "readonly",
+          "-?",
+          "-readonly",
+          "префикс минус",
+          "снят",
+          "модификатор",
+          "T[K]",
+          "все поля",
+          "freeze",
+          "замороз"
+        ],
+        "falseClaims": [
+          "Partial<T> нельзя выразить через mapped type",
+          "`-?` делает поля optional, а не required",
+          "readonly и optional нельзя комбинировать в одном mapped type",
+          "модификаторы работают в runtime"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "key_remapping",
+      "title": "Использует key remapping через as",
+      "expected": "Кандидат объясняет клаузу `as` (TS 4.1+): conditional возвращает `never` для фильтрации ключа или template literal для переименования; пример EventHandlers/on-prefix.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "key remapping — ключевой senior-паттерн из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "as",
+              "never",
+              "remap",
+              "переимен"
+            ],
+            "ask": "как отфильтровать только ключи `on*` из props через mapped type"
+          },
+          {
+            "match": [
+              "Capitalize",
+              "template literal",
+              "get$"
+            ],
+            "ask": "как переименовать ключ `age` в `viewAge` через as clause"
+          }
+        ],
+        "mustConcepts": [
+          "as",
+          "key remapping",
+          "remap",
+          "переимен",
+          "фильтр",
+          "never",
+          "удал",
+          "drop",
+          "template literal",
+          "on$",
+          "Capitalize",
+          "EventHandlers",
+          "4.1",
+          "conditional в as",
+          "Diff",
+          "SecureUser"
+        ],
+        "falseClaims": [
+          "переименовать ключ можно без клаузы as",
+          "never в as оставляет ключ с типом never в результате",
+          "as clause работает только с string keys без conditional",
+          "key remapping доступен с TypeScript 2.x"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "homomorphic_mapping",
+      "title": "Понимает гомоморфный mapped type",
+      "expected": "Кандидат объясняет: маппинг по `keyof T` наследует `readonly` и `?` из источника; маппинг по `[K in string]` не гомоморфен и модификаторы теряет.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "homomorphic preservation — частая ловушка из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "гомоморф",
+              "homomorph",
+              "readonly",
+              "сохран"
+            ],
+            "ask": "сохранятся ли readonly и optional при `{ [K in keyof User]: User[K] }`"
+          }
+        ],
+        "mustConcepts": [
+          "гомоморф",
+          "homomorph",
+          "наслед",
+          "сохран",
+          "readonly",
+          "optional",
+          "?",
+          "keyof T",
+          "T[K]",
+          "явн переопред",
+          "K in string",
+          "index signature",
+          "не гомоморф",
+          "модификатор"
+        ],
+        "falseClaims": [
+          "любой mapped type всегда сохраняет readonly из источника",
+          "маппинг по string union наследует модификаторы",
+          "явный тип значения string не снимает readonly",
+          "гомоморфность связана с runtime, не с compile time"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки mapped types",
+      "expected": "Кандидат называет: index signature пропадает после маппинга; явный value type снимает readonly; shallow Partial без рекурсии; переименование без as.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — index sig, readonly, DeepPartial",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "homomorphic_mapping",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "index signature",
+              "индекс",
+              "intersect"
+            ],
+            "ask": "почему index signature исчезает после mapped type и как это исправить"
+          },
+          {
+            "match": [
+              "DeepPartial",
+              "рекурс",
+              "ShallowPartial"
+            ],
+            "ask": "почему `{ [K in keyof T]?: Partial<T[K]> }` не делает deep partial"
+          }
+        ],
+        "mustConcepts": [
+          "index signature",
+          "индекс",
+          "исчез",
+          "intersect",
+          "пересеч",
+          "readonly снят",
+          "явный тип",
+          "string вместо T[K]",
+          "ShallowPartial",
+          "DeepPartial",
+          "рекурс",
+          "conditional",
+          "T extends object",
+          "без as",
+          "переимен",
+          "nested"
+        ],
+        "falseClaims": [
+          "index signature автоматически сохраняется при любом mapped type",
+          "`{ [K in keyof RUser]: string }` сохраняет readonly на id",
+          "Partial<T[K]> рекурсивно делает deep partial",
+          "переименовать ключ можно изменив только тип значения"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "mapped_vs_conditional",
+      "title": "Отличает mapped types от conditional types",
+      "expected": "Кандидат объясняет: mapped итерирует ключи объекта; conditional ветвится по assignability; часто комбинируют в одном выражении.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up Q из ITLead — mapped vs conditional",
+        "mustConcepts": [
+          "mapped",
+          "conditional",
+          "итерац ключ",
+          "extends",
+          "assignab",
+          "ветвлен",
+          "комбин",
+          "Uppercase",
+          "T[K] extends",
+          "object shape",
+          "форма объекта",
+          "разные механизм",
+          "вместе",
+          "одном выраж"
+        ],
+        "falseClaims": [
+          "mapped types и conditional types — одно и то же",
+          "conditional types перебирают ключи объекта как mapped",
+          "mapped types нельзя комбинировать с conditional",
+          "Partial реализован через conditional без mapped"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "stdlib_ecosystem",
+      "title": "Связывает с stdlib и экосистемой",
+      "expected": "Кандидат упоминает Partial, Required, Readonly, Pick, Record; опционально React ComponentProps, TanStack Query, tRPC, Zod partial.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "бонус — real-world и stdlib из ITLead",
+        "mustConcepts": [
+          "Partial",
+          "Required",
+          "Readonly",
+          "Pick",
+          "Record",
+          "stdlib",
+          "стандарт",
+          "ComponentProps",
+          "React",
+          "TanStack",
+          "tRPC",
+          "Zod",
+          "partial",
+          "utility",
+          "под капотом"
+        ],
+        "falseClaims": [
+          "Partial и Pick реализованы без mapped types",
+          "mapped types используются только в stdlib, не в библиотеках",
+          "Zod partial не связан с модификатором ?",
+          "ComponentProps не использует mapped types"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Mapped type — `{ [K in keyof T]: NewValueType }`: перебираю union ключей T и задаю новый тип значения. Модификаторы `?`/`readonly` и `-?`/`-readonly` дают Partial/Required/Readonly/Mutable. Key remapping через `as`: `never` фильтрует ключ, template literal переименовывает. Гомоморфный маппинг по keyof T сохраняет модификаторы источника.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для DTO patch делаю `{ [K in keyof T]?: T[K] }` — как Partial, но могу кастомизировать. Event handlers из props: `[K in keyof P as K extends \\`on${string}\\` ? K : never]: P[K]`. DeepPartial — рекурсивный conditional + mapped: `T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T`. Stdlib utilities — те же mapped types под капотом.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Mapped — map по ключам объекта на compile time. Conditional — ветвление по extends. Вместе: `{ [K in keyof T]: T[K] extends string ? Uppercase<T[K]> : T[K] }`. Index signature после маппинга теряется — intersect с `{ [key: string]: ... }`.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Mapped types — это Object.keys в runtime. Переименовать ключ можно через `{ [K in keyof T]: string }` без as clause.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Partial<T> нельзя выразить mapped type. Гомоморфный mapped type работает и для `[K in string]`. DeepPartial достаточно `{ [K in keyof T]?: Partial<T[K]> }`.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Mapped types и conditional types одно и то же — оба перебирают ключи. Readonly всегда сохраняется даже при явном `: string` в value type.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "mapped_syntax",
+      "exampleType": "good",
+      "exampleText": "`{ [K in keyof User]: boolean }` для `{ name: string; age: number }` → `{ name: boolean; age: boolean }` — compile-time, без runtime.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "mapped_syntax",
+      "exampleType": "good",
+      "exampleText": "ну это map для типов — k пробегает ключи user, каждому значению ставлю boolean",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "mapped_syntax",
+      "exampleType": "bad",
+      "exampleText": "[K in keyof T] выполняется в runtime и возвращает массив ключей через Object.keys.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "mapped_vs_alias",
+      "exampleType": "good",
+      "exampleText": "Alias просто даёт имя типу. Mapped системно меняет каждое value type и подхватывает новые поля из User автоматически.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "mapped_vs_alias",
+      "exampleType": "good",
+      "exampleText": "intersection добавляет поля сверху, mapped трансформирует все существующие — для generic utilities беру mapped",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "mapped_vs_alias",
+      "exampleType": "bad",
+      "exampleText": "type BooleanUser = User — это mapped type, потому что имя другое.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "modifier_syntax",
+      "exampleType": "good",
+      "exampleText": "`{ [K in keyof T]?: T[K] }` = Partial; `readonly [K in keyof T]: T[K]` = Readonly; `-?` и `-readonly` снимают модификаторы.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "modifier_syntax",
+      "exampleType": "good",
+      "exampleText": "Mutable<T> через `-readonly [K in keyof T]: T[K]` — снимаю readonly со всех полей разом",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "modifier_syntax",
+      "exampleType": "bad",
+      "exampleText": "`-?` делает все поля optional, как Partial. Readonly нельзя комбинировать с ? в mapped type.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "key_remapping",
+      "exampleType": "good",
+      "exampleText": "`[K in keyof T as K extends \\`on${string}\\` ? K : never]: T[K]` — только on* handlers. `Diff<T,U>`: `as K extends U ? never : K`.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "key_remapping",
+      "exampleType": "good",
+      "exampleText": "SecureUser: age → viewAge через as, id → never чтобы выкинуть поле из типа",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "key_remapping",
+      "exampleType": "bad",
+      "exampleText": "Фильтровать ключи можно через `{ [K in keyof T]: T[K] }` — never в value type удаляет ключ.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "homomorphic_mapping",
+      "exampleType": "good",
+      "exampleText": "`{ [K in keyof User]: User[K] }` сохраняет readonly id и optional name — гомоморфный маппинг по keyof T.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "homomorphic_mapping",
+      "exampleType": "good",
+      "exampleText": "[k in string] не гомоморфен — модификаторы с источника не тянутся",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "homomorphic_mapping",
+      "exampleType": "bad",
+      "exampleText": "Любой mapped type всегда гомоморфен, даже `[K in string | number]`.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "После mapped type index signature пропадает — intersect: `Mapped & { [key: string]: number | undefined }`.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "`{ [K in keyof RUser]: string }` снимает readonly — нужен T[K] или `-readonly` осознанно. DeepPartial — recursive conditional.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Index signature сохраняется автоматически. ShallowPartial<T> = `{ [K in keyof T]?: Partial<T[K]> }` рекурсивен для nested objects.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "mapped_vs_conditional",
+      "exampleType": "good",
+      "exampleText": "Mapped итерирует ключи для формы объекта; conditional ветвится по T extends U. Вместе фильтруют/трансформируют per-key типы.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "mapped_vs_conditional",
+      "exampleType": "good",
+      "exampleText": "mapped строит object shape, conditional решает if/else между типами — часто в value position mapped",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "mapped_vs_conditional",
+      "exampleType": "bad",
+      "exampleText": "Conditional type `{ [K in keyof T]: ... }` — синоним mapped type, различий нет.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "stdlib_ecosystem",
+      "exampleType": "good",
+      "exampleText": "Partial, Required, Readonly, Pick, Record — mapped types в stdlib. React ComponentProps, Zod .partial() — тот же паттерн.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "stdlib_ecosystem",
+      "exampleType": "good",
+      "exampleText": "tanstack query options optional keys — mapped с ?, trpc маппит input/output shapes",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "stdlib_ecosystem",
+      "exampleType": "bad",
+      "exampleText": "Pick и Partial реализованы conditional types без mapped syntax.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "what-are-mapped-types-in-typescript",
+    "apiUrl": "https://api.itlead.org/api/questions/what-are-mapped-types-in-typescript",
+    "pageUrl": "https://itlead.org/interview-questions/typescript/what-are-mapped-types-in-typescript",
+    "difficulty": "SENIOR",
+    "titleEn": "What are mapped types in TypeScript",
+    "categorySlug": "typescript",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

@@ -1,0 +1,605 @@
+{
+  "topic": {
+    "code": "nextjs_middleware_in_nextjs",
+    "name": "Middleware в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как работает middleware в Next.js и для каких задач его использовать?",
+    "shortAnswer": "Middleware в Next.js — именованная функция в `middleware.ts`, которая выполняется на Edge Runtime до того, как запрос дойдёт до маршрутов. Она перехватывает запросы для auth, i18n и заголовков без изменения компонентов страниц. Всегда задавай `config.matcher`, иначе middleware сработает и на статические файлы.",
+    "idealAnswer": "Middleware в Next.js — TypeScript-функция в `middleware.ts` в корне проекта; выполняется на Edge Network до маршрутов и позволяет перехватывать, инспектировать и перенаправлять запросы без правок page-компонентов. Аналогия: контроль безопасности в аэропорту — каждый запрос проходит один раз, вы решаете redirect, rewrite или pass-through. Runtime — Edge (V8 isolates, не Node.js): без cold start, но нет доступа к `fs`, Prisma, Node `crypto`, `bcrypt`. Без `config.matcher` middleware срабатывает на каждый запрос, включая `/_next/static`, `/_next/image`, `favicon.ico` — быстро сжигает квоту. Подходит: auth guards на `/app/*`, i18n redirect/rewrite, CSP/CORS, A/B через cookies, rate limiting `/api/*` через Upstash. Не подходит: прямые запросы к БД и сложная permission-логика — server component или route handler. Один `middleware.ts` на проект, без Express-style chaining — compose через `if` или hono внутри файла. Внутри: matcher regex O(1) → `NextRequest` (Web Fetch API: cookies, headers, nextUrl, geo) → возврат `NextResponse.redirect()`, `rewrite()` или `next()` с опциональными заголовками. `NextRequest` immutable — заголовки на нём не меняют. Отличие от Express: Edge глобально распределён и stateless; Express — per-instance Node.js со state и любыми модулями. От route handlers: middleware до роутинга на Edge без React context; handlers — per-route на сервере с полным Node.js. Типичные ошибки: (1) `export default` вместо именованного `export function middleware` — компилируется, но молча не работает; (2) нет matcher; (3) `await fetch` без timeout — лимит Edge ~30 с; (4) Node-модули в Edge; (5) мутация request. Redirect vs rewrite: redirect меняет URL в браузере, rewrite — что рендерится (i18n чаще rewrite). Cookie на redirect: создать `NextResponse.redirect()`, вызвать `.cookies.set()`, вернуть. Matcher для статики: `'/((?!api|_next/static|_next/image|favicon.ico).*)'`. Next.js 15: Turbopack, experimental async matcher; API без изменений.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "react"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "middleware_definition",
+      "title": "Понимает назначение middleware",
+      "expected": "Кандидат объясняет: `middleware.ts` в корне, выполняется на Edge до маршрутов; перехват redirect/rewrite/pass-through; auth, i18n, заголовки без правок page components.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — что такое middleware и когда срабатывает",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "middleware_definition",
+            "oftenConfusedWith": [
+              "middleware_vs_route_handlers",
+              "edge_runtime_express_diff"
+            ],
+            "anchorTermsExpected": [
+              "middleware.ts",
+              "Edge",
+              "до маршрут",
+              "перехват",
+              "redirect",
+              "rewrite"
+            ],
+            "anchorTermsWrongTopic": [
+              "middleware внутри page component",
+              "middleware это route handler",
+              "middleware выполняется после render"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "middleware.ts",
+              "Edge",
+              "перехват"
+            ],
+            "ask": "где лежит middleware и на каком этапе жизненного цикла запроса он выполняется"
+          }
+        ],
+        "mustConcepts": [
+          "middleware",
+          "middleware.ts",
+          "Edge",
+          "Edge Runtime",
+          "до маршрут",
+          "перехват",
+          "redirect",
+          "rewrite",
+          "NextResponse.next",
+          "корень проекта",
+          "именованн",
+          "export function middleware",
+          "auth",
+          "i18n",
+          "заголовк",
+          "без page component"
+        ],
+        "falseClaims": [
+          "middleware выполняется после рендера страницы",
+          "middleware.ts можно положить внутрь app/dashboard",
+          "middleware заменяет server components для auth",
+          "middleware работает в Node.js runtime на сервере приложения",
+          "можно иметь несколько middleware.ts в одном проекте как в Express"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "edge_runtime_express_diff",
+      "title": "Знает Edge Runtime и отличие от Express",
+      "expected": "Кандидат объясняет: V8 isolates на Edge, без Node.js; нет fs/Prisma/bcrypt; глобально распределён и stateless; Express — per-instance Node со state и любыми модулями.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевой trade-off Edge vs Node из ITLead theory",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "middleware_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "edge_runtime_express_diff",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "Edge Runtime",
+              "V8",
+              "stateless",
+              "Express",
+              "Node.js",
+              "fs",
+              "Prisma"
+            ],
+            "anchorTermsWrongTopic": [
+              "middleware на Edge имеет полный доступ к Prisma",
+              "Express middleware тоже на Edge Network"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Edge",
+              "Node",
+              "Prisma",
+              "fs"
+            ],
+            "ask": "почему Prisma и fs нельзя использовать в middleware и чем Edge отличается от Express middleware"
+          }
+        ],
+        "mustConcepts": [
+          "Edge Runtime",
+          "V8",
+          "изолят",
+          "не Node.js",
+          "stateless",
+          "глобальн",
+          "распредел",
+          "Express",
+          "per-instance",
+          "fs",
+          "Prisma",
+          "bcrypt",
+          "crypto",
+          "cold start",
+          "Web Crypto",
+          "Upstash",
+          "Vercel KV"
+        ],
+        "falseClaims": [
+          "Edge Runtime — это полноценный Node.js процесс",
+          "в middleware можно импортировать fs и читать файлы",
+          "Express middleware и Next.js middleware работают одинаково по runtime",
+          "Edge middleware может держать in-memory state между запросами на одном инстансе",
+          "Prisma Client работает в middleware без ошибок сборки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "nextrequest_nextresponse",
+      "title": "Знает NextRequest и NextResponse",
+      "expected": "Кандидат описывает API: cookies, headers, nextUrl, geo на NextRequest; redirect(), rewrite(), next() на NextResponse; request immutable; cookie на redirect через response.cookies.set().",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый API из quick example ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "NextRequest",
+              "NextResponse",
+              "redirect",
+              "rewrite"
+            ],
+            "ask": "чем redirect отличается от rewrite и как установить cookie при redirect"
+          }
+        ],
+        "mustConcepts": [
+          "NextRequest",
+          "NextResponse",
+          "cookies",
+          "headers",
+          "nextUrl",
+          "geo",
+          "redirect",
+          "rewrite",
+          "next()",
+          "immutable",
+          "неизмен",
+          "Web Fetch API",
+          "cookies.set",
+          "searchParams",
+          "pathname"
+        ],
+        "falseClaims": [
+          "можно напрямую мутировать headers на NextRequest",
+          "redirect и rewrite делают одно и то же с URL",
+          "нельзя установить cookie на redirect response",
+          "NextResponse.next() нельзя дополнить заголовками",
+          "middleware возвращает обычный Response без NextResponse"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "matcher_config",
+      "title": "Понимает config.matcher",
+      "expected": "Кандидат объясняет: matcher ограничивает пути; без него — все запросы включая static; negative lookahead для api/_next/static/_next/image/favicon.ico; синтаксис `/dashboard/:path*`.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "частая production-ошибка — квота и лишние вызовы без matcher",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "matcher",
+              "static",
+              "_next/static"
+            ],
+            "ask": "какой matcher пропускает api и статику и почему без matcher плохо"
+          }
+        ],
+        "mustConcepts": [
+          "config.matcher",
+          "matcher",
+          "static",
+          "_next/static",
+          "_next/image",
+          "favicon.ico",
+          "negative lookahead",
+          "каждый запрос",
+          "квота",
+          "O(1)",
+          "regex",
+          ":path*",
+          "api",
+          "пропуск",
+          "огранич"
+        ],
+        "falseClaims": [
+          "matcher необязателен — middleware и так умный",
+          "middleware по умолчанию не трогает _next/static",
+          "matcher работает только в Pages Router",
+          "один matcher не может исключить несколько префиксов",
+          "matcher выполняется после middleware function"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use_middleware",
+      "title": "Понимает когда использовать middleware",
+      "expected": "Кандидат называет: auth на protected routes, locale rewrite, CSP/CORS, A/B cookies, rate limit API через Upstash; НЕ для DB permission logic и >50% traffic без осторожности.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use таблица из ITLead",
+        "mustConcepts": [
+          "auth",
+          "protected",
+          "i18n",
+          "locale",
+          "CSP",
+          "CORS",
+          "A/B",
+          "cookies",
+          "rate limiting",
+          "Upstash",
+          "server component",
+          "route handler",
+          "база данных",
+          "permission",
+          "Clerk",
+          "NextAuth",
+          "next-intl"
+        ],
+        "falseClaims": [
+          "сложные permission queries из PostgreSQL — задача middleware",
+          "middleware подходит для любого объёма трафика без лимитов Edge",
+          "i18n всегда через redirect, rewrite не нужен",
+          "rate limiting возможен только в route handler, не в middleware",
+          "middleware заменяет server-side auth полностью"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки middleware",
+      "expected": "Кандидат называет: export default вместо named export; отсутствие matcher; fetch без AbortController timeout; Node modules в Edge; мутация immutable NextRequest.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — silent fail и Edge limits",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "export default",
+              "named export"
+            ],
+            "ask": "почему export default middleware молча не работает"
+          },
+          {
+            "match": [
+              "AbortController",
+              "timeout",
+              "fetch"
+            ],
+            "ask": "как ограничить hanging fetch в Edge middleware"
+          },
+          {
+            "match": [
+              "immutable",
+              "TypeError",
+              "headers"
+            ],
+            "ask": "как передать данные downstream если request immutable"
+          }
+        ],
+        "mustConcepts": [
+          "export default",
+          "именованн",
+          "export function middleware",
+          "молча",
+          "без matcher",
+          "AbortController",
+          "timeout",
+          "30 секунд",
+          "fetch",
+          "Node modules",
+          "immutable",
+          "TypeError",
+          "response headers",
+          "cookies",
+          "search params",
+          "rewrite URL",
+          "сборка",
+          "module resolution"
+        ],
+        "falseClaims": [
+          "export default middleware работает так же как named export",
+          "без timeout fetch в Edge безопасен бесконечно",
+          "можно set header напрямую на request для передачи в page",
+          "Edge Runtime поддерживает bcrypt для проверки пароля",
+          "отсутствие matcher — только warning в dev, не влияет на prod"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "middleware_vs_route_handlers",
+      "title": "Отличает middleware от route handlers",
+      "expected": "Кандидат сравнивает: middleware — до роутинга на Edge, без React context, first-pass auth; route handlers — per-route на сервере с Node.js и business logic; compose нескольких middleware через один файл.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up questions из ITLead interview block",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "route handler",
+              "App Router",
+              "chaining"
+            ],
+            "ask": "как совместить несколько middleware и где делать DB permission check"
+          }
+        ],
+        "mustConcepts": [
+          "route handler",
+          "App Router",
+          "до роутинг",
+          "React context",
+          "first-pass",
+          "business logic",
+          "Node.js",
+          "один middleware.ts",
+          "compose",
+          "if блок",
+          "hono",
+          "Express app.use",
+          "нет chaining",
+          "server component",
+          "токен",
+          "permission query"
+        ],
+        "falseClaims": [
+          "route handlers выполняются раньше middleware",
+          "можно подключить несколько middleware.ts как в Express",
+          "middleware имеет доступ к React context и hooks",
+          "middleware должен содержать всю business logic auth",
+          "route handlers работают только на Edge без Node.js"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Middleware в `middleware.ts` — именованный export, срабатывает на Edge до роутинга. Проверяю session cookie на `/app/*`, без токена — redirect на `/login?from=`. Всегда задаю matcher, чтобы не трогать `/_next/static`. Prisma и fs в Edge не работают — токен проверяю в middleware, права в server component.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для i18n делаю rewrite по Accept-Language — URL в браузере не меняется, рендерится `/de/...`. Rate limit на `/api/*` через Upstash sliding window. Fetch к auth-service с AbortController 5s — Edge убивает запрос через 30s без timeout.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Отличие от Express: Edge stateless и глобальный, Express — Node per-instance со state. Matcher `'/((?!api|_next/static|_next/image|favicon.ico).*)'` — negative lookahead. Cookie на redirect: `const res = NextResponse.redirect(...); res.cookies.set(...); return res`.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Middleware — это export default в любом компоненте, выполняется после SSR. Можно спокойно импортировать Prisma и читать БД прямо в middleware.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Matcher не нужен — Next.js сам пропускает статику. Request mutable, ставлю header на NextRequest и он дойдёт до page. Несколько middleware.ts подключаются как app.use в Express.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Redirect и rewrite одно и то же для i18n. Middleware имеет React context и может вызывать useEffect. await fetch без timeout безопасен на Edge.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "middleware_definition",
+      "exampleType": "good",
+      "exampleText": "middleware.ts в корне — Edge до routes; redirect/rewrite/next без правок page components.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "middleware_definition",
+      "exampleType": "good",
+      "exampleText": "ну middleware как фильтр на входе — auth и i18n до того как запрос попадёт в app router",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "middleware_definition",
+      "exampleType": "bad",
+      "exampleText": "Middleware выполняется внутри layout.tsx после hydration страницы.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "edge_runtime_express_diff",
+      "exampleType": "good",
+      "exampleText": "Edge — V8 isolates, без Node fs/Prisma; Express middleware — Node per-instance, можно state и любые модули.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "edge_runtime_express_diff",
+      "exampleType": "good",
+      "exampleText": "на edge нет prisma — беру upstash redis или vercel kv для rate limit и session lookup",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "edge_runtime_express_diff",
+      "exampleType": "bad",
+      "exampleText": "Edge Runtime это тот же Node.js на сервере Vercel, bcrypt работает нормально.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "nextrequest_nextresponse",
+      "exampleType": "good",
+      "exampleText": "NextRequest: cookies, nextUrl.pathname; без token — NextResponse.redirect; иначе NextResponse.next() с CSP header.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "nextrequest_nextresponse",
+      "exampleType": "good",
+      "exampleText": "rewrite для i18n — url не меняется; redirect для login — меняется; request immutable",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "nextrequest_nextresponse",
+      "exampleType": "bad",
+      "exampleText": "Пишу request.headers.set('x-user', id) — данные передаются в server component.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "matcher_config",
+      "exampleType": "good",
+      "exampleText": "config.matcher: '/dashboard/:path*' — только dashboard; без matcher жжёт квоту на favicon и _next/static.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "matcher_config",
+      "exampleType": "good",
+      "exampleText": "matcher '/((?!api|_next/static|_next/image|favicon.ico).*)' — negative lookahead для статики",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "matcher_config",
+      "exampleType": "bad",
+      "exampleText": "Matcher опционален — Next автоматически исключает _next/static из middleware.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use_middleware",
+      "exampleType": "good",
+      "exampleText": "Auth guard /app/*, next-intl rewrite, CORS на /api, A/B cookie — middleware; permission query из Postgres — server component.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_use_middleware",
+      "exampleType": "good",
+      "exampleText": "clerk/nextauth cookie check в middleware; stripe api rate limit через upstash",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use_middleware",
+      "exampleType": "bad",
+      "exampleText": "Все SQL joins и RBAC лучше делать в middleware на Edge — быстрее чем server component.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "export default middleware — compile ok, runtime noop; fix: export function middleware. Fetch с AbortController 5s.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "не мутирую request — данные в response cookie или rewrite с searchParams",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "export default function middleware — стандартный паттерн Next.js, named export не обязателен.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "middleware_vs_route_handlers",
+      "exampleType": "good",
+      "exampleText": "Middleware — first-pass token на Edge; route handler — POST /api/login и business logic с Node.js и БД.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "middleware_vs_route_handlers",
+      "exampleType": "good",
+      "exampleText": "один middleware.ts — compose if блоками или hono; express-style chain нет",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "middleware_vs_route_handlers",
+      "exampleType": "bad",
+      "exampleText": "Route handlers срабатывают раньше middleware и могут отменить redirect.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nextjs-middleware-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/nextjs-middleware-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/nextjs-middleware-in-nextjs",
+    "difficulty": "SENIOR",
+    "titleEn": "middleware in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

@@ -1,0 +1,485 @@
+{
+  "topic": {
+    "code": "git_merge_vs_rebase",
+    "name": "Git merge vs rebase",
+    "skillCode": "git",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "В чём разница между git merge и git rebase?",
+    "shortAnswer": "git merge создаёт коммит с двумя родителями и сохраняет полную историю веток; git rebase переносит коммиты поверх целевой ветки, переписывая SHA и формируя линейную историю. Merge — для общих веток; rebase — для локальной feature-ветки перед PR. Нельзя делать rebase на ветке, которую уже подтянули коллеги.",
+    "idealAnswer": "git merge интегрирует ветку, создавая новый merge commit с двумя родителями — обе линии истории остаются видимыми: видно, где ветки разошлись и слились. git rebase «переигрывает» коммиты feature-ветки поверх другой базы через cherry-pick: у каждого коммита меняется родитель, поэтому меняется и SHA, даже если diff байт-в-байт тот же. Итог rebase — прямая линия, как будто работа шла последовательно. Merge находит общего предка, считает three-way diff и записывает один коммит с двумя tips как родителями; оригинальные коммиты не трогаются. Rebase идёт от точки расхождения до tip feature и по одному cherry-pick'ает каждый коммит на новую базу. Правило выбора: общая или публичная ветка (main, develop) — только merge; локальная feature перед открытием PR — rebase на актуальный main для чистой истории; если ветку уже пушили и коллеги подтянули — merge, даже на своей feature. После push на shared remote rebase запрещён — ломает клоны команды. Конфликты: merge показывает все сразу в одном шаге; rebase останавливается на каждом конфликтном коммите — fix → git rebase --continue, или git rebase --abort. Типичные ошибки: rebase на main (`git checkout main && git rebase feature`); force-push после rebase когда коллега уже pull'нул; ожидание одного шага конфликтов при rebase. `--force-with-lease` пушит только если remote tip совпадает с последним fetch — не защищает коллегу между fetch и push. После rebase feature на main merge часто даёт fast-forward без merge commit; для метки PR в логе — `git merge --no-ff feature`. `git pull --rebase origin main` сначала fetch'ит remote, потом rebase на обновлённый tip; `git rebase main` — только на локальный main, который может отставать. Интерактивный rebase (`git rebase -i`) — squash/edit до первого push. Практика команд: «rebase перед PR, merge в main» покрывает большинство случаев.",
+    "maxScore": 10,
+    "skills": ["git"]
+  },
+  "checkpoints": [
+    {
+      "key": "merge_rebase_core",
+      "title": "Объясняет суть merge и rebase",
+      "expected": "Кандидат: merge — один коммит с двумя родителями, история веток сохраняется; rebase — перенос коммитов на новую базу, новые SHA, линейная история; код одинаковый, «записанная история» разная.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — два способа интеграции изменений",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": ["merge", "rebase", "два родител"],
+            "ask": "чем merge отличается от rebase по форме истории и SHA коммитов"
+          }
+        ],
+        "mustConcepts": [
+          "merge",
+          "rebase",
+          "два родител",
+          "merge commit",
+          "перепис",
+          "SHA",
+          "линейн",
+          "истори",
+          "интеграц",
+          "ветк",
+          "cherry-pick",
+          "переигр",
+          "родител",
+          "разгалуж",
+          "общий предок"
+        ],
+        "falseClaims": [
+          "merge и rebase дают одинаковую записанную историю",
+          "rebase не меняет SHA коммитов",
+          "merge переписывает уже существующие коммиты",
+          "rebase создаёт один merge commit с двумя родителями",
+          "merge и rebase всегда меняют содержимое файлов по-разному"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "history_shape",
+      "title": "Сравнивает форму истории",
+      "expected": "Кандидат: merge — разветвлённая история, видны точки расхождения и слияния; rebase — прямая линия, work выглядит последовательным; оригинальные коммиты при merge сохраняют SHA.",
+      "score": 1.0,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "branched vs linear — базовое сравнение из таблицы",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "merge_rebase_core",
+            "floorFraction": 0.4
+          }
+        ],
+        "mustConcepts": [
+          "разветвл",
+          "линейн",
+          "fork",
+          "расхожден",
+          "слияни",
+          "git log",
+          "graph",
+          "оригинальн",
+          "SHA сохран",
+          "последовательн",
+          "ветвлен",
+          "прямая линия",
+          "reflog"
+        ],
+        "falseClaims": [
+          "после rebase в логе видно старые SHA и точку merge",
+          "merge делает историю всегда линейной",
+          "rebase сохраняет оригинальные коммиты без изменений",
+          "форма истории не влияет на содержимое кода"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Выбирает merge или rebase по контексту",
+      "expected": "Кандидат: shared/public ветка (main, develop) — merge; локальная feature перед PR — rebase на main; после push на shared — только merge; интерактивный rebase до первого push для squash.",
+      "score": 2.0,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "decision rule — ключевой практический навык middle",
+        "confusionPairs": [
+          {
+            "checkpointKey": "when_to_use",
+            "oftenConfusedWith": ["common_mistakes"],
+            "anchorTermsExpected": [
+              "shared",
+              "public",
+              "main",
+              "feature",
+              "PR",
+              "локальн",
+              "merge для общих"
+            ],
+            "anchorTermsWrongTopic": [
+              "rebase main всегда",
+              "merge только для hotfix"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": ["main", "develop", "shared", "PR"],
+            "ask": "когда rebase допустим, а когда только merge"
+          }
+        ],
+        "mustConcepts": [
+          "shared",
+          "public",
+          "main",
+          "develop",
+          "feature",
+          "локальн",
+          "PR",
+          "push",
+          "remote",
+          "rebase перед PR",
+          "merge в main",
+          "squash",
+          "interactive rebase",
+          "коллег",
+          "подтянул",
+          "общая ветка"
+        ],
+        "falseClaims": [
+          "rebase на main после того как коллеги подтянули — нормальная практика",
+          "на feature после push всегда можно rebase и force-push",
+          "merge никогда не нужен если команда использует rebase",
+          "rebase подходит для любой публичной ветки",
+          "правило одно: всегда rebase"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "internal_mechanism",
+      "title": "Объясняет внутреннюю механику",
+      "expected": "Кандидат: merge — three-way diff (общий предок + два tip), один коммит с двумя родителями; rebase — cherry-pick каждого коммита от fork point, новый родитель → новый SHA.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "three-way merge и cherry-pick replay",
+        "probeConceptGroups": [
+          {
+            "match": ["three-way", "cherry-pick", "предок"],
+            "ask": "почему SHA меняется при rebase даже при том же diff"
+          }
+        ],
+        "mustConcepts": [
+          "three-way",
+          "общий предок",
+          "ancestor",
+          "cherry-pick",
+          "fork point",
+          "tip",
+          "верхушк",
+          "родительский SHA",
+          "diff",
+          "переигр",
+          "байт",
+          "коммит",
+          "база",
+          "replay"
+        ],
+        "falseClaims": [
+          "rebase не использует cherry-pick",
+          "SHA не зависит от родительского коммита",
+          "merge всегда требует ручного разрешения конфликтов",
+          "three-way diff нужен только для rebase",
+          "при rebase diff коммита всегда меняется"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "conflict_resolution",
+      "title": "Различает разрешение конфликтов",
+      "expected": "Кандидат: merge — все конфликты за один шаг; rebase — пауза на каждом конфликтном коммите, git rebase --continue после fix, git rebase --abort для отката.",
+      "score": 1.0,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "per-commit vs single-step — частая путаница",
+        "mustConcepts": [
+          "конфликт",
+          "один шаг",
+          "каждый коммит",
+          "rebase --continue",
+          "rebase --abort",
+          "merge",
+          "точка слияния",
+          "pause",
+          "останов",
+          "исправ",
+          "откат",
+          "abort"
+        ],
+        "falseClaims": [
+          "rebase показывает все конфликты сразу как merge",
+          "при rebase достаточно одного git add без continue",
+          "rebase --abort оставляет частично переписанную историю без отката",
+          "merge останавливается на каждом коммите feature отдельно",
+          "конфликты при merge и rebase разрешаются идентичным одношаговым процессом"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат: rebase shared main; force-push после rebase когда коллега pull'нул; ожидание одного шага конфликтов; `--force-with-lease` не защищает от pull между fetch и push.",
+      "score": 2.0,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — критичные anti-patterns",
+        "mustConcepts": [
+          "rebase main",
+          "shared branch",
+          "force-push",
+          "force-with-lease",
+          "коллег",
+          "pull",
+          "дубликат",
+          "осирот",
+          "reset --hard",
+          "origin/main",
+          "публичн",
+          "переписал main",
+          "diverged",
+          "orphan"
+        ],
+        "falseClaims": [
+          "rebase на main безопасен если ты maintainer",
+          "force-with-lease защищает всех кто уже pull'нул ветку",
+          "rebase shared ветки создаёт только cosmetic diff в логе",
+          "коллеги автоматически подхватят rebased history без действий",
+          "git pull после rebase main коллеги сработает без конфликтов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "pull_rebase_ff",
+      "title": "Знает pull --rebase и fast-forward",
+      "expected": "Кандидат: git pull --rebase fetch'ит remote и rebase на обновлённый tip; git rebase main — только локальный main; после rebase merge часто fast-forward; --no-ff для явного merge commit на границе PR.",
+      "score": 1.0,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up: pull --rebase vs rebase, fast-forward после rebase",
+        "mustConcepts": [
+          "pull --rebase",
+          "fetch",
+          "локальный main",
+          "fast-forward",
+          "no-ff",
+          "merge commit",
+          "границ",
+          "PR",
+          "remote tip",
+          "отстав",
+          "reflog",
+          "verify"
+        ],
+        "falseClaims": [
+          "git rebase main всегда эквивалентен git pull --rebase",
+          "после rebase merge всегда создаёт merge commit",
+          "fast-forward добавляет merge commit с двумя родителями",
+          "--no-ff запрещает merge после rebase",
+          "pull --rebase не делает fetch"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Merge — merge commit с двумя родителями, история показывает когда feature ответвилась. Rebase — коммиты D' и E' с новыми SHA поверх main, линия прямая. На main всегда merge; на локальной feature перед PR — rebase. После push на shared rebase нельзя.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну merge как скрепить два отчёта — оба пути видны. rebase — переписать свои коммиты в конец main. на общих ветках только merge, иначе коллегам reset --hard. конфликты при rebase по одному на коммит — continue после каждого",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Перед PR: git checkout feature && git rebase main, потом push --force-with-lease если уже пушил. В main: git merge --no-ff feature чтобы граница PR была в логе. git pull --rebase origin main подтягивает remote и линейно ставит мои коммиты сверху.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Merge и rebase — одно и то же, просто разные команды. Rebase на main после merge feature — best practice для чистого лога.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "На shared develop делаю rebase и force-push — коллеги сами разберутся. Конфликты при rebase решаются один раз в конце как при merge.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "SHA коммитов не меняется при rebase, меняется только порядок. force-with-lease гарантирует что никто не пострадает от force-push.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "merge_rebase_core",
+      "exampleType": "good",
+      "exampleText": "Merge: A-B-M, M имеет родителей B и E. Rebase feature на main: A-B-D'-E', новые SHA у D' и E'.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "merge_rebase_core",
+      "exampleType": "good",
+      "exampleText": "merge — один коммит два родителя, rebase — новые коммиты на новой базе",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "merge_rebase_core",
+      "exampleType": "bad",
+      "exampleText": "Rebase создаёт merge commit с двумя родителями, merge переписывает SHA всех коммитов feature.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "history_shape",
+      "exampleType": "good",
+      "exampleText": "git log --graph после merge — вилка и слияние; после rebase — прямая линия без merge node.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "history_shape",
+      "exampleType": "good",
+      "exampleText": "оригинальные D и E остаются при merge, при rebase только D' E' в истории main",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "history_shape",
+      "exampleType": "bad",
+      "exampleText": "Rebase сохраняет старые SHA в основной истории, merge делает историю линейной.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Локальная auth-feature перед PR — rebase на main. Слияние в main команды — merge. Ветку уже пушил и reviewer pull'нул — merge, не rebase.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "rebase -i для squash до первого push; main/develop — только merge",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "На main всегда rebase feature чтобы история была линейной, merge устарел.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "internal_mechanism",
+      "exampleType": "good",
+      "exampleText": "Merge: common ancestor + tips B и E → three-way diff → commit M. Rebase: cherry-pick D, E на B — новый parent → новый SHA.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "internal_mechanism",
+      "exampleType": "good",
+      "exampleText": "SHA меняется потому что parent commit другой, diff может быть идентичным",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "internal_mechanism",
+      "exampleType": "bad",
+      "exampleText": "Rebase просто меняет порядок коммитов без создания новых объектов в git.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "conflict_resolution",
+      "exampleType": "good",
+      "exampleText": "git merge feature — один conflict resolution. git rebase main — конфликт на D, fix, rebase --continue, потом на E.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "conflict_resolution",
+      "exampleType": "good",
+      "exampleText": "если rebase пошёл не так — rebase --abort вернёт как было",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "conflict_resolution",
+      "exampleType": "bad",
+      "exampleText": "При rebase все конфликты показываются сразу в одном окне как при merge.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "git checkout main && git rebase feature — переписывает публичный main, у коллег diverged history и сломанный pull.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "push feature, коллега pull, ты rebase + force-with-lease — его локальная feature осиротела",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "force-with-lease полностью безопасен на shared ветке если использовать вместо --force.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "pull_rebase_ff",
+      "exampleType": "good",
+      "exampleText": "pull --rebase: fetch origin/main, потом rebase локальных коммитов. rebase main без fetch — main может быть stale.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "pull_rebase_ff",
+      "exampleType": "good",
+      "exampleText": "после rebase merge feature часто ff; нужен merge commit — merge --no-ff",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "pull_rebase_ff",
+      "exampleType": "bad",
+      "exampleText": "git rebase main автоматически fetch'ит с origin. Fast-forward всегда создаёт merge commit.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "git-merge-vs-rebase",
+    "apiUrl": "https://api.itlead.org/api/questions/git-merge-vs-rebase",
+    "pageUrl": "https://itlead.org/interview-questions/git/git-merge-vs-rebase",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is the difference between git merge and git rebase?",
+    "categorySlug": "git",
+    "syncedAt": "2026-06-18T20:00:00.000Z"
+  }
+}

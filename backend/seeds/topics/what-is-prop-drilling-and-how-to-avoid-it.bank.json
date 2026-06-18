@@ -1,0 +1,594 @@
+{
+  "topic": {
+    "code": "what_is_prop_drilling_how_avoid_it",
+    "name": "Prop drilling и как его избежать",
+    "skillCode": "react",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое prop drilling в React и как его избежать?",
+    "shortAnswer": "Prop drilling — передача props через промежуточные компоненты, которым эти данные не нужны, только чтобы доставить их глубоко вложенному потомку. На 1–2 уровнях явные props — норма; при 3+ уровнях используют Context API для темы, локали и auth, а для сложного app-wide state — Redux или Zustand.",
+    "idealAnswer": "Prop drilling возникает, когда данные проходят через несколько слоёв компонентов как props, хотя промежуточные узлы их не используют — только пробрасывают дальше. Аналогия: записка передаётся через пять человек, чтобы дойти до одного адресата; все посередине держат её, но не читают. Главная проблема — промежуточные компоненты «загрязняются» props, которые им не нужны: рефакторинг болезненный, добавление нового prop требует правки всей цепочки. Реальная цена — coupling: компонент структурно зависит от prop, который не использует; в тестах приходится мокать лишние props. Правило выбора: 1–2 уровня — оставляют props, явный data flow здесь плюс; theme, locale, auth на 3+ компонентах — Context API; сложный state с async, persistence — Redux Toolkit или Zustand; частые обновления у многих consumers — state manager вместо Context, чтобы не триггерить массовые re-render. Сравнение: drilling — ручной проброс на каждом уровне, re-render только у прямых детей; Context — Provider оборачивает поддерево, все consumers при смене value; Redux/Zustand — глобальный store и селекторы. React внутри строит fiber-дерево сверху вниз: drilling тащит лишние данные через промежуточные fiber-узлы при reconciliation; Context использует отдельный Context fiber, кеширует value и уведомляет только consumers через dispatcher — компоненты без useContext пропускают update. Исправление через Context: createContext, Provider ближе к потребителям, useContext в листе — Header и Sidebar не знают про cartTotal. Типичные ошибки: забыли пробросить новый prop при рефакторинге (Child получает undefined); один UserContext на весь App (десятки consumers re-render при каждой смене user); createContext без defaultValue (crash вне Provider в тестах/порталах); объект value={{ theme, setTheme }} без useMemo — новый reference каждый render, все consumers обновляются даже при несвязанных изменениях в App. Реальные примеры: ChakraProvider/MUI ThemeProvider, auth Context в Next.js layout, Redux для бизнес-логики + Context для UI-темы. Тестирование: обернуть компонент в Provider с mock value в render. React 18+: drilling может блокировать suspense boundaries, пока родитель не отрендерится; Context с useTransition позволяет помечать обновления как non-urgent.",
+    "maxScore": 10,
+    "skills": [
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "prop_drilling_definition",
+      "title": "Понимает суть prop drilling",
+      "expected": "Кандидат объясняет: данные идут через промежуточные компоненты как props, хотя те их не используют; Parent получает user только чтобы передать Child; это не баг React, а следствие однонаправленного data flow.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — определение и quick example ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "prop_drilling_definition",
+            "oftenConfusedWith": [
+              "coupling_refactoring_cost",
+              "context_fix_pattern"
+            ],
+            "anchorTermsExpected": [
+              "промежуточн",
+              "не использ",
+              "пробрасыва",
+              "props",
+              "drilling"
+            ],
+            "anchorTermsWrongTopic": [
+              "drilling это баг React",
+              "любые props это drilling",
+              "Context заменяет все props"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "drilling",
+              "пробрасыва",
+              "промежуточн",
+              "Parent"
+            ],
+            "ask": "покажи на App → Parent → Child где Parent не использует user, но обязан его принять"
+          }
+        ],
+        "mustConcepts": [
+          "prop drilling",
+          "drilling",
+          "пробрасыва",
+          "промежуточн",
+          "не использ",
+          "props",
+          "вложенн",
+          "потомок",
+          "Parent",
+          "Child",
+          "user",
+          "цепочк",
+          "tunnel",
+          "однонаправлен",
+          "data flow",
+          "forward"
+        ],
+        "falseClaims": [
+          "prop drilling — ошибка React, которую нужно всегда устранять",
+          "любая передача props через родителя — это drilling",
+          "drilling означает что Parent использует user в своём UI",
+          "Context полностью заменяет props на всех уровнях",
+          "drilling нарушает однонаправленный поток данных"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "coupling_refactoring_cost",
+      "title": "Понимает coupling и цену рефакторинга",
+      "expected": "Кандидат объясняет: на 2 уровнях терпимо; на 4–5 уровнях переименование prop трогает всю цепочку; компоненты структурно зависят от props, которые не используют; тесты требуют лишних моков.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Why it gets painful — coupling и refactoring из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "prop_drilling_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "coupling",
+              "связан",
+              "рефактор",
+              "цепочк"
+            ],
+            "ask": "что ломается при добавлении newFeature в App, если Parent забыл пробросить его в Child"
+          }
+        ],
+        "mustConcepts": [
+          "coupling",
+          "связан",
+          "рефактор",
+          "переименован",
+          "цепочк",
+          "4-5",
+          "3+",
+          "уровн",
+          "тест",
+          "мок",
+          "структурн",
+          "зависим",
+          "не использ",
+          "feature flag",
+          "Layout",
+          "Sidebar",
+          "Panel",
+          "болезнен"
+        ],
+        "falseClaims": [
+          "на 5 уровнях drilling так же прост, как на 2",
+          "промежуточный компонент не зависит от props, которые пробрасывает",
+          "тестировать компонент без его props не нужно мокать",
+          "добавление boolean в GrandChild не трогает App и Layout",
+          "coupling не растёт с глубиной дерева"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use_strategy",
+      "title": "Знает когда props, Context или state manager",
+      "expected": "Кандидат называет: 1–2 уровня — props; theme/locale/auth на 3+ — Context; async, persistence, app-wide — Redux/Zustand; частые updates у многих consumers — state manager вместо Context.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "decision rule и comparison table — ключ middle",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "when_to_use_strategy",
+            "oftenConfusedWith": [
+              "context_fix_pattern",
+              "comparison_rerenders"
+            ],
+            "anchorTermsExpected": [
+              "1-2",
+              "3+",
+              "Context",
+              "Redux",
+              "Zustand",
+              "theme",
+              "auth"
+            ],
+            "anchorTermsWrongTopic": [
+              "всегда Context",
+              "props запрещены глубже 1 уровня",
+              "Redux для двух siblings"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "1-2",
+              "3+",
+              "уровн",
+              "Context"
+            ],
+            "ask": "на какой глубине drilling становится проблемой и что выбрать для theme vs shopping cart с async"
+          },
+          {
+            "match": [
+              "Redux",
+              "Zustand",
+              "async",
+              "persistence"
+            ],
+            "ask": "когда Context для корзины перестаёт хватать и нужен Redux"
+          }
+        ],
+        "mustConcepts": [
+          "1-2",
+          "3+",
+          "уровн",
+          "props",
+          "явн",
+          "data flow",
+          "Context",
+          "theme",
+          "locale",
+          "auth",
+          "Redux",
+          "Zustand",
+          "RTK",
+          "async",
+          "persistence",
+          "app-wide",
+          "state manager",
+          "частые обновлен",
+          "consumers",
+          "корзин",
+          "discount"
+        ],
+        "falseClaims": [
+          "props нельзя использовать глубже одного уровня",
+          "Context всегда лучше Redux для любого app-wide state",
+          "Redux нужен для theme на трёх компонентах",
+          "Zustand и Context решают одинаковые задачи без trade-off",
+          "drilling на 2 уровнях хуже Context по умолчанию"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "context_fix_pattern",
+      "title": "Исправляет drilling через Context",
+      "expected": "Кандидат описывает: createContext, Provider оборачивает поддерево ближе к consumers, промежуточные компоненты чистые, лист читает useContext; может привести CartContext/UserContext пример.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Fixing drilling with Context — основной паттерн ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "prop_drilling_definition",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "createContext",
+              "Provider",
+              "useContext",
+              "CartContext"
+            ],
+            "ask": "покажи App → Layout → Sidebar → UserMenu: сначала drilling, потом UserContext"
+          },
+          {
+            "match": [
+              "Provider",
+              "тест",
+              "mock",
+              "render"
+            ],
+            "ask": "как тестировать CartWidget с Context без drilling props"
+          }
+        ],
+        "mustConcepts": [
+          "createContext",
+          "Provider",
+          "useContext",
+          "Context",
+          "поддерев",
+          "промежуточн",
+          "чист",
+          "CartContext",
+          "UserContext",
+          "cartTotal",
+          "Header",
+          "Sidebar",
+          "CartWidget",
+          "UserMenu",
+          "Layout",
+          "value",
+          "потребител",
+          "consumer",
+          "без prop"
+        ],
+        "falseClaims": [
+          "useContext заменяет Provider — Provider не нужен",
+          "Context автоматически пробрасывает props всем детям без useContext",
+          "промежуточные компоненты всё равно должны знать про Context value",
+          "createContext без Provider всё равно даёт данные глубоким детям",
+          "Context работает только на корневом App"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "comparison_rerenders",
+      "title": "Сравнивает re-render: drilling vs Context",
+      "expected": "Кандидат сравнивает: drilling re-render только прямых детей; Context — все consumers при смене value; новый объект в Provider без useMemo триггерит всех consumers; Redux/Zustand — селекторы.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "comparison table re-renders и follow-up ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "re-render",
+              "перерендер",
+              "useMemo",
+              "consumer"
+            ],
+            "ask": "когда Context даёт больше re-render чем drilling и как useMemo на value помогает"
+          }
+        ],
+        "mustConcepts": [
+          "re-render",
+          "перерендер",
+          "прям",
+          "дет",
+          "consumer",
+          "споживач",
+          "Provider",
+          "value",
+          "useMemo",
+          "новый объект",
+          "reference",
+          "useSelector",
+          "селектор",
+          "Redux",
+          "Zustand",
+          "ThemeContext",
+          "ExpensiveChart"
+        ],
+        "falseClaims": [
+          "Context re-render только компоненты, читающие изменившееся поле",
+          "drilling re-render всё поддерево при каждом prop change",
+          "useMemo на value Provider не влияет на consumers",
+          "новый объект в value без изменения theme безопасен для performance",
+          "Context и drilling одинаково ведут себя при обновлении"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки drilling и Context",
+      "expected": "Кандидат называет: забыли пробросить prop; один Context на весь App; createContext без default; объект value без useMemo; scope Provider слишком широкий.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "comparison_rerenders",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "newFeature",
+              "undefined",
+              "забыл",
+              "проброс"
+            ],
+            "ask": "что случится если App передал newFeature, а Parent пробросил только user"
+          },
+          {
+            "match": [
+              "defaultValue",
+              "createContext",
+              "Provider",
+              "тест"
+            ],
+            "ask": "почему createContext() без default падает в тесте вне Provider"
+          },
+          {
+            "match": [
+              "useMemo",
+              "объект",
+              "value",
+              "каждый render"
+            ],
+            "ask": "почему ThemeContext.Provider value={{ theme, setTheme }} ухудшает performance"
+          }
+        ],
+        "mustConcepts": [
+          "забыл",
+          "проброс",
+          "newFeature",
+          "undefined",
+          "рефактор",
+          "EntireApp",
+          "один Context",
+          "defaultValue",
+          "createContext",
+          "null",
+          "вне Provider",
+          "тест",
+          "портал",
+          "useMemo",
+          "объект",
+          "reference",
+          "каждый render",
+          "scope",
+          "провайдер ближе",
+          "ExpensiveChart",
+          "UnrelatedChart"
+        ],
+        "falseClaims": [
+          "забытый prop в цепочке вызовет явную ошибку React, не undefined",
+          "один UserContext на весь App — best practice для performance",
+          "createContext без default безопасен в lazy routes",
+          "объект в value Provider мемоизируется React автоматически",
+          "замена drilling на Context всегда улучшает performance"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Prop drilling — когда Parent получает user только чтобы передать Child, сам не использует. На 1–2 уровнях оставляю props. На 3+ для theme/auth — UserContext.Provider ближе к Layout, UserMenu читает useContext. Для корзины с async скидками — Redux, не один гигантский Context на App.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Глубина 4: переименовал prop — правлю App, Layout, Sidebar, Panel. Coupling: Sidebar мокает user в тестах, хотя не рендерит его. Фикс: CartContext, Header/Sidebar чистые, CartWidget тянет cartTotal напрямую. value мемоизирую useMemo, иначе ExpensiveChart re-render на каждый tick App.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну drilling — тащишь пропсы через тех кто не юзает. два уровня ок, три плюс — context. главное не класть всё в один провайдер на корень и мемоизировать объект value",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Prop drilling — баг React, любые props через родителя надо сразу заменять Redux. Context перерендерит только нужное поле автоматически.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "На двух уровнях уже нужен Zustand. createContext() без default и Provider в тестах — нормально. value={{ theme, setTheme }} каждый render не влияет на consumers.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Parent может не принимать user — React сам доставит prop в Child. Один UserContext на EntireApp — правильный scope для locale.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "prop_drilling_definition",
+      "exampleType": "good",
+      "exampleText": "App → Parent → Child: Parent не использует user, но обязан принять и пробросить — это prop drilling.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "prop_drilling_definition",
+      "exampleType": "good",
+      "exampleText": "ну как записка через пять человек — посередине держат user, а читают только в Child",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "prop_drilling_definition",
+      "exampleType": "bad",
+      "exampleText": "Drilling — когда Parent рендерит user.name в своём JSX и передаёт дальше.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "coupling_refactoring_cost",
+      "exampleType": "good",
+      "exampleText": "Добавил newFeature в App — забыл Parent → Child получает undefined; с Context consumer сам объявляет нужные поля.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "coupling_refactoring_cost",
+      "exampleType": "good",
+      "exampleText": "на пяти уровнях переименование prop — пять файлов; тест Sidebar мокает user хотя не показывает его",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "coupling_refactoring_cost",
+      "exampleType": "bad",
+      "exampleText": "Coupling не растёт: промежуточный компонент не зависит от props, которые пробрасывает.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "when_to_use_strategy",
+      "exampleType": "good",
+      "exampleText": "Два уровня — props явный flow. Theme на Header/Modal/Drawer — Context. Корзина с persistence и async купонами — Redux Toolkit.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "when_to_use_strategy",
+      "exampleType": "good",
+      "exampleText": "1-2 уровня props ок, 3+ context для auth, zustand если много частых апдейтов у десятков consumers",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "when_to_use_strategy",
+      "exampleType": "bad",
+      "exampleText": "Redux для theme на трёх кнопках, props запрещены глубже одного уровня.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "context_fix_pattern",
+      "exampleType": "good",
+      "exampleText": "UserContext.Provider вокруг Layout: UserMenu useContext(UserContext), Layout и Sidebar без user prop.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "context_fix_pattern",
+      "exampleType": "good",
+      "exampleText": "тест CartWidget: render(<CartContext.Provider value={mock}><CartWidget /></CartContext.Provider>)",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "context_fix_pattern",
+      "exampleType": "bad",
+      "exampleText": "useContext заменяет Provider — достаточно createContext и данные сами дойдут до листа.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "comparison_rerenders",
+      "exampleType": "good",
+      "exampleText": "Drilling: re-render прямых детей. Context: все useContext при смене value. value={{ theme, setTheme }} без useMemo — лишние re-render всех consumers.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "comparison_rerenders",
+      "exampleType": "good",
+      "exampleText": "redux useSelector — только slice; context без мемо — весь consumer list на каждый render app",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "comparison_rerenders",
+      "exampleType": "bad",
+      "exampleText": "Context селективно подписывается на поля объекта value как useSelector.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Ошибки: забытый forward prop; UserContext на EntireApp; createContext() без default в портале; value без useMemo.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "провайдер theme ближе к ветке где нужен, не на корень — и useMemo(() => ({ theme, setTheme }), [theme])",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Замена drilling на Context без useMemo всегда ускоряет приложение; undefined от забытого prop — явный crash React.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "what-is-prop-drilling-and-how-to-avoid-it",
+    "apiUrl": "https://api.itlead.org/api/questions/what-is-prop-drilling-and-how-to-avoid-it",
+    "pageUrl": "https://itlead.org/interview-questions/react/what-is-prop-drilling-and-how-to-avoid-it",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is prop drilling and how to avoid it",
+    "categorySlug": "react",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

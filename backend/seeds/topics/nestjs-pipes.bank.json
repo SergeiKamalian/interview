@@ -1,0 +1,618 @@
+{
+  "topic": {
+    "code": "nestjs_pipes",
+    "name": "Pipes в NestJS",
+    "skillCode": "nestjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое pipes в NestJS и как они работают?",
+    "shortAnswer": "Pipes в NestJS — функции, реализующие интерфейс PipeTransform: они трансформируют и валидируют входные данные запроса (params, query, body) до того, как аргументы попадут в обработчик маршрута. Express всегда отдаёт URL-параметры строками; pipe вроде ParseIntPipe конвертирует их в нужный тип или бросает 400 Bad Request до выполнения handler.",
+    "idealAnswer": "Pipes в NestJS перехватывают входящие данные запроса (params, query, body) до вызова route handler, реализуя интерфейс PipeTransform. Две задачи: transform (\"123\" → 123) и validate (отклонить невалидный email, UUID, нечисловой id). HTTP всегда доставляет params и query как строки — pipes автоматически приводят их к нужному типу. ValidationPipe валидирует DTO через class-validator; ParseIntPipe, ParseUUIDPipe, ParseFloatPipe, ParseBoolPipe, ParseEnumPipe, DefaultValuePipe, ParseArrayPipe — для примитивов. Применение на четырёх уровнях (от специфичного к общему): параметр (@Param('id', ParseIntPipe)), метод (@UsePipes(ValidationPipe)), контроллер (@UsePipes на классе), глобально (app.useGlobalPipes или APP_PIPE в main.ts). Более специфичный уровень перекрывает менее специфичный. При регистрации маршрута NestJS привязывает pipes к аргументам по метаданным @Param/@Body/@Query; на каждом запросе последовательно вызывает transform(value, metadata) — при BadRequestException handler не выполняется, exception filter отдаёт 400. Custom pipes могут быть async (DB lookup в transform). Глобальный ValidationPipe с { transform: true, whitelist: true } — стандарт для POST/PUT DTO. ParseIntPipe — на уровне параметра для URL id. DefaultValuePipe + ParseIntPipe — для optional query с дефолтом. Типичные ошибки: ValidationPipe без transform: true (поля DTO остаются строками, @IsNumber() падает); @Body(ValidationPipe) без DTO-класса; неправильный порядок pipes (слева направо — сначала ParseIntPipe, потом ValidationPipe); throw new Error() вместо BadRequestException (500 вместо 400); забытый await в async pipe с DB. Custom pipe: @Injectable(), async transform(), BadRequestException для бизнес-валидации (уникальность email). Работает одинаково в REST, GraphQL (@Args()) и microservices (MessagePattern).",
+    "maxScore": 10,
+    "skills": [
+      "nestjs",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "pipes_definition",
+      "title": "Понимает назначение pipes",
+      "expected": "Кандидат объясняет: pipe реализует PipeTransform, трансформирует и/или валидирует аргументы до handler; перехватывает params/query/body; при невалидных данных — 400, handler не вызывается.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — transform и validate на границе HTTP",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "pipes_definition",
+            "oftenConfusedWith": [
+              "execution_flow",
+              "boundary_vs_manual"
+            ],
+            "anchorTermsExpected": [
+              "PipeTransform",
+              "transform",
+              "validate",
+              "до handler",
+              "400"
+            ],
+            "anchorTermsWrongTopic": [
+              "pipe это middleware",
+              "pipe выполняется после handler",
+              "guard валидирует body"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "PipeTransform",
+              "pipe",
+              "transform"
+            ],
+            "ask": "чем pipe отличается от guard и interceptor и когда он срабатывает относительно handler"
+          }
+        ],
+        "mustConcepts": [
+          "pipe",
+          "PipeTransform",
+          "transform",
+          "validate",
+          "валидац",
+          "трансформ",
+          "до handler",
+          "до обработчик",
+          "params",
+          "query",
+          "body",
+          "аргумент",
+          "400",
+          "BadRequest",
+          "невалид",
+          "перехват",
+          "входящ",
+          "route handler"
+        ],
+        "falseClaims": [
+          "pipes выполняются после route handler",
+          "pipes заменяют guards для авторизации",
+          "PipeTransform только для body, не для params",
+          "pipe не может бросить исключение до handler",
+          "pipes и middleware — одно и то же в NestJS"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "boundary_vs_manual",
+      "title": "Отличает pipes от ручного парсинга",
+      "expected": "Кандидат объясняет: ручной +id/parseInt в handler смешивает валидацию с бизнес-логикой, NaN уходит в сервис; pipe ловит bad input на границе и возвращает консистентный 400 до любой логики.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевой trade-off из ITLead — boundary validation",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "pipes_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "boundary_vs_manual",
+            "oftenConfusedWith": [
+              "builtin_pipes"
+            ],
+            "anchorTermsExpected": [
+              "границ",
+              "boundary",
+              "NaN",
+              "400",
+              "до логики"
+            ],
+            "anchorTermsWrongTopic": [
+              "parseInt в handler лучше pipe",
+              "pipe только для красоты кода"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "parseInt",
+              "+id",
+              "ручн",
+              "manual"
+            ],
+            "ask": "почему +id в handler хуже ParseIntPipe на границе"
+          }
+        ],
+        "mustConcepts": [
+          "ручн",
+          "manual",
+          "parseInt",
+          "+id",
+          "NaN",
+          "границ",
+          "boundary",
+          "до логики",
+          "400",
+          "консистент",
+          "bad input",
+          "сервис",
+          "handler",
+          "ParseIntPipe",
+          "строка",
+          "string",
+          "URL param"
+        ],
+        "falseClaims": [
+          "ручной parseInt в handler безопаснее pipe",
+          "+id на невалидной строке всегда бросает 400",
+          "pipe нужен только для DTO, не для URL params",
+          "NaN из +id безопасен для сервисного слоя"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "builtin_pipes",
+      "title": "Знает встроенные pipes",
+      "expected": "Кандидат называет ValidationPipe для DTO, ParseIntPipe/ParseUUIDPipe для params, ParseFloatPipe, ParseBoolPipe, ParseEnumPipe, DefaultValuePipe, ParseArrayPipe; понимает transform: true и whitelist для ValidationPipe.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "таблица built-in pipes — основной middle контент",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ValidationPipe",
+              "DTO",
+              "class-validator"
+            ],
+            "ask": "как ValidationPipe работает с DTO и зачем transform: true"
+          },
+          {
+            "match": [
+              "ParseIntPipe",
+              "ParseUUIDPipe",
+              "DefaultValuePipe"
+            ],
+            "ask": "какой pipe для URL id, UUID и optional query с дефолтом"
+          }
+        ],
+        "mustConcepts": [
+          "ValidationPipe",
+          "ParseIntPipe",
+          "ParseUUIDPipe",
+          "ParseFloatPipe",
+          "ParseBoolPipe",
+          "ParseEnumPipe",
+          "DefaultValuePipe",
+          "ParseArrayPipe",
+          "DTO",
+          "class-validator",
+          "transform: true",
+          "whitelist",
+          "строка",
+          "число",
+          "UUID",
+          "enum",
+          "дефолт",
+          "default"
+        ],
+        "falseClaims": [
+          "ValidationPipe работает без DTO-класса",
+          "ParseIntPipe валидирует email в body",
+          "whitelist добавляет лишние поля в DTO",
+          "transform: true не нужен если поля типизированы number",
+          "ParseUUIDPipe принимает любую строку как UUID"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "binding_levels",
+      "title": "Знает уровни привязки pipes",
+      "expected": "Кандидат перечисляет: параметр (самый специфичный), метод (@UsePipes), контроллер, глобально (main.ts / APP_PIPE); более специфичный перекрывает общий; ValidationPipe глобально, ParseIntPipe на параметре.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "binding levels из ITLead — базовый middle",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "глобальн",
+              "global",
+              "UsePipes",
+              "APP_PIPE"
+            ],
+            "ask": "где регистрировать ValidationPipe глобально и ParseIntPipe локально"
+          }
+        ],
+        "mustConcepts": [
+          "параметр",
+          "parameter",
+          "метод",
+          "method",
+          "контроллер",
+          "controller",
+          "глобальн",
+          "global",
+          "UsePipes",
+          "APP_PIPE",
+          "main.ts",
+          "useGlobalPipes",
+          "специфичн",
+          "перекрыв",
+          "ParseIntPipe",
+          "ValidationPipe"
+        ],
+        "falseClaims": [
+          "глобальный pipe не применяется если на методе другой pipe",
+          "ParseIntPipe нужно регистрировать только глобально",
+          "уровень контроллера сильнее уровня параметра",
+          "APP_PIPE и useGlobalPipes несовместимы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "execution_flow",
+      "title": "Понимает порядок выполнения pipes",
+      "expected": "Кандидат описывает: NestJS вызывает transform(value, metadata) последовательно слева направо; при исключении второй pipe и handler не выполняются; async pipes await-ятся; metadata из @Param/@Body/@Query.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "execution model из ITLead Theory",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "transform",
+              "metadata",
+              "последователь",
+              "слева направо"
+            ],
+            "ask": "что происходит если первый из двух pipes на параметре бросает BadRequestException"
+          }
+        ],
+        "mustConcepts": [
+          "transform",
+          "metadata",
+          "ArgumentMetadata",
+          "последователь",
+          "слева направо",
+          "left to right",
+          "async",
+          "await",
+          "BadRequestException",
+          "handler не",
+          "не вызыва",
+          "exception filter",
+          "400",
+          "регистрац",
+          "декоратор",
+          "Param",
+          "Body",
+          "Query"
+        ],
+        "falseClaims": [
+          "pipes на одном параметре выполняются параллельно",
+          "при ошибке первого pipe второй всё равно запускается",
+          "async pipe без await работает корректно",
+          "transform не получает metadata"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с pipes",
+      "expected": "Кандидат называет: ValidationPipe без transform: true; ValidationPipe без DTO; неправильный порядок pipes; new Error() вместо BadRequestException; missing await в async pipe с DB lookup.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "5 common mistakes из ITLead — частые production баги",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "builtin_pipes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "transform: true",
+              "transform true",
+              "без transform"
+            ],
+            "ask": "почему @IsNumber() падает на age: \"25\" без transform: true"
+          },
+          {
+            "match": [
+              "порядок",
+              "order",
+              "ValidationPipe",
+              "ParseIntPipe"
+            ],
+            "ask": "правильный порядок ValidationPipe и ParseIntPipe на @Param('id')"
+          },
+          {
+            "match": [
+              "Error",
+              "BadRequestException",
+              "500"
+            ],
+            "ask": "почему throw new Error в custom pipe даёт 500"
+          }
+        ],
+        "mustConcepts": [
+          "transform: true",
+          "whitelist",
+          "DTO",
+          "без DTO",
+          "порядок",
+          "ParseIntPipe",
+          "ValidationPipe",
+          "слева направо",
+          "BadRequestException",
+          "new Error",
+          "500",
+          "async",
+          "await",
+          "Promise",
+          "DB",
+          "lookup",
+          "строка",
+          "IsNumber",
+          "типичн",
+          "ошибк"
+        ],
+        "falseClaims": [
+          "ValidationPipe по умолчанию приводит строки к number",
+          "порядок pipes на параметре не важен",
+          "new Error в pipe возвращает 400",
+          "async transform без await возвращает корректное значение",
+          "@Body(ValidationPipe) без класса — нормальный паттерн"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "custom_async_pipes",
+      "title": "Понимает custom и async pipes",
+      "expected": "Кандидат описывает: @Injectable() класс с PipeTransform, async transform для DB/business checks, BadRequestException для клиентских ошибок; пример UniqueEmailPipe; работает в REST, GraphQL, microservices.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "advanced example из ITLead — бонус middle",
+        "mustConcepts": [
+          "custom",
+          "кастом",
+          "Injectable",
+          "PipeTransform",
+          "async",
+          "transform",
+          "BadRequestException",
+          "уникальн",
+          "email",
+          "DB",
+          "business",
+          "GraphQL",
+          "Args",
+          "microservice",
+          "MessagePattern",
+          "DI",
+          "constructor"
+        ],
+        "falseClaims": [
+          "custom pipe не может быть Injectable",
+          "async pipe не поддерживается NestJS",
+          "custom pipe должен возвращать Observable вместо Promise",
+          "pipes не работают в GraphQL resolvers"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Pipes реализуют PipeTransform и срабатывают до handler: transform и validate params/query/body. Express отдаёт id строкой — ParseIntPipe даёт number или 400. Глобально ValidationPipe с transform: true и whitelist; ParseIntPipe на @Param. Custom async pipe с await и BadRequestException для проверки уникальности в БД.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На все POST/PUT — глобальный ValidationPipe { transform: true, whitelist: true }. На :id — ParseIntPipe на параметре. Ручной +id в handler не использую — NaN улетит в сервис. В custom pipe только BadRequestException, не Error. Pipes слева направо: сначала парсинг, потом валидация.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Pipe как сканер на входе: строка из URL → число или 400 до бизнес-логики. ValidationPipe + DTO class с декораторами class-validator. DefaultValuePipe перед ParseIntPipe для optional limit. Async UniqueEmailPipe — await exists, throw BadRequestException.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Pipes выполняются после handler и только логируют результат. Guard и pipe — одно и то же для валидации body.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "ValidationPipe глобально без опций — @IsNumber() сам сконвертирует \"25\". Порядок pipes не важен. В custom pipe throw new Error — клиент получит понятный 400.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "@Post() create(@Body(ValidationPipe) body: any) — ValidationPipe работает и без DTO. parseInt в сервисе лучше чем ParseIntPipe на границе.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "pipes_definition",
+      "exampleType": "good",
+      "exampleText": "PipeTransform.transform вызывается до route handler; валидирует или преобразует аргумент; при ошибке — BadRequestException, handler не выполняется.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "pipes_definition",
+      "exampleType": "good",
+      "exampleText": "ну pipe — фильтр на входе: params, query, body проверяются до метода контроллера",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "pipes_definition",
+      "exampleType": "bad",
+      "exampleText": "Pipe — это middleware который логирует запрос после ответа handler.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "boundary_vs_manual",
+      "exampleType": "good",
+      "exampleText": "+id на \"abc\" даёт NaN в сервисе; ParseIntPipe на границе сразу 400 — валидация отделена от бизнес-логики.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "boundary_vs_manual",
+      "exampleType": "good",
+      "exampleText": "ручной parseInt в handler — плохо, bad input доезжает далеко; pipe ловит на boundary",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "boundary_vs_manual",
+      "exampleType": "bad",
+      "exampleText": "ParseIntPipe и +id в handler эквивалентны — pipe только синтаксический сахар.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "builtin_pipes",
+      "exampleType": "good",
+      "exampleText": "ValidationPipe + CreateUserDto с @IsEmail/@IsInt; ParseIntPipe на id; ParseUUIDPipe на userId; DefaultValuePipe(10) + ParseIntPipe для limit.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "builtin_pipes",
+      "exampleType": "good",
+      "exampleText": "глобально ValidationPipe transform whitelist; для enum — ParseEnumPipe; массив из query — ParseArrayPipe",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "builtin_pipes",
+      "exampleType": "bad",
+      "exampleText": "ParseIntPipe валидирует nested DTO с @ValidateNested. ValidationPipe без class-validator декораторов всё равно проверит поля.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "binding_levels",
+      "exampleType": "good",
+      "exampleText": "ValidationPipe — app.useGlobalPipes в main.ts; ParseIntPipe — только @Param('id', ParseIntPipe); параметр перекрывает контроллер.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "binding_levels",
+      "exampleType": "good",
+      "exampleText": "APP_PIPE useClass ValidationPipe или useGlobalPipes — на все запросы; @UsePipes на методе — точечно",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "binding_levels",
+      "exampleType": "bad",
+      "exampleText": "ParseIntPipe нужно регистрировать глобально на всё приложение, иначе не работает.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "execution_flow",
+      "exampleType": "good",
+      "exampleText": "transform(value, metadata) по цепочке слева направо; первый pipe бросил — второй и handler не запускаются; async pipe Nest await-ит.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "execution_flow",
+      "exampleType": "good",
+      "exampleText": "метаданные из @Param/@Body — Nest знает какой pipe к какому аргументу; exception filter отдаёт 400",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "execution_flow",
+      "exampleType": "bad",
+      "exampleText": "Два pipes на параметре выполняются параллельно через Promise.all.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Ошибки: ValidationPipe() без transform — age остаётся \"25\"; @Body(ValidationPipe) без DTO; ValidationPipe перед ParseIntPipe; Error вместо BadRequestException; await забыли в DB pipe.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "без transform: true @IsInt падает на строке из JSON — самая частая продакшн ошибка с pipes",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Порядок @Param('id', ValidationPipe, ParseIntPipe) правильный — сначала валидируем строку как DTO.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "custom_async_pipes",
+      "exampleType": "good",
+      "exampleText": "@Injectable() UniqueEmailPipe implements PipeTransform; async transform await emailExists; throw BadRequestException; inject UsersService.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "custom_async_pipes",
+      "exampleType": "good",
+      "exampleText": "ValidationPipe на @Args() в GraphQL — тот же механизм что REST @Body()",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "custom_async_pipes",
+      "exampleType": "bad",
+      "exampleText": "Custom pipe не может инжектить сервисы — только статические функции без DI.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-pipes",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-pipes",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-pipes",
+    "difficulty": "MIDDLE",
+    "titleEn": "What are pipes in NestJS?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

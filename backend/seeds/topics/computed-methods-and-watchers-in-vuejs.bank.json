@@ -1,0 +1,544 @@
+{
+  "topic": {
+    "code": "computed_methods_and_watchers_in_vuejs",
+    "name": "Computed, methods и watchers во Vue.js",
+    "skillCode": "vue",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "В чём разница между computed, methods и watchers во Vue.js и когда что использовать?",
+    "shortAnswer": "Computed кеширует производные значения и пересчитывается только при изменении зависимостей — для отображения в шаблоне. Methods выполняются при каждом вызике без кеша — для обработчиков событий с параметрами. Watchers запускают callback при изменении конкретного реактивного источника — для async side effects: API-запросов, debounce, localStorage.",
+    "idealAnswer": "Computed, methods и watchers — три инструмента Vue для работы с реактивными данными. Computed — кешированная формула: при первом чтении getter отслеживает зависимости через Proxy и track(), кеширует результат и пересчитывает только когда зависимости меняются (lazy, sync-only). Methods — обычные функции без отслеживания: выполняются заново при каждом вызику, подходят для обработчиков событий и вычислений с параметрами. Watchers — явный источник + callback через Effect и queueScheduler: срабатывают после текущего цикла обновления DOM, поддерживают async — API, debounce, localStorage. Когда что: fullName из firstName+lastName — computed; submit формы с аргументами — method; fetch при смене route params или debounced search — watcher. Таблица: computed — кеш да, возвращает значение, триггер — чтение+изменение deps, async нет, side effects не рекомендуются. Methods — кеш нет, триггер — каждый вызов, async да. Watchers — кеш нет, не возвращают значение в шаблон, side effects — их назначение. Типичные ошибки: method вместо computed при повторном чтении в шаблоне (1000 элементов — лишние вычисления); async в computed (возвращает Promise, Vue не await); side effects в computed (apiCall при каждом чтении getter); watch на plain variable без ref; deep: true на большом объекте — лучше watch(() => items.value.length). watch vs watchEffect: watchEffect сразу запускается и auto-collects deps; watch — явный source, lazy по умолчанию, old/new в callback. Writable computed (get/set) — для v-model над объединённым значением при раздельном state. Pinia getters — computed; Nuxt watchers на route params; debounced search — классический watcher-паттерн.",
+    "maxScore": 10,
+    "skills": [
+      "vue",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "computed_caching",
+      "title": "Понимает computed и кеширование",
+      "expected": "Кандидат объясняет: computed кеширует результат, отслеживает зависимости при первом запуске getter, пересчитывается только при их изменении; lazy — не сразу, а при следующем чтении; только синхронный return.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ядро темы — кеш и lazy invalidation из ITLead TL;DR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "computed_caching",
+            "oftenConfusedWith": [
+              "methods_no_cache"
+            ],
+            "anchorTermsExpected": [
+              "кеш",
+              "зависимост",
+              "lazy",
+              "getter",
+              "синхрон"
+            ],
+            "anchorTermsWrongTopic": [
+              "каждый render",
+              "Promise",
+              "side effect"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "computed",
+              "кеш",
+              "зависимост"
+            ],
+            "ask": "почему computed не пересчитывается при каждом render, а method — да"
+          }
+        ],
+        "mustConcepts": [
+          "computed",
+          "кеш",
+          "кешир",
+          "зависимост",
+          "getter",
+          "lazy",
+          "invalidate",
+          "устарел",
+          "пересчит",
+          "синхрон",
+          "ref",
+          "reactive",
+          "отображ",
+          "производн",
+          "doubleCount",
+          "fullName"
+        ],
+        "falseClaims": [
+          "computed пересчитывается при каждом render цикле",
+          "computed может быть async и Vue дождётся Promise",
+          "computed не отслеживает зависимости автоматически",
+          "computed и method одинаково кешируют результат"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "methods_no_cache",
+      "title": "Понимает methods без кеша",
+      "expected": "Кандидат объясняет: methods — обычные функции, выполняются при каждом вызике, без отслеживания зависимостей; для event handlers и вычислений с параметрами.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовое отличие method от computed из quick example",
+        "mustConcepts": [
+          "methods",
+          "метод",
+          "каждый вызов",
+          "без кеш",
+          "обработчик",
+          "event handler",
+          "параметр",
+          "submit",
+          "click",
+          "doubleCountMethod",
+          "plain function"
+        ],
+        "falseClaims": [
+          "methods кешируют результат как computed",
+          "methods автоматически отслеживают reactive deps",
+          "method в шаблоне дешевле computed при повторных вызовах",
+          "methods нельзя использовать с параметрами"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "watchers_side_effects",
+      "title": "Понимает watchers и side effects",
+      "expected": "Кандидат объясняет: watcher следит за явным реактивным источником, запускает callback (async ok) после DOM update; для API fetch, debounce, localStorage, DOM; не возвращает значение в шаблон.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "назначение watchers — async side effects из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "watch",
+              "watcher",
+              "debounce",
+              "API"
+            ],
+            "ask": "почему debounced search лучше через watch, а не computed"
+          }
+        ],
+        "mustConcepts": [
+          "watch",
+          "watcher",
+          "callback",
+          "side effect",
+          "async",
+          "API",
+          "fetch",
+          "debounce",
+          "localStorage",
+          "источник",
+          "source",
+          "queueScheduler",
+          "DOM update",
+          "не возвращает"
+        ],
+        "falseClaims": [
+          "watcher возвращает значение для шаблона как computed",
+          "watcher синхронно блокирует render",
+          "watch работает на plain variable без ref",
+          "watcher кеширует результат между вызовами"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Выбирает правильный инструмент",
+      "expected": "Кандидат называет правила: derived display — computed; user events с params — method; реакция на изменение с fetch/debounce — watcher; одно значение несколько раз в template — computed; несколько sources — watch с массивом.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "when to use и comparison table из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "computed_caching",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "fullName",
+              "display",
+              "отображ"
+            ],
+            "ask": "firstName + lastName в шаблоне — computed или method и почему"
+          },
+          {
+            "match": [
+              "route params",
+              "Nuxt",
+              "navigation"
+            ],
+            "ask": "fetch при смене route param — computed, method или watch"
+          }
+        ],
+        "mustConcepts": [
+          "отображ",
+          "display",
+          "derived",
+          "производн",
+          "fullName",
+          "event handler",
+          "параметр",
+          "API fetch",
+          "debounce",
+          "несколько раз",
+          "template",
+          "массив источников",
+          "Pinia getter",
+          "cart total"
+        ],
+        "falseClaims": [
+          "для API при изменении userId нужен computed async",
+          "повторный getFullName() в template — норма для 1000 элементов",
+          "debounced search делают через computed",
+          "обработчик клика с id товара — computed"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "vue_reactivity_internals",
+      "title": "Знает внутренности реактивности Vue 3",
+      "expected": "Кандидат упоминает Proxy, track/trigger, Effect при первом run computed; invalidation stale → re-run на next access; watchers через queueScheduler после tick.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "How Vue handles internally — middle+ depth",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "track",
+              "trigger",
+              "Effect",
+              "Proxy"
+            ],
+            "ask": "как Vue определяет зависимости computed при первом запуске getter"
+          },
+          {
+            "match": [
+              "scheduler",
+              "batch",
+              "microtask",
+              "closure"
+            ],
+            "ask": "чего не хватает plain memo closure по сравнению с Vue computed"
+          }
+        ],
+        "mustConcepts": [
+          "Proxy",
+          "track",
+          "trigger",
+          "Effect",
+          "Vue 3",
+          "ref",
+          "reactive",
+          "stale",
+          "invalidate",
+          "next access",
+          "lazy",
+          "queueScheduler",
+          "batch",
+          "microtask",
+          "scheduler",
+          "планировщик"
+        ],
+        "falseClaims": [
+          "computed пересчитывается сразу при каждом trigger без lazy access",
+          "methods проходят через track() как computed",
+          "Vue 2 и Vue 3 одинаково реализуют computed через Object.defineProperty только",
+          "plain closure с memo даёт тот же batching что Vue computed"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: method вместо computed в template; async computed (Promise); side effects в computed; watch на non-reactive; deep watch на большом объекте — сузить до getter.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Common mistakes блок ITLead — частые gotchas",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "async",
+              "Promise",
+              "fetchUser"
+            ],
+            "ask": "почему computed(async () => ...) не работает для загрузки user"
+          },
+          {
+            "match": [
+              "deep: true",
+              "500",
+              "length"
+            ],
+            "ask": "как оптимизировать watch на большом массиве items"
+          }
+        ],
+        "mustConcepts": [
+          "async computed",
+          "Promise",
+          "watchEffect",
+          "side effect",
+          "apiCall",
+          "plain variable",
+          "ref",
+          "getter function",
+          "deep: true",
+          "рекурсив",
+          "getFullName",
+          "1000 элемент",
+          "Nuxt auth",
+          "watchEffect async"
+        ],
+        "falseClaims": [
+          "Vue await async computed автоматически",
+          "side effects в computed безопасны если deps не меняются",
+          "watch(plainVar) сработает без ref",
+          "deep: true на 500-item array — всегда оптимально"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "watch_vs_watcheffect",
+      "title": "Отличает watch от watchEffect",
+      "expected": "Кандидат сравнивает: watchEffect — immediate, auto-collect deps из тела; watch — явный source, lazy по умолчанию, old/new в callback; writable computed get/set для v-model.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "follow-up Q из ITLead — бонус middle",
+        "mustConcepts": [
+          "watchEffect",
+          "watch",
+          "immediate",
+          "lazy",
+          "old value",
+          "new value",
+          "auto-collect",
+          "writable computed",
+          "get",
+          "set",
+          "v-model"
+        ],
+        "falseClaims": [
+          "watch и watchEffect полностью идентичны",
+          "watchEffect требует явный source как первый аргument",
+          "writable computed нельзя использовать с v-model"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Computed кеширует fullName и пересчитывает только когда firstName или lastName меняются. Methods — для @click с параметром. Watch на query с debounce 300ms — fetch searchAPI, потому что async side effect, не display value.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В шаблоне {{ total }} два раза — computed reduce по cart items, один пересчёт на цикл. Method getTotal() вызвался бы дважды. Route param id — watch в Nuxt, при навигации fetch. userId — watchEffect async fetchUser, не computed async.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Vue 3 Proxy + track при первом getter run — deps записаны. trigger помечает stale, пересчёт при следующем чтении. Watcher через queueScheduler после DOM. Pinia getters — те же computed под капотом.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Computed и methods одинаковые — оба кешируют. Async computed с await fetchUser — Vue вернёт имя пользователя в шаблон. Watch на let plainVar = 'hello' сработает при изменении.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для списка из 1000 имён вызываю getFullName() в каждой строке — это быстрее computed. Side effect apiCall() внутри computed — норм, сработает один раз. deep: true на весь cart всегда лучше чем watch length.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Debounced search делаю через computed(async () => searchAPI(query)). Watcher нужен только когда не нужен async. watchEffect и watch — одно и то же, разницы нет.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "computed_caching",
+      "exampleType": "good",
+      "exampleText": "computed(() => count.value * 2) — кеш, пересчёт только при изменении count, console.log один раз на клик.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "computed_caching",
+      "exampleType": "good",
+      "exampleText": "ну computed как формула в excel — пока inputs те же, значение из кеша, lazy пересчёт",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "computed_caching",
+      "exampleType": "bad",
+      "exampleText": "computed пересчитывается каждый render как method, кеша нет.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "methods_no_cache",
+      "exampleType": "good",
+      "exampleText": "doubleCountMethod() — функция без tracking, log на каждый render cycle при вызове из template.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "methods_no_cache",
+      "exampleType": "good",
+      "exampleText": "handleSubmit(formData) — method с параметром для click/submit, computed так не сделаешь",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "methods_no_cache",
+      "exampleType": "bad",
+      "exampleText": "methods Vue автоматически кеширует результат между render как computed properties.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "watchers_side_effects",
+      "exampleType": "good",
+      "exampleText": "watch(query, debounce 300ms → searchAPI) — async side effect, results в ref, не return в template.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "watchers_side_effects",
+      "exampleType": "good",
+      "exampleText": "watch route params в nuxt — fetch при navigation, callback после dom update",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "watchers_side_effects",
+      "exampleType": "bad",
+      "exampleText": "watcher возвращает total для {{ total }} в шаблоне как computed getter.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "fullName computed; button @click с addItem(id) — method; userId change → watch fetch profile.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "cart total — computed reduce; element plus validation message — computed; vuetify handler с args — methods",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "debounced search через computed, API fetch при submit — через watcher без params.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "vue_reactivity_internals",
+      "exampleType": "good",
+      "exampleText": "первый run getter — Effect + track() на каждый ref; trigger → stale; re-run на next read, не сразу.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "vue_reactivity_internals",
+      "exampleType": "good",
+      "exampleText": "plain memo closure без scheduler — нет batching когда несколько deps меняются в одной microtask",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "vue_reactivity_internals",
+      "exampleType": "bad",
+      "exampleText": "methods тоже проходят track() при каждом вызове как computed getter.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "async computed возвращает Promise object — для fetch userId используй watchEffect async.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "вместо watch(items, cb, {deep:true}) на 500 items — watch(() => items.value.length, cb)",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "computed с apiCall() внутри — ок, side effect один раз на dep change неважен сколько чтений в template.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "watch_vs_watcheffect",
+      "exampleType": "good",
+      "exampleText": "watchEffect сразу и сам собирает deps; watch(count, (n,o) => ...) — явный source, old/new.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "watch_vs_watcheffect",
+      "exampleType": "good",
+      "exampleText": "writable computed get/set — v-model fullName при split firstName lastName",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "watch_vs_watcheffect",
+      "exampleType": "bad",
+      "exampleText": "watchEffect требует передать source первым аргументом как watch.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "computed-methods-and-watchers-in-vuejs",
+    "apiUrl": "https://api.itlead.org/api/questions/computed-methods-and-watchers-in-vuejs",
+    "pageUrl": "https://itlead.org/interview-questions/vue/computed-methods-and-watchers-in-vuejs",
+    "difficulty": "MIDDLE",
+    "titleEn": "Computed, methods and watchers in Vue.js",
+    "categorySlug": "vue",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

@@ -1,0 +1,607 @@
+{
+  "topic": {
+    "code": "how_does_reactivity_work_in_vuejs",
+    "name": "Реактивность в Vue.js",
+    "skillCode": "vue",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работает реактивность в Vue.js?",
+    "shortAnswer": "Реактивность Vue отслеживает, какие данные компонент читает при рендере, через ES6 `Proxy` и перезапускает только зависимые части UI при изменении. `ref()` — для примитивов и значений, которые можно полностью заменить (доступ через `.value`); `reactive()` — для объектов с мутацией свойств на месте. Vue 3 `Proxy` перехватывает любые изменения, включая динамически добавленные свойства; Vue 2 `Object.defineProperty` — нет.",
+    "idealAnswer": "Реактивность Vue — автоматическое отслеживание зависимостей: при рендере компонент «читает» данные, Proxy регистрирует связь «эффект зависит от свойства», при записи вызывается trigger и перерисовываются только затронутые шаблоны и computed. Аналогия: формула в таблице — изменил ячейку, пересчитались только формулы, которые на неё ссылаются. Механизм Vue 3: ES6 `Proxy` перехватывает get/set; при чтении — `track()`, при записи — `trigger()`. Зависимости хранятся в `WeakMap<object, Map<key, Set<effect>>>`. Vue 2 использовал `Object.defineProperty` — работало только для свойств, существовавших при инициализации; пропускало новые свойства и присвоение по индексу массива (`arr[0] = x`). `ref()` оборачивает любое значение в контейнер с `.value`, Proxy на контейнере; шаблоны auto-unwrap ref без `.value`. `reactive()` проксирует объект целиком — доступ к свойствам без `.value`; оба дают глубокую реактивность вложенных объектов. Правило: примитивы и замена целиком — `ref`; сложный объект с мутацией на месте — `reactive`. `computed()` регистрирует свой effect и кеширует результат, пока зависимости не изменились. Типичные ошибки: push plain object в reactive-массив (внутренние мутации не отслеживаются); `count++` вместо `count.value++` в script; переприсвоение `state.arr = []` ломает Proxy-цепочку; деструктуризация reactive без `toRefs()` теряет реактивность; `:key=\"i\"` в v-for ломает tracking при reorder. `markRaw()` отключает реактивность для объектов, которые не нужно отслеживать. В проде: Pinia на ref/reactive, Nuxt `useState()` — reactive для SSR-safe shared state, VueUse `useStorage` синхронизирует ref с localStorage. Отладка потерянной реактивности: Vue DevTools, проверка toRefs после destructuring, markRaw, timeline effects.",
+    "maxScore": 10,
+    "skills": [
+      "vue",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "reactivity_definition",
+      "title": "Понимает суть реактивности Vue",
+      "expected": "Кандидат объясняет: Vue отслеживает, какие данные читаются при render, и обновляет только зависимые части UI; dependency tracking, не полный re-render всего приложения.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — dependency tracking и автоматическое обновление UI",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "reactivity_definition",
+            "oftenConfusedWith": [
+              "proxy_track_trigger",
+              "ref_vs_reactive"
+            ],
+            "anchorTermsExpected": [
+              "dependency",
+              "зависимост",
+              "отслежив",
+              "render",
+              "рендер",
+              "автоматич",
+              "обновл"
+            ],
+            "anchorTermsWrongTopic": [
+              "Virtual DOM diff всего дерева",
+              "ручной setState",
+              "реактивность это только ref"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "зависимост",
+              "dependency",
+              "отслежив"
+            ],
+            "ask": "что происходит при изменении count — перерисовывается ли всё приложение"
+          }
+        ],
+        "mustConcepts": [
+          "реактивност",
+          "dependency tracking",
+          "отслеживан",
+          "зависимост",
+          "render",
+          "рендер",
+          "шаблон",
+          "template",
+          "автоматич",
+          "обновл",
+          "UI",
+          "интерфейс",
+          "данные измен",
+          "effect",
+          "эффект",
+          "только зависим",
+          "не всё приложен"
+        ],
+        "falseClaims": [
+          "Vue перерисовывает всё приложение при любом изменении данных",
+          "реактивность требует ручного вызова forceUpdate для каждого поля",
+          "реактивность работает только с ref, не с reactive",
+          "Vue не знает какие компоненты зависят от данных"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "proxy_track_trigger",
+      "title": "Знает механизм Proxy, track и trigger",
+      "expected": "Кандидат описывает: Proxy перехватывает get/set; при чтении track() регистрирует зависимость; при записи trigger() планирует re-render затронутых effects; WeakMap для графа зависимостей.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "центральный механизм middle — Proxy и граф зависимостей из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "reactivity_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "track",
+              "trigger",
+              "Proxy"
+            ],
+            "ask": "что делает track при чтении свойства и trigger при записи"
+          },
+          {
+            "match": [
+              "WeakMap",
+              "граф",
+              "effect"
+            ],
+            "ask": "как Vue хранит связь между свойством и эффектами"
+          }
+        ],
+        "mustConcepts": [
+          "Proxy",
+          "ES6 Proxy",
+          "track",
+          "trigger",
+          "getter",
+          "setter",
+          "перехват",
+          "intercept",
+          "WeakMap",
+          "Map",
+          "Set",
+          "effect",
+          "эффект",
+          "граф зависимост",
+          "dependency graph",
+          "чтение",
+          "запись",
+          "get",
+          "set",
+          "schedule",
+          "re-render"
+        ],
+        "falseClaims": [
+          "Vue 3 использует Object.defineProperty как основной механизм",
+          "track вызывается при записи, trigger при чтении",
+          "Proxy нужен только для ref, reactive работает без Proxy",
+          "граф зависимостей хранится в обычном массиве без WeakMap"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "ref_vs_reactive",
+      "title": "Различает ref() и reactive()",
+      "expected": "Кандидат объясняет: ref() оборачивает значение в контейнер с .value, работает с примитивами; reactive() проксирует объект напрямую; шаблоны auto-unwrap ref; ref когда заменяешь целиком, reactive когда мутируешь свойства.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевое разделение ref/reactive из TL;DR и follow-up",
+        "confusionPairs": [
+          {
+            "checkpointKey": "ref_vs_reactive",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              ".value",
+              "ref",
+              "reactive",
+              "auto-unwrap",
+              "примитив",
+              "объект"
+            ],
+            "anchorTermsWrongTopic": [
+              "reactive для чисел",
+              "ref не работает с объектами",
+              ".value в template обязателен всегда"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ref",
+              "reactive",
+              ".value"
+            ],
+            "ask": "когда выбрать ref, когда reactive и зачем .value в script но не в template"
+          }
+        ],
+        "mustConcepts": [
+          "ref",
+          "reactive",
+          ".value",
+          "auto-unwrap",
+          "разворачив",
+          "шаблон",
+          "script",
+          "примитив",
+          "число",
+          "строка",
+          "объект",
+          "контейнер",
+          "замен",
+          "мутац",
+          "глубок",
+          "deep",
+          "nested",
+          "вложен"
+        ],
+        "falseClaims": [
+          "reactive() работает с примитивами напрямую",
+          "ref() не поддерживает объекты",
+          "в template всегда нужен .value для ref",
+          "ref и reactive не дают глубокую реактивность вложенных объектов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "vue2_vs_vue3",
+      "title": "Отличает Vue 2 defineProperty от Vue 3 Proxy",
+      "expected": "Кандидат сравнивает: Vue 2 Object.defineProperty — только существующие свойства; пропуск новых свойств и arr[i]=x; Vue 3 Proxy оборачивает объект целиком и перехватывает любые операции.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "исторический контекст и ограничения Vue 2 из ITLead",
+        "mustConcepts": [
+          "Vue 2",
+          "Vue 3",
+          "Object.defineProperty",
+          "defineProperty",
+          "Proxy",
+          "новое свойств",
+          "динамич",
+          "индекс массива",
+          "arr[0]",
+          "Vue.set",
+          "$set",
+          "инициализац",
+          "getter",
+          "setter",
+          "перехват",
+          "удален",
+          "delete"
+        ],
+        "falseClaims": [
+          "Vue 2 Proxy перехватывал динамически добавленные свойства",
+          "Vue 3 вернулся к defineProperty для производительности",
+          "присвоение arr[0] = x было реактивным в Vue 2 без Vue.set",
+          "Proxy в Vue 3 работает только на первом уровне объекта"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки реактивности",
+      "expected": "Кандидат называет: plain object в reactive-массив; count++ без .value; state.arr = [] ломает proxy; destructuring без toRefs; index key в v-for; присвоение non-reactive объекта reactive-свойству.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — главные footguns middle",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "ref_vs_reactive",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "push",
+              "plain",
+              "reactive("
+            ],
+            "ask": "почему state.items.push({ count: 0 }) не обновляет UI при items[0].count++"
+          },
+          {
+            "match": [
+              "destructuring",
+              "toRefs",
+              "деструктур"
+            ],
+            "ask": "почему const { count } = reactive state теряет реактивность и как исправить"
+          },
+          {
+            "match": [
+              "state.arr =",
+              "splice",
+              "length = 0"
+            ],
+            "ask": "почему переприсвоение reactive-массива ломает отслеживание"
+          }
+        ],
+        "mustConcepts": [
+          "plain object",
+          "push",
+          "reactive(",
+          ".value",
+          "count++",
+          "переприсво",
+          "state.arr =",
+          "splice",
+          "length = 0",
+          "destructuring",
+          "деструктур",
+          "toRefs",
+          "v-for",
+          ":key",
+          "index key",
+          "item.id",
+          "markRaw",
+          "нереактив",
+          "assign",
+          "присво"
+        ],
+        "falseClaims": [
+          "push plain object в reactive array делает его автоматически reactive",
+          "count++ на ref корректно инкрементирует значение",
+          "можно безопасно заменить reactive array через state.arr = []",
+          "деструктуризация reactive сохраняет реактивность как в React useState",
+          "index как key в v-for безопасен при reorder списка"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "computed_caching",
+      "title": "Понимает computed() и кеширование",
+      "expected": "Кандидат объясняет: computed регистрирует effect при вычислении; пересчитывается только при изменении зависимостей; возвращает кеш между рендерами если deps не менялись.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "computed example из ITLead advanced — derived data",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "computed",
+              "кеш",
+              "cache"
+            ],
+            "ask": "когда computed пересчитывается и когда возвращает кеш"
+          }
+        ],
+        "mustConcepts": [
+          "computed",
+          "computed()",
+          "кеш",
+          "cache",
+          "кеширован",
+          "зависимост",
+          "dependency",
+          "getter",
+          "effect",
+          "пересчёт",
+          "recompute",
+          "derived",
+          "производн",
+          "filter",
+          "не менял"
+        ],
+        "falseClaims": [
+          "computed пересчитывается при каждом render независимо от deps",
+          "computed и methods работают одинаково по кешированию",
+          "computed не регистрирует dependencies",
+          "computed всегда синхронно блокирует UI при долгом расчёте"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use_apis",
+      "title": "Знает когда ref, reactive, computed, markRaw",
+      "expected": "Кандидат называет: примитивы — ref; замена целиком — ref; вложенный объект с мутацией — reactive; derived с кешем — computed; opt-out — markRaw; async данные — ref + await.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use таблица ITLead — практический выбор API",
+        "mustConcepts": [
+          "примитив",
+          "ref",
+          "reactive",
+          "computed",
+          "markRaw",
+          "async",
+          "await",
+          "замен",
+          "мутац",
+          "opt-out",
+          "отключ",
+          "реактивност",
+          "Pinia",
+          "Nuxt",
+          "useState",
+          "VueUse",
+          "localStorage"
+        ],
+        "falseClaims": [
+          "markRaw делает объект глубоко reactive",
+          "computed нужен для всех производных значений включая side effects",
+          "reactive лучше ref для примитивов",
+          "markRaw автоматически применяется ко всем внешним API объектам"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Vue при render через Proxy вызывает track на каждое прочитанное свойство. count.value++ срабатывает trigger — перерисовывается только кнопка с count, не всё дерево. ref для числа, reactive для todos.list с вложенными объектами.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Счётчик: ref(0), в script count.value++, в template {{ count }} без .value. Todo-list: reactive({ list: [] }), push с id, toggle по find — всё proxied. remaining через computed — кеш пока list не менялся. Деструктуризацию state — только через toRefs.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Vue 3 Proxy ловит arr[0]=x и новые ключи — Vue 2 требовал Vue.set. Plain object в push — оборачиваю reactive(). state.arr = [] ломает chain — splice или length=0. v-for :key=\"item.id\", не index.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Реактивность Vue — это Virtual DOM diff всего приложения при каждом клике. ref и reactive одно и то же, .value нужен везде включая template.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "const { count } = reactive({ count: 0 }) — реактивность сохраняется как в React. count++ на ref правильно. push({ n: 1 }) в reactive array автоматически делает n reactive.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Vue 2 и Vue 3 одинаково обрабатывают динамические свойства через defineProperty. computed пересчитывается каждый render без кеша.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "reactivity_definition",
+      "exampleType": "good",
+      "exampleText": "Реактивность — dependency tracking: Vue знает какие компоненты читали count и обновляет только их при изменении.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "reactivity_definition",
+      "exampleType": "good",
+      "exampleText": "ну как формула в excel — поменял ячейку, пересчитались только зависимые, не вся таблица",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "reactivity_definition",
+      "exampleType": "bad",
+      "exampleText": "При любом изменении данных Vue делает полный re-render всего приложения с нуля.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "proxy_track_trigger",
+      "exampleType": "good",
+      "exampleText": "Proxy get → track('этот effect зависит от count'); set → trigger → schedule re-render только dependent effects. WeakMap хранит object→key→Set<effects>.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "proxy_track_trigger",
+      "exampleType": "good",
+      "exampleText": "чтение в template регистрирует track, запись count.value++ дергает trigger — vue не трогает unrelated state",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "proxy_track_trigger",
+      "exampleType": "bad",
+      "exampleText": "track вызывается при setter, trigger при getter — наоборот от реальности Vue 3.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "ref_vs_reactive",
+      "exampleType": "good",
+      "exampleText": "ref(0) — .value в script, auto-unwrap в template. reactive({ todos: [] }) — todos.list.push без .value. ref когда count.value = 0 целиком, reactive когда мутируешь поля объекта.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "ref_vs_reactive",
+      "exampleType": "good",
+      "exampleText": "newTodo — ref строка, todos — reactive объект; оба deep reactive для вложенного, но примитив только через ref",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "ref_vs_reactive",
+      "exampleType": "bad",
+      "exampleText": "reactive(0) для счётчика — стандартный паттерн. В template пишу count.value всегда.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "vue2_vs_vue3",
+      "exampleType": "good",
+      "exampleText": "Vue 2: defineProperty только на существующие ключи, arr[i]=x мимо. Vue 3: Proxy на объект — новые свойства, delete, index set — всё перехватывается.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "vue2_vs_vue3",
+      "exampleType": "good",
+      "exampleText": "в vue2 добавление поля после init — Vue.set; vue3 proxy сам ловит",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "vue2_vs_vue3",
+      "exampleType": "bad",
+      "exampleText": "Vue 3 вернулся к defineProperty потому что Proxy медленнее на массивах.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "items.push(reactive({ count: 0 })) — иначе count++ внутри plain object без proxy. count.value++ не count++. state.arr.splice(0) не state.arr=[].",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "const { count } = toRefs(state) — без toRefs count станет plain number. v-for key=item.id при reorder, не index i",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Деструктуризация reactive как useState — ок. state.items = [] безопаснее splice. Index key в v-for — best practice.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "computed_caching",
+      "exampleType": "good",
+      "exampleText": "remaining = computed(() => todos.list.filter(!done).length) — первый read track deps, дальше кеш пока list не менялся; completeAll меняет done → один пересчёт.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "computed_caching",
+      "exampleType": "good",
+      "exampleText": "computed свой effect — между рендерами без изменений list filter не гоняется заново",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "computed_caching",
+      "exampleType": "bad",
+      "exampleText": "computed и обычная function в methods — одинаково, оба кешируют результат между renders.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "when_to_use_apis",
+      "exampleType": "good",
+      "exampleText": "boolean flag — ref; store shape — reactive; filtered list — computed; chart instance от echarts — markRaw чтобы vue не proxy огромный объект.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "when_to_use_apis",
+      "exampleType": "good",
+      "exampleText": "nuxt useState — reactive под капотом; pinia ref/reactive; async fetch — ref(null) потом .value = data",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "when_to_use_apis",
+      "exampleType": "bad",
+      "exampleText": "markRaw включает глубокую реактивность. Для строк всегда reactive({ text: '' }) вместо ref.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "how-does-reactivity-work-in-vuejs",
+    "apiUrl": "https://api.itlead.org/api/questions/how-does-reactivity-work-in-vuejs",
+    "pageUrl": "https://itlead.org/interview-questions/vue/how-does-reactivity-work-in-vuejs",
+    "difficulty": "MIDDLE",
+    "titleEn": "How does reactivity work in Vue.js?",
+    "categorySlug": "vue",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

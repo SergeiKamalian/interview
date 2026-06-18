@@ -1,0 +1,684 @@
+{
+  "topic": {
+    "code": "shcho_take_n_1_problema_v_graphql",
+    "name": "N+1 проблема в GraphQL",
+    "skillCode": "typescript",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое проблема N+1 в GraphQL и как её избежать?",
+    "shortAnswer": "N+1 в GraphQL возникает, когда список из N родительских объектов запускает N отдельных запросов к БД за дочерними данными плюс один начальный запрос — итого N+1 обращений вместо двух. Наивный field resolver вызывается для каждого элемента списка; GraphQL не батчит запросы автоматически. Основное решение — DataLoader: собирает ключи за один tick event loop и выполняет один batched-запрос с WHERE IN.",
+    "idealAnswer": "N+1 в GraphQL — когда запрос списка из N родителей (users, orders) плюс вложенное поле (posts, items) приводит к 1 запросу за список и N запросам за дочерние сущности — всего N+1 round trip к БД вместо 2. Клиент видит один HTTP-запрос, но сервер выполняет resolver для каждого parent-объекта отдельно: GraphQL.js идёт depth-first, async/await между resolver-ами не координирует ORM — Prisma/Sequelize получают N отдельных SELECT с разным userId/orderId. Пример: 10 users + posts → 11 SQL; 100 users → 101. Для одного объекта проблемы нет; для списков, пагинации и high-traffic API батчинг обязателен. DataLoader (Meta) собирает все .load(key) за один event loop tick, затем batch-функция делает один findMany с IN (...), возвращает массивы в порядке ключей; мемоизирует в рамках одного request. Loader создают в context factory на каждый запрос — singleton на уровне модуля утекает кеш между пользователями. Каждый уровень вложенности (users→posts→comments) требует своего loader; батчинг только posts не спасает comments. Альтернативы: Prisma include — один SQL, но всегда тянет все вложенные данные; Hasura/Postgres CTE — батчинг на уровне движка; Apollo Federation батчит entity lookup на gateway, но внутри subgraph n+1 возможен. Типичные ошибки: «одна GraphQL-операция = один SQL»; batching только верхнего уровня; списки без first/cursor; nested n+1 без loader на каждом уровне. Детекция: Apollo Studio tracing, Prisma query log — десятки почти одинаковых запросов с разным ID. N+1 — параллельные запросы на одном уровне; waterfall — последовательная глубина (posts, потом comments для каждого). Senior: persisted queries, CDN для публичных операций, query complexity limits, денормализация горячих путей, DataLoader на каждом list-field resolver.",
+    "maxScore": 10,
+    "skills": [
+      "typescript",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "n_plus_1_definition",
+      "title": "Понимает суть N+1 в GraphQL",
+      "expected": "Кандидат объясняет: список N родителей + 1 запрос за список + N запросов за дочерние поля = N+1 обращений к БД; один HTTP-запрос клиента не означает один SQL.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — определение и масштабирование с размером списка",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "n_plus_1_definition",
+            "oftenConfusedWith": [
+              "resolver_execution"
+            ],
+            "anchorTermsExpected": [
+              "N+1",
+              "n + 1",
+              "родител",
+              "дочерн",
+              "список",
+              "один HTTP",
+              "N запрос"
+            ],
+            "anchorTermsWrongTopic": [
+              "waterfall только на клиенте",
+              "GraphQL всегда один SQL",
+              "проблема только REST"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "N+1",
+              "n + 1",
+              "11 запрос",
+              "101"
+            ],
+            "ask": "сколько SQL будет при 10 users и поле posts без батчинга"
+          }
+        ],
+        "mustConcepts": [
+          "N+1",
+          "n + 1",
+          "родител",
+          "дочерн",
+          "список",
+          "N объект",
+          "один начальн",
+          "round trip",
+          "обращен",
+          "БД",
+          "баз",
+          "масштабир",
+          "линейн",
+          "10 users",
+          "11 запрос",
+          "HTTP один",
+          "SQL много"
+        ],
+        "falseClaims": [
+          "одна GraphQL-операция всегда даёт один запрос к БД",
+          "N+1 возможна только в REST, не в GraphQL",
+          "проблема не зависит от размера списка",
+          "10 users и posts без батчинга — это 2 SQL, не 11"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "resolver_execution",
+      "title": "Знает почему resolver вызывается N раз",
+      "expected": "Кандидат объясняет: GraphQL выполняет field resolver для каждого объекта в списке depth-first; встроенного батчинга нет; ORM получает N отдельных запросов.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "механизм выполнения — ключ к пониманию причины",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "n_plus_1_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "depth-first",
+              "resolver",
+              "parent",
+              "для кажд"
+            ],
+            "ask": "почему User.posts вызывается отдельно для каждого user в списке"
+          }
+        ],
+        "mustConcepts": [
+          "resolver",
+          "field resolver",
+          "depth-first",
+          "глубин",
+          "parent",
+          "родител",
+          "для кажд",
+          "каждый объект",
+          "список",
+          "Query.users",
+          "User.posts",
+          "async",
+          "await",
+          "ORM",
+          "Prisma",
+          "Sequelize",
+          "нет батчин",
+          "отдельн",
+          "WHERE userId"
+        ],
+        "falseClaims": [
+          "GraphQL автоматически батчит все nested resolver-ы",
+          "resolver для списка вызывается один раз на весь список дочерних данных",
+          "async/await между resolver-ами объединяет SQL в один запрос",
+          "схема GraphQL гарантирует один round trip к БД"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "dataloader_solution",
+      "title": "Объясняет решение через DataLoader",
+      "expected": "Кандидат описывает: DataLoader собирает ключи за event loop tick, batch-функция с IN (...), возврат в порядке ключей, итого 2 SQL независимо от N; .load(parent.id) в resolver.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "основной production-fix из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "n_plus_1_definition",
+            "floorFraction": 0.5
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "dataloader_solution",
+            "oftenConfusedWith": [
+              "detection_alternatives"
+            ],
+            "anchorTermsExpected": [
+              "DataLoader",
+              "batch",
+              "load",
+              "IN",
+              "event loop",
+              "tick"
+            ],
+            "anchorTermsWrongTopic": [
+              "Prisma include это DataLoader",
+              "loader на уровне модуля правильно"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "DataLoader",
+              "batch",
+              "load"
+            ],
+            "ask": "когда DataLoader отправляет batch-запрос и сколько SQL будет с loader-ом"
+          },
+          {
+            "match": [
+              "userIds",
+              "IN",
+              "map",
+              "порядок"
+            ],
+            "ask": "что должна вернуть batch-функция и почему порядок ключей важен"
+          }
+        ],
+        "mustConcepts": [
+          "DataLoader",
+          "dataloader",
+          "batch",
+          "батч",
+          "load",
+          ".load",
+          "batch function",
+          "batch-функц",
+          "event loop",
+          "tick",
+          "IN",
+          "findMany",
+          "userIds",
+          "orderIds",
+          "порядок ключ",
+          "мемоиз",
+          "кеш",
+          "request",
+          "2 запрос",
+          "два SQL",
+          "context",
+          "loaders"
+        ],
+        "falseClaims": [
+          "DataLoader выполняет отдельный SQL на каждый .load()",
+          "DataLoader батчит автоматически все уровни схемы одним loader-ом",
+          "batch-функция может вернуть плоский массив без привязки к ключам",
+          "DataLoader заменяет необходимость думать о N+1 на всех уровнях"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "nested_n_plus_1",
+      "title": "Понимает вложенный N+1",
+      "expected": "Кандидат объясняет: users→posts→comments умножает запросы; loader на posts не защищает comments; каждый list-field уровень нуждается в своём loader; Prisma include — trade-off одного SQL vs over-fetch.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "nested n+1 — senior pitfall из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "dataloader_solution",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "comments",
+              "posts",
+              "вложен",
+              "три уровн"
+            ],
+            "ask": "сколько loader-ов нужно для users { posts { comments } }"
+          },
+          {
+            "match": [
+              "include",
+              "Prisma",
+              "over-fetch"
+            ],
+            "ask": "чем Prisma include отличается от DataLoader на каждом уровне"
+          }
+        ],
+        "mustConcepts": [
+          "вложен",
+          "nested",
+          "comments",
+          "posts",
+          "users",
+          "уровень",
+          "каждый уровень",
+          "commentLoader",
+          "postLoader",
+          "authorLoader",
+          "умнож",
+          "3 запрос",
+          "include",
+          "Prisma",
+          "over-fetch",
+          "перезагруз",
+          "глубин",
+          "новый resolver",
+          "новый loader"
+        ],
+        "falseClaims": [
+          "один postLoader защищает и posts, и comments, и author",
+          "Prisma include всегда лучше DataLoader без компромиссов",
+          "вложенность в GraphQL не увеличивает число SQL при одном loader-е",
+          "nested n+1 решается только пагинацией без loader-ов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "dataloader_scope",
+      "title": "Знает правильный scope DataLoader",
+      "expected": "Кандидат объясняет: новый экземпляр loader на каждый HTTP-запрос в context factory; singleton на модуле — утечка кеша между пользователями; кеш живёт только в lifecycle запроса.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "mistake 4 из ITLead — security/data leak",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "context",
+              "singleton",
+              "модул",
+              "запрос"
+            ],
+            "ask": "где создавать DataLoader и почему нельзя module-level singleton"
+          }
+        ],
+        "mustConcepts": [
+          "context",
+          "context factory",
+          "createLoaders",
+          "на запрос",
+          "per request",
+          "singleton",
+          "модул",
+          "module-level",
+          "утечк",
+          "кеш",
+          "cache",
+          "разные пользов",
+          "изолир",
+          "ApolloServer",
+          "req"
+        ],
+        "falseClaims": [
+          "один глобальный DataLoader на всё приложение — best practice",
+          "кеш DataLoader безопасно шарить между запросами разных пользователей",
+          "loader создают один раз при старте сервера",
+          "scope loader-а не влияет на корректность данных"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные заблуждения",
+      "expected": "Кандидат называет: «вложенность GraphQL = один SQL»; батчинг только верхнего уровня; списки без first/cursor; игнор nested n+1; путает один HTTP с одним SQL.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — частые production-ошибки, intermediate tier",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "один запрос",
+              "схема",
+              "вложен"
+            ],
+            "ask": "почему одна GraphQL-операция не равна одному SQL"
+          },
+          {
+            "match": [
+              "first",
+              "cursor",
+              "пагинац"
+            ],
+            "ask": "зачем first/cursor на list fields в production"
+          }
+        ],
+        "mustConcepts": [
+          "заблужден",
+          "ошибк",
+          "один SQL",
+          "одна операция",
+          "схема",
+          "вложен",
+          "батчинг только",
+          "верхний уровень",
+          "first",
+          "cursor",
+          "пагинац",
+          "1000 users",
+          "OOM",
+          "out-of-memory",
+          "Post.author",
+          "authorLoader",
+          "prototype",
+          "production"
+        ],
+        "falseClaims": [
+          "если клиент отправил один HTTP POST, сервер делает ровно один SQL",
+          "DataLoader на users→posts автоматически батчит posts→author",
+          "пагинация на users снимает N+1 для items без DataLoader",
+          "nested fields без loader-ов безопасны на малых данных в production навсегда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_it_matters",
+      "title": "Понимает когда N+1 критична",
+      "expected": "Кандидат различает: один объект — ок; малый список в прототипе — терпимо; paginated/high-traffic/nested lists — батчинг обязателен.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when it matters из ITLead",
+        "mustConcepts": [
+          "один объект",
+          "single",
+          "прототип",
+          "малый список",
+          "high-traffic",
+          "нагрузк",
+          "пагинац",
+          "first: 10",
+          "cursor",
+          "nested lists",
+          "production",
+          "обязател",
+          "DataLoader не optional",
+          "5 items",
+          "приемлем"
+        ],
+        "falseClaims": [
+          "N+1 всегда критична даже для query одного user по id",
+          "в прототипе с 1000 users на странице N+1 неважна",
+          "cursor pagination автоматически убирает N+1 без loader",
+          "nested lists не хуже одного уровня по числу SQL"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "detection_alternatives",
+      "title": "Знает детекцию и альтернативы",
+      "expected": "Кандидат упоминает Apollo Studio tracing, Prisma logs, одинаковые SQL с разным ID; Prisma include vs DataLoader vs Hasura; n+1 vs waterfall; Federation не спасает внутри subgraph.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "follow-up и real-world table — бонус senior",
+        "mustConcepts": [
+          "Apollo Studio",
+          "tracing",
+          "Prisma log",
+          "одинаков",
+          "ID параметр",
+          "waterfall",
+          "последователь",
+          "Federation",
+          "subgraph",
+          "Hasura",
+          "CTE",
+          "GitHub",
+          "Shopify",
+          "persisted queries",
+          "complexity limit"
+        ],
+        "falseClaims": [
+          "Apollo Federation полностью устраняет n+1 во всех сервисах",
+          "waterfall и n+1 — одно и то же",
+          "Hasura требует ручной DataLoader на каждом resolver",
+          "без Apollo Studio n+1 невозможно обнаружить"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "N+1 — когда Query.users делает 1 SQL, а User.posts resolver вызывается для каждого user отдельно: 10 users → 11 запросов. GraphQL не батчит сам. DataLoader собирает id за tick и делает один findMany с IN; loader создаю в context на каждый request.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Клиент шлёт один POST с users { posts { comments } }, а на сервере без loader-ов: 1 + N(users) + N(posts) SQL. На posts повесил postLoader, на comments — commentLoader, итого 3 запроса. Singleton DataLoader на модуле — утечка чужих данных между запросами.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для монолита с Prisma иногда include на hot path — один SQL. Для Apollo + микросервисов — DataLoader на каждый list resolver. В проде смотрю Apollo tracing: 50 одинаковых SELECT с разным userId — классический n+1.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "GraphQL по определению решает N+1: клиент просит nested data в одном запросе, значит БД тоже получает один запрос.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Достаточно одного DataLoader для posts — comments и author подтянутся автоматически. Loader можно создать один раз при импорте модуля и переиспользовать.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "N+1 — это когда клиент делает N+1 HTTP-запросов к API. Waterfall и n+1 — синонимы. Apollo Federation полностью убирает проблему на gateway.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "n_plus_1_definition",
+      "exampleType": "good",
+      "exampleText": "10 users + поле posts без батчинга: 1 SELECT users + 10 SELECT posts по userId = 11 SQL при одном GraphQL-запросе.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "n_plus_1_definition",
+      "exampleType": "good",
+      "exampleText": "ну n+1 — список родителей тянет отдельный запрос за детьми на каждый элемент, не два sql а n+1",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "n_plus_1_definition",
+      "exampleType": "bad",
+      "exampleText": "N+1 значит клиент отправляет N+1 HTTP-запросов, а сервер всегда делает один SQL.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "resolver_execution",
+      "exampleType": "good",
+      "exampleText": "GraphQL.js depth-first: сначала список users, потом User.posts для каждого parent — ORM видит N отдельных WHERE userId = ?.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "resolver_execution",
+      "exampleType": "good",
+      "exampleText": "resolver posts вызывается per user object, async между ними не склеивает sql — встроенного batching нет",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "resolver_execution",
+      "exampleType": "bad",
+      "exampleText": "Field resolver для posts в списке users выполняется один раз на весь результат Query.users.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "dataloader_solution",
+      "exampleType": "good",
+      "exampleText": "postLoader.load(parent.id) — все load за tick собираются, batchFn делает findMany where userId in (...), возвращает массивы в порядке id: 2 SQL total.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "dataloader_solution",
+      "exampleType": "good",
+      "exampleText": "dataloader ждёт конец tick event loop, потом один batched запрос — прозрачно для цепочки resolver-ов",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "dataloader_solution",
+      "exampleType": "bad",
+      "exampleText": "DataLoader — это ORM plugin Prisma, который автоматически include-ит все nested fields.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "nested_n_plus_1",
+      "exampleType": "good",
+      "exampleText": "users→posts→comments: postLoader не спасает comments — нужен commentLoader; иначе 1 + N + N×M запросов. Prisma include — 1 SQL, но over-fetch если клиент просил только title.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "nested_n_plus_1",
+      "exampleType": "good",
+      "exampleText": "новый list-field resolver — новый loader, пропустил author на Post — снова n+1",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "nested_n_plus_1",
+      "exampleType": "bad",
+      "exampleText": "Достаточно postLoader — comments resolver унаследует батчинг автоматически.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "dataloader_scope",
+      "exampleType": "good",
+      "exampleText": "context: ({ req }) => ({ loaders: createLoaders() }) — свежие loader-ы и кеш только на этот HTTP-запрос.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "dataloader_scope",
+      "exampleType": "good",
+      "exampleText": "const loader = new DataLoader(fn) на уровне модуля — кеш утекает между юзерами, только в factory на request",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "dataloader_scope",
+      "exampleType": "bad",
+      "exampleText": "Глобальный singleton DataLoader быстрее и безопасен — кеш между запросами это feature.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Ошибка: думать nested GraphQL = один SQL. Ошибка: batching только users→posts, забыть Post.author. Production: first: N на list fields.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "users { posts { title } } без first на 1000 users — 1001 sql и риск oom, не только latency",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Раз схема одна операция — Prisma сам сделает один JOIN без настройки resolver-ов.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "when_it_matters",
+      "exampleType": "good",
+      "exampleText": "user(id: 1) { posts } — один child query, ок. Paginated orders на high-traffic API — DataLoader обязателен даже при first: 10.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "when_it_matters",
+      "exampleType": "good",
+      "exampleText": "прототип 3 users — можно naive; nested lists в prod — batching на каждом уровне",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "when_it_matters",
+      "exampleType": "bad",
+      "exampleText": "N+1 одинаково критична для query одного order и для списка 10k orders.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "detection_alternatives",
+      "exampleType": "good",
+      "exampleText": "Prisma log: 11 почти одинаковых SELECT с разным id — n+1. Waterfall — depth-first последовательность; n+1 — параллельные sibling queries. Federation gateway батчит entities, subgraph всё равно нужен DataLoader.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "detection_alternatives",
+      "exampleType": "good",
+      "exampleText": "hasura батчит cte, shopify иногда prisma include, github — dataloaders на repos→stargazers",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "detection_alternatives",
+      "exampleType": "bad",
+      "exampleText": "Waterfall и n+1 — одно и то же, Apollo Federation решает оба на уровне gateway.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "shcho-take-n-1-problema-v-graphql",
+    "apiUrl": "https://api.itlead.org/api/questions/shcho-take-n-1-problema-v-graphql",
+    "pageUrl": "https://itlead.org/interview-questions/typescript/shcho-take-n-1-problema-v-graphql",
+    "difficulty": "SENIOR",
+    "titleEn": "What is the n + 1 problem in GraphQL?",
+    "categorySlug": "typescript",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

@@ -1,0 +1,613 @@
+{
+  "topic": {
+    "code": "what_is_csrf_attack_prevention",
+    "name": "CSRF: атака и защита",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое CSRF-атака и как от неё защититься?",
+    "shortAnswer": "CSRF (Cross-Site Request Forgery) — атака, при которой вредоносный сайт заставляет браузер пользователя отправить аутентифицированный запрос на другой сайт без ведома пользователя. Браузер автоматически прикрепляет cookies cross-site, поэтому сервер не отличает подделку от настоящего запроса. Защита: CSRF-токены на state-changing endpoints и `SameSite=Strict` на session cookie.",
+    "idealAnswer": "CSRF (Cross-Site Request Forgery, межсайтовая подделка запроса) — атака, когда злоумышленник заставляет браузер авторизованного пользователя отправить запрос на целевой сайт, используя уже установленные session cookies. Same-Origin Policy ограничивает чтение данных с другого origin, но cookies — исключение: браузер отправляет их автоматически на любой запрос к домену, который их выставил. Сервер видит валидную сессию и не знает, пришёл запрос с вашей формы или со страницы evil.com. Механизм: GET через `<img src=\"https://bank.com/transfer?to=attacker&amount=1000\">` — cookie bank.com уходит автоматически; POST через скрытую форму с auto-submit на evil.com — пользователь ничего не видит, перевод проходит. Защита обязательна на state-changing операциях (POST, PUT, DELETE) для authenticated endpoints; GET только для read-only. CSRF-токены: сервер генерирует случайное значение, привязанное к сессии, встраивает в форму или отдаёт через `/csrf`; при submit проверяет совпадение. Злоумышленник на evil.com не может прочитать токен из-за Same-Origin Policy. Express: middleware csurf, hidden `_csrf` или заголовок `X-CSRF-Token` для SPA/AJAX. SameSite cookies: `sameSite: 'strict'` — браузер не отправляет cookie на cross-site запросы; `Lax` — cookie на top-level GET навигации, но блок cross-site POST; `None` — везде, требует `Secure`. На современном Chrome SameSite=Lax по умолчанию с v80, но Safari полностью исправила реализацию только с 16.4 — безопаснее комбинировать SameSite и токены. Double-submit cookie: токен в cookie и в header/form field — сервер сверяет; без server-side session store; атакующий не читает cookie с другого origin. JWT в `Authorization` header вместо cookie — браузер не прикрепляет custom headers cross-site автоматически, CSRF-вектор исчезает. Типичные ошибки: защита HTML-форм, но не AJAX JSON (`Content-Type: application/json` не блокирует CSRF); статические токены вместо session-bound; state change через GET (любой `<img>`); только Origin/Referer (прокси и privacy tools их режут, OWASP — ненадёжно как единственная защита); `SameSite=Lax` везде без токенов — top-level POST navigation всё ещё риск. CSRF vs XSS: XSS внедряет код на ваш сайт и может украсть токен напрямую; CSRF использует существующую аутентификацию с другого origin без инъекции. Production: Express csurf, Django @csrf_protect, Rails protect_from_forgery; microservices — JWT в Authorization; три слоя: SameSite + CSRF token + Origin check как secondary.",
+    "maxScore": 10,
+    "skills": [
+      "javascript",
+      "expressjs",
+      "architecture"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "csrf_definition",
+      "title": "Понимает суть CSRF",
+      "expected": "Кандидат объясняет: CSRF — вредоносный сайт заставляет браузер отправить authenticated запрос; cookies уходят автоматически cross-site; сервер не отличает подделку от легитимного запроса.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — cookies и forged requests",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "csrf_definition",
+            "oftenConfusedWith": [
+              "csrf_vs_xss"
+            ],
+            "anchorTermsExpected": [
+              "CSRF",
+              "cookies",
+              "cross-site",
+              "поддел",
+              "сессия",
+              "автоматическ"
+            ],
+            "anchorTermsWrongTopic": [
+              "XSS инъекция",
+              "SQL injection",
+              "CORS блокирует запрос"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "CSRF",
+              "cookies",
+              "cross-site"
+            ],
+            "ask": "почему сервер не может отличить forged запрос от настоящего при cookie-auth"
+          }
+        ],
+        "mustConcepts": [
+          "CSRF",
+          "Cross-Site Request Forgery",
+          "межсайтов",
+          "поддел",
+          "cookies",
+          "cookie",
+          "автоматическ",
+          "cross-site",
+          "сессия",
+          "session",
+          "authenticated",
+          "аутентифиц",
+          "злоумышлен",
+          "evil.com",
+          "браузер",
+          "без ведома",
+          "forged",
+          "подделан"
+        ],
+        "falseClaims": [
+          "CSRF требует XSS для работы",
+          "cookies не отправляются cross-site",
+          "Same-Origin Policy блокирует отправку cookies",
+          "CSRF атакует только неавторизованных пользователей",
+          "сервер всегда знает origin формы по cookie"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "attack_mechanism",
+      "title": "Знает как работает атака",
+      "expected": "Кандидат описывает: GET через img/link с query params; POST через скрытую форму и auto-submit; cookie целевого домена прикрепляется автоматически; пользователь может ничего не заметить.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "how the attack works — quick example ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "img",
+              "GET",
+              "form",
+              "POST"
+            ],
+            "ask": "как злоумышленник может выполнить перевод через GET и через POST без клика пользователя"
+          }
+        ],
+        "mustConcepts": [
+          "img",
+          "GET",
+          "POST",
+          "form",
+          "hidden",
+          "auto-submit",
+          "submit",
+          "script",
+          "query",
+          "transfer",
+          "cookie прикреп",
+          "автоматическ",
+          "фон",
+          "evil.com",
+          "bank.com",
+          "без взаимод"
+        ],
+        "falseClaims": [
+          "CSRF работает только через POST",
+          "GET запросы никогда не несут cookies",
+          "пользователь всегда видит форму перед submit",
+          "атака требует чтения ответа с целевого сайта"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "csrf_tokens",
+      "title": "Применяет CSRF-токены",
+      "expected": "Кандидат: сервер генерирует случайный session-bound токен; встраивает в форму или отдаёт через endpoint; проверяет на POST/PUT/DELETE; csurf/X-CSRF-Token для SPA; атакующий не читает токен cross-origin.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "основной prevention method — tokens + csurf",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "csrf_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "csrfToken",
+              "csurf",
+              "_csrf",
+              "X-CSRF-Token"
+            ],
+            "ask": "как SPA получает и отправляет CSRF-токен при JSON POST"
+          },
+          {
+            "match": [
+              "Same-Origin",
+              "не может прочитать"
+            ],
+            "ask": "почему evil.com не может украсть CSRF-токен с bank.com"
+          }
+        ],
+        "mustConcepts": [
+          "CSRF token",
+          "токен",
+          "csurf",
+          "_csrf",
+          "X-CSRF-Token",
+          "req.csrfToken",
+          "session",
+          "сессия",
+          "случайн",
+          "unpredictable",
+          "hidden input",
+          "403",
+          "Forbidden",
+          "state-changing",
+          "POST",
+          "PUT",
+          "DELETE",
+          "Same-Origin",
+          "не читает",
+          "middleware",
+          "Express"
+        ],
+        "falseClaims": [
+          "CSRF-токен можно захардкодить как static-token-123",
+          "Content-Type application/json автоматически защищает от CSRF",
+          "токен не нужен если есть HTTPS",
+          "csrf middleware нужен только для HTML форм",
+          "токен можно передать в URL query без риска"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "samesite_cookies",
+      "title": "Настраивает SameSite cookies",
+      "expected": "Кандидат: sameSite strict блокирует cross-site cookie; Lax — top-level GET ok, cross-site POST blocked; None требует Secure; Chrome default Lax с v80; комбинировать с токенами.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "modern complement — SameSite Strict/Lax/None",
+        "confusionPairs": [
+          {
+            "checkpointKey": "samesite_cookies",
+            "oftenConfusedWith": [
+              "csrf_tokens"
+            ],
+            "anchorTermsExpected": [
+              "SameSite",
+              "Strict",
+              "Lax",
+              "cross-site cookie"
+            ],
+            "anchorTermsWrongTopic": [
+              "CORS Allow-Origin",
+              "httpOnly заменяет SameSite"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Strict",
+              "Lax",
+              "None"
+            ],
+            "ask": "чем отличаются SameSite Strict, Lax и None"
+          }
+        ],
+        "mustConcepts": [
+          "SameSite",
+          "sameSite",
+          "Strict",
+          "Lax",
+          "None",
+          "Secure",
+          "httpOnly",
+          "session cookie",
+          "cross-site",
+          "не отправ",
+          "top-level",
+          "навигац",
+          "Chrome 80",
+          "Safari",
+          "комбинир",
+          "токен",
+          "res.cookie"
+        ],
+        "falseClaims": [
+          "SameSite=Lax полностью заменяет CSRF-токены",
+          "SameSite=None работает без Secure",
+          "SameSite блокирует XSS",
+          "SameSite=Strict отправляет cookie на cross-site POST",
+          "достаточно SameSite на всех браузерах без токенов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "double_submit_jwt",
+      "title": "Знает double-submit и JWT без cookie",
+      "expected": "Кандидат: double-submit — токен в cookie и в header/form, сервер сверяет; JWT в Authorization header — браузер не шлёт custom headers cross-site, CSRF surface исчезает; если JWT в cookie — нужен X-CSRF-Token.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "double-submit + JWT microservices из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "double-submit",
+              "Authorization",
+              "JWT"
+            ],
+            "ask": "почему JWT в Authorization header убирает CSRF-риск"
+          }
+        ],
+        "mustConcepts": [
+          "double-submit",
+          "double submit",
+          "cookie",
+          "header",
+          "form field",
+          "совпад",
+          "match",
+          "JWT",
+          "Authorization",
+          "Bearer",
+          "не прикрепляет",
+          "custom header",
+          "microservice",
+          "session store",
+          "без серверной сессии"
+        ],
+        "falseClaims": [
+          "JWT в localStorage защищён от CSRF так же как cookie",
+          "double-submit требует server-side session store",
+          "Authorization header браузер шлёт автоматически cross-site",
+          "JWT в httpOnly cookie не требует CSRF защиты"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки CSRF-защиты",
+      "expected": "Кандидат называет: AJAX JSON без X-CSRF-Token; статические токены; state change через GET; только Origin/Referer; SameSite=Lax без токенов на чувствительных routes.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — частые production провалы",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "csrf_tokens",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "application/json",
+              "fetch",
+              "AJAX"
+            ],
+            "ask": "почему JSON POST без X-CSRF-Token всё ещё уязвим"
+          },
+          {
+            "match": [
+              "GET",
+              "delete",
+              "state change"
+            ],
+            "ask": "почему нельзя удалять пользователя через GET endpoint"
+          },
+          {
+            "match": [
+              "Origin",
+              "Referer",
+              "OWASP"
+            ],
+            "ask": "почему Origin/Referer нельзя использовать как единственную защиту"
+          }
+        ],
+        "mustConcepts": [
+          "application/json",
+          "fetch",
+          "AJAX",
+          "API routes",
+          "статическ",
+          "hardcode",
+          "GET",
+          "state change",
+          "delete",
+          "img",
+          "Origin",
+          "Referer",
+          "OWASP",
+          "прокси",
+          "privacy",
+          "strip",
+          "Lax",
+          "top-level POST",
+          "X-CSRF-Token",
+          "403"
+        ],
+        "falseClaims": [
+          "Content-Type application/json блокирует cross-site POST",
+          "Origin header всегда присутствует и надёжен",
+          "GET для delete безопасен если endpoint скрыт",
+          "static-token-123 достаточен для production",
+          "защита HTML форм покрывает все API endpoints"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "csrf_vs_xss",
+      "title": "Отличает CSRF от XSS",
+      "expected": "Кандидат: XSS внедряет код на ваш сайт и может украсть токен; CSRF использует существующую auth с другого origin без инъекции; XSS ломает SOP, CSRF эксплуатирует cookie exception.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up question из ITLead interview section",
+        "mustConcepts": [
+          "XSS",
+          "CSRF",
+          "инъекц",
+          "inject",
+          "украсть токен",
+          "Same-Origin Policy",
+          "SOP",
+          "cookie exception",
+          "исключение",
+          "другой origin",
+          "без инъекц",
+          "script",
+          "отлича"
+        ],
+        "falseClaims": [
+          "CSRF и XSS — одна и та же атака",
+          "CSRF требует выполнения JavaScript на целевом сайте",
+          "XSS не может украсть CSRF-токен",
+          "защита от CSRF автоматически защищает от XSS"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "CSRF — evil.com заставляет браузер отправить POST на bank.com с session cookie пользователя. Сервер видит валидную сессию и выполняет перевод. Защита: CSRF-токен в каждом state-changing запросе + SameSite=Strict на session cookie. Для SPA — GET /csrf, потом X-CSRF-Token в fetch headers.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На transfer endpoint ставлю csurf middleware, отдаю токен через /csrf, React fetch шлёт X-CSRF-Token. Session cookie с sameSite strict и httpOnly. Origin check как дополнительный слой, не вместо токена. JWT API — только Authorization header, не cookie.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Браузер шлёт cookies cross-site автоматически — SOP на чтение, но не на отправку cookie. Подделанный POST с evil.com проходит как легитимный. Double-submit: токен в cookie и header — атакующий не прочитает cookie с другого origin.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "CSRF — это когда хакер внедряет script на ваш сайт. Достаточно HTTPS и CORS — cookies защищены автоматически.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Поставил SameSite=Lax на cookie — CSRF-токены не нужны. JSON API защищён Content-Type application/json. Удаление пользователя через GET /user/delete — нормально, если URL не публикуют.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Проверяю только Origin header — если evil.com, отклоняю. Статический токен static-token-123 в каждой форме. CSRF и XSS — одно и то же, решается CSP.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "csrf_definition",
+      "exampleType": "good",
+      "exampleText": "CSRF — злоумышленный сайт инициирует authenticated запрос от имени пользователя; cookie уходит автоматически, сервер не видит подделку.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "csrf_definition",
+      "exampleType": "good",
+      "exampleText": "ну csrf — evil.com дергает bank.com с твоей сессией, браузер сам прикрепляет cookie",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "csrf_definition",
+      "exampleType": "bad",
+      "exampleText": "CSRF работает только если пользователь не залогинен — cookies не отправляются на чужие сайты.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "attack_mechanism",
+      "exampleType": "good",
+      "exampleText": "На evil.com скрытая form action bank.com/transfer method POST + script submit — cookie bank.com уходит, перевод проходит.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "attack_mechanism",
+      "exampleType": "good",
+      "exampleText": "img src с GET transfer?to=attacker — браузер шлёт cookie без клика пользователя",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "attack_mechanism",
+      "exampleType": "bad",
+      "exampleText": "CSRF требует, чтобы атакующий прочитал ответ bank.com — без этого cookie не отправятся.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "csrf_tokens",
+      "exampleType": "good",
+      "exampleText": "csurf middleware: req.csrfToken() в hidden _csrf; forged POST без токена → 403 Forbidden.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "csrf_tokens",
+      "exampleType": "good",
+      "exampleText": "SPA: useEffect fetch /csrf → setToken → POST с X-CSRF-Token header; evil.com не прочитает токен из SOP",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "csrf_tokens",
+      "exampleType": "bad",
+      "exampleText": "JSON fetch не нуждается в CSRF — application/json блокирует cross-site запросы браузером.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "samesite_cookies",
+      "exampleType": "good",
+      "exampleText": "res.cookie sessionId с sameSite strict secure httpOnly — браузер не шлёт cookie на cross-site POST с evil.com.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "samesite_cookies",
+      "exampleType": "good",
+      "exampleText": "Lax — cookie на переход по ссылке GET, но не на cross-site POST form; Strict — вообще не шлёт cross-site",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "samesite_cookies",
+      "exampleType": "bad",
+      "exampleText": "SameSite=Lax полностью заменяет CSRF-токены на всех браузерах включая старый Safari.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "double_submit_jwt",
+      "exampleType": "good",
+      "exampleText": "JWT в Authorization Bearer — браузер не добавляет header cross-site автоматически, CSRF vector отсутствует.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "double_submit_jwt",
+      "exampleType": "good",
+      "exampleText": "double-submit: random token в cookie и в X-CSRF-Token — сервер сверяет match, без Redis session",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "double_submit_jwt",
+      "exampleType": "bad",
+      "exampleText": "JWT в httpOnly cookie без CSRF-токена безопасен — подпись JWT защищает от подделки.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Защитил HTML forms csurf, но /api/transfer JSON без X-CSRF-Token — fetch с evil.com всё ещё проходит.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "app.get /user/delete — любой img cross-site удалит пользователя; нужен POST + csrfProtection",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Origin/Referer достаточно — OWASP рекомендует только их без токенов.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "csrf_vs_xss",
+      "exampleType": "good",
+      "exampleText": "XSS — код на вашем сайте, может украсть CSRF token; CSRF — запрос с другого origin без инъекции, эксплуатирует auto cookies.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "csrf_vs_xss",
+      "exampleType": "good",
+      "exampleText": "xss ломает sop и читает dom; csrf не нужен доступ к странице — только заставить браузер отправить cookie",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "csrf_vs_xss",
+      "exampleType": "bad",
+      "exampleText": "CSRF — подвид XSS; csurf защищает и от XSS инъекций.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "what-is-csrf-attack-and-prevention",
+    "apiUrl": "https://api.itlead.org/api/questions/what-is-csrf-attack-and-prevention",
+    "pageUrl": "https://itlead.org/interview-questions/general/what-is-csrf-attack-and-prevention",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is CSRF and how to prevent it?",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

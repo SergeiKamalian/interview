@@ -1,0 +1,618 @@
+{
+  "topic": {
+    "code": "nestjs_guards",
+    "name": "Guards в NestJS",
+    "skillCode": "nestjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое guards в NestJS и как реализовать аутентификацию?",
+    "shortAnswer": "Guards в NestJS реализуют интерфейс CanActivate и выполняются до обработчика маршрута, чтобы разрешить или заблокировать запрос на основе аутентификации или прав. Стандартный паттерн: проверить JWT, прикрепить декодированный payload к request.user, вернуть true. Guards выполняются после middleware, но до interceptors и pipes; применяются через @UseGuards() на методе, контроллере или глобально через APP_GUARD.",
+    "idealAnswer": "Guards — классы, реализующие CanActivate; они решают, может ли запрос дойти до route handler, на основе статуса аутентификации или прав пользователя. canActivate возвращает true (разрешить) или false (403), либо бросает исключение (401/403) — тогда pipeline останавливается, контроллер не выполняется. Порядок NestJS: middleware → guards → interceptors (до handler) → pipes → route handler → interceptors (после) → exception filters. ExecutionContext делает guards мощнее middleware: switchToHttp().getRequest(), getHandler() и getClass() для чтения metadata (@Roles, @Public()). Применение: @UseGuards на методе — одна route; на классе контроллера — весь контроллер; APP_GUARD в module providers — весь app с DI (предпочтительнее app.useGlobalGuards в main.ts). Аутентификация (кто ты?) и авторизация (что можешь?) — разные concerns; типично цепочка @UseGuards(JwtAuthGuard, RolesGuard). Базовый AuthGuard проверяет наличие Authorization header. Production JWT guard: @Injectable(), JwtService.verifyAsync с await, extract Bearer token, request.user = payload, UnauthorizedException при отсутствии/невалидном токене. RolesGuard через Reflector.getAllAndOverride читает @Roles с handler/class; @Public() через SetMetadata + Reflector.getAllAndOverride в глобальном JwtAuthGuard пропускает /auth/login без токена. Guard vs middleware: middleware на уровне Express/Fastify без знания NestJS routes; guard внутри NestJS, видит metadata конкретного handler. GraphQL: switchToGraphql() вместо switchToHttp(). Типичные ошибки: verifyAsync без await (guard всегда пропускает); забытый request.user = payload; отсутствие @Injectable(); new Error() вместо UnauthorizedException (500 вместо 401); глобальный guard без @Public() на login/health/register.",
+    "maxScore": 10,
+    "skills": [
+      "nestjs",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "guards_definition",
+      "title": "Понимает назначение guards и CanActivate",
+      "expected": "Кандидат объясняет: guard — «вышибала» перед handler; CanActivate возвращает true/false или бросает исключение; false → 403, UnauthorizedException → 401; контроллер не выполняется при блокировке.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — CanActivate и allow/deny до handler",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "guards_definition",
+            "oftenConfusedWith": [
+              "pipeline_order",
+              "guard_vs_middleware"
+            ],
+            "anchorTermsExpected": [
+              "CanActivate",
+              "guard",
+              "true",
+              "false",
+              "401",
+              "403",
+              "handler"
+            ],
+            "anchorTermsWrongTopic": [
+              "guard это middleware",
+              "guard трансформирует response",
+              "pipe проверяет auth"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "CanActivate",
+              "guard",
+              "true",
+              "false"
+            ],
+            "ask": "что возвращает canActivate и что происходит при false или throw"
+          }
+        ],
+        "mustConcepts": [
+          "guard",
+          "CanActivate",
+          "canActivate",
+          "true",
+          "false",
+          "401",
+          "403",
+          "UnauthorizedException",
+          "ForbiddenException",
+          "route handler",
+          "обработчик",
+          "блокир",
+          "разреш",
+          "исключен",
+          "pipeline",
+          "до handler"
+        ],
+        "falseClaims": [
+          "guard выполняется после route handler",
+          "return false даёт 401 вместо 403",
+          "guard и interceptor решают одну задачу",
+          "CanActivate необязателен для guard",
+          "guard автоматически проверяет JWT без кода"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "pipeline_order",
+      "title": "Знает порядок выполнения в NestJS pipeline",
+      "expected": "Кандидат называет порядок: middleware → guards → interceptors → pipes → handler → interceptors (after) → exception filters; guards после middleware, до interceptors и pipes.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый pipeline из ITLead Theory",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "middleware",
+              "guard",
+              "interceptor",
+              "pipe"
+            ],
+            "ask": "полный порядок: middleware, guards, interceptors, pipes, handler"
+          }
+        ],
+        "mustConcepts": [
+          "middleware",
+          "guard",
+          "interceptor",
+          "pipe",
+          "route handler",
+          "exception filter",
+          "порядок",
+          "после middleware",
+          "до interceptor",
+          "до pipe",
+          "до handler",
+          "pipeline",
+          "останов"
+        ],
+        "falseClaims": [
+          "guards выполняются до middleware",
+          "pipes выполняются до guards",
+          "exception filter запускается до guards",
+          "interceptors всегда только после handler"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "execution_context",
+      "title": "Понимает ExecutionContext и metadata",
+      "expected": "Кандидат объясняет: ExecutionContext оборачивает платформу; switchToHttp().getRequest(); getHandler() и getClass() для чтения @Roles, @Public() через Reflector.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ExecutionContext — ключевое отличие guard от middleware",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "guards_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ExecutionContext",
+              "switchToHttp",
+              "getHandler"
+            ],
+            "ask": "зачем guard нужен ExecutionContext и как читать metadata декораторов"
+          }
+        ],
+        "mustConcepts": [
+          "ExecutionContext",
+          "switchToHttp",
+          "getRequest",
+          "getHandler",
+          "getClass",
+          "metadata",
+          "Reflector",
+          "декоратор",
+          "@Roles",
+          "@Public",
+          "Express",
+          "Fastify",
+          "GraphQL",
+          "switchToGraphql",
+          "платформ"
+        ],
+        "falseClaims": [
+          "middleware имеет ExecutionContext как guard",
+          "switchToHttp работает только с Express, не с Fastify",
+          "guard не может читать metadata handler",
+          "getHandler возвращает request object"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "jwt_auth_guard",
+      "title": "Реализует JWT AuthGuard (production паттерн)",
+      "expected": "Кандидат описывает: @Injectable(), async canActivate, JwtService.verifyAsync с await, extract Bearer token, request.user = payload, UnauthorizedException при ошибке.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "основной production-паттерн аутентификации из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "verifyAsync",
+              "await",
+              "JWT",
+              "Bearer"
+            ],
+            "ask": "как извлечь Bearer token и почему verifyAsync нужен await"
+          },
+          {
+            "match": [
+              "request.user",
+              "payload",
+              "req.user"
+            ],
+            "ask": "куда класть decoded payload и зачем контроллеру req.user"
+          }
+        ],
+        "mustConcepts": [
+          "JwtService",
+          "verifyAsync",
+          "await",
+          "async",
+          "Bearer",
+          "Authorization",
+          "extractToken",
+          "request.user",
+          "req.user",
+          "payload",
+          "UnauthorizedException",
+          "JWT_SECRET",
+          "Invalid",
+          "expired",
+          "простроч",
+          "недейств",
+          "Injectable"
+        ],
+        "falseClaims": [
+          "verifyAsync без await корректно блокирует невалидный токен",
+          "payload автоматически попадает в req.user без присвоения",
+          "достаточно проверить наличие header без verify",
+          "JwtAuthGuard не нужен @Injectable если guard простой"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "apply_guards_public",
+      "title": "Знает @UseGuards, APP_GUARD и @Public()",
+      "expected": "Кандидат описывает: @UseGuards на method/controller; APP_GUARD в module для глобальной защиты с DI; @Public() + Reflector.getAllAndOverride для bypass login/health.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "when to use и global guard pattern из ITLead",
+        "confusionPairs": [
+          {
+            "checkpointKey": "apply_guards_public",
+            "oftenConfusedWith": [
+              "auth_roles_chain"
+            ],
+            "anchorTermsExpected": [
+              "APP_GUARD",
+              "@Public",
+              "UseGuards",
+              "Reflector"
+            ],
+            "anchorTermsWrongTopic": [
+              "useGlobalGuards лучше APP_GUARD для DI",
+              "@Public() без Reflector в guard"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "APP_GUARD",
+              "global",
+              "Public"
+            ],
+            "ask": "как сделать /auth/login доступным при глобальном JwtAuthGuard"
+          }
+        ],
+        "mustConcepts": [
+          "UseGuards",
+          "@UseGuards",
+          "APP_GUARD",
+          "useClass",
+          "module",
+          "providers",
+          "global",
+          "глобальн",
+          "Public",
+          "isPublic",
+          "SetMetadata",
+          "Reflector",
+          "getAllAndOverride",
+          "login",
+          "health",
+          "register",
+          "useGlobalGuards",
+          "DI"
+        ],
+        "falseClaims": [
+          "app.useGlobalGuards в main.ts поддерживает DI как APP_GUARD",
+          "@Public() работает без проверки в guard через Reflector",
+          "глобальный guard не блокирует /auth/login без дополнительного кода",
+          "UseGuards можно только на method, не на controller class"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "auth_roles_chain",
+      "title": "Разделяет auth и authorization, цепочку guards",
+      "expected": "Кандидат объясняет: JwtAuthGuard — identity (валидный токен); RolesGuard — permissions (@Roles); @UseGuards(Guard1, Guard2) — все должны пройти; NestJS останавливается на первом false/throw.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "auth vs authz и chaining — ключевой middle паттерн",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "RolesGuard",
+              "Roles",
+              "auth",
+              "authorization"
+            ],
+            "ask": "чем auth guard отличается от roles guard и как их связать"
+          },
+          {
+            "match": [
+              "UseGuards",
+              "Guard1",
+              "chain",
+              "цепоч"
+            ],
+            "ask": "что происходит при @UseGuards(JwtAuthGuard, RolesGuard) если roles не совпали"
+          }
+        ],
+        "mustConcepts": [
+          "аутентиф",
+          "авториз",
+          "identity",
+          "permissions",
+          "RolesGuard",
+          "Roles",
+          "ROLES_KEY",
+          "цепоч",
+          "chain",
+          "UseGuards",
+          "JwtAuthGuard",
+          "403",
+          "ForbiddenException",
+          "admin",
+          "role",
+          "рол",
+          "первый guard",
+          "false",
+          "throw"
+        ],
+        "falseClaims": [
+          "RolesGuard проверяет JWT без JwtAuthGuard",
+          "один guard одновременно решает auth и roles без разделения",
+          "при chain достаточно чтобы один guard вернул true",
+          "RolesGuard бросает 401 вместо 403 при неверной роли"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки guards",
+      "expected": "Кандидат называет: verifyAsync без await; забытый request.user; без @Injectable(); new Error() вместо UnauthorizedException; global guard без @Public() на публичных routes.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes блок ITLead — частые production баги",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "await",
+              "verifyAsync",
+              "Promise"
+            ],
+            "ask": "почему guard без await на verifyAsync всегда пропускает запрос"
+          },
+          {
+            "match": [
+              "Error",
+              "UnauthorizedException",
+              "500"
+            ],
+            "ask": "чем плох new Error() вместо UnauthorizedException"
+          }
+        ],
+        "mustConcepts": [
+          "await",
+          "verifyAsync",
+          "Promise",
+          "request.user",
+          "payload",
+          "Injectable",
+          "DI",
+          "UnauthorizedException",
+          "ForbiddenException",
+          "new Error",
+          "500",
+          "exception filter",
+          "Public",
+          "login",
+          "health",
+          "глобальн guard",
+          "silent bug",
+          "undefined",
+          "req.user"
+        ],
+        "falseClaims": [
+          "verifyAsync без await всё равно блокирует невалидный JWT",
+          "req.user заполняется автоматически после verifyAsync",
+          "new Error() даёт такой же 401 JSON как UnauthorizedException",
+          "без @Injectable guard создаётся вручную без проблем"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Guard реализует CanActivate и решает, пускать ли запрос к handler. JwtAuthGuard async: extract Bearer, await jwtService.verifyAsync, request.user = payload, return true. Guards после middleware, до pipes. Глобально — APP_GUARD в module; login помечаю @Public(), guard читает Reflector и skip JWT.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На admin routes ставлю @UseGuards(JwtAuthGuard, RolesGuard) — сначала токен, потом @Roles('admin'). ExecutionContext даёт getHandler для metadata. Без await на verifyAsync guard всегда true — типичная ловушка. UnauthorizedException для 401, не new Error().",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну guard как вышибала: нет токена — 401, есть — handler работает. middleware парсит cookies, guard уже смотрит jwt и роли. req.user сам не появится — надо payload присвоить после verify",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Guard — это middleware NestJS, они одно и то же. Pipes выполняются до guards и проверяют JWT.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "canActivate вызывает verifyAsync без await — Promise игнорируется, но токен всё равно проверяется. req.user заполняется JwtService автоматически.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Глобальный JwtAuthGuard через useGlobalGuards в main.ts — лучший способ, DI работает. На login @Public() не нужен, guard сам знает публичные routes.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "guards_definition",
+      "exampleType": "good",
+      "exampleText": "CanActivate: true — запрос идёт к handler; false — 403; throw UnauthorizedException — 401, controller не выполняется.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "guards_definition",
+      "exampleType": "good",
+      "exampleText": "guard как охранник у двери — без валидного токена в handler не пускает",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "guards_definition",
+      "exampleType": "bad",
+      "exampleText": "Guard выполняется после controller и может изменить response body.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "pipeline_order",
+      "exampleType": "good",
+      "exampleText": "Порядок: middleware → guards → interceptors → pipes → handler. Guard останавливает pipeline до business logic.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "pipeline_order",
+      "exampleType": "good",
+      "exampleText": "сначала middleware, потом guards, потом уже pipes валидируют dto",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "pipeline_order",
+      "exampleType": "bad",
+      "exampleText": "Guards идут первыми, до middleware и exception filters.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "execution_context",
+      "exampleType": "good",
+      "exampleText": "ExecutionContext.switchToHttp().getRequest() + getHandler()/getClass() — Reflector читает @Roles и @Public metadata.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "execution_context",
+      "exampleType": "good",
+      "exampleText": "через context.getHandler() roles guard понимает какие роли нужны на этом методе",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "execution_context",
+      "exampleType": "bad",
+      "exampleText": "Middleware тоже читает @Roles через getHandler — guard для этого не нужен.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "jwt_auth_guard",
+      "exampleType": "good",
+      "exampleText": "async canActivate: token = Bearer из Authorization, payload = await jwtService.verifyAsync(token), request.user = payload, return true; catch → UnauthorizedException.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "jwt_auth_guard",
+      "exampleType": "good",
+      "exampleText": "без await verifyAsync guard всегда true — обязательно async и присвоить payload в req.user",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "jwt_auth_guard",
+      "exampleType": "bad",
+      "exampleText": "canActivate sync: jwtService.verifyAsync(token); return true — достаточно наличия header Authorization.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "apply_guards_public",
+      "exampleType": "good",
+      "exampleText": "APP_GUARD useClass JwtAuthGuard в AppModule providers; @Public() + Reflector.getAllAndOverride('isPublic') в guard для /auth/login.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "apply_guards_public",
+      "exampleType": "good",
+      "exampleText": "на один route — @UseGuards на метод, на весь controller — на класс, на всё app — APP_GUARD с DI",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "apply_guards_public",
+      "exampleType": "bad",
+      "exampleText": "useGlobalGuards в main.ts — единственный способ глобальной защиты с JwtService injection.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "auth_roles_chain",
+      "exampleType": "good",
+      "exampleText": "@UseGuards(JwtAuthGuard, RolesGuard): auth проверяет токен, RolesGuard — user.roles vs @Roles('admin'); viewer получит 403 после успешного JWT.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "auth_roles_chain",
+      "exampleType": "good",
+      "exampleText": "auth — кто ты, roles — что можешь; chain останавливается на первом false или throw",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "auth_roles_chain",
+      "exampleType": "bad",
+      "exampleText": "RolesGuard сам валидирует JWT и не нужен JwtAuthGuard в цепочке.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Ошибки: no await verifyAsync; no request.user; no @Injectable(); throw new Error() → 500 HTML; global guard без @Public на login.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "в тестах guard мокают, а в prod забыли req.user — silent undefined в controller",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "new Error('No token') — нормальный способ вернуть 401 JSON клиенту.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-guards",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-guards",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-guards",
+    "difficulty": "MIDDLE",
+    "titleEn": "What are guards in NestJS and how to implement authentication?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

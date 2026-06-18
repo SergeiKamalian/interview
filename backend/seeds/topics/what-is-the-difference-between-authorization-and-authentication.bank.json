@@ -1,0 +1,601 @@
+{
+  "topic": {
+    "code": "what_is_difference_between_authorization_authentication",
+    "name": "Аутентификация и авторизация",
+    "skillCode": "architecture",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "В чём разница между аутентификацией (authentication) и авторизацией (authorization)?",
+    "shortAnswer": "Аутентификация подтверждает, кто вы — проверяет учётные данные (пароль, JWT, OAuth). Авторизация определяет, что вам разрешено — проверяет роли, scopes и правила доступа. Аутентификация всегда первой: без идентификации нельзя проверить права. 401 — «докажи, кто ты»; 403 — «знаю кто ты, но доступ закрыт».",
+    "idealAnswer": "Аутентификация (authentication) отвечает на вопрос «Ты тот, за кого себя выдаёшь?» — проверяет credentials: пароль, JWT, OAuth, биометрия. Авторизация (authorization) отвечает «Можешь ли ты это сделать?» — проверяет permissions: роли, scopes, ACL, RBAC/ABAC. Одна подтверждает личность, другая применяет правила доступа. Без аутентификации авторизация невозможна — нет identity для проверки прав. Порядок: сначала login/verify token (auth), затем checkRole/checkPermission (authz). Middleware: verifyToken → checkRole, не наоборот — иначе поддельный header role: admin пройдёт без верификации. HTTP-коды: 401 Unauthorized при провале аутентификации (нужен re-login или валидные credentials); 403 Forbidden при провале авторизации (identity подтверждена, но доступ заблокирован). Путать коды — типичная ошибка: 401 на hasPermission запускает ненужный flow повторного входа. JWT несёт обе функции: authentication генерирует токен после verify credentials; authorization читает roles/scopes из payload. OAuth 2.0: провайдер (Google/GitHub) для auth, access token scopes для authz на API. Механизмы: auth — Passport.js, Auth0, NextAuth; authz — CASL, Casbin, node-acl, @PreAuthorize. Когда: публичная страница — skip both; профиль — auth + authz только на свои данные; admin — auth + role admin; API rate limits — auth идентифицирует caller, authz по тарифу. Типичные ошибки: 401 вместо 403 при отсутствии permission; role в JWT без короткого expiresIn — после downgrade в БД токен ещё admin; authz middleware до auth; активная session ≠ актуальные permissions без re-check БД. Stale role fix: access token 15m + refresh с запросом role из DB или blacklist в Redis. RBAC — права по роли (admin delete); ABAC — атрибуты time/location/owner для гранулярных правил. Express: authenticateToken (401) vs role check в handler (403). Production: Cognito auth + IAM authz; microservices stateless JWT + Redis blacklist.",
+    "maxScore": 10,
+    "skills": [
+      "architecture",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "auth_authz_definition",
+      "title": "Различает аутентификацию и авторизацию",
+      "expected": "Кандидат объясняет: auth — «кто ты?», проверка credentials; authz — «что можешь?», проверка permissions/roles; одна подтверждает identity, другая enforcement правил доступа.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — who vs what, identity vs permissions",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "auth_authz_definition",
+            "oftenConfusedWith": [
+              "http_401_403",
+              "jwt_in_both"
+            ],
+            "anchorTermsExpected": [
+              "аутентификац",
+              "авторизац",
+              "кто ты",
+              "что можеш",
+              "credentials",
+              "permissions",
+              "рол",
+              "identity"
+            ],
+            "anchorTermsWrongTopic": [
+              "401 и 403 одно и то же",
+              "JWT только для auth",
+              "OAuth это авторизация без auth"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "аутентификац",
+              "авторизац",
+              "кто",
+              "что можеш"
+            ],
+            "ask": "чем authentication отличается от authorization на примере входа в админку"
+          }
+        ],
+        "mustConcepts": [
+          "аутентификац",
+          "authentication",
+          "авторизац",
+          "authorization",
+          "кто ты",
+          "что можеш",
+          "credentials",
+          "учётн",
+          "пароль",
+          "permissions",
+          "дозвол",
+          "рол",
+          "scopes",
+          "identity",
+          "личност",
+          "правила доступа",
+          "ACL",
+          "подтвержда"
+        ],
+        "falseClaims": [
+          "аутентификация и авторизация — одно и то же",
+          "авторизация проверяет пароль",
+          "аутентификация определяет роли пользователя",
+          "можно авторизовать без аутентификации",
+          "OAuth заменяет авторизацию полностью"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "auth_before_authz",
+      "title": "Понимает порядок: auth перед authz",
+      "expected": "Кандидат объясняет: сначала verify identity (login/token), затем check permissions; без auth нет identity для authz; middleware verifyToken перед checkRole.",
+      "score": 1.0,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "TL;DR — auth first, skip auth → skip authz",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "auth_authz_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "mustConcepts": [
+          "сначала",
+          "перв",
+          "порядок",
+          "verifyToken",
+          "checkRole",
+          "middleware",
+          "логин",
+          "токен",
+          "без аутентификац",
+          "нет identity",
+          "втор",
+          "после",
+          "доступ к ресурсу"
+        ],
+        "falseClaims": [
+          "авторизацию можно запускать до проверки токена",
+          "checkRole перед verifyToken — правильный порядок",
+          "сессия заменяет порядок middleware",
+          "публичный API всегда нужен auth middleware"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "http_401_403",
+      "title": "Знает 401 vs 403",
+      "expected": "Кандидат объясняет: 401 — провал auth, клиент должен re-login или отправить валидные credentials; 403 — identity подтверждена, но access denied; путать коды — red flag.",
+      "score": 2.0,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Wrong HTTP code — ключевая interview ошибка из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "http_401_403",
+            "oftenConfusedWith": [
+              "auth_authz_definition"
+            ],
+            "anchorTermsExpected": [
+              "401",
+              "403",
+              "Unauthorized",
+              "Forbidden",
+              "re-login",
+              "credentials",
+              "залогинен",
+              "блокирован"
+            ],
+            "anchorTermsWrongTopic": [
+              "404 при нет прав",
+              "500 при неверном пароле",
+              "401 и 403 взаимозаменяемы"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "401",
+              "403"
+            ],
+            "ask": "что вернуть если пароль неверный vs пользователь залогинен но не admin"
+          },
+          {
+            "match": [
+              "401",
+              "hasPermission"
+            ],
+            "ask": "почему 401 при !hasPermission — ошибка для клиента"
+          }
+        ],
+        "mustConcepts": [
+          "401",
+          "403",
+          "Unauthorized",
+          "Forbidden",
+          "аутентификац",
+          "авторизац",
+          "re-login",
+          "повторн",
+          "логин",
+          "credentials",
+          "валидн",
+          "залогинен",
+          "блокирован",
+          "доступ закрыт",
+          "докажи",
+          "знаю кто",
+          "Invalid credentials",
+          "Access denied"
+        ],
+        "falseClaims": [
+          "401 и 403 — одна и та же ошибка",
+          "403 когда не передан токен",
+          "401 когда пользователь залогинен но не admin",
+          "при !hasPermission всегда 401",
+          "статус-код не важен если есть JSON error"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "jwt_in_both",
+      "title": "Понимает роль JWT в auth и authz",
+      "expected": "Кандидат объясняет: JWT — carrier; auth генерирует после verify credentials; authz читает roles/scopes из payload; один токен — две задачи; OAuth scopes для authz.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "JWT carries identity + roles — ключ ITLead follow-up",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "JWT",
+              "role",
+              "scopes"
+            ],
+            "ask": "как JWT участвует в authentication и authorization в одном запросе"
+          },
+          {
+            "match": [
+              "OAuth",
+              "scopes"
+            ],
+            "ask": "как OAuth access token связан с scopes и авторизацией API"
+          }
+        ],
+        "mustConcepts": [
+          "JWT",
+          "токен",
+          "role",
+          "рол",
+          "scopes",
+          "payload",
+          "генерир",
+          "verify",
+          "credentials",
+          "identity",
+          "OAuth",
+          "access token",
+          "носитель",
+          "декодир",
+          "claims",
+          "две задачи",
+          "один токен"
+        ],
+        "falseClaims": [
+          "JWT используется только для аутентификации",
+          "roles в JWT не влияют на авторизацию",
+          "OAuth не связан с authorization",
+          "JWT заменяет проверку permissions в БД всегда",
+          "scopes только для OAuth без auth"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "mechanisms_rbac",
+      "title": "Знает механизмы и RBAC vs ABAC",
+      "expected": "Кандидат называет механизмы: auth — пароли, JWT, OAuth, Passport; authz — RBAC, ACL, scopes; может упомянуть RBAC (роль) vs ABAC (атрибуты time/location/owner).",
+      "score": 1.0,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Comparison table mechanisms из ITLead",
+        "mustConcepts": [
+          "RBAC",
+          "ABAC",
+          "ACL",
+          "scopes",
+          "рол",
+          "Passport",
+          "CASL",
+          "Casbin",
+          "OAuth",
+          "биометр",
+          "атрибут",
+          "время",
+          "location",
+          "owner",
+          "роль admin",
+          "node-acl",
+          "NextAuth"
+        ],
+        "falseClaims": [
+          "RBAC и ABAC — одно и то же",
+          "ACL только для аутентификации",
+          "Passport.js — библиотека только для авторизации",
+          "scopes не используются в JWT"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: 401 вместо 403; role в JWT без короткого expiry; authz до auth; session как proof of permissions без re-check БД; stale role после revoke.",
+      "score": 2.0,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "expiresIn",
+              "stale",
+              "застарел"
+            ],
+            "ask": "роль admin отозвали в БД, JWT ещё admin — что делать"
+          },
+          {
+            "match": [
+              "checkRole",
+              "verifyToken",
+              "порядок"
+            ],
+            "ask": "почему checkRole перед verifyToken опасен"
+          },
+          {
+            "match": [
+              "сессия",
+              "session",
+              "permissions"
+            ],
+            "ask": "почему активная session не гарантирует актуальные права"
+          }
+        ],
+        "mustConcepts": [
+          "401 вместо 403",
+          "expiresIn",
+          "короткоживуч",
+          "15m",
+          "refresh",
+          "БД",
+          "downgrade",
+          "revoke",
+          "stale",
+          "застарел",
+          "checkRole",
+          "verifyToken",
+          "порядок middleware",
+          "сессия",
+          "session",
+          "re-check",
+          "blacklist",
+          "Redis",
+          "role admin"
+        ],
+        "falseClaims": [
+          "долгоживучий JWT безопасен для roles",
+          "сессия всегда отражает текущие permissions",
+          "401 на authorization failure — нормальная практика",
+          "после logout JWT мгновенно недействителен без blacklist",
+          "role в header можно trust без verify token"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда применять auth и authz",
+      "expected": "Кандидат примеры: публичная страница — skip; профиль — auth + authz на свои данные; admin — auth + role; API — auth идентифицирует, authz по тарифу/rate limit.",
+      "score": 1.0,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "When to use блок ITLead",
+        "mustConcepts": [
+          "публичн",
+          "лендинг",
+          "блог",
+          "профиль",
+          "свои данные",
+          "admin",
+          "админ",
+          "rate limit",
+          "тариф",
+          "API",
+          "skip",
+          "пропустить",
+          "идентифицир",
+          "dashboard"
+        ],
+        "falseClaims": [
+          "на публичный лендинг всегда нужен JWT",
+          "admin dashboard без авторизации ролей",
+          "профиль другого пользователя доступен после login",
+          "rate limiting не связан с auth"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Аутентификация — «кто ты?»: login проверяет пароль, выдаёт JWT. Авторизация — «что можешь?»: middleware читает role из токена и разрешает /admin только admin. Сначала verify token (401 если нет), потом check role (403 если user). Путать 401 и 403 — клиент зря перелогинивается.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На маркетплейсе публичный каталог без auth. Профиль — auth по cookie/JWT, authz что видишь только свои заказы. Админка — auth + role admin. JWT несёт userId (auth) и role/scopes (authz). Если role сняли в БД — короткий access 15m и refresh с запросом актуальной role.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Express: authenticateToken — 401 без токена или invalid. Внутри /users if role !== admin — 403. OAuth через Google — auth; scopes в access token — authz на API endpoints.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Authentication и authorization — одно и то же, оба проверяют пароль при каждом запросе.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Если пользователь залогинен но не admin — возвращаю 401 Unauthorized чтобы он снова ввёл пароль.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "На /admin сначала checkRole по header X-Role, потом verifyToken — так быстрее. JWT с role admin без expiresIn — норм, роль в токене всегда актуальна.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "auth_authz_definition",
+      "exampleType": "good",
+      "exampleText": "Auth: пароль/JWT подтверждает identity. Authz: RBAC проверяет может ли эта identity удалить пост.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "auth_authz_definition",
+      "exampleType": "good",
+      "exampleText": "ну auth — кто ты, authz — что тебе можно, без первого второе не работает",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "auth_authz_definition",
+      "exampleType": "bad",
+      "exampleText": "Авторизация проверяет email и пароль на login форме.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "auth_before_authz",
+      "exampleType": "good",
+      "exampleText": "Middleware chain: verifyToken → checkRole. Без валидного токена role не проверяем.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "auth_before_authz",
+      "exampleType": "good",
+      "exampleText": "сначала логин или bearer token, только потом canAccessAdmin",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "auth_before_authz",
+      "exampleType": "bad",
+      "exampleText": "checkRole можно ставить первым — если role admin в header, токен не нужен.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "http_401_403",
+      "exampleType": "good",
+      "exampleText": "Неверный пароль — 401, клиент re-login. Залогинен как user на /admin — 403 Forbidden, не 401.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "http_401_403",
+      "exampleType": "good",
+      "exampleText": "401 = докажи кто ты, 403 = знаю кто ты но нет — два разных flow для клиента",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "http_401_403",
+      "exampleType": "bad",
+      "exampleText": "!hasPermission всегда 401 — так REST API стандартизирован.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "jwt_in_both",
+      "exampleType": "good",
+      "exampleText": "Login: jwt.sign после verify password — auth. GET /users: decoded.role === admin — authz из того же токена.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "jwt_in_both",
+      "exampleType": "good",
+      "exampleText": "один jwt — sub для identity и role/scopes для прав",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "jwt_in_both",
+      "exampleType": "bad",
+      "exampleText": "JWT только для login, permissions всегда только из session cookie.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "mechanisms_rbac",
+      "exampleType": "good",
+      "exampleText": "Auth: Passport + OAuth. Authz: CASL abilities или Casbin policy. RBAC — admin delete; ABAC — owner может edit только свой post.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "mechanisms_rbac",
+      "exampleType": "good",
+      "exampleText": "scopes в jwt для api, rbac роли admin user viewer",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "mechanisms_rbac",
+      "exampleType": "bad",
+      "exampleText": "RBAC — это способ аутентификации через роль в пароле.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "expiresIn 15m + refresh из БД — после revoke admin role новый token уже user. Blacklist jti в Redis на logout.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "не 401 на hasPermission — 403. не checkRole до verifyToken",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Сессия после login гарантирует права до logout, даже если role изменили в БД.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Блог — без auth. Личный кабинет — auth + только свои данные. Admin panel — auth + role check.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "api: auth кто звонит, authz лимиты по тарифу free vs pro",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "На любой странице включая landing нужны JWT и RBAC — безопасность превыше всего.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "what-is-the-difference-between-authorization-and-authentication",
+    "apiUrl": "https://api.itlead.org/api/questions/what-is-the-difference-between-authorization-and-authentication",
+    "pageUrl": "https://itlead.org/interview-questions/general/what-is-the-difference-between-authorization-and-authentication",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is the difference between authorization and authentication?",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

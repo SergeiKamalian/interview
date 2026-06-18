@@ -1,0 +1,590 @@
+{
+  "topic": {
+    "code": "nestjs_interceptors",
+    "name": "Interceptors в NestJS",
+    "skillCode": "nestjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое interceptors в NestJS и как они работают?",
+    "shortAnswer": "Interceptor в NestJS — класс, реализующий NestInterceptor, который оборачивает выполнение route handler через RxJS Observable: код до next.handle() выполняется до handler, операторы в .pipe() — после. Используют для логирования, трансформации ответа, кеширования и маппинга ошибок на нескольких маршрутах.",
+    "idealAnswer": "NestJS interceptor — класс, оборачивающий выполнение route handler с помощью RxJS Observable и позволяющий выполнять логику до и после handler. intercept(context, next) получает ExecutionContext и CallHandler; next.handle() возвращает Observable, который при подписке запускает handler; всё в .pipe() выполняется post-handler. Код до next.handle() — pre-handler (логирование входа, проверка кеша). Interceptors стоят в pipeline после guards и до pipes на входе, после handler на выходе: Request → Middleware → Guards → Interceptors (pre) → Pipes → Route Handler → Interceptors (post) → Exception Filters → Response. От middleware: middleware работает с сырыми req/res линейно до handler; interceptor оборачивает Observable handler и даёт декларативный контроль потока через retry, timeout, catchError, map. От guard/pipe: auth — guard (до interceptors), валидация входа — pipe (между interceptors и handler). Применение: @UseInterceptors на методе/контроллере; глобально через APP_INTERCEPTOR в providers модуля (с DI). Глобальные interceptors выполняются в порядке регистрации в providers. Типичные кейсы: TransformInterceptor — обёртка { data, success, timestamp }; LoggingInterceptor — tap с замером времени; CacheInterceptor — of(cached) short-circuit без вызова handler; catchError для маппинга DB error → HTTP 503; timeout interceptor — pipe(timeout(5000), catchError → HttpException 408). Ошибки идут через throwError, catchError их ловит, tap — только на успешных emission. Частые ошибки: .then() на next.handle() (Observable, не Promise) — нужен map; tap для error handling (ошибки handler обходят tap); забытый return next.handle() при cache miss → undefined; async intercept возвращает Promise<Observable>, не Observable. Условное применение: проверка context.switchToHttp().getRequest().method внутри intercept или @UseInterceptors только на нужных методах. Overhead глобального interceptor ~1–2ms на типичный transform/logging.",
+    "maxScore": 10,
+    "skills": [
+      "nestjs",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "interceptor_definition",
+      "title": "Понимает суть interceptor",
+      "expected": "Кандидат объясняет: interceptor реализует NestInterceptor, оборачивает handler через Observable, выполняет логику до и после handler; next.handle() запускает handler при подписке.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — обёртка handler через Observable из ITLead TL;DR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "interceptor_definition",
+            "oftenConfusedWith": [
+              "next_handle_pipe",
+              "pipeline_position"
+            ],
+            "anchorTermsExpected": [
+              "interceptor",
+              "NestInterceptor",
+              "next.handle",
+              "Observable",
+              "до handler",
+              "после handler"
+            ],
+            "anchorTermsWrongTopic": [
+              "interceptor это middleware",
+              "guard оборачивает Observable",
+              "pipe выполняется до handler"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "interceptor",
+              "NestInterceptor",
+              "next.handle"
+            ],
+            "ask": "чем interceptor отличается от простого вызова handler в middleware"
+          }
+        ],
+        "mustConcepts": [
+          "interceptor",
+          "перехват",
+          "NestInterceptor",
+          "intercept",
+          "ExecutionContext",
+          "CallHandler",
+          "next.handle",
+          "Observable",
+          "оборачива",
+          "handler",
+          "до handler",
+          "после handler",
+          "RxJS",
+          "route handler",
+          "логик"
+        ],
+        "falseClaims": [
+          "interceptor заменяет guard для авторизации",
+          "interceptor валидирует входные данные как pipe",
+          "next.handle() возвращает Promise",
+          "interceptor выполняется только после handler"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "next_handle_pipe",
+      "title": "Знает next.handle() и .pipe()",
+      "expected": "Кандидат объясняет: код до next.handle() — pre-handler; next.handle() возвращает Observable; операторы в .pipe() (tap, map, catchError) выполняются post-handler на потоке ответа.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевая модель split pre/post из ITLead quick example",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "interceptor_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "next.handle",
+              "pipe",
+              "tap",
+              "map"
+            ],
+            "ask": "что выполняется до next.handle(), а что внутри .pipe()"
+          }
+        ],
+        "mustConcepts": [
+          "next.handle",
+          "pipe",
+          "tap",
+          "map",
+          "catchError",
+          "pre-handler",
+          "post-handler",
+          "Observable",
+          "подпис",
+          "subscribe",
+          "оператор",
+          "до handler",
+          "после handler",
+          "ответ",
+          "emission"
+        ],
+        "falseClaims": [
+          "tap выполняется до вызова handler",
+          "map в pipe работает до handler",
+          "можно вызвать .then() на next.handle()",
+          "pipe не нужен для трансформации ответа"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "pipeline_position",
+      "title": "Знает место в pipeline запроса",
+      "expected": "Кандидат описывает порядок: Middleware → Guards → Interceptors (pre) → Pipes → Handler → Interceptors (post) → Exception Filters; guard может отклонить до interceptor; pipes между interceptors и handler.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "pipeline position из ITLead — базовый middle",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "guard",
+              "pipe",
+              "middleware",
+              "pipeline"
+            ],
+            "ask": "где interceptors относительно guards и pipes"
+          }
+        ],
+        "mustConcepts": [
+          "middleware",
+          "guard",
+          "pipe",
+          "interceptor",
+          "exception filter",
+          "handler",
+          "pipeline",
+          "порядок",
+          "до handler",
+          "после handler",
+          "отклон",
+          "guard до",
+          "pipes между"
+        ],
+        "falseClaims": [
+          "interceptors выполняются до guards",
+          "pipes идут после interceptors post-handler",
+          "exception filters до interceptors",
+          "middleware оборачивает Observable handler"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "interceptor_vs_middleware_guard",
+      "title": "Отличает interceptor от middleware, guard и pipe",
+      "expected": "Кандидат сравнивает: middleware — req/res до handler; interceptor — Observable stream с retry/timeout/catchError; auth — guard; валидация входа — pipe; global envelope и logging — interceptor.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "when to use таблица ITLead — частая путаница на middle",
+        "confusionPairs": [
+          {
+            "checkpointKey": "interceptor_vs_middleware_guard",
+            "oftenConfusedWith": [
+              "pipeline_position",
+              "interceptor_definition"
+            ],
+            "anchorTermsExpected": [
+              "middleware",
+              "guard",
+              "pipe",
+              "auth",
+              "валидац",
+              "Observable",
+              "req/res"
+            ],
+            "anchorTermsWrongTopic": [
+              "auth через interceptor",
+              "валидация DTO в interceptor",
+              "middleware даёт catchError"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "middleware",
+          "guard",
+          "pipe",
+          "interceptor",
+          "auth",
+          "авторизац",
+          "валидац",
+          "req",
+          "res",
+          "Observable",
+          "retry",
+          "timeout",
+          "catchError",
+          "envelope",
+          "логирован",
+          "transform"
+        ],
+        "falseClaims": [
+          "auth лучше делать в interceptor чем в guard",
+          "DTO validation — задача interceptor",
+          "middleware может map ответ handler декларативно",
+          "guard и interceptor взаимозаменяемы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "applying_interceptors",
+      "title": "Знает способы подключения interceptors",
+      "expected": "Кандидат называет: @UseInterceptors на методе и контроллере; APP_INTERCEPTOR в providers для глобальной регистрации с DI; порядок глобальных interceptors = порядок в providers.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Applying interceptors блок ITLead",
+        "mustConcepts": [
+          "UseInterceptors",
+          "APP_INTERCEPTOR",
+          "глобальн",
+          "контроллер",
+          "метод",
+          "providers",
+          "DI",
+          "модуль",
+          "порядок",
+          "регистрац",
+          "LoggingInterceptor",
+          "TransformInterceptor"
+        ],
+        "falseClaims": [
+          "глобальный interceptor нельзя зарегистрировать с DI",
+          "UseInterceptors работает только на уровне метода",
+          "порядок APP_INTERCEPTOR не влияет на результат",
+          "interceptors подключаются только в main.ts без DI"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки interceptors",
+      "expected": "Кандидат называет: .then() на Observable; tap для error path; забытый return next.handle() при cache miss; async intercept → Promise<Observable>; catchError вместо tap для ошибок handler.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — частые production-баги из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "then",
+              "Promise",
+              "Observable"
+            ],
+            "ask": "почему .then() на next.handle() падает с TypeError"
+          },
+          {
+            "match": [
+              "tap",
+              "catchError",
+              "ошибк"
+            ],
+            "ask": "почему tap не ловит ошибки handler"
+          },
+          {
+            "match": [
+              "cache",
+              "of(cached)",
+              "next.handle"
+            ],
+            "ask": "что будет если при cache miss забыть return next.handle()"
+          }
+        ],
+        "mustConcepts": [
+          "then",
+          "Promise",
+          "Observable",
+          "map",
+          "tap",
+          "catchError",
+          "ошибк",
+          "handler",
+          "cache miss",
+          "undefined",
+          "async",
+          "Promise<Observable>",
+          "return next.handle",
+          "of(cached)",
+          "TypeError",
+          "production"
+        ],
+        "falseClaims": [
+          "tap перехватывает ошибки handler",
+          "next.handle() можно await как Promise",
+          "async intercept возвращает Observable<any>",
+          "cache miss без return next.handle вернёт пустой Observable автоматически"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "rxjs_patterns",
+      "title": "Знает практические RxJS-паттерны",
+      "expected": "Кандидат описывает: TransformInterceptor с map для envelope; CacheInterceptor с of(cached) short-circuit; catchError для маппинга ошибок; timeout + catchError → HttpException 408; условное применение по request.method.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Examples + senior follow-up timeout из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "TransformInterceptor",
+              "envelope",
+              "data",
+              "success"
+            ],
+            "ask": "как глобально обернуть все ответы в { data, success, timestamp }"
+          },
+          {
+            "match": [
+              "of(cached)",
+              "cache",
+              "short-circuit"
+            ],
+            "ask": "как пропустить handler при cache hit"
+          },
+          {
+            "match": [
+              "timeout",
+              "408",
+              "HttpException"
+            ],
+            "ask": "как реализовать timeout interceptor для медленных DB-запросов"
+          }
+        ],
+        "mustConcepts": [
+          "TransformInterceptor",
+          "map",
+          "envelope",
+          "data",
+          "success",
+          "timestamp",
+          "CacheInterceptor",
+          "of",
+          "cached",
+          "short-circuit",
+          "catchError",
+          "timeout",
+          "HttpException",
+          "408",
+          "503",
+          "method",
+          "POST",
+          "stampede",
+          "Sentry",
+          "Datadog"
+        ],
+        "falseClaims": [
+          "of(cached) всё равно вызывает handler",
+          "timeout работает без RxJS operators",
+          "catchError в interceptor не видит ошибки handler",
+          "transform interceptor нужно вешать на каждый метод отдельно без APP_INTERCEPTOR"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Interceptor оборачивает handler через Observable: до next.handle() логирую вход, в pipe(tap) — время после ответа. Auth — guard, DTO validation — ValidationPipe. Глобально TransformInterceptor через APP_INTERCEPTOR даёт { data, success } на всех endpoint.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "LoggingInterceptor: const now = Date.now(); return next.handle().pipe(tap(() => log elapsed)). Cache hit — return of(cached), handler не трогаем. Ошибки handler — catchError, не tap. async intercept → Promise<Observable<any>>.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Pipeline: middleware → guard → interceptor pre → pipe → handler → interceptor post → exception filter. Timeout: pipe(timeout(5000), catchError → HttpException 408). Для POST-only проверяю req.method внутри intercept.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Interceptor — это middleware для req/res. Авторизацию делаю в interceptor, guard не нужен. next.handle().then(data => wrap(data)) — стандартный паттерн.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Ошибки handler ловлю через tap(() => throw ...). При cache miss просто return без next.handle — Nest сам вызовет handler. tap и catchError делают одно и то же.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Interceptors идут до guards. Pipes выполняются после post-handler interceptors. of(cached) всё равно запускает route handler для прогрева кеша.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "interceptor_definition",
+      "exampleType": "good",
+      "exampleText": "NestInterceptor.intercept получает context и CallHandler; next.handle() возвращает Observable, который при subscribe запускает route handler.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "interceptor_definition",
+      "exampleType": "good",
+      "exampleText": "ну interceptor — обёртка вокруг handler, можно код до и после, через rxjs observable",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "interceptor_definition",
+      "exampleType": "bad",
+      "exampleText": "Interceptor — это guard который проверяет JWT перед handler и блокирует неавторизованных.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "next_handle_pipe",
+      "exampleType": "good",
+      "exampleText": "console.log до next.handle(); return next.handle().pipe(tap после, map для transform) — split pre/post.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "next_handle_pipe",
+      "exampleType": "good",
+      "exampleText": "всё в pipe — post-handler; map меняет data после того как handler отдал результат",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "next_handle_pipe",
+      "exampleType": "bad",
+      "exampleText": "return next.handle().then(data => ({ wrapped: data })) — правильный способ обернуть ответ.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "pipeline_position",
+      "exampleType": "good",
+      "exampleText": "Guard может вернуть false до interceptor. Pipes между interceptor и handler — валидация DTO. Post-interceptor до exception filter.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "pipeline_position",
+      "exampleType": "good",
+      "exampleText": "middleware первый, потом guards, interceptors, pipes, handler, снова interceptors на выходе",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "pipeline_position",
+      "exampleType": "bad",
+      "exampleText": "Pipes выполняются до guards, interceptors последние перед response без exception filters.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "interceptor_vs_middleware_guard",
+      "exampleType": "good",
+      "exampleText": "Middleware — req/res chain; interceptor — Observable с retry/timeout. Auth — AuthGuard, не interceptor. ValidationPipe — pipe, не map в interceptor.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "interceptor_vs_middleware_guard",
+      "exampleType": "good",
+      "exampleText": "глобальный envelope и timing — interceptor; проверка ролей — guard; class-validator — pipe",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "interceptor_vs_middleware_guard",
+      "exampleType": "bad",
+      "exampleText": "Для JWT auth использую LoggingInterceptor с проверкой Authorization header — guard избыточен.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "applying_interceptors",
+      "exampleType": "good",
+      "exampleText": "@UseInterceptors на @Get() методе; @Controller + @UseInterceptors на классе; APP_INTERCEPTOR в AppModule providers для DI.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "applying_interceptors",
+      "exampleType": "good",
+      "exampleText": "два APP_INTERCEPTOR — transform первый, logging второй, порядок в providers важен",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "applying_interceptors",
+      "exampleType": "bad",
+      "exampleText": "Глобальный interceptor только через app.use() в main.ts, APP_INTERCEPTOR не поддерживает inject.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "if (cached) return of(cached); else return next.handle().pipe(...) — обе ветки обязаны return Observable.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "ошибки handler — catchError в pipe, tap только на success; async intercept: Promise<Observable<any>>",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "return next.handle().pipe(tap(err => log)) — tap залогирует все ошибки handler в production.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "rxjs_patterns",
+      "exampleType": "good",
+      "exampleText": "TransformInterceptor: pipe(map(data => ({ data, success: true, timestamp }))). Cache: if hit return of(cached). Timeout: pipe(timeout(5000), catchError → 408).",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "rxjs_patterns",
+      "exampleType": "good",
+      "exampleText": "catchError маппит Prisma error в HttpException 503; of(cached) — handler не вызывается вообще",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "rxjs_patterns",
+      "exampleType": "bad",
+      "exampleText": "Для timeout достаточно setTimeout в intercept до next.handle без RxJS timeout operator.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-interceptors",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-interceptors",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-interceptors",
+    "difficulty": "MIDDLE",
+    "titleEn": "What are interceptors in NestJS?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

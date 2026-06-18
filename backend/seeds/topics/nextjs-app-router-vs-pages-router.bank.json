@@ -1,0 +1,569 @@
+{
+  "topic": {
+    "code": "nextjs_app_router_vs_pages_router",
+    "name": "App Router vs Pages Router в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "В чём разница между App Router и Pages Router в Next.js и когда какой выбирать?",
+    "shortAnswer": "Pages Router (`pages/`) по умолчанию рендерит клиентские компоненты и получает данные через `getServerSideProps` / `getStaticProps`. App Router (`app/`) по умолчанию использует React Server Components: данные фетчатся в `async`-компонентах на сервере, HTML стримится, а гидратируются только части с `'use client'`. Для новых проектов рекомендуют App Router.",
+    "idealAnswer": "Next.js содержит две системы маршрутизации: Pages Router (`pages/`, с Next.js 9, дефолт до 13) и App Router (`app/`, с Next.js 13, стабилен с 13.4+, дефолт с 14). Pages Router предполагает, что браузер делает основную работу: страница — клиентский компонент, данные приходят через экспорты `getServerSideProps`, `getStaticProps` или `getStaticPaths` как `{ props }`, сериализованные в JSON. App Router по умолчанию делает каждый компонент React Server Component: `async`-функции фетчат данные прямо в компоненте, результат уходит как HTML; браузер гидратирует только `'use client'`-части. Ключевая строка: `getServerSideProps` vs `async`-компонент. При SSR в Pages: сервер выполняет data helper → props на клиент → полная гидратация дерева через `hydrateRoot`, JS-бандл страницы уходит в браузер. В App Router Next.js обходит дерево `app/`, собирает вложенные `layout.tsx`, async-компоненты стримят HTML по мере готовности, `'use client'`-компоненты летят как RSC Payload (React Flight), гидратируется только клиентская часть. `fetch` в App Router патчится Next.js: одинаковые URL в одном request dedupe; по умолчанию кешируется — `{ cache: 'no-store' }` или `{ next: { revalidate: 3600 } }` для контроля. App Router даёт вложенные layouts, `loading.tsx` (Suspense из коробки), per-route `error.tsx`, `generateMetadata`, streaming, Server Actions (`'use server'`), меньший client bundle. Pages — `_app.tsx`, `<Head>`, ручные спиннеры, API routes + client fetch для мутаций. Когда App: новый проект, SEO, динамический UI, colocation данных. Когда Pages: legacy до 13, `output: 'export'` (RSC несовместим со static export), команда ещё не освоила RSC. Оба роутера могут сосуществовать, но `_app.tsx` Context не виден в `app/` — auth/theme провайдеры дублируют или переносят в `app/layout.tsx`. Типичные ошибки: `'use client'` на всей странице (убивает RSC), `useState`/`useEffect` в server component (build error), ожидание провайдеров из `_app` в `app/`, `fallback: false` там где контент растёт. Server component может передать server-fetched данные в `'use client'` child через props (строки, числа, plain objects); функции не сериализуются — нужен Server Action.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "react"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "pages_vs_app_core",
+      "title": "Понимает суть Pages vs App Router",
+      "expected": "Кандидат объясняет: Pages — клиентский компонент по умолчанию, данные через file-level exports; App — RSC по умолчанию, сервер стримит HTML, гидратация только у `'use client'`.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — две модели рендеринга в одном фреймворке",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "pages_vs_app_core",
+            "oftenConfusedWith": [
+              "request_flow_rsc",
+              "data_fetching_models"
+            ],
+            "anchorTermsExpected": [
+              "Pages Router",
+              "App Router",
+              "RSC",
+              "use client",
+              "pages/",
+              "app/",
+              "клиент",
+              "сервер"
+            ],
+            "anchorTermsWrongTopic": [
+              "App Router использует getServerSideProps",
+              "Pages Router это RSC",
+              "оба роутера одинаково гидратируют всё дерево"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Pages Router",
+              "App Router",
+              "pages/",
+              "app/"
+            ],
+            "ask": "где по умолчанию выполняется компонент — в браузере или на сервере"
+          }
+        ],
+        "mustConcepts": [
+          "Pages Router",
+          "App Router",
+          "pages/",
+          "app/",
+          "React Server Component",
+          "RSC",
+          "use client",
+          "клиентский компонент",
+          "серверный компонент",
+          "гидрат",
+          "HTML",
+          "бандл",
+          "по умолчанию",
+          "Next.js 13",
+          "Next.js 14",
+          "стрим",
+          "streaming"
+        ],
+        "falseClaims": [
+          "App Router и Pages Router используют одну модель компонентов по умолчанию",
+          "Pages Router по умолчанию — server component",
+          "App Router отправляет полный JS-бандл каждой страницы как Pages",
+          "getServerSideProps работает внутри app/",
+          "оба роутера одинаково стримят HTML"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "data_fetching_models",
+      "title": "Сравнивает модели data fetching",
+      "expected": "Кандидат сравнивает: Pages — `getServerSideProps`/`getStaticProps`/`getStaticPaths` как named exports и `{ props }`; App — `async`-компонент с `await fetch` или прямым доступом к БД, данные рядом с UI, без props-прослойки.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "главный API-конtrast из ITLead quick example",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "pages_vs_app_core",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "getServerSideProps",
+              "getStaticProps",
+              "async"
+            ],
+            "ask": "чем getServerSideProps отличается от async page component в app/"
+          },
+          {
+            "match": [
+              "props",
+              "serialize",
+              "JSON"
+            ],
+            "ask": "как данные попадают из сервера в компонент в каждом роутере"
+          }
+        ],
+        "mustConcepts": [
+          "getServerSideProps",
+          "getStaticProps",
+          "getStaticPaths",
+          "async",
+          "await",
+          "fetch",
+          "props",
+          "сериализ",
+          "JSON",
+          "colocation",
+          "колокац",
+          "file-level",
+          "export",
+          "server fetch",
+          "клиентский бандл",
+          "не попадает в bundle"
+        ],
+        "falseClaims": [
+          "getServerSideProps можно вызывать внутри app/page.tsx",
+          "async server component обязан использовать getServerSideProps",
+          "fetch в App Router всегда выполняется в браузере",
+          "props в Pages Router не сериализуются в JSON"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "request_flow_rsc",
+      "title": "Описывает flow запроса и RSC Payload",
+      "expected": "Кандидат описывает: Pages SSR — helper → props → полная гидратация; App — обход layout/page, стрим HTML, `'use client'` через React Flight, гидратация только client-частей; server components остаются чистым HTML.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "request flow и RSC — ключ для middle+ понимания App Router",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "RSC Payload",
+              "React Flight",
+              "Flight"
+            ],
+            "ask": "что происходит с use client компонентом при запросе в App Router"
+          },
+          {
+            "match": [
+              "hydrate",
+              "гидрат",
+              "server component"
+            ],
+            "ask": "гидратируются ли server components в браузере"
+          }
+        ],
+        "mustConcepts": [
+          "layout.tsx",
+          "route manifest",
+          "стрим",
+          "streaming",
+          "RSC Payload",
+          "React Flight",
+          "Flight",
+          "hydrateRoot",
+          "гидрат",
+          "use client",
+          "чистый HTML",
+          "React runtime",
+          "браузер",
+          "incremental",
+          "await",
+          "pause"
+        ],
+        "falseClaims": [
+          "server components гидратируются в браузере как обычные React-компоненты",
+          "App Router не поддерживает streaming",
+          "Pages Router стримит HTML так же как App Router",
+          "RSC Payload — это тот же JSON что props из getServerSideProps"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "layouts_streaming_features",
+      "title": "Знает layouts, loading и фичи App Router",
+      "expected": "Кандидат называет: вложенные `layout.tsx`, `loading.tsx` (Suspense), per-route `error.tsx`, `generateMetadata`, Server Actions; в Pages — `_app.tsx`, `<Head>`, ручной loading state.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "таблица фич ITLead — практическое отличие в DX",
+        "mustConcepts": [
+          "layout.tsx",
+          "loading.tsx",
+          "error.tsx",
+          "generateMetadata",
+          "Suspense",
+          "Server Actions",
+          "use server",
+          "_app.tsx",
+          "_error.tsx",
+          "Head",
+          "nested layout",
+          "вложен",
+          "parallel routes",
+          "partial prerendering",
+          "скелетон",
+          "skeleton"
+        ],
+        "falseClaims": [
+          "loading.tsx работает в pages/ так же как в app/",
+          "generateMetadata доступен в Pages Router через тот же API",
+          "Server Actions работают только в Pages Router",
+          "_app.tsx автоматически оборачивает маршруты app/"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Выбирает роутер по контексту",
+      "expected": "Кандидат называет: App для новых проектов с SEO/динамикой; Pages для legacy и `output: 'export'`; постепенная миграция route-by-route; hybrid как временное состояние.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use из ITLead — практический выбор",
+        "mustConcepts": [
+          "новый проект",
+          "legacy",
+          "миграц",
+          "output export",
+          "static export",
+          "SEO",
+          "LCP",
+          "hybrid",
+          "сосуществ",
+          "route-by-route",
+          "create-t3-app",
+          "команда",
+          "RSC модель"
+        ],
+        "falseClaims": [
+          "Pages Router обязателен для всех новых Next.js проектов",
+          "App Router совместим с output export и static export",
+          "hybrid mode — рекомендуемая постоянная архитектура",
+          "legacy проект нельзя мигрировать постепенно"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки миграции",
+      "expected": "Кандидат называет: `'use client'` на всей странице, hooks в server component, Context из `_app` не виден в `app/`, передача функций как props; `fallback: false` для растущего контента.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — частые production-ловушки при миграции",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "pages_vs_app_core",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "use client",
+              "useState",
+              "useEffect"
+            ],
+            "ask": "почему useState в app/page.tsx даёт build error и как правильно"
+          },
+          {
+            "match": [
+              "_app.tsx",
+              "Context",
+              "provider"
+            ],
+            "ask": "почему theme provider из _app не работает в app/ маршрутах"
+          },
+          {
+            "match": [
+              "функц",
+              "prop",
+              "Server Action"
+            ],
+            "ask": "можно ли передать fetch-функцию как prop в use client child"
+          }
+        ],
+        "mustConcepts": [
+          "use client",
+          "useState",
+          "useEffect",
+          "useContext",
+          "build error",
+          "async await",
+          "_app.tsx",
+          "app/layout.tsx",
+          "Context",
+          "provider",
+          "auth",
+          "theme",
+          "гибрид",
+          "fallback blocking",
+          "fallback false",
+          "getStaticPaths",
+          "Server Action",
+          "функции не сериализ",
+          "TTFB",
+          "bundle size"
+        ],
+        "falseClaims": [
+          "можно ставить use client на всю страницу без потери преимуществ RSC",
+          "useEffect в server component — нормальный паттерн для fetch",
+          "Context из _app.tsx автоматически доступен в app/",
+          "функции сериализуются через props в RSC так же как объекты",
+          "fallback false подходит для контента с новыми slug после деплоя"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "fetch_cache_dedup",
+      "title": "Понимает кеш и dedupe fetch в App Router",
+      "expected": "Кандидат объясняет: Next.js патчит fetch — dedupe одинаковых URL в одном request; кеш по умолчанию; `cache: 'no-store'` или `next.revalidate` для контроля.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "dedupe/caching — бонус из follow-up ITLead",
+        "mustConcepts": [
+          "dedupe",
+          "дедупл",
+          "кеш",
+          "cache",
+          "no-store",
+          "revalidate",
+          "fetch patched",
+          "один request",
+          "один URL",
+          "render pass"
+        ],
+        "falseClaims": [
+          "Pages Router автоматически dedupe fetch между компонентами",
+          "fetch в App Router никогда не кешируется",
+          "revalidate работает только в getStaticProps а не в App Router fetch"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Pages Router: страница — client component, getServerSideProps на сервере возвращает props, браузер гидратирует всё дерево. App Router: async page на сервере, HTML стримится, use client только у интерактивных кусков — меньше JS и быстрее LCP на динамике.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Новый лендинг с SEO — app/ с nested layout и loading.tsx. Старый монолит на pages/ — новые фичи в app/, провайдеры переношу в app/layout.tsx, не рассчитываю на _app Context в hybrid.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Вместо getServerSideProps в app/posts/[id]/page.tsx просто await fetch в async компоненте — код не попадает в client bundle. SearchInput с useState — отдельный файл с use client, страница передаёт initialQuery строкой.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "App Router — это просто переименование pages/ в app/, getServerSideProps работает там же. Оба роутера одинаково гидратируют всё дерево.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Ставлю use client на всю страницу — так проще с hooks. ThemeProvider из _app.tsx автоматически виден во всех app/ маршрутах.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для static export беру App Router — RSC отлично работает с output export. fetch в App Router всегда идёт только из браузера.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "pages_vs_app_core",
+      "exampleType": "good",
+      "exampleText": "Pages — компонент в браузере после hydration; App — RSC по умолчанию, HTML с сервера, use client только где нужны hooks.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "pages_vs_app_core",
+      "exampleType": "good",
+      "exampleText": "ну pages это старый подход — js на клиент, app — сервер стримит html, клиент только интерактив",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "pages_vs_app_core",
+      "exampleType": "bad",
+      "exampleText": "App Router и Pages Router оба по умолчанию client-only компоненты без серверного рендера.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "data_fetching_models",
+      "exampleType": "good",
+      "exampleText": "Pages: export async function getServerSideProps → return { props }. App: export default async function Page() { const data = await fetch(...) } — без props-прослойки.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "data_fetching_models",
+      "exampleType": "good",
+      "exampleText": "в app могу await db.post.findMany прямо в page.tsx — драйвер не уходит в bundle, в pages пришлось бы только через getServerSideProps",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "data_fetching_models",
+      "exampleType": "bad",
+      "exampleText": "В app/page.tsx экспортирую getServerSideProps — это официальный способ data fetching в App Router.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "request_flow_rsc",
+      "exampleType": "good",
+      "exampleText": "App Router собирает layouts по пути, стримит готовые части HTML, use client части летят как RSC Payload и гидратируются отдельно — server components остаются статичной разметкой.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "request_flow_rsc",
+      "exampleType": "good",
+      "exampleText": "pages ssr: gssp → json props → hydrateRoot всего дерева; app: async layout/page стримят, клиент не трогает server html",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "request_flow_rsc",
+      "exampleType": "bad",
+      "exampleText": "Server components в App Router всё равно гидратируются hydrateRoot как в Pages Router.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "layouts_streaming_features",
+      "exampleType": "good",
+      "exampleText": "app/dashboard/layout.tsx + loading.tsx — sidebar сразу, skeleton пока await getRecentActivity(), без ручного useState спиннера как в pages.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "layouts_streaming_features",
+      "exampleType": "good",
+      "exampleText": "generateMetadata per route вместо Head; error.tsx на сегмент; мутации через Server Actions с use server",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "layouts_streaming_features",
+      "exampleType": "bad",
+      "exampleText": "loading.tsx в pages/ автоматически включает Suspense как в app/.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Greenfield с SEO — App Router. Legacy pages/ — мигрирую постепенно. Static export — только Pages, RSC там не работает.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "команда не знает rsc — можно временно pages, но новый код лучше сразу в app",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Hybrid mode — лучшая долгосрочная архитектура, провайдеры из _app покрывают app/.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "use client на всей page — убивает RSC, bundle x2. Правильно: маленький SearchInput.tsx с use client, page остаётся server async.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "auth provider только в _app — в app/ маршрутах контекста нет, дублирую или переношу в app/layout.tsx",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Передаю searchPosts функцию как prop в use client — сериализуется нормально, Server Action не нужен.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "fetch_cache_dedup",
+      "exampleType": "good",
+      "exampleText": "Два компонента await fetch('/api/posts') в одном request — Next dedupe, один сетевой вызов. Свежие данные — cache: 'no-store', ISR — next: { revalidate: 3600 }.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "fetch_cache_dedup",
+      "exampleType": "good",
+      "exampleText": "fetch в app патчен — не как в браузере, кеш по умолчанию, надо явно no-store если нужен realtime",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "fetch_cache_dedup",
+      "exampleType": "bad",
+      "exampleText": "Pages Router dedupe fetch между компонентами так же как App Router из коробки.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nextjs-app-router-vs-pages-router",
+    "apiUrl": "https://api.itlead.org/api/questions/nextjs-app-router-vs-pages-router",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/nextjs-app-router-vs-pages-router",
+    "difficulty": "MIDDLE",
+    "titleEn": "App Router vs Pages Router in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T16:30:00.000Z"
+  }
+}

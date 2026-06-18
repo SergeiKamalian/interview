@@ -1,0 +1,644 @@
+{
+  "topic": {
+    "code": "what_is_reactmemo_why_is_it_needed",
+    "name": "React.memo — что это и зачем нужен",
+    "skillCode": "react",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое React.memo и зачем он нужен?",
+    "shortAnswer": "React.memo — HOC, который оборачивает функциональный компонент и пропускает его re-render, если props не изменились (поверхностное сравнение через Object.is). Для функций и объектов в props обязательно сочетай с useCallback и useMemo, иначе сравнение каждый раз проваливается.",
+    "idealAnswer": "React.memo — higher-order component (HOC), оборачивающий функциональный компонент и пропускающий его re-render, когда props не изменились. По умолчанию React при re-render родителя перерисовывает всех детей, даже если их props идентичны. memo вставляет поверхностную проверку props перед вызовом render: примитивы сравниваются по значению, объекты, массивы и функции — по ссылке (Object.is / shallowEqual по Object.keys). Если все props равны, React возвращает закешированный ReactElement и не вызывает функцию компонента — экономится CPU и diff DOM. Внутри React хранит предыдущие props и последний вывод в fiber-узле; сравнение стоит ~1–2 микросекунды и окупается только если сэкономленный render заметно дороже. Второй аргумент memo — кастомный comparator (prevProps, nextProps) => boolean: true = props равны, skip re-render; false = разрешить render. Глубокое сравнение здесь может стоить дороже самого render. Когда использовать: элементы списков, редко меняющиеся leaf-компоненты; тяжёлые chart/table; чистые display-компоненты без локального state; React Profiler показывает лишние re-render с теми же props. Не использовать: крошечные компоненты (<0.1ms), props меняются каждый render, нет данных профайлера — overhead сравнения без выигрыша. Обязательная пара: useCallback для функций-prop и useMemo для объектов/массивов — inline onClick={() => ...} и const user = { ... } в render создают новые ссылки, memo бесполезен. Типичные ошибки: inline-функции без useCallback; object literals в render; мутация props in-place (memo видит ту же ссылку, UI stale); нестабильный children (новый JSX каждый render); memo на микрокомпонентах без Profiler. React.memo vs useMemo: memo кеширует вывод компонента по равенству props; useMemo кеширует вычисленное значение внутри компонента — часто вместе: memo на границе, useMemo для стабильного объекта в props. React 18: memo работает с startTransition; срочные обновления не откладываются. Практика: React Window, MUI TableRow, TanStack Table cells, Next.js client boundaries.",
+    "maxScore": 10,
+    "skills": [
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "reactmemo_definition",
+      "title": "Понимает назначение React.memo",
+      "expected": "Кандидат объясняет: React.memo — HOC для функционального компонента; пропускает re-render, если props не изменились; без memo родительский re-render тянет всех детей.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — HOC и skip re-render при неизменных props",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "reactmemo_definition",
+            "oftenConfusedWith": [
+              "memo_vs_usememo",
+              "internal_mechanism"
+            ],
+            "anchorTermsExpected": [
+              "React.memo",
+              "memo",
+              "HOC",
+              "props",
+              "skip",
+              "re-render"
+            ],
+            "anchorTermsWrongTopic": [
+              "useMemo кеширует компонент",
+              "memo заменяет Virtual DOM",
+              "memo это PureComponent для hooks"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "React.memo",
+              "memo",
+              "HOC"
+            ],
+            "ask": "что происходит с memo-компонентом при re-render родителя с теми же props"
+          }
+        ],
+        "mustConcepts": [
+          "React.memo",
+          "memo",
+          "HOC",
+          "оборачива",
+          "функциональн",
+          "компонент",
+          "props",
+          "проп",
+          "re-render",
+          "перерендер",
+          "skip",
+          "пропуск",
+          "не изменил",
+          "родител",
+          "дочерн",
+          "лишн"
+        ],
+        "falseClaims": [
+          "React.memo предотвращает re-render родителя",
+          "React.memo это useMemo для компонентов",
+          "memo глубоко сравнивает props по умолчанию",
+          "memo работает только с class components",
+          "memo блокирует все обновления state внутри компонента"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "shallow_comparison",
+      "title": "Понимает поверхностное сравнение props",
+      "expected": "Кандидат объясняет: shallow compare через Object.is; примитивы по значению; объекты, массивы, функции — по ссылке; два литерала с одинаковым содержимым не равны.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "механизм сравнения — ключ к пониманию когда memo работает",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "reactmemo_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "shallow_comparison",
+            "oftenConfusedWith": [
+              "custom_comparison"
+            ],
+            "anchorTermsExpected": [
+              "shallow",
+              "Object.is",
+              "референс",
+              "ссылк"
+            ],
+            "anchorTermsWrongTopic": [
+              "deep equal по умолчанию",
+              "JSON.stringify сравнение"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Object.is",
+              "shallow",
+              "объект"
+            ],
+            "ask": "почему { a: 1 } и { a: 1 } не равны для memo"
+          }
+        ],
+        "mustConcepts": [
+          "shallow",
+          "поверхност",
+          "Object.is",
+          "shallowEqual",
+          "Object.keys",
+          "примитив",
+          "значен",
+          "референс",
+          "ссылк",
+          "объект",
+          "массив",
+          "функц",
+          "литерал",
+          "одинаков содерж",
+          "не равн"
+        ],
+        "falseClaims": [
+          "React.memo сравнивает props по deep equality",
+          "два объекта с одинаковыми полями всегда равны для memo",
+          "строки и числа сравниваются по ссылке",
+          "Object.is сравнивает вложенные поля объектов рекурсивно"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "usecallback_usememo_pair",
+      "title": "Сочетает memo с useCallback и useMemo",
+      "expected": "Кандидат объясняет: inline-функции и object literals в render дают новые ссылки каждый render; memo бесполезен без useCallback для handlers и useMemo для объектов/массивов в props.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "главный практический паттерн из ITLead TL;DR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "shallow_comparison",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useCallback",
+              "inline",
+              "onClick"
+            ],
+            "ask": "почему memo(Button) с onClick={() => ...} не экономит re-render"
+          },
+          {
+            "match": [
+              "useMemo",
+              "объект",
+              "литерал"
+            ],
+            "ask": "как стабилизировать user object для memo(UserProfile)"
+          }
+        ],
+        "mustConcepts": [
+          "useCallback",
+          "useMemo",
+          "inline",
+          "стрелочн",
+          "onClick",
+          "handler",
+          "обработчик",
+          "литерал",
+          "новая ссылк",
+          "каждый render",
+          "стабилиз",
+          "референс",
+          "пара",
+          "вместе",
+          "props",
+          "функц-prop"
+        ],
+        "falseClaims": [
+          "React.memo сам стабилизирует функции в props",
+          "достаточно memo без useCallback для onClick",
+          "useMemo нужен только для чисел, не для объектов",
+          "inline arrow с тем же телом даёт ту же ссылку",
+          "memo и useCallback взаимозаменяемы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Знает когда применять и когда пропускать memo",
+      "expected": "Кандидат называет: list items, тяжёлые chart/table, display без state, данные Profiler; пропускает для tiny components, props меняются каждый render, нет evidence — overhead без выигрыша.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use / skip из ITLead",
+        "mustConcepts": [
+          "список",
+          "ListItem",
+          "TodoItem",
+          "chart",
+          "таблиц",
+          "display",
+          "Profiler",
+          "DevTools",
+          "0.1ms",
+          "overhead",
+          "tiny",
+          "мелк",
+          "leaf",
+          "лист",
+          "профил"
+        ],
+        "falseClaims": [
+          "memo нужен на каждый компонент по умолчанию",
+          "memo всегда ускоряет приложение",
+          "Profiler не нужен перед добавлением memo",
+          "memo заменяет виртуализацию длинных списков"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "custom_comparison",
+      "title": "Знает кастомное сравнение props",
+      "expected": "Кандидат описывает второй аргумент memo(Component, (prev, next) => boolean): true = skip, false = render; пример сравнения по id; предупреждает о стоимости deep equal.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "custom comparator из ITLead advanced example",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "второй аргумент",
+              "prevProps",
+              "nextProps",
+              "comparator"
+            ],
+            "ask": "что возвращает кастомная функция сравнения: true или false для skip"
+          }
+        ],
+        "mustConcepts": [
+          "второй аргумент",
+          "prevProps",
+          "nextProps",
+          "comparator",
+          "кастом",
+          "true",
+          "false",
+          "skip",
+          "id",
+          "user.id",
+          "deep",
+          "глубок",
+          "стоимость",
+          "benchmark"
+        ],
+        "falseClaims": [
+          "true во втором аргументе означает разрешить re-render",
+          "кастомное сравнение всегда лучше shallow",
+          "deep equal в comparator бесплатно",
+          "второй аргумент обязателен для memo"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "internal_mechanism",
+      "title": "Знает внутреннее устройство memo",
+      "expected": "Кандидат описывает: fiber хранит prev props и cached ReactElement; shallowEqual по Object.keys; функция компонента не вызывается при match; React 18 + startTransition.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "fiber + shallowEqual — middle depth из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "fiber",
+              "shallowEqual",
+              "кеш"
+            ],
+            "ask": "где React хранит предыдущие props и закешированный вывод memo-компонента"
+          }
+        ],
+        "mustConcepts": [
+          "fiber",
+          "fiber-узел",
+          "prev props",
+          "предыдущ",
+          "ReactElement",
+          "кеш",
+          "shallowEqual",
+          "Object.keys",
+          "не вызыва",
+          "функция компонента",
+          "MemoComponent",
+          "startTransition",
+          "React 18",
+          "concurrent",
+          "микросекунд"
+        ],
+        "falseClaims": [
+          "memo хранит кеш в Redux store",
+          "memo полностью отключает reconciliation",
+          "memo не работает в concurrent mode React 18",
+          "при match memo всё равно вызывает render function"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с React.memo",
+      "expected": "Кандидат называет: inline functions, object literals в render, мутация props in-place, нестабильный children, memo без Profiler на микрокомпонентах; fixes — useCallback, useMemo, immutability.",
+      "score": 2,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — частые production ловушки",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "usecallback_usememo_pair",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "children",
+              "JSX",
+              "span"
+            ],
+            "ask": "почему <MemoChild><span>label</span></MemoChild> ломает memo каждый render"
+          },
+          {
+            "match": [
+              "мутац",
+              "items.push",
+              "in-place"
+            ],
+            "ask": "что будет если мутировать массив в props без смены ссылки"
+          }
+        ],
+        "mustConcepts": [
+          "inline",
+          "useCallback",
+          "литерал",
+          "useMemo",
+          "мутац",
+          "in-place",
+          "immutable",
+          "иммутаб",
+          "children",
+          "JSX",
+          "stale",
+          "устарев",
+          "Profiler",
+          "0.05ms",
+          "overhead",
+          "DevTools"
+        ],
+        "falseClaims": [
+          "можно мутировать props objects — memo всё равно обновит UI",
+          "children не участвует в shallow compare",
+          "memo на 0.05ms компоненте всегда выгоден",
+          "новый JSX children каждый render не влияет на memo",
+          "забытый useCallback не влияет на memo-детей с handlers"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "memo_vs_usememo",
+      "title": "Отличает React.memo от useMemo",
+      "expected": "Кандидат сравнивает: memo оборачивает компонент и кеширует render output по props; useMemo кеширует вычисленное значение внутри компонента; часто используют вместе.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "follow-up Q из ITLead — частая путаница middle",
+        "mustConcepts": [
+          "React.memo",
+          "useMemo",
+          "компонент",
+          "значен",
+          "вычислен",
+          "границ",
+          "prop",
+          "вместе",
+          "кеш render",
+          "hook"
+        ],
+        "falseClaims": [
+          "React.memo и useMemo делают одно и то же",
+          "useMemo заменяет React.memo для компонентов",
+          "React.memo это синтаксический сugar useMemo"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "React.memo оборачивает функциональный компонент и делает shallow compare props через Object.is. Если props те же — skip re-render, React отдаёт закешированный элемент. Для onToggle передаю useCallback, для user object — useMemo, иначе новые ссылки каждый render и memo бесполезен.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В TodoList 200 items: memo(TodoItem) + стабильный handleToggle через useCallback — toggle одной задачи пропускает 199 re-render. Сначала Profiler, потом memo на тяжёлых leaf. Inline onClick={() => alert(1)} убивает memo — Object.is для двух стрелок всегда false.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "StatusBadge с memo и status=\"active\" рендерится один раз — count в Dashboard меняется, строка status та же. UserProfile с user literal в render re-render каждый клик; fix useMemo(() => ({ name, details }), [name]). Кастомный comparator по user.id когда shallow не хватает.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "React.memo глубоко сравнивает все props, поэтому { a: 1 } и { a: 1 } равны. useCallback не нужен — memo сам оптимизирует функции.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Оборачиваю все компоненты в memo без Profiler — overhead сравнения всегда выгоднее. Мутирую items.push в props — memo видит ту же ссылку, UI обновится сам.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "React.memo и useMemo одно и то же. true во втором аргументе comparator означает разрешить re-render. memo отключает reconciliation полностью.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "reactmemo_definition",
+      "exampleType": "good",
+      "exampleText": "memo — HOC: оборачиваешь Button, родитель re-render, props label те же — Button не вызывается.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "reactmemo_definition",
+      "exampleType": "good",
+      "exampleText": "ну memo не даёт ребёнку перерисовываться если пропсы не поменялись, родитель крутится — дети с теми же props стоят",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "reactmemo_definition",
+      "exampleType": "bad",
+      "exampleText": "React.memo блокирует setState внутри компонента и предотвращает re-render родителя.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "shallow_comparison",
+      "exampleType": "good",
+      "exampleText": "shallowEqual: Object.keys + Object.is на каждое значение; числа и строки по value, объекты и функции по reference.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "shallow_comparison",
+      "exampleType": "good",
+      "exampleText": "два { name: 'Alice' } — разные ссылки, memo re-render; та же ссылка на объект — skip",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "shallow_comparison",
+      "exampleType": "bad",
+      "exampleText": "memo сравнивает вложенные поля user.details.age рекурсивно по умолчанию.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "usecallback_usememo_pair",
+      "exampleType": "good",
+      "exampleText": "const handleClick = useCallback(() => log('clicked'), []); <MemoButton onClick={handleClick} /> — ссылка стабильна, memo skip.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "usecallback_usememo_pair",
+      "exampleType": "good",
+      "exampleText": "user = useMemo(() => ({ name: 'Alice', details: { age: 30 } }), []) — иначе новый literal каждый render ломает memo(UserProfile)",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "usecallback_usememo_pair",
+      "exampleType": "bad",
+      "exampleText": "<MemoChild onClick={() => alert(1)} /> — memo работает, тело функции одинаковое.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "memo на TodoItem в списке 500 строк; skip на IconBadge который рендерится за 0.05ms без Profiler evidence.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "тяжёлая chart cell — memo + Profiler показал одинаковые props; props меняются каждый render — memo бессмысленен",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "memo на каждый div в приложении — всегда быстрее без измерений.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "custom_comparison",
+      "exampleType": "good",
+      "exampleText": "memo(UserCard, (prev, next) => prev.user.id === next.user.id) — true skip, false render; не deep equal всего user.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "custom_comparison",
+      "exampleType": "good",
+      "exampleText": "второй аргумент: true = props равны пропустить, false = перерисовать",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "custom_comparison",
+      "exampleType": "bad",
+      "exampleText": "return false в comparator означает skip re-render.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "internal_mechanism",
+      "exampleType": "good",
+      "exampleText": "fiber хранит prev props и last element; match — функция компонента не вызывается, DOM diff пропускается.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "internal_mechanism",
+      "exampleType": "good",
+      "exampleText": "React 18 startTransition — memo comparison на каждой попытке; urgent input не defer",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "internal_mechanism",
+      "exampleType": "bad",
+      "exampleText": "memo кеш в localStorage компонента, fiber не участвует.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Fix: useCallback для handlers, useMemo для config object; не items.push — spread/new array; children в useMemo или module constant.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "забыл useCallback на onToggle — все memo TodoItem re-render каждый раз тихо",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "<MemoChild><span>label</span></MemoChild> — children не prop, memo игнорирует.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "memo_vs_usememo",
+      "exampleType": "good",
+      "exampleText": "memo(TodoItem) — skip render по props; useMemo внутри родителя — стабильный filteredTodos массив в prop.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "memo_vs_usememo",
+      "exampleType": "good",
+      "exampleText": "memo на границе компонента, useMemo для объекта что передаёшь вниз",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "memo_vs_usememo",
+      "exampleType": "bad",
+      "exampleText": "useMemo(() => <List />, []) заменяет React.memo(List).",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "what-is-reactmemo-and-why-is-it-needed",
+    "apiUrl": "https://api.itlead.org/api/questions/what-is-reactmemo-and-why-is-it-needed",
+    "pageUrl": "https://itlead.org/interview-questions/react/what-is-reactmemo-and-why-is-it-needed",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is React.memo and why is it needed",
+    "categorySlug": "react",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

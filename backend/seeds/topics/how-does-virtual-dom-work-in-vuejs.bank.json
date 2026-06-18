@@ -1,0 +1,583 @@
+{
+  "topic": {
+    "code": "how_does_virtual_dom_work_vuejs",
+    "name": "Virtual DOM в Vue.js",
+    "skillCode": "vue",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как работает Virtual DOM в Vue.js?",
+    "shortAnswer": "Virtual DOM — дерево JS-объектов (VNode), зеркалирующее структуру реального DOM. Компилятор превращает `<template>` в функцию `render()`, которая возвращает VNodes. При реактивном изменении Vue вызывает `patch(oldVNode, newVNode)` и обращается к браузерным API только для узлов, где деревья различаются. Батчинг через microtask и `nextTick()` объединяет несколько мутаций в один проход патчинга.",
+    "idealAnswer": "Virtual DOM в Vue — дерево JavaScript-объектов (VNode), отражающее структуру реального DOM. Vue вычисляет минимальный набор DOM-мутаций после каждого изменения данных вместо перезаписи всего интерфейса. Компилятор преобразует `<template>` в функцию `render()`, возвращающую VNodes — plain JS-объекты с полями `type`, `props`, `children`, `key`. При изменении реактивного состояния (сеттер `ref()`) планировщик ставит render-эффект в очередь; на следующем тике `render()` создаёт новое дерево, и оба дерева передаются в `patch(oldVNode, newVNode)`. Прямая запись в DOM (`innerHTML = ...`) вызывает reflow/repaint на каждое присвоение; Vue батчит реактивные изменения в один diff и применяет точечные мутации (например, `textContent`). Trade-off: ~2× памяти и медленнее initial render, но частые обновления дешевле. Алгоритм `patch`: одинаковый тег и `key` — обновить props и рекурсия в children; разный тег — unmount старого, mount нового; для списков siblings — longest increasing subsequence для минимума перемещений. `:key` в `v-for` критичен: без него сравнение по индексу даёт неверные результаты при insert/delete. `shapeFlag` (Element/Text/Fragment) и compiler-injected `patchFlags` (TEXT, PROPS) позволяют пропускать полный рекурсивный обход — в production до ~90% быстрее наивного diff. Vue не патчит после каждой записи: jobs сбрасываются в microtask через `Promise.resolve().then()`; `nextTick()` возвращает Promise после flush — десять мутаций = один patch pass. Типичные ошибки: `:key` на стабильных узлах вне списка (full remount каждый render); прямая мутация props в child (обход реактивности, patch не запускается); index как key в `v-for` (вставка в начало сдвигает все ключи); неверные ожидания от Teleport — diff в дереве компонентов, DOM-мутация в другом месте, при SSR target может отсутствовать. SSR: `renderToString()` сериализует VNodes в HTML без diff на сервере; клиент гидратирует патчем in-place. Vue diff синхронный однопроходный; React Fiber resumable — Vue проще и быстрее для большинства UI, Fiber лучше для очень больших дерев с приоритизацией.",
+    "maxScore": 10,
+    "skills": [
+      "vue",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "vdom_definition",
+      "title": "Понимает Virtual DOM и VNode",
+      "expected": "Кандидат объясняет: Virtual DOM — лёгкая JS-копия DOM; VNode — объект с type/props/children/key; Vue diff-ит деревья и патчит только изменившиеся узлы, а не переписывает весь DOM.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — что такое VDOM и зачем",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "vdom_definition",
+            "oftenConfusedWith": [
+              "vdom_vs_direct_dom",
+              "patch_algorithm"
+            ],
+            "anchorTermsExpected": [
+              "VNode",
+              "Virtual DOM",
+              "type",
+              "props",
+              "children",
+              "key",
+              "patch",
+              "минимальн",
+              "diff"
+            ],
+            "anchorTermsWrongTopic": [
+              "Virtual DOM это Shadow DOM",
+              "Vue пересоздаёт весь DOM каждый render",
+              "VNode это реальный DOM-узел"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "VNode",
+              "Virtual DOM",
+              "patch"
+            ],
+            "ask": "чем VNode отличается от реального DOM-узла и зачем Vue держит виртуальное дерево"
+          }
+        ],
+        "mustConcepts": [
+          "Virtual DOM",
+          "VNode",
+          "type",
+          "props",
+          "children",
+          "key",
+          "JS-объект",
+          "зеркал",
+          "реальн",
+          "DOM",
+          "diff",
+          "patch",
+          "минимальн",
+          "мутац",
+          "не переписыва",
+          "лёгк",
+          "копи"
+        ],
+        "falseClaims": [
+          "Virtual DOM — это Shadow DOM браузера",
+          "Vue каждый раз пересоздаёт весь реальный DOM",
+          "VNode и DOM-элемент — одно и то же",
+          "Virtual DOM всегда быстрее прямого DOM при любом сценарии",
+          "Virtual DOM не использует diff"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "vdom_vs_direct_dom",
+      "title": "Сравнивает Virtual DOM с прямым DOM",
+      "expected": "Кандидат сравнивает: прямой innerHTML/reflow на каждое изменение vs батч diff + точечные мутации; trade-off память (~2×) и initial render vs частые обновления; интерактивный UI vs статика.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "trade-off из TL;DR — когда VDOM оправдан",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "vdom_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "mustConcepts": [
+          "innerHTML",
+          "reflow",
+          "repaint",
+          "прям",
+          "DOM",
+          "батч",
+          "textContent",
+          "память",
+          "initial render",
+          "частые обнов",
+          "интерактив",
+          "статик",
+          "trade-off",
+          "перерисов"
+        ],
+        "falseClaims": [
+          "Virtual DOM не использует память",
+          "прямой DOM всегда быстрее для интерактивных UI",
+          "Virtual DOM убирает reflow полностью",
+          "статические страницы обязаны использовать Virtual DOM"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "vnode_render_pipeline",
+      "title": "Знает pipeline template → render → patch",
+      "expected": "Кандидат описывает: компилятор превращает template в render(); ref/reactive change → scheduler → новый VNode tree → patch с предыдущим; createElement/setAttribute только где деревья различаются.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "центральный flow из ITLead — compiler + reactivity + patch",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "render(",
+              "template",
+              "ref(",
+              "scheduler"
+            ],
+            "ask": "что происходит от изменения ref до обновления текста в DOM"
+          }
+        ],
+        "mustConcepts": [
+          "template",
+          "render()",
+          "компил",
+          "ref()",
+          "reactive",
+          "сеттер",
+          "scheduler",
+          "очеред",
+          "render effect",
+          "новое дерево",
+          "oldVNode",
+          "newVNode",
+          "createElement",
+          "setAttribute",
+          "следующ",
+          "тик"
+        ],
+        "falseClaims": [
+          "template напрямую меняет DOM без render()",
+          "patch вызывается синхронно на каждый setter без очереди",
+          "render() возвращает реальные DOM-узлы",
+          "компилятор работает только в runtime без build step"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "patch_algorithm",
+      "title": "Понимает алгоритм patch и оптимизации",
+      "expected": "Кандидат объясняет patch(old, new): same tag+key → update props + recurse; different tag → unmount/mount; списки — LIS для минимума moves; shapeFlag и patchFlags пропускают лишний diff (~90% в prod).",
+      "score": 2.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "главный алгоритм middle — patch, shapeFlag, patchFlags",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "vnode_render_pipeline",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "patchFlags",
+              "shapeFlag",
+              "TEXT"
+            ],
+            "ask": "что дают patchFlags от компилятора и почему TEXT=1 ускоряет diff"
+          },
+          {
+            "match": [
+              "longest",
+              "LIS",
+              "subsequence",
+              "sibling"
+            ],
+            "ask": "как Vue минимизирует перемещения элементов в списке siblings"
+          }
+        ],
+        "mustConcepts": [
+          "patch",
+          "oldVNode",
+          "newVNode",
+          "рекурс",
+          "одинаков",
+          "тег",
+          "key",
+          "props",
+          "unmount",
+          "mount",
+          "список",
+          "sibling",
+          "longest increasing subsequence",
+          "LIS",
+          "shapeFlag",
+          "patchFlags",
+          "TEXT",
+          "PROPS",
+          "Fragment",
+          "пропуск",
+          "поддерев"
+        ],
+        "falseClaims": [
+          "patch всегда делает полный рекурсивный обход без оптимизаций",
+          "patchFlags добавляются в runtime вручную",
+          "разный tag при том же key — Vue только обновляет props",
+          "shapeFlag требует instanceof для каждого узла"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "key_based_diff",
+      "title": "Понимает роль :key в v-for",
+      "expected": "Кандидат объясняет: :key даёт стабильную идентичность для diff; без key — сравнение по индексу; index как key при insert/delete перерендеривает весь список; keyed diff находит минимум патчей.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевая практика v-for — частая ошибка на собесах",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "v-for",
+              ":key",
+              "index"
+            ],
+            "ask": "что сломается при v-for :key=\"i\" и вставке элемента в начало списка"
+          }
+        ],
+        "mustConcepts": [
+          ":key",
+          "v-for",
+          "стабильн",
+          "уникальн",
+          "id",
+          "индекс",
+          "index",
+          "вставк",
+          "удален",
+          "сдвиг",
+          "keyed diff",
+          "без key",
+          "по индекс",
+          "перерендер",
+          "todo.id"
+        ],
+        "falseClaims": [
+          "key нужен на каждом элементе включая статичные div",
+          "index как key безопасен при любых операциях со списком",
+          "без :key Vue не может отрендерить v-for",
+          "key влияет только на CSS, не на diff"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "batching_nexttick",
+      "title": "Знает батчинг и nextTick",
+      "expected": "Кандидат объясняет: Vue батчит reactive writes в microtask; один flush на tick; nextTick() возвращает Promise после flush; await nextTick() для чтения обновлённого DOM; ten mutations = one patch.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "nextTick из TL;DR — типичный follow-up",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "nextTick",
+              "microtask",
+              "flush"
+            ],
+            "ask": "почему nextTick в for-цикле не даёт последовательных DOM-чтений после каждой итерации"
+          }
+        ],
+        "mustConcepts": [
+          "nextTick",
+          "батч",
+          "batch",
+          "microtask",
+          "Promise.resolve",
+          "flush",
+          "очеред",
+          "один patch",
+          "десять мутац",
+          "await nextTick",
+          "DOM",
+          "обновлён",
+          "тик",
+          "race condition"
+        ],
+        "falseClaims": [
+          "каждая мутация ref сразу вызывает отдельный patch",
+          "nextTick выполняется синхронно до return из setter",
+          "nextTick в цикле даёт отдельный flush на итерацию",
+          "nextTick не возвращает Promise в Vue 3"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки VDOM",
+      "expected": "Кандидат называет: :key на стабильных узлах → remount; прямая мутация props → нет reactive setter; index key; Teleport — diff в component tree, DOM в другом месте, SSR target warning.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "props.item",
+              "emit",
+              "мутац"
+            ],
+            "ask": "почему props.item.done = true не вызывает patch и что делать вместо этого"
+          },
+          {
+            "match": [
+              "Teleport",
+              "body",
+              "SSR"
+            ],
+            "ask": "как Teleport связан с virtual DOM и почему target может отсутствовать при SSR"
+          }
+        ],
+        "mustConcepts": [
+          ":key",
+          "стабильн",
+          "remount",
+          "unmount",
+          "фокус",
+          "transition",
+          "props",
+          "мутац",
+          "reactive setter",
+          "emit",
+          "update:item",
+          "index key",
+          "Teleport",
+          "component tree",
+          "target",
+          "SSR",
+          "warning",
+          "фокус"
+        ],
+        "falseClaims": [
+          "можно безопасно мутировать props в script setup",
+          ":key на div с count++ оптимизирует diff",
+          "Teleport отключает virtual diff",
+          "Teleport всегда работает даже если target ещё не в DOM"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Virtual DOM — дерево VNode-объектов с type/props/children/key. Template компилируется в render(); при изменении ref scheduler ставит job, на тике patch сравнивает старое и новое дерево и меняет только textContent там, где diff нашёл различие. Десять ref++ за один tick — один patch благодаря microtask flush.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну vdom — vue держит js-копию dom, дифает и патчит точечно. v-for с :key=\"todo.id\" — при toggle меняется один li, без key vue перерисует весь список. patchFlags от компилятора режут diff примерно на 90% в prod.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "innerHTML на каждое изменение — полный reflow; Vue батчит в один diff pass. Trade-off: больше памяти и медленнее первый render, зато 10 обновлений в секунду дешевле. SSR: renderToString без patch на сервере, клиент гидратирует патчем in-place.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Virtual DOM — это Shadow DOM. Vue каждый клик пересоздаёт всю страницу в браузере через innerHTML.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "v-for без :key работает так же как с todo.id. Можно спокойно делать props.item.done = true — Vue всё равно создаст новый VNode.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "nextTick синхронный — после count++ DOM обновлён сразу в той же строке кода. patchFlags вручную ставят в template.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "vdom_definition",
+      "exampleType": "good",
+      "exampleText": "VNode — plain object { type, props, children, key }; patch(old, new) находит минимальные DOM-мутации.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "vdom_definition",
+      "exampleType": "good",
+      "exampleText": "виртуальный dom — js-дерево как черновик перед реальной перерисовкой стен",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "vdom_definition",
+      "exampleType": "bad",
+      "exampleText": "Virtual DOM — нативный API браузера для скрытых деревьев, Vue его включает автоматически.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "vdom_vs_direct_dom",
+      "exampleType": "good",
+      "exampleText": "element.innerHTML = x — reflow каждый раз; Vue один diff pass и textContent только где изменилось.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "vdom_vs_direct_dom",
+      "exampleType": "good",
+      "exampleText": "интерактивный todo — vdom ок; статический лендинг без js можно без фреймворка",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "vdom_vs_direct_dom",
+      "exampleType": "bad",
+      "exampleText": "Virtual DOM не занимает дополнительной памяти и всегда быстрее innerHTML.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "vnode_render_pipeline",
+      "exampleType": "good",
+      "exampleText": "count++ → ref setter → scheduler queue → render() новый VNode → patch → только текст в <p> меняется, button VNode skip.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "vnode_render_pipeline",
+      "exampleType": "good",
+      "exampleText": "компилятор template в render(), ref триггерит эффект, createElement только на diff",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "vnode_render_pipeline",
+      "exampleType": "bad",
+      "exampleText": "template напрямую вызывает document.createElement при каждом изменении ref без очереди.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "patch_algorithm",
+      "exampleType": "good",
+      "exampleText": "same tag + same key — update props recurse children; different tag — unmount old mount new; siblings — LIS минимизирует moves.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "patch_algorithm",
+      "exampleType": "good",
+      "exampleText": "patchFlags TEXT=1 — vue не сравнивает props, только текст; shapeFlag O(1) вместо instanceof",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "patch_algorithm",
+      "exampleType": "bad",
+      "exampleText": "patch всегда обходит всё дерево полностью, компилятор не вставляет patchFlags.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "key_based_diff",
+      "exampleType": "good",
+      "exampleText": "v-for :key=\"todo.id\" — toggle одного todo патчит один li; :key=\"i\" при insert в начало — все ключи сдвигаются, весь список remount.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "key_based_diff",
+      "exampleType": "good",
+      "exampleText": "без key vue сравнивает siblings по индексу — вставка на 0 патчит все следующие узлы зря",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "key_based_diff",
+      "exampleType": "bad",
+      "exampleText": "index как key — best practice, Vue сам найдёт id внутри объекта.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "batching_nexttick",
+      "exampleType": "good",
+      "exampleText": "10 ref mutations → один microtask flush → один patch; await nextTick() перед read DOM после write.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "batching_nexttick",
+      "exampleType": "good",
+      "exampleText": "nextTick promise resolve после flush — не ждать dom в том же синхронном блоке после count++",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "batching_nexttick",
+      "exampleType": "bad",
+      "exampleText": "каждый count++ немедленно патчит dom, nextTick устарел в vue 3",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "<div :key=\"count\"> — каждый count++ remount, теряется focus; props.item.done = true — emit('update:item') вместо мутации.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Teleport to body — diff в component tree, dom patch на body; при ssr target может не быть — warning vue 3.2+",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": ":key на статичном div ускоряет diff; Teleport отключает patch и пишет напрямую минуя vdom.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "how-does-virtual-dom-work-in-vuejs",
+    "apiUrl": "https://api.itlead.org/api/questions/how-does-virtual-dom-work-in-vuejs",
+    "pageUrl": "https://itlead.org/interview-questions/vue/how-does-virtual-dom-work-in-vuejs",
+    "difficulty": "MIDDLE",
+    "titleEn": "How does virtual DOM work in Vue.js?",
+    "categorySlug": "vue",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

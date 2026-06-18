@@ -1,0 +1,635 @@
+{
+  "topic": {
+    "code": "nuxt_middleware_explained",
+    "name": "Middleware в Nuxt",
+    "skillCode": "nuxt",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое middleware в Nuxt и как его использовать?",
+    "shortAnswer": "Nuxt middleware — функция, которая выполняется до монтирования страницы: проверяет условия, делает редирект или блокирует навигацию. Типы: global (`.global.ts` на каждый роут), named (через `definePageMeta`), inline (функция в `definePageMeta`). Возвращает `navigateTo()` для редиректа или `abortNavigation()` для остановки без смены URL.",
+    "idealAnswer": "Nuxt middleware — функция `defineNuxtRouteMiddleware`, которая перехватывает навигацию на уровне роутера до монтирования компонента страницы. В отличие от `onMounted` или `useFetch`, middleware может полностью заблокировать рендеринг и предотвратить «вспышку» приватного контента. Три типа: global (`middleware/auth.global.ts` — автоматически на каждый роут, порядок по алфавиту имени файла), named (`middleware/admin.ts` + `definePageMeta({ middleware: 'admin' })`), inline (функция прямо в `definePageMeta`). Для редиректа — `return navigateTo('/login')` или `navigateTo({ path: '/login', query: { redirect: to.path } })`; для блокировки без смены URL — `abortNavigation()` или `throw createError({ statusCode: 401 })`. Цепочка: сначала global (алфавит), затем named из meta, затем inline; первая функция с ненулевым return останавливает цепочку. На SSR Nitro запускает middleware перед `render:page`; на клиенте — `beforeEach` Vue Router. При первой загрузке middleware выполняется дважды (сервер + гидратация) — поэтому `localStorage` не работает; для auth используют `useCookie()` или `useState()`. Middleware — для auth, role guards, SEO-редиректов, feature flags; не для загрузки данных (`useAsyncData`, `useFetch`) и UI-логики (`onMounted`). Типичные ошибки: мутация readonly `to.path`, `localStorage` на SSR, редирект без сохранения `from.path`, глобальный auth без пропуска `/__nuxt_devtools__`, async без `await`. Продакшен-паттерны: `nuxt-auth` в `auth.global.ts`, A/B через named middleware, cache-aware auth с короткоживущим cookie `lastCheck`.",
+    "maxScore": 10,
+    "skills": [
+      "nuxt",
+      "vue",
+      "typescript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "middleware_definition",
+      "title": "Понимает назначение middleware",
+      "expected": "Кандидат объясняет: middleware выполняется до монтирования страницы, перехватывает навигацию на уровне роутера, может редиректить или полностью заблокировать рендеринг — в отличие от onMounted/useFetch.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — timing до mount и блокировка рендеринга",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "middleware_definition",
+            "oftenConfusedWith": [
+              "when_to_use",
+              "middleware_types"
+            ],
+            "anchorTermsExpected": [
+              "до монтирован",
+              "до mount",
+              "роутер",
+              "блокир",
+              "редирект",
+              "defineNuxtRouteMiddleware"
+            ],
+            "anchorTermsWrongTopic": [
+              "middleware это useAsyncData",
+              "middleware выполняется после onMounted",
+              "middleware только на клиенте"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "middleware",
+              "до mount",
+              "до монтирован"
+            ],
+            "ask": "чем middleware отличается от проверки auth в onMounted — почему важен timing"
+          }
+        ],
+        "mustConcepts": [
+          "middleware",
+          "defineNuxtRouteMiddleware",
+          "до монтирован",
+          "до mount",
+          "роутер",
+          "навигац",
+          "перехват",
+          "блокир",
+          "редирект",
+          "route guard",
+          "охран",
+          "auth",
+          "авторизац",
+          "вспышк",
+          "приватн",
+          "контент",
+          "onMounted",
+          "useFetch"
+        ],
+        "falseClaims": [
+          "middleware выполняется после монтирования страницы",
+          "middleware и onMounted дают одинаковый UX для auth",
+          "middleware не может заблокировать рендеринг",
+          "middleware заменяет useAsyncData для загрузки данных"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "middleware_types",
+      "title": "Знает три типа middleware",
+      "expected": "Кандидат перечисляет global (`.global.ts`, каждый роут), named (файл в `middleware/` + `definePageMeta`), inline (функция в `definePageMeta`); знает суффикс `.global.ts` и подключение named по имени файла.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "типы middleware — ключевая структура Nuxt",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "middleware_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "global",
+              ".global.ts",
+              "named",
+              "inline"
+            ],
+            "ask": "когда выбрать global, named или inline middleware для auth и feature flag"
+          }
+        ],
+        "mustConcepts": [
+          "global",
+          ".global.ts",
+          "named",
+          "inline",
+          "definePageMeta",
+          "middleware/",
+          "каждый роут",
+          "автоматическ",
+          "имя файла",
+          "admin",
+          "feature flag",
+          "одноразов",
+          "переиспольз",
+          "opt-in",
+          "суффикс"
+        ],
+        "falseClaims": [
+          "global middleware нужно явно подключать в nuxt.config",
+          "named middleware запускается на всех роутах автоматически",
+          "inline middleware живёт в отдельном файле middleware/",
+          ".global.ts и named middleware работают одинаково по охвату"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "navigate_abort_api",
+      "title": "Различает navigateTo и abortNavigation",
+      "expected": "Кандидат объясняет: `navigateTo()` меняет URL и рендерит другую страницу; `abortNavigation()` останавливает навигацию без смены URL; может упомянуть `createError` для error page и сохранение redirect через query.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "API возврата — основной механизм guard",
+        "confusionPairs": [
+          {
+            "checkpointKey": "navigate_abort_api",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "navigateTo",
+              "abortNavigation",
+              "редирект",
+              "URL не меня",
+              "createError"
+            ],
+            "anchorTermsWrongTopic": [
+              "to.path = '/login'",
+              "router.push в middleware вместо navigateTo",
+              "abortNavigation всегда меняет URL"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "navigateTo",
+              "abortNavigation"
+            ],
+            "ask": "когда вернуть navigateTo, а когда abortNavigation для admin-only страницы"
+          },
+          {
+            "match": [
+              "redirect",
+              "query",
+              "from.path"
+            ],
+            "ask": "как сохранить целевой URL при редиректе на login"
+          }
+        ],
+        "mustConcepts": [
+          "navigateTo",
+          "abortNavigation",
+          "редирект",
+          "останов",
+          "блокир",
+          "URL",
+          "смена URL",
+          "без смены",
+          "createError",
+          "statusCode",
+          "401",
+          "error page",
+          "query",
+          "redirect",
+          "from.path",
+          "to.path",
+          "return"
+        ],
+        "falseClaims": [
+          "abortNavigation меняет URL на /login",
+          "navigateTo и abortNavigation делают одно и то же",
+          "можно изменить to.path для редиректа",
+          "return undefined всегда останавливает цепочку"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "execution_chain",
+      "title": "Понимает порядок выполнения цепочки",
+      "expected": "Кандидат описывает порядок: global (алфавит по имени файла) → named из definePageMeta → inline; первая ненулевая return останавливает цепочку; async middleware требует await.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "порядок и остановка цепочки — частый вопрос на собеседовании",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "алфавит",
+              "порядок",
+              "global",
+              "named",
+              "inline"
+            ],
+            "ask": "в каком порядке выполняются auth.global.ts, admin named и inline при переходе на /admin/users"
+          },
+          {
+            "match": [
+              "await",
+              "async",
+              "$fetch"
+            ],
+            "ask": "почему fetch без await в middleware ломает guard"
+          }
+        ],
+        "mustConcepts": [
+          "порядок",
+          "алфавит",
+          "global",
+          "named",
+          "inline",
+          "цепочк",
+          "chain",
+          "останов",
+          "null",
+          "undefined",
+          "return",
+          "definePageMeta",
+          "auth.global",
+          "logger.global",
+          "await",
+          "async",
+          "$fetch",
+          "первый ненулев"
+        ],
+        "falseClaims": [
+          "named middleware всегда выполняется раньше global",
+          "цепочка продолжается после navigateTo от предыдущего middleware",
+          "async fetch без await корректно блокирует навигацию",
+          "inline middleware выполняется раньше global"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Знает когда использовать middleware",
+      "expected": "Кандидат называет: auth/session, role-based access, SEO-редиректы, feature flags; НЕ использует для data fetching (useAsyncData/useFetch) и UI-логики (onMounted/composables).",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use / skip из ITLead TL;DR",
+        "mustConcepts": [
+          "auth",
+          "авторизац",
+          "сесси",
+          "role",
+          "рол",
+          "admin",
+          "SEO",
+          "редирект",
+          "legacy URL",
+          "feature flag",
+          "A/B",
+          "useAsyncData",
+          "useFetch",
+          "data fetching",
+          "загрузк данных",
+          "onMounted",
+          "composable",
+          "UI логик",
+          "route guard"
+        ],
+        "falseClaims": [
+          "middleware предназначен для загрузки данных страницы",
+          "useAsyncData заменяет middleware для auth",
+          "UI-анимации лучше делать в global middleware",
+          "middleware и composables взаимозаменяемы по timing"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "ssr_timing_storage",
+      "title": "Понимает SSR, двойной запуск и хранилище",
+      "expected": "Кандидат объясняет: при SSR middleware на сервере (Nitro) и на клиенте при гидратации; localStorage недоступен на сервере — useCookie/useState; может упомянуть process.server/client guards.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "SSR double-run и cookie — критично для консистентного auth",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "SSR",
+              "дважды",
+              "гидрат",
+              "сервер"
+            ],
+            "ask": "почему middleware выполняется дважды при первой загрузке и как это влияет на auth"
+          },
+          {
+            "match": [
+              "useCookie",
+              "useState",
+              "localStorage"
+            ],
+            "ask": "почему useCookie предпочтительнее localStorage в middleware"
+          }
+        ],
+        "mustConcepts": [
+          "SSR",
+          "Nitro",
+          "render:page",
+          "beforeEach",
+          "Vue Router",
+          "дважды",
+          "двойн",
+          "гидрат",
+          "hydration",
+          "сервер",
+          "клиент",
+          "localStorage",
+          "useCookie",
+          "useState",
+          "process.server",
+          "process.client",
+          "несовпад",
+          "консистент",
+          "синхрон",
+          "cookie"
+        ],
+        "falseClaims": [
+          "localStorage работает в middleware на SSR",
+          "middleware выполняется только на клиенте",
+          "на SSR middleware не запускается вообще",
+          "useAsyncData доступен в middleware до resolve"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки middleware",
+      "expected": "Кандидат называет: мутация readonly to.path, localStorage на SSR, редирект без redirect query, global auth блокирует /__nuxt_devtools__, async без await; правильные альтернативы.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — расширенный блок ITLead с 5 антипаттернами",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "to.path",
+              "readonly",
+              "мутац"
+            ],
+            "ask": "почему to.path = '/login' не работает и что делать вместо"
+          },
+          {
+            "match": [
+              "__nuxt_devtools",
+              "/__"
+            ],
+            "ask": "как global auth не ломает Nuxt DevTools"
+          },
+          {
+            "match": [
+              "lastCheck",
+              "maxAge",
+              "cache"
+            ],
+            "ask": "как cache-aware middleware пропускает повторные auth-проверки"
+          }
+        ],
+        "mustConcepts": [
+          "to.path",
+          "readonly",
+          "RouteLocation",
+          "мутац",
+          "localStorage",
+          "useCookie",
+          "redirect query",
+          "from.path",
+          "__nuxt_devtools",
+          "/__",
+          "await",
+          "async",
+          "fetch",
+          "$fetch",
+          "then",
+          "undefined",
+          "цепочк",
+          "lastCheck",
+          "maxAge",
+          "cache-aware",
+          "nuxt-auth"
+        ],
+        "falseClaims": [
+          "to.path можно менять напрямую для редиректа",
+          "localStorage консистентен между SSR и клиентом в middleware",
+          "fetch().then() в middleware корректно ждёт результат",
+          "global auth не мешает внутренним путям Nuxt"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Middleware в Nuxt — guard до mount: global auth.global.ts проверяет useCookie('auth'), без токена navigateTo на login с redirect query. Named admin.ts на /admin через definePageMeta. abortNavigation для не-админа без смены URL. Не для данных — useAsyncData отдельно.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Короче: middleware ловит роут раньше компонента. Global на всё, named на конкретные страницы, inline для разовых флагов. navigateTo — редирект, abortNavigation — стоп. На SSR два прогона, поэтому cookie, не localStorage.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Порядок: auth.global → logger.global (алфавит), потом named admin, потом inline. Первый return navigateTo/abort останавливает цепочку. Async guard — только с await $fetch, иначе страница отрендерится до проверки.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Middleware — это то же самое что useAsyncData, только в папке middleware. Проверяю токен через localStorage и меняю to.path на /login.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Auth лучше в onMounted — страница успеет показать dashboard, потом редирект. Named middleware запускается раньше global. fetch('/api/user').then() в middleware нормально ждёт ответ.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "abortNavigation всегда редиректит на login. Middleware на SSR не выполняется. useAsyncData в middleware уже resolved к моменту guard.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "middleware_definition",
+      "exampleType": "good",
+      "exampleText": "defineNuxtRouteMiddleware срабатывает до mount — блокирует рендер приватной страницы, в отличие от onMounted где контент уже виден.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "middleware_definition",
+      "exampleType": "good",
+      "exampleText": "ну middleware как охрана на входе — до того как страница показалась, решает пускать или на login",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "middleware_definition",
+      "exampleType": "bad",
+      "exampleText": "Middleware выполняется после useFetch и onMounted, поэтому идеален для загрузки данных страницы.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "middleware_types",
+      "exampleType": "good",
+      "exampleText": "auth.global.ts — на каждый роут без config; admin.ts подключаю middleware: 'admin' в definePageMeta; inline для beta-флага прямо в meta.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "middleware_types",
+      "exampleType": "good",
+      "exampleText": "global с .global.ts суффиксом, named по имени файла, inline — функция в meta для одноразовых проверок",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "middleware_types",
+      "exampleType": "bad",
+      "exampleText": "Named middleware автоматически на всех роутах как global, разница только в имени файла.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "navigate_abort_api",
+      "exampleType": "good",
+      "exampleText": "navigateTo({ path: '/login', query: { redirect: to.path } }) — редирект с сохранением цели; abortNavigation('Admin required') — error page без смены URL.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "navigate_abort_api",
+      "exampleType": "good",
+      "exampleText": "гость — navigateTo login, залогинен не-админ на /admin — abortNavigation, админ проходит",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "navigate_abort_api",
+      "exampleType": "bad",
+      "exampleText": "Для редиректа делаю to.path = '/login' — Vue Router сам поймёт.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "execution_chain",
+      "exampleType": "good",
+      "exampleText": "auth.global ('a') до logger.global ('l'); если auth throw 401 — logger не запускается. Inline в meta — последний в цепочке.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "execution_chain",
+      "exampleType": "good",
+      "exampleText": "глобальные по алфавиту, потом named из meta, inline в конце — первый не-null return рубит цепочку",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "execution_chain",
+      "exampleType": "bad",
+      "exampleText": "Inline middleware всегда первый; fetch без await всё равно дождётся перед следующим middleware.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Auth и role guards — middleware с useCookie/Pinia; legacy URL — global redirect; данные страницы — useAsyncData, не middleware.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "a/b тест named middleware, stripe checkout inline guard, seo редиректы global — ui в onMounted",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Все данные для страницы гружу в global middleware через useAsyncData — так правильно в Nuxt.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "ssr_timing_storage",
+      "exampleType": "good",
+      "exampleText": "Первая загрузка: middleware на Nitro перед render:page и снова на клиенте при hydration. Токен только useCookie — синхронен SSR/клиент.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "ssr_timing_storage",
+      "exampleType": "good",
+      "exampleText": "localStorage на сервере undefined — редирект на ssr, пропуск на клиенте, гидратация ломается; cookie решает",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "ssr_timing_storage",
+      "exampleType": "bad",
+      "exampleText": "Middleware только в браузере через beforeEach, на сервере Nitro его не вызывает.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Не мутирую to.path; auth через useCookie; redirect: from.path в query; if (to.path.startsWith('/__')) return для DevTools; await $fetch в async guard.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "cache-aware: useCookie('lastCheck', { maxAge: 300 }) после валидации — на горячих роутах не бьём auth api каждый переход",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "to.path = '/login' работает если вернуть true; localStorage.getItem на SSR ок если process.client проверить потом.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nuxt-middleware-explained",
+    "apiUrl": "https://api.itlead.org/api/questions/nuxt-middleware-explained",
+    "pageUrl": "https://itlead.org/interview-questions/nuxt/nuxt-middleware-explained",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is middleware in Nuxt and how to use it?",
+    "categorySlug": "nuxt",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

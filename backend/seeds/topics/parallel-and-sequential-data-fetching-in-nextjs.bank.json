@@ -1,0 +1,564 @@
+{
+  "topic": {
+    "code": "parallel_and_sequential_data_fetching_in_nextjs",
+    "name": "Параллельное и последовательное получение данных в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как организовать параллельное и последовательное получение данных в Next.js Server Components и как это влияет на время загрузки страницы?",
+    "shortAnswer": "Последовательный fetch выполняет запросы по очереди — суммируются все задержки (200ms + 300ms = 500ms). Параллельный через Promise.all() запускает независимые запросы одновременно — важна только самая медленная (max(200ms, 300ms) = 300ms). Server Components в Next.js не параллелизуют await автоматически — Promise.all() нужно писать явно.",
+    "idealAnswer": "Структура data fetching напрямую влияет на производительность страницы в Next.js. Последовательный (sequential) fetch — waterfall: каждый await блокирует render pipeline до завершения запроса; три запроса по 200/300/200ms дают ~700ms суммарно. Параллельный fetch через Promise.all() создаёт все promise сразу, async-функция ждёт самый медленный; те же три запроса — ~300ms. Используй параллель когда запросы независимы (профиль, посты, уведомления по одному userId). Последовательный — когда поздние данные зависят от ранних (user → team по user.teamId). Смешанный паттерн: параллелизуй всё с общим ID, затем последовательно fetch зависимых данных (product + reviews параллельно, seller по product.sellerId — после). Promise.all() отклоняется при первой ошибке; Promise.allSettled() ждёт все и возвращает status каждого — для некритичных данных (рекомендации, аналитика) с fallback вместо падения страницы. Server Components не переупорядочивают await — два последовательных await в Page() остаются waterfall даже без 'use client'. Типичные ошибки: скрытый waterfall (await getProduct до Promise.all с getReviews(product.id)); передача уже resolved значений в Promise.all вместо promise; N+1 в цикле for...await вместо Promise.all(userIds.map(...)); ожидание автопараллелизации в SC. Ключевой паттерн: const productPromise = getProduct(id) до любого await, затем Promise.all([productPromise, reviewsPromise, ...]). Streaming через Suspense позволяет показать быстрые секции, пока медленные данные догружаются за boundary — скорость parallel + UX progressive rendering. Проверка параллельности: Network tab (перекрывающиеся запросы) или console.time вокруг Promise.all на сервере.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "sequential_vs_parallel",
+      "title": "Отличает последовательный и параллельный fetch",
+      "expected": "Кандидат объясняет: sequential суммирует задержки каждого await; parallel через Promise.all() — время равно max из запросов; независимые запросы выигрывают от параллели.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — sum vs max времени",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "sequential_vs_parallel",
+            "oftenConfusedWith": [
+              "when_to_use",
+              "promise_all_mechanism"
+            ],
+            "anchorTermsExpected": [
+              "Promise.all",
+              "waterfall",
+              "max",
+              "сумм",
+              "последователь",
+              "параллель"
+            ],
+            "anchorTermsWrongTopic": [
+              "Next.js сам параллелит",
+              "await не блокирует render"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Promise.all",
+              "параллель",
+              "parallel"
+            ],
+            "ask": "три запроса 200/300/200ms — сколько займёт sequential vs parallel"
+          }
+        ],
+        "mustConcepts": [
+          "последователь",
+          "sequential",
+          "параллель",
+          "parallel",
+          "Promise.all",
+          "waterfall",
+          "сумм",
+          "max",
+          "самый медленн",
+          "независим",
+          "await блокир",
+          "200ms",
+          "300ms",
+          "700ms",
+          "Server Component",
+          "render pipeline"
+        ],
+        "falseClaims": [
+          "параллельный fetch суммирует все задержки как sequential",
+          "sequential и parallel дают одинаковое время для независимых запросов",
+          "await не блокирует следующий запрос в async Server Component",
+          "Promise.all запускает запросы по очереди"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Выбирает паттерн по зависимостям данных",
+      "expected": "Кандидат называет: parallel для независимых (profile, analytics, notifications); sequential когда нужен результат предыдущего (user → team по teamId); mixed — параллель общего ID + sequential зависимых; Suspense для progressive UI.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use из таблицы ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "зависим",
+              "teamId",
+              "user"
+            ],
+            "ask": "когда sequential оправдан — пример user → team"
+          },
+          {
+            "match": [
+              "Suspense",
+              "streaming",
+              "progressive"
+            ],
+            "ask": "как Suspense меняет выбор между parallel и sequential"
+          }
+        ],
+        "mustConcepts": [
+          "независим",
+          "зависим",
+          "mixed",
+          "смешан",
+          "profile",
+          "analytics",
+          "notifications",
+          "teamId",
+          "user",
+          "Suspense",
+          "streaming",
+          "progressive",
+          "иерарх",
+          "dashboard"
+        ],
+        "falseClaims": [
+          "всегда нужен только Promise.all без исключений",
+          "sequential никогда не нужен в Next.js",
+          "Suspense заменяет Promise.all для независимых запросов",
+          "зависимые запросы можно безопасно параллелить без общего ID"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "promise_all_mechanism",
+      "title": "Понимает механику Promise.all",
+      "expected": "Кандидат объясняет: promise создаются сразу и начинают выполняться; async suspend до последнего settle; передавать нужно сами promise, не уже awaited значения.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "quick example и internal mechanics ITLead",
+        "mustConcepts": [
+          "Promise.all",
+          "promise",
+          "сразу",
+          "немедленно",
+          "suspend",
+          "settle",
+          "event loop",
+          "не значения",
+          "не resolved",
+          "getUser(id)",
+          "getPosts(id)",
+          "передав promise"
+        ],
+        "falseClaims": [
+          "Promise.all ждёт создания promise по очереди",
+          "можно передать await getUser() и await getPosts() в Promise.all для параллели",
+          "Promise.all откладывает старт запросов до первого await внутри",
+          "Promise.all работает только в Client Components"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "hidden_waterfall",
+      "title": "Распознаёт скрытый waterfall",
+      "expected": "Кандидат называет: await до Promise.all создаёт bottleneck; getReviews(product.id) после await getProduct — ложная параллель; fix — запуск promise до любого await.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "mistake 1 и 5 — частая production-ошибка",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "sequential_vs_parallel",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "waterfall",
+              "скрыт",
+              "await до"
+            ],
+            "ask": "почему await getProduct перед Promise.all([getReviews(product.id), ...]) — не параллель"
+          },
+          {
+            "match": [
+              "productPromise",
+              "до await",
+              "запуск promise"
+            ],
+            "ask": "как переписать ProductPage без лишнего ожидания reviews"
+          }
+        ],
+        "mustConcepts": [
+          "waterfall",
+          "скрыт",
+          "bottleneck",
+          "узкое место",
+          "await до",
+          "перед Promise.all",
+          "productPromise",
+          "reviewsPromise",
+          "getProduct",
+          "getReviews",
+          "product.id",
+          "productId",
+          "ложн",
+          "выглядит параллель",
+          "resolved значен"
+        ],
+        "falseClaims": [
+          "Promise.all внутри кода автоматически параллелит даже после await",
+          "getReviews(product.id) стартует параллельно с getProduct без общего productId",
+          "один await перед Promise.all не влияет на общее время",
+          "Promise.all([user, posts]) после двух await всё равно параллелит запросы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "all_vs_allsettled",
+      "title": "Различает Promise.all и Promise.allSettled",
+      "expected": "Кандидат объясняет: Promise.all reject при первой ошибке; allSettled ждёт все и возвращает fulfilled/rejected per promise; allSettled для некритичных секций с fallback.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "mistake 2 и follow-up Q ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "allSettled",
+              "fulfilled",
+              "rejected"
+            ],
+            "ask": "когда allSettled лучше all — recommendations vs user profile"
+          }
+        ],
+        "mustConcepts": [
+          "Promise.all",
+          "Promise.allSettled",
+          "allSettled",
+          "reject",
+          "отклон",
+          "fulfilled",
+          "rejected",
+          "status",
+          "fallback",
+          "некритич",
+          "recommendations",
+          "analytics",
+          "comments",
+          "одна ошибка",
+          "crash"
+        ],
+        "falseClaims": [
+          "Promise.all продолжает после ошибки одного запроса",
+          "allSettled падает при первой rejection как all",
+          "для user profile всегда лучше allSettled вместо all",
+          "allSettled не возвращает status отдельных promise"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "n_plus_one_loops",
+      "title": "Избегает N+1 в циклах await",
+      "expected": "Кандидат называет: for...await getUser(id) — N последовательных запросов; fix — Promise.all(userIds.map(id => getUser(id))).",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "mistake 3 — N+1 в Server Components",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "N+1",
+              "цикл",
+              "for",
+              "map"
+            ],
+            "ask": "5 userIds по 200ms — for await vs Promise.all map"
+          }
+        ],
+        "mustConcepts": [
+          "N+1",
+          "цикл",
+          "for",
+          "await в цикле",
+          "map",
+          "Promise.all",
+          "userIds",
+          "последовательно в цикле",
+          "1000ms",
+          "200ms",
+          "одновременно",
+          "batch"
+        ],
+        "falseClaims": [
+          "for await в цикле параллелит запросы автоматически",
+          "N+1 проблема не актуальна в Server Components",
+          "Promise.all нельзя использовать с массивом id",
+          "map с async без Promise.all даёт параллель"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "sc_explicit_parallel",
+      "title": "Знает что SC не параллелят автоматически",
+      "expected": "Кандидат объясняет: Next.js не переупорядочивает await в async Server Component; два последовательных await — waterfall; параллель только через явный Promise.all.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевой TL;DR — ответственность разработчика",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "sequential_vs_parallel",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "sc_explicit_parallel",
+            "oftenConfusedWith": [
+              "hidden_waterfall"
+            ],
+            "anchorTermsExpected": [
+              "Server Component",
+              "не автомат",
+              "явно",
+              "Promise.all",
+              "await порядок"
+            ],
+            "anchorTermsWrongTopic": [
+              "React Query параллелит SC",
+              "Next.js dedupe делает parallel"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "Server Component",
+          "не автомат",
+          "не паралелиз",
+          "явно",
+          "explicit",
+          "Promise.all",
+          "await порядок",
+          "Next.js не переупоряд",
+          "async Page",
+          "getUser",
+          "getPosts",
+          "ответственность",
+          "RSC"
+        ],
+        "falseClaims": [
+          "Server Components автоматически параллелят независимые fetch",
+          "Next.js анализирует зависимости и reorder await",
+          "два await подряд в SC выполняются параллельно",
+          "App Router делает Promise.all за разработчика"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Независимые getUser и getPosts по одному userId — Promise.all, время max(200, 300)=300ms. Если seller нужен product.sellerId — сначала параллель product/reviews/recommendations по productId, потом await getSeller. SC сами не параллелят — два await подряд это waterfall.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На dashboard параллелю profile, analytics, notifications через Promise.all — ни один не ждёт другой. Для comments с fallback беру allSettled: одна ошибка не валит всю страницу. Скрытый waterfall ловлю: productPromise до await, не await product потом reviews.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Sequential 200+300+200=700ms, parallel max=300ms. В ProfilePage [user, posts]=await Promise.all([getUser(userId), getUserPosts(userId)]). В цикле userIds — Promise.all(map getUser), не for await.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Server Components сами параллелят fetch — достаточно двух await подряд в Page(). Promise.all не нужен.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "const user=await getUser(); const posts=await getPosts(); return Promise.all([user, posts]) — так параллелю запросы.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Promise.allSettled всегда хуже Promise.all — для критичного user profile тоже allSettled, ошибка comments не важна но и user не нужен.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "sequential_vs_parallel",
+      "exampleType": "good",
+      "exampleText": "Sequential суммирует latency каждого await; Promise.all для независимых — только самый медленный запрос определяет время.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "sequential_vs_parallel",
+      "exampleType": "good",
+      "exampleText": "ну waterfall — один за другим, 700ms; parallel через all — 300ms, все три стартуют сразу",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "sequential_vs_parallel",
+      "exampleType": "bad",
+      "exampleText": "Parallel fetch тоже складывает 200+300+200 — просто быстрее из-за кеша Next.js.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Profile + analytics + notifications — parallel; user → team по teamId — sequential после user; recommendations — Suspense boundary.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "mixed: product/reviews параллель по productId, seller sequential по sellerId из product",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Всегда только parallel — sequential устарел, teamId можно угадать без user.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "promise_all_mechanism",
+      "exampleType": "good",
+      "exampleText": "Promise.all([getUser(id), getPosts(id)]) — оба promise стартуют до suspend; передаю функции, не awaited значения.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "promise_all_mechanism",
+      "exampleType": "good",
+      "exampleText": "all создаёт promise сразу, ждёт последний settle, event loop свободен для другой работы на сервере",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "promise_all_mechanism",
+      "exampleType": "bad",
+      "exampleText": "Promise.all принимает уже готовые user и posts после await — так тоже параллелит сеть.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "hidden_waterfall",
+      "exampleType": "good",
+      "exampleText": "await getProduct до Promise.all([getReviews(product.id), ...]) — reviews ждёт product зря; fix: reviewsPromise=getReviews(productId) до await.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "hidden_waterfall",
+      "exampleType": "good",
+      "exampleText": "код выглядит parallel но await перед all — bottleneck, запускай promise до первого await",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "hidden_waterfall",
+      "exampleType": "bad",
+      "exampleText": "Promise.all внутри всегда параллелит — неважно что product уже awaited выше.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "all_vs_allsettled",
+      "exampleType": "good",
+      "exampleText": "Promise.all — любая ошибка валит всё; allSettled для comments/recommendations с fallback [] если fulfilled check failed.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "all_vs_allsettled",
+      "exampleType": "good",
+      "exampleText": "user критичен — all; analytics некритична — allSettled + null fallback",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "all_vs_allsettled",
+      "exampleType": "bad",
+      "exampleText": "Promise.all игнорирует rejected promise и возвращает остальные результаты.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "n_plus_one_loops",
+      "exampleType": "good",
+      "exampleText": "const users=await Promise.all(userIds.map(id=>getUser(id))) — 5×200ms параллель ≈200ms, не 1000ms for await.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "n_plus_one_loops",
+      "exampleType": "good",
+      "exampleText": "for await getUser в цикле — классический N+1 waterfall на SC странице",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "n_plus_one_loops",
+      "exampleType": "bad",
+      "exampleText": "for (const id of userIds) await getUser(id) — Next.js батчит их автоматически в один запрос.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "sc_explicit_parallel",
+      "exampleType": "good",
+      "exampleText": "async Server Component Page: два await подряд — sequential; явный [user,posts]=await Promise.all([...]) — parallel. Next.js порядок await не меняет.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "sc_explicit_parallel",
+      "exampleType": "good",
+      "exampleText": "sc не магия — параллелизм моя ответственность через Promise.all в RSC",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "sc_explicit_parallel",
+      "exampleType": "bad",
+      "exampleText": "App Router Server Components автоматически dedupe и parallelize все fetch в дереве.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "parallel-and-sequential-data-fetching-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/parallel-and-sequential-data-fetching-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/parallel-and-sequential-data-fetching-in-nextjs",
+    "difficulty": "MIDDLE",
+    "titleEn": "Parallel and sequential data fetching in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

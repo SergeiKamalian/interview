@@ -1,0 +1,599 @@
+{
+  "topic": {
+    "code": "type_narrowing_typescript",
+    "name": "Сужение типов в TypeScript",
+    "skillCode": "typescript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое сужение типов (type narrowing) в TypeScript и какие техники используются для сужения union-типов?",
+    "shortAnswer": "Сужение типов — механизм TypeScript, который уточняет union-тип до конкретного подтипа через анализ проверок в потоке управления (if/else, switch, early return). Шесть основных техник: typeof, instanceof, in, проверка равенства, truthiness и type predicates (value is Type). Всё происходит на этапе компиляции — runtime overhead ноль.",
+    "idealAnswer": "Type narrowing (сужение типов) — способ, которым TypeScript уточняет переменную с широкого union-типа до конкретного подтипа, анализируя runtime-проверки, которые вы уже пишете в коде. Компилятор выполняет control flow analysis на AST: для каждой ветки (if, else, switch case, early return) пересчитывает, каким типом может быть переменная в этой точке. Оригинальный тип не меняется — TypeScript просто «знает больше» внутри конкретной ветки. Никакого runtime cost: типы стираются при компиляции, V8 видит обычные JavaScript conditionals. Шесть основных техник: typeof для примитивных union (string | number); instanceof для экземпляров классов (MouseEvent | KeyboardEvent); оператор in для форм объектов и интерфейсов (Circle | Square); сужение через равенство для discriminated unions (result.status === 'ok'); truthiness для удаления null/undefined (if (name) — name: string); type predicates для reusable guards (function isString(val): val is string). Когда что использовать: примитивы → typeof; классы → instanceof; object shapes → 'prop' in obj; state machines, API, Redux actions → discriminated unions с equality; сложная валидация unknown → type predicates; null/undefined → предпочитать === null вместо truthiness для точности. Discriminated unions (общее поле kind/status с литералом) — самый чистый паттерн для сложного состояния. Типичные ошибки: == null вместо === null — TypeScript не сужает string | null; обращение к свойству без in (p.x на A | B); сужение не сохраняется в callback если переменная переприсваивается — нужен const v = value; instanceof String на примитивах — не работает; после сужения union опциональные вложенные поля (data?: string) остаются string | undefined и требуют отдельной проверки. Отличие от type assertion (as string): narrowing доказывает тип через control flow с проверкой компилятора; assertion — обещание без доказательства, ошибка в runtime если обещание ложно. Narrowing работает через await если переменная не переприсваивается. Exhaustiveness через never в default switch: const _check: never = action — compile error при пропущенном case. Реальные применения: React discriminated props (kind: 'button' | 'link'), Redux reducers switch(action.type), Zod safeParse result.success, API responses { success: true; data } | { success: false; error }.",
+    "maxScore": 10,
+    "skills": [
+      "typescript",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "narrowing_definition",
+      "title": "Понимает сужение типов",
+      "expected": "Кандидат объясняет: narrowing уточняет union до подтипа через runtime-проверки; compile-time only, zero runtime cost; типы стираются при компиляции.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — что такое narrowing и compile-time only",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "narrowing_definition",
+            "oftenConfusedWith": [
+              "vs_type_assertion",
+              "control_flow_analysis"
+            ],
+            "anchorTermsExpected": [
+              "narrowing",
+              "сужен",
+              "union",
+              "compile-time",
+              "runtime cost",
+              "control flow"
+            ],
+            "anchorTermsWrongTopic": [
+              "runtime type check",
+              "metadata",
+              "as string"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "narrowing",
+              "сужен",
+              "union"
+            ],
+            "ask": "что такое type narrowing и чем отличается от обычного union-типа"
+          }
+        ],
+        "mustConcepts": [
+          "narrowing",
+          "сужен",
+          "type narrowing",
+          "union",
+          "объединен",
+          "подтип",
+          "compile-time",
+          "компил",
+          "runtime cost",
+          "накладн",
+          "стира",
+          "erase",
+          "control flow",
+          "поток управлен",
+          "уточн",
+          "refine",
+          "широк"
+        ],
+        "falseClaims": [
+          "narrowing добавляет runtime type checks",
+          "narrowing меняет тип переменной в runtime",
+          "narrowing и type assertion одно и то же",
+          "TypeScript вставляет проверки типов в скомпилированный JS",
+          "narrowing работает только с discriminated unions"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "control_flow_analysis",
+      "title": "Понимает control flow analysis",
+      "expected": "Кандидат описывает: компилятор отслеживает тип по веткам if/else, switch, early return; в каждой ветке тип пересчитывается; hover в IDE показывает суженный тип.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "как компилятор сужает — ключевой механизм middle",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "narrowing_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "control flow",
+              "ветк",
+              "if",
+              "switch"
+            ],
+            "ask": "как TypeScript пересчитывает тип внутри if/else и switch"
+          },
+          {
+            "match": [
+              "early return",
+              "ранний return"
+            ],
+            "ask": "как early return влияет на сужение в оставшихся ветках"
+          }
+        ],
+        "mustConcepts": [
+          "control flow analysis",
+          "ветк",
+          "branch",
+          "if",
+          "else",
+          "switch",
+          "early return",
+          "ранний return",
+          "AST",
+          "пересчит",
+          "recalculate",
+          "hover",
+          "IDE",
+          "typeof",
+          "intersect",
+          "пересечен"
+        ],
+        "falseClaims": [
+          "control flow analysis работает только в switch",
+          "тип переменной физически меняется в runtime",
+          "narrowing не работает через await",
+          "early return не влияет на сужение в else"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "narrowing_techniques",
+      "title": "Знает шесть техник сужения",
+      "expected": "Кандидат перечисляет и применяет: typeof (примитивы), instanceof (классы), in (object shapes), equality (discriminated unions), truthiness (null/undefined), type predicates (val is Type).",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "шесть техник из ITLead — основной практический блок",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "typeof",
+              "instanceof",
+              "in operator"
+            ],
+            "ask": "когда typeof, когда instanceof, когда in — примеры для каждого"
+          },
+          {
+            "match": [
+              "type predicate",
+              "val is",
+              "is string"
+            ],
+            "ask": "что такое type predicate и как написать guard-функцию"
+          },
+          {
+            "match": [
+              "truthiness",
+              "правдивост"
+            ],
+            "ask": "truthiness narrowing vs === null — когда что предпочитать"
+          }
+        ],
+        "mustConcepts": [
+          "typeof",
+          "instanceof",
+          "in operator",
+          "оператор in",
+          "equality",
+          "равенств",
+          "truthiness",
+          "правдивост",
+          "type predicate",
+          "predicates",
+          "val is",
+          "is string",
+          "type guard",
+          "guard",
+          "string | number",
+          "MouseEvent",
+          "KeyboardEvent",
+          "Circle",
+          "Square",
+          "radius"
+        ],
+        "falseClaims": [
+          "typeof работает для всех union включая object shapes",
+          "instanceof подходит для примитивов string",
+          "in operator работает только с class",
+          "type predicate добавляет runtime metadata",
+          "truthiness всегда точнее чем === null"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "discriminated_unions_narrowing",
+      "title": "Сужает discriminated unions",
+      "expected": "Кандидат объясняет: equality check на литеральном дискримinant (status/kind/type); самый чистый паттерн для state machines, API, Redux actions; React polymorphic props.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "discriminated unions — ключевой паттерн из ITLead",
+        "mustConcepts": [
+          "discriminated union",
+          "дискримин",
+          "литерал",
+          "status",
+          "kind",
+          "type",
+          "equality",
+          "равенств",
+          "state machine",
+          "состоян",
+          "Redux",
+          "action.type",
+          "switch",
+          "React",
+          "props",
+          "polymorphic",
+          "полиморф"
+        ],
+        "falseClaims": [
+          "discriminated union требует instanceof",
+          "discriminant может быть типом string без литерала",
+          "equality narrowing работает только в switch",
+          "discriminated union добавляет runtime overhead"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки narrowing",
+      "expected": "Кандидат называет: == null vs === null; свойство без in; сужение в callback при reassignment; instanceof на примитивах; опциональные вложенные поля после сужения union.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "5 mistakes из ITLead — частая потеря type safety на code review",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "vs_type_assertion",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "== null",
+              "=== null"
+            ],
+            "ask": "почему == null не сужает string | null"
+          },
+          {
+            "match": [
+              "callback",
+              "setTimeout",
+              "reassign"
+            ],
+            "ask": "почему сужение может не сохраниться в callback и как исправить"
+          },
+          {
+            "match": [
+              "optional",
+              "data?",
+              "undefined"
+            ],
+            "ask": "почему action.data остаётся string | undefined после сужения type === LOAD"
+          }
+        ],
+        "mustConcepts": [
+          "== null",
+          "=== null",
+          "строг",
+          "loose equality",
+          "in operator",
+          "без in",
+          "callback",
+          "setTimeout",
+          "reassign",
+          "переприсва",
+          "const v",
+          "instanceof String",
+          "примитив",
+          "optional",
+          "data?",
+          "undefined",
+          "вложен",
+          "nested",
+          "отдельн проверк"
+        ],
+        "falseClaims": [
+          "== null сужает string | null так же как === null",
+          "p.x безопасен на A | B если x truthy",
+          "сужение всегда сохраняется в setTimeout callback",
+          "instanceof String работает для string примитива",
+          "после сужения union опциональные поля автоматически string"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "vs_type_assertion",
+      "title": "Отличает narrowing от type assertion",
+      "expected": "Кандидат сравнивает: narrowing доказывает тип через control flow с проверкой компилятора; as string — обещание без доказательства, runtime error если ложно.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up Q из ITLead — частая путаница middle",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "as string",
+              "assertion",
+              "приведен"
+            ],
+            "ask": "чем narrowing отличается от as string"
+          }
+        ],
+        "mustConcepts": [
+          "type assertion",
+          "as string",
+          "as",
+          "приведен",
+          "assertion",
+          "обещан",
+          "доказ",
+          "proof",
+          "control flow",
+          "runtime error",
+          "ошибка runtime",
+          "компилятор провер",
+          "без доказательств",
+          "compile-time safety"
+        ],
+        "falseClaims": [
+          "as string и narrowing эквивалентны по безопасности",
+          "type assertion проверяется компилятором так же как narrowing",
+          "narrowing имеет runtime overhead а assertion нет",
+          "as string безопаснее чем narrowing"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Знает когда какую технику применять",
+      "expected": "Кандидат сопоставляет: примитивы → typeof; классы → instanceof; shapes → in; API/state → discriminated unions; unknown → predicates; null → === null.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use таблица из ITLead",
+        "mustConcepts": [
+          "string | number",
+          "typeof",
+          "class",
+          "instanceof",
+          "interface",
+          "in operator",
+          "API response",
+          "Redux",
+          "Zod",
+          "safeParse",
+          "unknown",
+          "predicate",
+          "null",
+          "undefined",
+          "=== null",
+          "tRPC",
+          "Express",
+          "never",
+          "exhaustive",
+          "вичерп"
+        ],
+        "falseClaims": [
+          "typeof подходит для Circle | Square union",
+          "instanceof для string | number union",
+          "truthiness всегда лучше === null",
+          "discriminated union не нужен для API responses",
+          "never guard имеет runtime effect"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Type narrowing — TypeScript сужает string | number через typeof в if/else: в ветке string — toUpperCase, в else — toFixed. Всё compile-time, типы стираются, V8 видит обычный JS. Для объектов — in operator или discriminated union с equality на status/kind.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В reducer switch(action.type) сужает Action до LOAD или UPDATE. Для LOAD с success и data?: string нужна ещё проверка && action.data — nested optional не сужается автоматически. В callback после check сохраняю const v = value, иначе reassignment ломает narrowing.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Zod safeParse: if (result.success) data безопасен. Type guard isUser(obj): obj is User для unknown из API. Не путаю с as string — assertion без proof, runtime crash. Exhaustiveness: default const _: never = action.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Narrowing — runtime type check, TypeScript вставляет typeof в каждый скомпилированный файл. as string и narrowing безопасны одинаково.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для string | null использую == null — TypeScript сужает до string. На A | B проверяю p.x без in. В setTimeout после check value всегда сужен, даже если value = null ниже.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "instanceof String для string примитива — правильный narrowing. После action.type === LOAD action.data уже string без дополнительной проверки.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "narrowing_definition",
+      "exampleType": "good",
+      "exampleText": "Narrowing уточняет union до подтипа через проверки в коде — compile-time only, zero runtime cost.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "narrowing_definition",
+      "exampleType": "good",
+      "exampleText": "ну сужение типов — ts понимает что в if typeof x === string x уже string, без as",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "narrowing_definition",
+      "exampleType": "bad",
+      "exampleText": "Narrowing добавляет runtime metadata к объектам для проверки типов в V8.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "control_flow_analysis",
+      "exampleType": "good",
+      "exampleText": "Control flow analysis: в if typeof input === string — input: string; в else — number. Early return для null сужает оставшиеся ветки.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "control_flow_analysis",
+      "exampleType": "good",
+      "exampleText": "компилятор пересчитывает тип на каждой ветке if/switch — hover в IDE показывает суженный тип",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "control_flow_analysis",
+      "exampleType": "bad",
+      "exampleText": "Control flow analysis работает только в switch, if/else не сужает типы.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "narrowing_techniques",
+      "exampleType": "good",
+      "exampleText": "typeof для string|number, instanceof для MouseEvent|KeyboardEvent, in для Circle|Square, val is string для reusable guard.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "narrowing_techniques",
+      "exampleType": "good",
+      "exampleText": "шесть техник: typeof, instanceof, in, equality, truthiness, type predicates — каждая для своего случая",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "narrowing_techniques",
+      "exampleType": "bad",
+      "exampleText": "typeof подходит для Circle | Square — radius in shape не нужен, typeof shape === circle работает.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "discriminated_unions_narrowing",
+      "exampleType": "good",
+      "exampleText": "result.status === 'ok' — result сужен до { status: 'ok'; data: string }; props.kind === 'button' в React polymorphic component.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "discriminated_unions_narrowing",
+      "exampleType": "good",
+      "exampleText": "redux switch(action.type) — чистое сужение discriminated union, onClick только в button ветке",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "discriminated_unions_narrowing",
+      "exampleType": "bad",
+      "exampleText": "Discriminated union требует instanceof для narrowing, equality check не работает.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "== null не сужает string | null — нужен === null. p.x на A|B без in — error. В callback const v = value перед setTimeout.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "после type === LOAD data?: string остаётся optional — нужен && action.data для trim",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "== null и === null сужают одинаково. instanceof String для string примитива — ok.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "vs_type_assertion",
+      "exampleType": "good",
+      "exampleText": "Narrowing — proof через control flow, компилятор проверяет. as string — promise без proof, runtime crash если wrong.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "vs_type_assertion",
+      "exampleType": "good",
+      "exampleText": "assertion обещание компилятору, narrowing доказательство — на review as заменяю guard или if",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "vs_type_assertion",
+      "exampleType": "bad",
+      "exampleText": "as string безопаснее narrowing — компилятор строже проверяет assertion.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "примитивы typeof, классы instanceof, shapes in, API discriminated union, unknown predicates, null === null.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "zod safeParse success branch, tRPC userId in req.body — реальные кейсы narrowing",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Всегда truthiness для null — === null избыточен. never guard работает в runtime.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "type-narrowing-in-typescript",
+    "apiUrl": "https://api.itlead.org/api/questions/type-narrowing-in-typescript",
+    "pageUrl": "https://itlead.org/interview-questions/typescript/type-narrowing-in-typescript",
+    "difficulty": "MIDDLE",
+    "titleEn": "Type narrowing in TypeScript",
+    "categorySlug": "typescript",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

@@ -1,0 +1,610 @@
+{
+  "topic": {
+    "code": "nodejs_cluster_module",
+    "name": "Модуль cluster в Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое модуль cluster в Node.js и зачем он нужен?",
+    "shortAnswer": "Модуль cluster в Node.js запускает несколько worker-процессов, которые совместно слушают один TCP-порт — по одному worker на ядро CPU. Без cluster Node.js по умолчанию использует одно ядро независимо от размера машины; ОС распределяет входящие соединения между workers через round-robin без внешнего прокси.",
+    "idealAnswer": "Node.js по умолчанию работает в одном процессе на одном ядре CPU. Модуль cluster позволяет приложению породить несколько worker-процессов, которые разделяют один TCP-порт — типичный паттерн: primary (`cluster.isPrimary`) форкает `os.cpus().length` workers через `cluster.fork()`, workers в ветке `else` создают HTTP-сервер и вызывают `.listen(8000)` на том же порту. При `cluster.fork()` V8 копирует процесс через `clone()`; primary один раз привязывает listening socket с `SO_REUSEPORT` (Linux 3.9+), workers наследуют file descriptor и блокируются на `accept()` — ядро ОС round-robin распределяет новые соединения, прокси между клиентом и worker не нужен. IPC между primary и workers — Unix domain sockets: сигналы, `cluster.on('exit')`, кастомные сообщения через `process.send()`. Когда использовать: CPU-bound нагрузка выше ~20% — форкинг по ядрам даёт параллелизм (цикл 10^8 итераций на одном потоке блокирует остальные запросы). I/O-heavy приложения (БД, внешние API) — cluster не нужен: async/await и event loop масштабируют I/O без overhead форков. Менее 2 ядер — startup cost перекрывает выгоду; в Docker/K8s с 1 CPU лучше масштабировать реплики на уровне контейнеров, а не cluster внутри pod. Zero-downtime deploy: перезапуск workers по одному. Graceful shutdown: без `server.close()` при SIGTERM обрываются in-flight запросы; worker ждёт drain через `server.close(() => process.exit(0))`, primary шлёт SIGTERM всем workers и ждёт таймаут. Типичные ошибки: хардкод `4` workers вместо `os.cpus().length`; глобальные переменные для shared state (у каждого worker свой V8 heap — counter в worker 1 не виден в worker 2, нужен Redis или сообщения в primary); отсутствие `cluster.on('exit', () => cluster.fork())` — падение одного worker молча снижает capacity; `listen()` в primary вместо workers; in-memory сессии без Redis/sticky sessions. Cluster vs `child_process.fork()`: fork создаёт subprocess с IPC, но без разделения порта; cluster добавляет наследование сокета. WebSockets требуют sticky sessions (HAProxy по IP или worker ID в URL). PM2 (`pm2 start app.js -i max`) оборачивает cluster автоматически; raw cluster — когда нужна кастомная логика restart без зависимостей. Round-robin по умолчанию на Linux; `CLUSTER_ROUND_ROBIN=false` отключает.",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "cluster_definition",
+      "title": "Понимает назначение модуля cluster",
+      "expected": "Кандидат объясняет: cluster порождает несколько worker-процессов на одном порту; primary управляет, workers обрабатывают HTTP; без cluster Node использует одно ядро; `cluster.isPrimary`, `cluster.fork()`, `os.cpus().length`.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — multi-process на все ядра, один порт",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "cluster_definition",
+            "oftenConfusedWith": [
+              "fork_primary_worker",
+              "cluster_vs_child_process"
+            ],
+            "anchorTermsExpected": [
+              "cluster",
+              "worker",
+              "primary",
+              "один порт",
+              "os.cpus",
+              "fork",
+              "одно ядро"
+            ],
+            "anchorTermsWrongTopic": [
+              "cluster это worker_threads",
+              "cluster заменяет event loop",
+              "каждый worker слушает свой порт"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "cluster",
+              "worker",
+              "primary",
+              "fork"
+            ],
+            "ask": "чем primary отличается от worker и зачем fork по числу ядер"
+          }
+        ],
+        "mustConcepts": [
+          "cluster",
+          "модуль cluster",
+          "worker",
+          "primary",
+          "isPrimary",
+          "fork",
+          "cluster.fork",
+          "один порт",
+          "TCP",
+          "одно ядро",
+          "CPU core",
+          "os.cpus",
+          "процесс",
+          "несколько процесс",
+          "разделя",
+          "совместно",
+          "по ядр",
+          "масштаб"
+        ],
+        "falseClaims": [
+          "cluster создаёт потоки внутри одного процесса как worker_threads",
+          "без cluster Node автоматически использует все ядра",
+          "каждый worker слушает свой уникальный порт",
+          "primary обрабатывает HTTP-запросы вместе с workers",
+          "cluster заменяет async/await для I/O"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "fork_primary_worker",
+      "title": "Знает паттерн primary/worker и fork",
+      "expected": "Кандидат описывает ветвление `if (cluster.isPrimary) { fork + exit handler } else { http.createServer().listen() }`; primary только lifecycle, HTTP в workers; `cluster.on('exit', () => cluster.fork())` для автоперезапуска.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "базовый production-паттерн из quick example ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "cluster_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "isPrimary",
+              "fork",
+              "listen",
+              "exit"
+            ],
+            "ask": "где в коде fork, где listen и зачем cluster.on('exit')"
+          }
+        ],
+        "mustConcepts": [
+          "isPrimary",
+          "cluster.isPrimary",
+          "fork",
+          "cluster.fork",
+          "else",
+          "ветв",
+          "listen",
+          "createServer",
+          "primary",
+          "worker",
+          "lifecycle",
+          "жизненн",
+          "exit",
+          "cluster.on",
+          "перезапуск",
+          "restart",
+          "crashed",
+          "упал"
+        ],
+        "falseClaims": [
+          "listen вызывается в primary, workers простаивают",
+          "fork нужен только один раз без exit handler",
+          "primary и worker выполняют один и тот же HTTP handler без ветвления",
+          "cluster.fork() создаёт thread, а не process"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "internal_load_balancing",
+      "title": "Понимает внутреннее балансирование нагрузки",
+      "expected": "Кандидат объясняет: primary биндит порт с SO_REUSEPORT; workers наследуют fd и accept(); ядро ОС round-robin распределяет соединения без внешнего прокси; IPC через Unix domain sockets и process.send().",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "how it works internally — SO_REUSEPORT и round-robin",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "round-robin",
+              "SO_REUSEPORT",
+              "accept",
+              "прокси"
+            ],
+            "ask": "как балансировка работает без nginx/haproxy между клиентом и worker"
+          }
+        ],
+        "mustConcepts": [
+          "round-robin",
+          "SO_REUSEPORT",
+          "accept",
+          "ядро",
+          "ОС",
+          "kernel",
+          "file descriptor",
+          "дескриптор",
+          "наслед",
+          "inherit",
+          "прокси",
+          "без прокси",
+          "IPC",
+          "Unix domain",
+          "process.send",
+          "соединен",
+          "распредел"
+        ],
+        "falseClaims": [
+          "cluster требует nginx для балансировки между workers",
+          "primary проксирует каждый запрос к worker",
+          "workers конкурируют за разные порты",
+          "round-robin реализует только Node.js, не ядро ОС"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use_cluster",
+      "title": "Понимает когда использовать cluster",
+      "expected": "Кандидат различает: CPU-bound выше ~20% — cluster помогает; I/O-heavy — async/event loop без fork; <2 ядер и 1-CPU Docker/K8s — реплики контейнеров вместо cluster внутри pod; zero-downtime через поочерёдный restart workers.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ключевой trade-off CPU vs I/O и контейнеры — из when to use ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "when_to_use_cluster",
+            "oftenConfusedWith": [
+              "cluster_definition",
+              "cluster_vs_child_process"
+            ],
+            "anchorTermsExpected": [
+              "CPU-bound",
+              "I/O",
+              "event loop",
+              "Docker",
+              "Kubernetes",
+              "реплик"
+            ],
+            "anchorTermsWrongTopic": [
+              "cluster для всех Node приложений",
+              "cluster ускоряет запросы к БД"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "CPU",
+              "I/O",
+              "event loop"
+            ],
+            "ask": "почему I/O-heavy API не выигрывает от cluster"
+          },
+          {
+            "match": [
+              "Docker",
+              "Kubernetes",
+              "контейнер",
+              "1 CPU"
+            ],
+            "ask": "зачем в K8s масштабировать pod replicas, а не cluster внутри одного контейнера"
+          }
+        ],
+        "mustConcepts": [
+          "CPU-bound",
+          "CPU-intensive",
+          "I/O-heavy",
+          "I/O",
+          "event loop",
+          "async",
+          "20%",
+          "нагрузк",
+          "Docker",
+          "Kubernetes",
+          "контейнер",
+          "реплик",
+          "1 ядро",
+          "2 ядр",
+          "overhead",
+          "форк",
+          "zero-downtime",
+          "без просто",
+          "по одному"
+        ],
+        "falseClaims": [
+          "cluster всегда ускоряет любое Node.js приложение",
+          "I/O к БД требует cluster для параллелизма",
+          "cluster внутри 1-CPU Docker даёт 4x throughput",
+          "меньше 2 ядер — идеальный кейс для cluster",
+          "async/await не масштабирует I/O без cluster"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки cluster",
+      "expected": "Кандидат называет: хардкод числа workers; shared state через глобальные переменные (нужен Redis/primary); нет exit handler; listen в primary; in-memory сессии без Redis/sticky sessions.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "fork_primary_worker",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "counter",
+              "глобальн",
+              "Redis",
+              "состоян"
+            ],
+            "ask": "почему let counter++ в worker не даёт общий счётчик между workers"
+          },
+          {
+            "match": [
+              "session",
+              "sticky",
+              "Redis"
+            ],
+            "ask": "почему in-memory сессия ломается при round-robin между workers"
+          }
+        ],
+        "mustConcepts": [
+          "хардкод",
+          "os.cpus.length",
+          "глобальн",
+          "counter",
+          "состоян",
+          "shared state",
+          "Redis",
+          "redis.incr",
+          "V8 heap",
+          "отдельн",
+          "процесс",
+          "exit handler",
+          "cluster.on exit",
+          "listen primary",
+          "session",
+          "сесси",
+          "sticky",
+          "память",
+          "in-memory"
+        ],
+        "falseClaims": [
+          "глобальная переменная counter общая для всех workers",
+          "хардкод 4 workers подходит для любого сервера",
+          "падение worker не влияет на capacity без exit handler",
+          "in-memory session работает при round-robin без sticky",
+          "primary должен вызывать listen для балансировки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "graceful_shutdown",
+      "title": "Знает graceful shutdown workers",
+      "expected": "Кандидат описывает: SIGTERM на worker → server.close() drain in-flight → process.exit; primary шлёт SIGTERM всем workers и ждёт таймаут; без этого rolling deploy обрывает запросы.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "graceful shutdown — частая production-проблема ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "SIGTERM",
+              "server.close",
+              "drain",
+              "Kubernetes"
+            ],
+            "ask": "что происходит при SIGTERM без server.close и как drain in-flight запросы"
+          }
+        ],
+        "mustConcepts": [
+          "graceful",
+          "shutdown",
+          "SIGTERM",
+          "server.close",
+          "drain",
+          "in-flight",
+          "текущ",
+          "запрос",
+          "process.exit",
+          "таймаут",
+          "timeout",
+          "30",
+          "rolling deploy",
+          "Kubernetes",
+          "pod",
+          "обрыв",
+          "заверш",
+          "primary kill"
+        ],
+        "falseClaims": [
+          "process.exit сразу при SIGTERM безопасен для production",
+          "server.close не нужен — ядро само дождётся ответа",
+          "primary не должен управлять shutdown workers",
+          "Kubernetes не шлёт SIGTERM при остановке pod"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "cluster_vs_child_process",
+      "title": "Отличает cluster от child_process.fork",
+      "expected": "Кандидат сравнивает: child_process.fork() — subprocess с IPC без разделения порта; cluster добавляет наследование сокета — все workers accept на одном порту; упоминает PM2 или IPC metrics как бонус.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "follow-up Q cluster vs fork — бонус middle",
+        "mustConcepts": [
+          "child_process",
+          "fork",
+          "IPC",
+          "порт",
+          "сокет",
+          "наслед",
+          "PM2",
+          "process.send",
+          "метрик",
+          "отлич",
+          "subprocess"
+        ],
+        "falseClaims": [
+          "child_process.fork и cluster.fork делают одно и то же с портом",
+          "cluster не использует IPC",
+          "PM2 не связан с cluster"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Cluster — primary форкает worker на каждое ядро через os.cpus().length, все слушают порт 8000. Ядро ОС round-robin кидает соединения на accept() разных workers — curl десять раз покажет разные PID. Для CPU-bound циклов это даёт параллелизм; для I/O к БД достаточно одного процесса с event loop.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В проде: if (cluster.isPrimary) { fork по cpus, on exit перезапуск }; else express.listen. Shared counter — только Redis, не глобалка. SIGTERM → server.close drain, потом exit. В K8s с 1 CPU лучше 3 pod replica, чем cluster внутри одного контейнера.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Без cluster Node сидит на одном ядре. cluster.fork копирует процесс, SO_REUSEPORT — workers на одном порту. child_process.fork — IPC есть, порт общий не наследуется. PM2 -i max делает то же автоматически.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Cluster создаёт потоки в одном процессе как worker_threads. Глобальный counter++ общий для всех workers. Для API к PostgreSQL всегда нужен cluster на 64 workers.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "listen вешаю на primary, workers только fork для красоты. При SIGTERM сразу process.exit(0) — in-flight не важны. Сессию храню в памяти worker — round-robin не мешает.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Форкаю ровно 4 worker на любом железе. Cluster балансирует через nginx между workers на разных портах. I/O-heavy приложение без cluster не масштабируется вообще.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "cluster_definition",
+      "exampleType": "good",
+      "exampleText": "Модуль cluster порождает worker-процессы на одном TCP-порту — по одному на ядро, потому что Node по умолчанию один процесс на одно ядро.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "cluster_definition",
+      "exampleType": "good",
+      "exampleText": "ну cluster — несколько процессов node на одном порту, primary форкает, workers принимают http",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "cluster_definition",
+      "exampleType": "bad",
+      "exampleText": "Cluster — это worker_threads внутри одного процесса, каждый worker свой порт 8001, 8002.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "fork_primary_worker",
+      "exampleType": "good",
+      "exampleText": "isPrimary — цикл fork по os.cpus().length и on exit перезапуск; else — createServer.listen, primary HTTP не трогает.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "fork_primary_worker",
+      "exampleType": "good",
+      "exampleText": "primary только lifecycle, воркеры слушают порт, упал воркер — fork нового",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "fork_primary_worker",
+      "exampleType": "bad",
+      "exampleText": "http.createServer.listen вызываю в isPrimary, workers не нужны для приёма трафика.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "internal_load_balancing",
+      "exampleType": "good",
+      "exampleText": "SO_REUSEPORT: primary биндит сокет, workers наследуют fd, ядро round-robin на accept — без nginx между клиентом и worker.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "internal_load_balancing",
+      "exampleType": "good",
+      "exampleText": "десять curl — разные pid, это kernel round-robin, не прокси в node",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "internal_load_balancing",
+      "exampleType": "bad",
+      "exampleText": "Primary принимает запрос и проксирует его случайному worker через HTTP — так работает cluster.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use_cluster",
+      "exampleType": "good",
+      "exampleText": "Тяжёлый compute в handler — cluster по ядрам; чистый CRUD к БД — один процесс, event loop тянет тысячи async I/O. В Docker с 1 CPU — replicas на уровне оркестратора.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use_cluster",
+      "exampleType": "good",
+      "exampleText": "cpu выше 20% и много ядер — fork; io api — не надо; k8s — pod replicas вместо cluster внутри",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use_cluster",
+      "exampleType": "bad",
+      "exampleText": "Любое Express API обязательно на cluster, иначе event loop не работает с БД.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "let counter в worker — у каждого свой heap; общий счётчик через redis.incr. Сессия in-memory — только sticky или Redis store.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "не хардкодь 4 fork — os.cpus().length; on exit fork или потеряешь 25% capacity на quad-core",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Глобальный counter++ синхронизируется между workers автоматически через event loop.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "graceful_shutdown",
+      "exampleType": "good",
+      "exampleText": "SIGTERM на worker: server.close ждёт in-flight, потом exit(0); таймаут 30s force-kill. K8s rolling deploy без этого рвёт ответы.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "graceful_shutdown",
+      "exampleType": "good",
+      "exampleText": "primary на sigterm kill всех workers, ждём drain — zero downtime deploy по одному",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "graceful_shutdown",
+      "exampleType": "bad",
+      "exampleText": "При деплое сразу kill -9 всех workers — так быстрее и безопаснее для пользователей.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "cluster_vs_child_process",
+      "exampleType": "good",
+      "exampleText": "child_process.fork — subprocess и IPC, но порт не шарится; cluster добавляет socket inheritance для одного listen на всех workers.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "cluster_vs_child_process",
+      "exampleType": "good",
+      "exampleText": "pm2 -i max оборачивает cluster; process.send с worker на primary для метрик без shared memory",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "cluster_vs_child_process",
+      "exampleType": "bad",
+      "exampleText": "child_process.fork и cluster.fork идентичны — оба автоматически шарят HTTP-порт.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-cluster-module",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-cluster-module",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-cluster-module",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is the cluster module in Node.js?",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

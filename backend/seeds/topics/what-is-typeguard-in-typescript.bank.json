@@ -1,0 +1,634 @@
+{
+  "topic": {
+    "code": "what_is_typeguard_in_typescript",
+    "name": "Type guard в TypeScript",
+    "skillCode": "typescript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое type guard в TypeScript и как он помогает сужать типы в union и unknown?",
+    "shortAnswer": "Type guard — runtime-проверка, которая сужает union-тип до конкретного подтипа внутри блока кода. Встроенные варианты: typeof, instanceof, in; пользовательский guard — функция с предикатом `param is SpecificType`, где ключевое слово `is` обязательно. Обычный `boolean` в return type не запускает narrowing.",
+    "idealAnswer": "Type guard (защита типа) — проверка во время выполнения, которая сообщает компилятору TypeScript точный тип значения внутри конкретного блока кода, сужая union-тип до более точного подтипа. Без guard TypeScript видит `string | number` как оба варианта одновременно и не даёт вызвать `.length` или `.toFixed()` без проверки. С guard каждая ветка `if` получает один точный тип; при выходе из блока union возвращается. Встроенные guard: `typeof` для примитивов (string, number, boolean, function), `instanceof` для экземпляров классов, `in` для проверки наличия свойства на объекте — полезно для полиморфных интерфейсов без общего базового класса. Пользовательский guard — функция с типом возврата `param is SpecificType`; предикат `is` — контракт для control flow analysis: TypeScript сужает тип на каждом call site. Плоский `boolean` в return type не участвует в narrowing — частая ошибка в code review. TypeScript выполняет control flow analysis: отслеживает возможные типы по всем путям, распознаёт встроенные guard по паттерну, пересекает union с подтипом внутри ветки. Дополнительный runtime cost только от самой проверки — V8 выполняет обычный JavaScript. Когда использовать: union в параметрах, API-ответы как `unknown`, полиморфные React-компоненты (`\"onClick\" in props`). Пропускать при одном конкретном типе. Предпочитать guard над `as` для данных из API и user input; `as` — только для trusted static shapes. Типичные ошибки: `in` подтверждает наличие свойства, но не другого метода (Cat с meow ≠ bark); `instanceof String` для строковых примитивов — нужен `typeof`; перезапись переменной внутри guard-блока сбрасывает narrowing; в циклах narrowing сбрасывается на каждой итерации — фиксировать в `const` внутри тела. Discriminated union с литеральным полем `type: \"success\" | \"error\"` и `switch` надёжнее property checks — паттерн Redux Toolkit для action types. Реальные примеры: Mantine `\"onClick\" in props` для button vs link; Express `typeof req.body === \"object\"`; Zod `safeParse().success` сужает результат.",
+    "maxScore": 10,
+    "skills": [
+      "typescript",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "typeguard_definition",
+      "title": "Понимает что такое type guard",
+      "expected": "Кандидат объясняет: runtime-проверка сужает union до подтипа в блоке кода; без guard TS не даёт type-specific операции; narrowing локально в scope, при выходе union возвращается.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — runtime check + narrowing union",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "typeguard_definition",
+            "oftenConfusedWith": [
+              "control_flow_narrowing",
+              "user_defined_guard"
+            ],
+            "anchorTermsExpected": [
+              "type guard",
+              "runtime",
+              "narrow",
+              "сужен",
+              "union",
+              "блок"
+            ],
+            "anchorTermsWrongTopic": [
+              "type guard это as casting",
+              "guard проверяет только compile time",
+              "narrowing глобально на всю функцию"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "type guard",
+              "guard",
+              "сужен",
+              "narrow"
+            ],
+            "ask": "чем type guard отличается от обычного if без сужения типа"
+          }
+        ],
+        "mustConcepts": [
+          "type guard",
+          "guard",
+          "защит",
+          "runtime",
+          "narrow",
+          "сужен",
+          "union",
+          "объединен",
+          "подтип",
+          "блок",
+          "ветка",
+          "if",
+          "compile",
+          "компилятор",
+          "scope",
+          "область",
+          "string | number",
+          "без guard",
+          "type-specific"
+        ],
+        "falseClaims": [
+          "type guard работает только на compile time без runtime check",
+          "type guard и as casting дают одинаковую безопасность",
+          "narrowing сохраняется после выхода из if-блока",
+          "type guard пересоздаёт типы в runtime JavaScript"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "builtin_guards",
+      "title": "Знает встроенные typeof, instanceof, in",
+      "expected": "Кандидат объясняет различия: typeof — примитивы; instanceof — экземпляры классов; in — наличие свойства на объекте для полиморфных интерфейсов.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "встроенные guard из TL;DR ITLead — базовый инструментарий",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "typeguard_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "builtin_guards",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "typeof",
+              "instanceof",
+              "in",
+              "примитив",
+              "свойств"
+            ],
+            "anchorTermsWrongTopic": [
+              "typeof для классов",
+              "instanceof для string примитива",
+              "in проверяет тип значения свойства"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "typeof",
+              "instanceof",
+              "in"
+            ],
+            "ask": "когда typeof, когда instanceof и когда in для сужения union"
+          },
+          {
+            "match": [
+              "onClick",
+              "props",
+              "ButtonProps",
+              "LinkProps"
+            ],
+            "ask": "как \"onClick\" in props отличает button от link в полиморфном компоненте"
+          }
+        ],
+        "mustConcepts": [
+          "typeof",
+          "instanceof",
+          "in",
+          "примитив",
+          "string",
+          "number",
+          "boolean",
+          "function",
+          "класс",
+          "class",
+          "экземпляр",
+          "свойств",
+          "property",
+          "наличие",
+          "интерфейс",
+          "полиморф",
+          "onClick",
+          "props",
+          "встроен"
+        ],
+        "falseClaims": [
+          "typeof проверяет экземпляры классов так же как instanceof",
+          "instanceof работает для строковых примитивов",
+          "in гарантирует что другие методы тоже доступны",
+          "typeof и in взаимозаменяемы для любых union"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "user_defined_guard",
+      "title": "Понимает пользовательский type guard с is",
+      "expected": "Кандидат объясняет: функция с return type `param is SpecificType`; `is` — type predicate, без него boolean не сужает; пример isUser(obj: unknown): obj is User.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "is predicate — ключевой middle-паттерн для unknown/API",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "is",
+              "predicate",
+              "предикат",
+              "obj is"
+            ],
+            "ask": "почему return boolean не сужает тип, а val is string — сужает"
+          },
+          {
+            "match": [
+              "unknown",
+              "isUser",
+              "API"
+            ],
+            "ask": "как написать guard для unknown из API перед доступом к полям"
+          }
+        ],
+        "mustConcepts": [
+          "user-defined",
+          "пользователь",
+          "is",
+          "predicate",
+          "предикат",
+          "obj is",
+          "param is",
+          "SpecificType",
+          "boolean",
+          "return type",
+          "тип возврата",
+          "call site",
+          "место вызова",
+          "unknown",
+          "any",
+          "isUser",
+          "isString",
+          "контракт",
+          "narrowing"
+        ],
+        "falseClaims": [
+          "функция с return boolean сужает тип так же как is predicate",
+          "is в return type опционально для narrowing",
+          "пользовательский guard не работает с unknown",
+          "type predicate добавляет runtime overhead сверх проверки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "control_flow_narrowing",
+      "title": "Понимает control flow analysis и scope narrowing",
+      "expected": "Кандидат объясняет: TS отслеживает типы по путям кода; narrowing только в ветке; nested if сужает прогрессивно; в циклах сбрасывается — const внутри тела; reassignment сбрасывает narrowing.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "control flow analysis — как компилятор применяет guard",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "control flow",
+              "поток",
+              "цикл",
+              "loop"
+            ],
+            "ask": "почему narrowing ломается в цикле и как зафиксировать const внутри"
+          },
+          {
+            "match": [
+              "reassignment",
+              "перезапис",
+              "data = 42"
+            ],
+            "ask": "почему перезапись переменной внутри guard-блока сбрасывает сужение"
+          }
+        ],
+        "mustConcepts": [
+          "control flow",
+          "поток управлен",
+          "анализ",
+          "ветка",
+          "branch",
+          "scope",
+          "область",
+          "nested",
+          "вложен",
+          "цикл",
+          "loop",
+          "итерац",
+          "const",
+          "reassignment",
+          "перезапис",
+          "сброс",
+          "reset",
+          "intersect",
+          "пересечен",
+          "union возвращ"
+        ],
+        "falseClaims": [
+          "narrowing сохраняется после reassignment в той же ветке",
+          "в циклах TypeScript держит narrowed тип между итерациями",
+          "control flow analysis работает только для typeof",
+          "nested if не сужает тип дополнительно"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use_guards",
+      "title": "Знает когда использовать guard vs as",
+      "expected": "Кандидат называет: union params, unknown из API, полиморфные компоненты; пропускать при одном типе; guard для untrusted data, as только для trusted static shapes.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use и guard vs as из ITLead",
+        "mustConcepts": [
+          "union",
+          "unknown",
+          "API",
+          "полиморф",
+          "React",
+          "компонент",
+          "as",
+          "casting",
+          "trusted",
+          "untrusted",
+          "user input",
+          "пропуст",
+          "один тип",
+          "конкретн",
+          "Express",
+          "middleware",
+          "Zod",
+          "safeParse"
+        ],
+        "falseClaims": [
+          "as casting безопасен для любых API-ответов",
+          "guard не нужен если тип уже unknown",
+          "для union всегда лучше as чем guard",
+          "type guard нужен даже для переменной с одним конкретным типом"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с type guards",
+      "expected": "Кандидат называет: in + wrong method; boolean вместо is predicate; instanceof String для примитива; reassignment в guard-блоке; Cat/Dog meow vs bark.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — частые code review ошибки",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "builtin_guards",
+            "floorFraction": 0.4
+          },
+          {
+            "checkpointKey": "user_defined_guard",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "meow",
+              "bark",
+              "Cat",
+              "Dog"
+            ],
+            "ask": "почему \"meow\" in animal не даёт вызвать bark на Cat"
+          },
+          {
+            "match": [
+              "boolean",
+              "isString",
+              "без is"
+            ],
+            "ask": "почему isString с return boolean не сужает x внутри if"
+          },
+          {
+            "match": [
+              "instanceof String",
+              "примитив"
+            ],
+            "ask": "почему instanceof String не работает для строкового примитива"
+          }
+        ],
+        "mustConcepts": [
+          "meow",
+          "bark",
+          "Cat",
+          "Dog",
+          "in",
+          "наличие",
+          "не метод",
+          "boolean",
+          "без is",
+          "isString",
+          "instanceof String",
+          "примитив",
+          "typeof",
+          "reassignment",
+          "перезапис",
+          "data = 42",
+          "сброс",
+          "ошибк",
+          "code review",
+          "discriminated"
+        ],
+        "falseClaims": [
+          "\"meow\" in animal гарантирует что bark доступен",
+          "return boolean и val is string дают одинаковый narrowing",
+          "instanceof String проверяет строковый примитива",
+          "перезапись в guard-блоке не влияет на narrowing"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "discriminated_unions_relation",
+      "title": "Связывает type guards с discriminated unions",
+      "expected": "Кандидат объясняет: литеральное поле type как discriminant; switch/if сужает всю форму объекта; надёжнее property checks; Redux Toolkit action types.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "senior follow-up из ITLead — discriminated union vs in/typeof",
+        "mustConcepts": [
+          "discriminated",
+          "дискримин",
+          "union",
+          "type:",
+          "success",
+          "error",
+          "switch",
+          "литерал",
+          "literal",
+          "надёжн",
+          "property check",
+          "Redux",
+          "action",
+          "форма объекта",
+          "сужен",
+          "narrow"
+        ],
+        "falseClaims": [
+          "discriminated union не связан с type guards",
+          "switch на discriminant не сужает union",
+          "property checks всегда надёжнее discriminated union",
+          "discriminant может быть любым string без literal"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Type guard — runtime check, который сужает union внутри if. typeof для string|number, in для полиморфных props, пользовательный guard с `obj is User` — без is boolean не сужает. Предпочитаю guard над as для API unknown.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На middleware Express: typeof req.body === \"object\" перед чтением полей. В React Mantine: \"onClick\" in props → button, иначе link. isUser(unknown) с is predicate — Zod-паттерн safeParse.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Control flow analysis: после typeof value === \"string\" в ветке string, снаружи снова union. В цикле сбрасывается — const narrowed = item внутри. Discriminated union type: \"success\"|\"error\" + switch надёжнее чем in на случайные поля.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Type guard проверяет типы только на compile time, в runtime JavaScript ничего не выполняется. Return boolean и val is string — одинаково сужают тип.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "instanceof String для строкового литерала \"hello\" — правильный guard. \"meow\" in animal значит можно вызвать bark. as casting безопаснее guard для API.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "После if (typeof data === \"string\") { data = 42 } TypeScript помнит что data number вне блока. Narrowing в for-loop держится между итерациями автоматически.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "typeguard_definition",
+      "exampleType": "good",
+      "exampleText": "Guard — runtime check, TS сужает union в ветке if, без guard .length на string|number — ошибка.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "typeguard_definition",
+      "exampleType": "good",
+      "exampleText": "ну guard как контрольный пункт — прошёл typeof, внутри блока точный тип, вышел — union снова",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "typeguard_definition",
+      "exampleType": "bad",
+      "exampleText": "Type guard — это compile-time only, narrowing глобально на всю функцию после одного if.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "builtin_guards",
+      "exampleType": "good",
+      "exampleText": "typeof — примитивы, instanceof — классы, in — есть ли свойство на объекте для ButtonProps|LinkProps.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "builtin_guards",
+      "exampleType": "good",
+      "exampleText": "\"onClick\" in props → button, else link — полиморф без casting",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "builtin_guards",
+      "exampleType": "bad",
+      "exampleText": "Для string примитива использую instanceof String. typeof и in всегда взаимозаменяемы.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "user_defined_guard",
+      "exampleType": "good",
+      "exampleText": "function isUser(obj: unknown): obj is User { return typeof obj === \"object\" && obj !== null && \"name\" in obj; }",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "user_defined_guard",
+      "exampleType": "good",
+      "exampleText": "без is в return — boolean, narrowing не работает, x остаётся any",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "user_defined_guard",
+      "exampleType": "bad",
+      "exampleText": "function isString(v: any): boolean — после if (isString(x)) x.length работает, TS сужает до string.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "control_flow_narrowing",
+      "exampleType": "good",
+      "exampleText": "Nested if сужает прогрессивно. Reassignment data=42 в string-ветке — снаружи снова string|number.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "control_flow_narrowing",
+      "exampleType": "good",
+      "exampleText": "в for-loop const item = arr[i] после guard — фиксирую narrowed тип на итерацию",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "control_flow_narrowing",
+      "exampleType": "bad",
+      "exampleText": "Control flow analysis только для typeof, nested if не сужает дополнительно.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use_guards",
+      "exampleType": "good",
+      "exampleText": "Union params и unknown из fetch — guard. Один конкретный тип — guard не нужен. as только trusted shapes.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_use_guards",
+      "exampleType": "good",
+      "exampleText": "API body unknown → guard перед user.name. Zod safeParse.success — встроенный narrowing",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use_guards",
+      "exampleType": "bad",
+      "exampleText": "Для любого API всегда as User — guard медленнее и не нужен.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Cat|Dog: \"meow\" in animal → meow(), не bark(). in проверяет свойство, не другой метод.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "isString без is predicate — тихая ошибка в review, x.length не compile",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "\"meow\" in animal гарантирует bark. instanceof String для \"test\" — ок для примитива.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "discriminated_unions_relation",
+      "exampleType": "good",
+      "exampleText": "type: \"success\"|\"error\" — discriminant, switch сужает data vs error. Redux actions так.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "discriminated_unions_relation",
+      "exampleType": "good",
+      "exampleText": "discriminated union надёжнее random in-checks на интерфейсы без базового класса",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "discriminated_unions_relation",
+      "exampleType": "bad",
+      "exampleText": "Discriminated union и type guard не связаны, switch не сужает union по литералу.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "what-is-typeguard-in-typescript",
+    "apiUrl": "https://api.itlead.org/api/questions/what-is-typeguard-in-typescript",
+    "pageUrl": "https://itlead.org/interview-questions/typescript/what-is-typeguard-in-typescript",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is typeguard in TypeScript",
+    "categorySlug": "typescript",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

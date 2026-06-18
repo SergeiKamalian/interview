@@ -1,0 +1,665 @@
+{
+  "topic": {
+    "code": "css_container_queries",
+    "name": "CSS Container Queries",
+    "skillCode": "html-css",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое CSS container queries и чем они отличаются от media queries?",
+    "shortAnswer": "CSS container queries стилизуют элементы на основе размера родительского контейнера, а не viewport. На родителе нужен `container-type: inline-size`, затем `@container (min-width: 400px)` меняет layout внутри контейнера. `@media` проверяет ширину окна браузера — глобально; `@container` — локально, per-element. Один компонент адаптируется в sidebar и в main grid без контекстных override.",
+    "idealAnswer": "CSS container queries позволяют стилизовать элементы по размеру родительского контейнера, а не viewport. Media queries следят за окном браузера — вся страница реагирует одинаково; container queries — как «личный термостат» на каждом контейнере: компонент адаптируется к своему слоту. Перед `@container` на родителе обязательно `container-type: inline-size` (или `size`, `style`). Без объявленного контейнера правила `@container` молча игнорируются. Синтаксис: `.parent { container-type: inline-size; }` + `@container (min-width: 400px) { .card { display: flex; flex-direction: row; } }`. Одна `.card` в контейнере 300px остаётся stacked, в 500px — row layout; ширина браузера не влияет. Ключевое отличие: `@media` через `matchMedia()` — один viewport на страницу, компоненты привязаны к page context; `@container` — query list на каждый declared container, независимая оценка. Карточка в sidebar узкая, в hero широкая — без extra CSS. Когда container queries: переиспользуемые компоненты (card в sidebar и grid), dashboard widgets разной ширины. Когда media queries: глобальный layout (nav collapse на mobile), print, orientation — page-level решения. Правило: компонент в разных layout → container queries; меняешь структуру страницы → media queries. Container query units: `cqw`, `cqh`, `cqi`, `cqb`, `cqmin`, `cqmax` — процент от размера контейнера; `clamp(1rem, 4cqw, 2rem)` предсказуемее `vw` внутри вложенных блоков. Named containers: `container-name: sidebar` + `@container sidebar (min-width: 300px)` — без имени запрос идёт к ближайшему ancestor с `container-type`. Типичные ошибки: забыть `container-type` (silent ignore); `block-size` вместо `inline-size` без нужды; style queries без `style` в `container-type`; over-querying на 20px иконке; nested containers в flex/grid без `self-contained` (цикл resize). Внутри: `container-type` создаёт containment (`contain: layout style`), изолирует subtree; контейнер не может query свой размер — circular dependency. Browser support: Chrome 105+, Firefox 110+, Safari 16+. Полного polyfill нет — fallback через ResizeObserver + классы. Performance: observer-based evaluation; много контейнеров → много observers; senior-паттерн — `container-type: style size self-contained` на shared ancestor вместо каждой карточки в grid из 50 элементов.",
+    "maxScore": 10,
+    "skills": [
+      "html-css",
+      "css"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "cq_definition_vs_media",
+      "title": "Отличает container queries от media queries",
+      "expected": "Кандидат объясняет: `@container` смотрит размер родительского контейнера (локально, per-element); `@media` — viewport/окно браузера (глобально). Один компонент может вести себя по-разному в sidebar и main без page-specific override.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — trigger container vs viewport",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "cq_definition_vs_media",
+            "oftenConfusedWith": [
+              "when_to_use",
+              "syntax_usage"
+            ],
+            "anchorTermsExpected": [
+              "контейнер",
+              "viewport",
+              "родител",
+              "локальн",
+              "глобальн",
+              "@container",
+              "@media"
+            ],
+            "anchorTermsWrongTopic": [
+              "container-type достаточно без @container",
+              "media queries для компонентов лучше"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "@container",
+              "@media",
+              "viewport"
+            ],
+            "ask": "одна карточка в sidebar 240px и в main 900px — что сработает и почему"
+          }
+        ],
+        "mustConcepts": [
+          "container queries",
+          "контейнерн",
+          "@container",
+          "media queries",
+          "медиазапрос",
+          "@media",
+          "viewport",
+          "окно браузер",
+          "родительск",
+          "контейнер",
+          "локальн",
+          "глобальн",
+          "per-element",
+          "размер родител",
+          "ширина окна",
+          "matchMedia",
+          "независим",
+          "sidebar",
+          "hero",
+          "компонент"
+        ],
+        "falseClaims": [
+          "@container и @media проверяют одно и то же — viewport",
+          "container queries заменяют media queries полностью",
+          "media queries лучше для переиспользуемых card-компонентов",
+          "@container работает без declared container на родителе"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "container_type_setup",
+      "title": "Настраивает container-type на родителе",
+      "expected": "Кандидат объясняет: перед `@container` на родителе нужен `container-type: inline-size` (или `size`, `style inline-size` для style queries). Без объявления контейнера правила `@container` молча игнорируются — без ошибки в консоли.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "обязательный setup — без него feature не работает",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "cq_definition_vs_media",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "container_type_setup",
+            "oftenConfusedWith": [
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "container-type",
+              "inline-size",
+              "родител",
+              "объяв",
+              "игнорир"
+            ],
+            "anchorTermsWrongTopic": [
+              "достаточно @container без container-type",
+              "container-name заменяет container-type"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "container-type",
+              "inline-size"
+            ],
+            "ask": "чем inline-size отличается от size и когда нужен size"
+          }
+        ],
+        "mustConcepts": [
+          "container-type",
+          "inline-size",
+          "block-size",
+          "size",
+          "style",
+          "родител",
+          "батьк",
+          "объяв",
+          "контейнер",
+          "без container-type",
+          "игнорир",
+          "молча",
+          "нет ошибки",
+          "min-width",
+          "ширина",
+          "inline",
+          "block",
+          "containment",
+          "self-contained"
+        ],
+        "falseClaims": [
+          "@container работает без container-type на родителе",
+          "container-type: block-size достаточен для большинства card layout",
+          "container-name без container-type включает queries",
+          "браузер покажет ошибку если забыли container-type"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Выбирает container vs media queries",
+      "expected": "Кандидат применяет правило: переиспользуемые компоненты в разных layout (card, widget) → container queries; page-wide layout (nav collapse, print, orientation) → media queries. Может привести пример sidebar vs main grid.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "практический trade-off — когда какой механизм",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "cq_definition_vs_media",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "when_to_use",
+            "oftenConfusedWith": [
+              "cq_definition_vs_media"
+            ],
+            "anchorTermsExpected": [
+              "компонент",
+              "layout",
+              "sidebar",
+              "nav",
+              "mobile",
+              "переиспольз"
+            ],
+            "anchorTermsWrongTopic": [
+              "всегда container queries",
+              "media queries только устарели"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "когда",
+              "выбор",
+              "media",
+              "container"
+            ],
+            "ask": "dashboard widget в flex grid и collapse nav на mobile — что куда"
+          }
+        ],
+        "mustConcepts": [
+          "переиспольз",
+          "компонент",
+          "card",
+          "widget",
+          "sidebar",
+          "grid",
+          "layout",
+          "page-wide",
+          "глобальн",
+          "nav",
+          "mobile",
+          "print",
+          "orientation",
+          "media queries",
+          "container queries",
+          "контекст",
+          "override",
+          "библиотек",
+          "dashboard",
+          "hero"
+        ],
+        "falseClaims": [
+          "container queries полностью заменяют media queries",
+          "nav collapse на mobile делают через @container",
+          "media queries лучше для card в sidebar и main одновременно",
+          "container queries только для print styles"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "syntax_usage",
+      "title": "Пишет синтаксис @container",
+      "expected": "Кандидат показывает паттерн: родитель с `container-type: inline-size`, дочерний селектор в `@container (min-width: Npx)`. Понимает, что одна `.card` даёт разный layout в узком и широком контейнере при той же ширине viewport.",
+      "score": 1.0,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый синтаксис из quick example",
+        "mustConcepts": [
+          "@container",
+          "min-width",
+          "container-type",
+          "inline-size",
+          "flex-direction",
+          "row",
+          "column",
+          "родител",
+          "дочерн",
+          "card",
+          "stacked",
+          "side-by-side",
+          "300px",
+          "500px",
+          "display flex",
+          "правило",
+          "селектор"
+        ],
+        "falseClaims": [
+          "@container пишется на том же элементе что и container-type без вложенности",
+          "min-width в @container смотрит viewport",
+          "достаточно width на родителе без container-type"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.8
+      }
+    },
+    {
+      "key": "container_units",
+      "title": "Использует container query units",
+      "expected": "Кандидат знает единицы `cqw`, `cqi`, `cqb`, `cqmin`/`cqmax` — процент от размера контейнера. Может привести `clamp(1rem, 4cqw, 2rem)` или `6cqi` для fluid typography относительно контейнера, не viewport.",
+      "score": 1.0,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "cq-единицы — практический бонус senior темы",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "cqw",
+              "cqi",
+              "clamp"
+            ],
+            "ask": "почему cqi предсказуемее vw для метрики внутри widget"
+          }
+        ],
+        "mustConcepts": [
+          "cqw",
+          "cqh",
+          "cqi",
+          "cqb",
+          "cqmin",
+          "cqmax",
+          "единицы",
+          "контейнер",
+          "процент",
+          "clamp",
+          "fluid",
+          "typography",
+          "шрифт",
+          "viewport",
+          "vw",
+          "inline size",
+          "block size",
+          "метрик",
+          "padding"
+        ],
+        "falseClaims": [
+          "cqw это процент viewport как vw",
+          "container units работают без container-type",
+          "cqi и cqw всегда одинаковы"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.8
+      }
+    },
+    {
+      "key": "named_containers",
+      "title": "Именует контейнеры",
+      "expected": "Кандидат объясняет: `container-name: sidebar` + `@container sidebar (min-width: 300px)` таргетирует конкретный контейнер. Без имени `@container` запрашивает ближайшего ancestor с `container-type`.",
+      "score": 1.0,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "named containers для нескольких контекстов на странице",
+        "mustConcepts": [
+          "container-name",
+          "именован",
+          "sidebar",
+          "main",
+          "ancestor",
+          "предок",
+          "ближайш",
+          "несколько контейнер",
+          "таргет",
+          "конкретн",
+          "dashboard-card",
+          "wrapper"
+        ],
+        "falseClaims": [
+          "container-name включает queries без container-type",
+          "без имени @container всегда смотрит viewport",
+          "можно иметь только один named container на странице"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки",
+      "expected": "Кандидат называет: забытый `container-type` (silent fail); style queries без `style` в `container-type`; over-query на слишком маленьком контейнере; nested containers без `self-contained` (resize loop); путаница `block-size` vs `inline-size`.",
+      "score": 2.0,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — критично для production",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.5
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "container_type_setup",
+            "floorFraction": 0.5
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "style query",
+              "style(",
+              "--variant"
+            ],
+            "ask": "почему style query не срабатывает без style в container-type"
+          },
+          {
+            "match": [
+              "self-contained",
+              "вложен",
+              "flex",
+              "grid"
+            ],
+            "ask": "зачем self-contained при nested containers"
+          }
+        ],
+        "mustConcepts": [
+          "забыл",
+          "container-type",
+          "молча",
+          "игнорир",
+          "style queries",
+          "style",
+          "container-type style",
+          "кастомн",
+          "свойств",
+          "--variant",
+          "block-size",
+          "inline-size",
+          "self-contained",
+          "resize loop",
+          "цикл",
+          "вложен",
+          "flex",
+          "grid",
+          "over-query",
+          "маленьк",
+          "иконк",
+          "20px",
+          "Firefox 121"
+        ],
+        "falseClaims": [
+          "если @container не работает браузер покажет warning",
+          "style queries работают с одним container-type: inline-size",
+          "block-size надёжнее inline-size для card layout",
+          "nested container queries никогда не вызывают resize loop"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "containment_performance",
+      "title": "Понимает containment и performance",
+      "expected": "Кандидат объясняет: `container-type` создаёт containment (`contain: layout style`); контейнер не query свой размер — circular dependency. Observer-based evaluation; много контейнеров → много observers; senior: shared ancestor вместо observer на каждую card; `content-visibility: auto` для off-screen.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "senior follow-up — internals и cost в grid",
+        "mustConcepts": [
+          "containment",
+          "contain",
+          "layout style",
+          "circular",
+          "циклич",
+          "ResizeObserver",
+          "observer",
+          "performance",
+          "50 карт",
+          "shared ancestor",
+          "content-visibility",
+          "polyfill",
+          "Chrome 105",
+          "Safari 16"
+        ],
+        "falseClaims": [
+          "container queries не создают containment",
+          "контейнер может query свой собственный размер",
+          "есть полный polyfill для @container",
+          "100 container queries бесплатны по сравнению с media"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Container queries стилизуют по ширине родителя, не viewport. На `.parent` ставлю `container-type: inline-size`, в `@container (min-width: 400px)` переключаю `.card` на row. Одна карточка в sidebar 240px остаётся column, в main 900px — row. Media queries оставляю для nav collapse и page layout.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В component library раньше три набора @media override для card в sidebar, grid и banner. Один @container заменил их — компонент сам адаптируется. Font-size через clamp(1rem, 6cqi, 2.5rem) привязан к widget, не к vw.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "DashboardCard: `.widget { container-type: inline-size; container-name: dashboard-card; }`. Метрика масштабируется cqi. Style query `@container style(--variant: dark)` — но только если `container-type: style inline-size`.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "@container (min-width: 400px) на .card достаточно — container-type на родителе не нужен, браузер сам поймёт контекст.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Container queries полностью заменили media queries — nav на mobile делаю через @container на body, viewport больше не смотрю.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Style query `@container style(--variant: dark)` работает с `container-type: inline-size` — style в container-type лишний.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "cq_definition_vs_media",
+      "exampleType": "good",
+      "exampleText": "@media — ширина окна, глобально; @container — ширина родительского блока, локально. Карточка в sidebar и hero ведёт себя по-разному при одной ширине браузера.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "cq_definition_vs_media",
+      "exampleType": "good",
+      "exampleText": "ну media смотрит viewport, container — родителя. один компонент без костылей в разных layout",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "cq_definition_vs_media",
+      "exampleType": "bad",
+      "exampleText": "@container и @media оба проверяют window.innerWidth — разница только в синтаксисе.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "container_type_setup",
+      "exampleType": "good",
+      "exampleText": "Без `container-type: inline-size` на `.parent` правила `@container` просто не применяются — silent ignore, ошибок нет.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "container_type_setup",
+      "exampleType": "good",
+      "exampleText": "inline-size для width-based card; size если нужна и высота; style inline-size для style queries с --variant",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "container_type_setup",
+      "exampleType": "bad",
+      "exampleText": "Достаточно задать width: 500px на родителе — @container сработает автоматически.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Card в sidebar и main grid — container queries. Collapse header nav на 768px viewport — media query.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "виджеты дашборда разной ширины — @container каждый сам; print styles — @media",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Для mobile navigation всегда @container на nav-item — viewport не важен.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "syntax_usage",
+      "exampleType": "good",
+      "exampleText": ".parent { container-type: inline-size; } @container (min-width: 450px) { .card { flex-direction: row; } }",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "syntax_usage",
+      "exampleType": "good",
+      "exampleText": "два div.parent 300px и 560px — одна .card, разный flex-direction без media",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "syntax_usage",
+      "exampleType": "bad",
+      "exampleText": "@container пишу на .card с container-type: inline-size — query своего размера.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "container_units",
+      "exampleType": "good",
+      "exampleText": "font-size: clamp(1.25rem, 6cqi, 2.5rem) — масштаб от inline-size контейнера, не vw.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "container_units",
+      "exampleType": "good",
+      "exampleText": "cqi удобнее vw когда widget вложен — vw смотрит viewport, cqi слот",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "container_units",
+      "exampleType": "bad",
+      "exampleText": "cqw — это то же что 1vw, просто другое имя в спецификации.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "named_containers",
+      "exampleType": "good",
+      "exampleText": "container-name: sidebar + @container sidebar (min-width: 300px) — правило только внутри sidebar, не в main.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "named_containers",
+      "exampleType": "good",
+      "exampleText": "без имени — ближайший ancestor с container-type; с именем — явный таргет",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "named_containers",
+      "exampleType": "bad",
+      "exampleText": "container-name: card достаточно — container-type не обязателен если имя задано.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Забыл container-type — @container молча игнорируется. Style query без style в container-type — все карточки default theme.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "nested flex: inner container-type inline-size self-contained — иначе resize loop parent↔child",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "min-width: 300px на 20px иконке — query сработает когда контейнер вырастет.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "containment_performance",
+      "exampleType": "good",
+      "exampleText": "container-type создаёт contain: layout style; элемент не query свой размер — circular dependency. Grid 50 cards: observer на shared ancestor, не на каждую card.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "containment_performance",
+      "exampleType": "good",
+      "exampleText": "полного polyfill нет; fallback ResizeObserver + классы; content-visibility: auto снижает active observers",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "containment_performance",
+      "exampleType": "bad",
+      "exampleText": "100 @container на странице бесплатны — браузер не создаёт observers, только CSS parse.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "css-container-queries",
+    "apiUrl": "https://api.itlead.org/api/questions/css-container-queries",
+    "pageUrl": "https://itlead.org/interview-questions/html-css/css-container-queries",
+    "difficulty": "SENIOR",
+    "titleEn": "CSS container queries",
+    "categorySlug": "html-css",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

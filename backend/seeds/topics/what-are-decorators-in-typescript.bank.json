@@ -1,0 +1,582 @@
+{
+  "topic": {
+    "code": "what_are_decorators_typescript",
+    "name": "Декораторы в TypeScript",
+    "skillCode": "typescript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое декораторы в TypeScript и как они работают?",
+    "shortAnswer": "Декораторы TypeScript — это функции, применяемые через синтаксис `@имя` к классам, методам, свойствам или параметрам. Компилятор переписывает `@Logger class User {}` в `Logger(User)` на этапе сборки, до запуска кода. Требуется `\"experimentalDecorators\": true` в `tsconfig.json`. Широко используются в Angular, NestJS и TypeORM.",
+    "idealAnswer": "Декораторы TypeScript — функции, оборачивающие классы, методы, свойства или параметры через синтаксис `@decorator` и выполняющиеся в момент определения класса или члена, а не при вызове. Аналогия: декоратор как штамп на конверте — содержимое не меняется, но меняется обработка. Компилятор на emit-фазе сканирует `@decorator` и переписывает в прямой вызов функции: `@Logger class User {}` становится примерно `User = Logger(User)`. Специального рантайма нет — только трансформированный AST. Требуется `\"experimentalDecorators\": true` в `tsconfig.json` или флаг `--experimentalDecorators` в CLI. С `\"emitDecoratorMetadata\": true` компилятор добавляет символы `Reflect.metadata` через `tslib` — так Angular и NestJS инжектят типы зависимостей без явной передачи; нужен также `import \"reflect-metadata\"` в entry point. TypeScript 5.0+ поддерживает legacy (`experimentalDecorators`) и новый режим TC39 stage 3; Angular, NestJS и большинство фреймворков пока на legacy. Ключевая ментальная модель: декоратор класса срабатывает при загрузке модуля (парсинге файла), а не при каждом `new Class()`. Когда использовать: повторяющийся boilerplate (логирование, тайминг, обработка ошибок), контракты фреймворков (`@Component`, `@Get`), валидация DTO (`@IsEmail()`). Не использовать для одноразовой логики (проще обычная функция-обёртка) и на hot path (каждый декоратор — лишний слой вызова). Декоратор метода получает три аргумента: `target` (прототип для instance-методов, конструктор для static), `propertyKey` (имя метода), `descriptor` (`PropertyDescriptor` с `value`, `writable`, `enumerable`, `configurable`). Метод-декоратор обязан `return desc` — bundler'ы вроде esbuild ожидают возврат модифицированного дескриптора. Фабрики декораторов (`@Throttle(1000)`) — функция, возвращающая декоратор; позволяет параметризовать поведение. Стек: фабрики вызываются сверху вниз, сами декораторы применяются снизу вверх (`@A @B method()` — сначала `B`, потом `A` оборачивает результат). Декоратор класса получает только конструктор — параметры конструктора недоступны напрямую; для перехвата нужно вернуть новый класс, расширяющий оригинал. При наследовании: декораторы дочернего класса модифицируют прототип дочернего; переопределённый метод без декоратора — недекорирован. Типичные ошибки: забыть `experimentalDecorators`; не возвращать descriptor; вешать method decorator на arrow function class field (`search = () => {}` — `desc.value` undefined, декоратор молча не работает); `Reflect.getMetadata` без `emitDecoratorMetadata` и `reflect-metadata`; декорировать `#private` поля — нет runtime descriptor. Реальное применение: NestJS (`@Controller`, `@Get`, `@Body`), Angular (`@Component`, `@Injectable`, `@Input`), TypeORM (`@Entity`, `@Column`), class-validator (`@IsEmail`, `@MinLength`), class-transformer (`@Expose`, `@Transform`). Продвинутый паттерн NestJS: декораторы сохраняют метаданные на классе через `Reflect.defineMetadata`, bootstrapper читает их позже для регистрации маршрутов — декоратор не трогает Express напрямую.",
+    "maxScore": 10,
+    "skills": [
+      "typescript",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "decorator_definition",
+      "title": "Понимает что такое декоратор",
+      "expected": "Кандидат объясняет: декоратор — функция с синтаксисом `@имя`, применяется к классу/методу/свойству/параметру; работает на уровне метаданных и модификации определения, а не вызова.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — функции-обёртки с @syntax",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "@decorator",
+              "декоратор",
+              "функци",
+              "оборачив"
+            ],
+            "ask": "что такое декоратор и к чему его можно применить в TypeScript"
+          }
+        ],
+        "mustConcepts": [
+          "декоратор",
+          "@",
+          "синтаксис",
+          "функци",
+          "класс",
+          "метод",
+          "свойство",
+          "параметр",
+          "оборачив",
+          "модификатор",
+          "аннотац",
+          "метаданн",
+          "определен",
+          "не вызов",
+          "wrap",
+          "member"
+        ],
+        "falseClaims": [
+          "декоратор выполняется при каждом вызове метода",
+          "декоратор — встроенный синтаксис TypeScript без трансформации",
+          "декораторы работают только с классами, не с методами",
+          "декоратор меняет тело функции во время выполнения вызова"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "compiler_transform",
+      "title": "Знает трансформацию компилятором",
+      "expected": "Кандидат объясняет: `@Logger class User {}` → `Logger(User)` на emit-фазе; нужен `experimentalDecorators`; опционально `emitDecoratorMetadata` + `reflect-metadata` для DI; legacy vs TC39 stage 3.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "compile-time rewrite и флаги tsconfig — ключ из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "decorator_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "experimentalDecorators",
+              "Logger(User)",
+              "emit"
+            ],
+            "ask": "как компилятор переписывает @decorator и какие флаги tsconfig нужны"
+          }
+        ],
+        "mustConcepts": [
+          "компилятор",
+          "emit",
+          "перепис",
+          "трансформ",
+          "Logger(User)",
+          "experimentalDecorators",
+          "tsconfig",
+          "emitDecoratorMetadata",
+          "Reflect.metadata",
+          "tslib",
+          "reflect-metadata",
+          "build time",
+          "сборк",
+          "AST",
+          "legacy",
+          "TC39"
+        ],
+        "falseClaims": [
+          "декораторы выполняются специальным рантаймом TypeScript",
+          "experimentalDecorators не нужен для @syntax",
+          "emitDecoratorMetadata работает без import reflect-metadata",
+          "декораторы не требуют никаких флагов в tsconfig"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "execution_timing",
+      "title": "Понимает момент выполнения декоратора",
+      "expected": "Кандидат объясняет: декоратор класса срабатывает при загрузке/парсинге модуля, а не при `new Class()` или вызове метода; это главная ментальная модель.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "runs at definition not instantiation — частая ловушка middle",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "execution_timing",
+            "oftenConfusedWith": [
+              "decorator_definition"
+            ],
+            "anchorTermsExpected": [
+              "загрузк",
+              "модул",
+              "парсинг",
+              "определен",
+              "не new",
+              "не вызов"
+            ],
+            "anchorTermsWrongTopic": [
+              "при каждом new",
+              "при вызове метода",
+              "в runtime при инстанцировании"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "загрузк",
+              "модул",
+              "new User",
+              "определен"
+            ],
+            "ask": "когда срабатывает @LogCreation на классе — при new или при загрузке файла"
+          }
+        ],
+        "mustConcepts": [
+          "загрузк",
+          "модул",
+          "парсинг",
+          "определен",
+          "definition",
+          "не инстанц",
+          "не new",
+          "не вызов",
+          "module load",
+          "файл",
+          "один раз",
+          "Creating",
+          "Class defined",
+          "ментальн",
+          "момент"
+        ],
+        "falseClaims": [
+          "декоратор класса срабатывает при каждом new Class()",
+          "декоратор метода срабатывает только при первом вызове метода",
+          "декоратор выполняется в момент вызова декорированной функции",
+          "декоратор и конструктор выполняются в одно и то же время при new"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "method_decorator_api",
+      "title": "Знает API декоратора метода",
+      "expected": "Кандидат перечисляет три аргумента: target, propertyKey, descriptor; объясняет что method decorator обязан return descriptor; знает PropertyDescriptor поля.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "follow-up Q про аргументы method decorator из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "target",
+              "propertyKey",
+              "descriptor",
+              "return desc"
+            ],
+            "ask": "какие три аргумента получает декоратор метода и зачем return descriptor"
+          }
+        ],
+        "mustConcepts": [
+          "target",
+          "propertyKey",
+          "descriptor",
+          "PropertyDescriptor",
+          "value",
+          "writable",
+          "enumerable",
+          "configurable",
+          "return",
+          "return desc",
+          "прототип",
+          "конструктор",
+          "static",
+          "instance",
+          "имя метода",
+          "symbol"
+        ],
+        "falseClaims": [
+          "декоратор метода получает только target",
+          "return descriptor необязателен для method decorator",
+          "descriptor не содержит value для обычных методов",
+          "target для instance-метода — это конструктор класса"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "decorator_factories_stacking",
+      "title": "Понимает фабрики и порядок стека",
+      "expected": "Кандидат объясняет: фабрика (`Throttle(1000)`) возвращает декоратор для параметризации; стек: фабрики сверху вниз, применение снизу вверх; декоратор класса не видит параметры конструктора.",
+      "score": 0.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "factory pattern и stacking order — бонус follow-up ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Throttle(1000)",
+              "фабрик",
+              "@A @B"
+            ],
+            "ask": "зачем @Throttle(1000) вместо @Throttle и в каком порядке применяются @A @B"
+          }
+        ],
+        "mustConcepts": [
+          "фабрик",
+          "factory",
+          "Throttle",
+          "параметр",
+          "конфигурац",
+          "возвращает декоратор",
+          "стек",
+          "stack",
+          "сверху вниз",
+          "снизу вверх",
+          "@A @B",
+          "порядок",
+          "параметриз",
+          "delay",
+          "log level"
+        ],
+        "falseClaims": [
+          "фабрика декоратора и сам декоратор — одно и то же",
+          "стекованные декораторы применяются сверху вниз",
+          "декоратор класса напрямую читает параметры конструктора",
+          "@Throttle без скобок может принять аргумент delay"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с декораторами",
+      "expected": "Кандидат называет: забытый experimentalDecorators; не return descriptor; method decorator на arrow class field; Reflect.getMetadata без обоих флагов; декорирование #private полей; наследование сбрасывает декоратор при override без @.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "method_decorator_api",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "arrow",
+              "search = ()",
+              "desc.value"
+            ],
+            "ask": "почему @Throttle на arrow function class field молча не работает"
+          },
+          {
+            "match": [
+              "Reflect.getMetadata",
+              "undefined",
+              "reflect-metadata"
+            ],
+            "ask": "почему Reflect.getMetadata возвращает undefined"
+          },
+          {
+            "match": [
+              "#private",
+              "private field",
+              "descriptor"
+            ],
+            "ask": "почему нельзя декорировать поле с # синтаксисом"
+          }
+        ],
+        "mustConcepts": [
+          "experimentalDecorators",
+          "return desc",
+          "arrow",
+          "стрелочн",
+          "class field",
+          "desc.value",
+          "undefined",
+          "Reflect.getMetadata",
+          "emitDecoratorMetadata",
+          "reflect-metadata",
+          "#private",
+          "private keyword",
+          "descriptor",
+          "наследован",
+          "override",
+          "переопредел",
+          "esbuild",
+          "bundler",
+          "Decorators not enabled"
+        ],
+        "falseClaims": [
+          "arrow function class field имеет desc.value как обычный метод",
+          "Reflect.getMetadata работает только с experimentalDecorators",
+          "#private поля можно декорировать через PropertyDescriptor",
+          "дочерний override сохраняет декоратор родителя автоматически",
+          "не return descriptor безопасно во всех bundler'ах"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "framework_usage",
+      "title": "Знает применение в фреймворках",
+      "expected": "Кандидат называет NestJS (@Controller, @Get), Angular (@Component, @Injectable), TypeORM (@Entity), class-validator (@IsEmail); понимает cross-cutting concerns и metadata-driven routing.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Real-world usage и when to use из ITLead",
+        "mustConcepts": [
+          "NestJS",
+          "Angular",
+          "TypeORM",
+          "class-validator",
+          "class-transformer",
+          "@Component",
+          "@Injectable",
+          "@Get",
+          "@Controller",
+          "@Entity",
+          "@Column",
+          "@IsEmail",
+          "@Expose",
+          "DI",
+          "маршрут",
+          "валидац",
+          "DTO",
+          "metadata",
+          "bootstrapper"
+        ],
+        "falseClaims": [
+          "декораторы используются только в Angular, в NestJS их нет",
+          "декоратор @Get напрямую регистрирует маршрут в Express",
+          "class-validator работает без декораторов на полях DTO",
+          "декораторы обязательны для любой TypeScript-логики"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Декоратор — функция с @syntax, компилятор переписывает `@Log class User {}` в `Log(User)` при сборке. Срабатывает при загрузке модуля, не при new. Нужен experimentalDecorators. В NestJS @Get сохраняет метаданные маршрута, bootstrapper читает Reflect.getMetadata позже.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для повторяющегося логирования методов делаю @Log factory — DRY. Method decorator получает target, propertyKey, descriptor и обязан return desc. @Throttle(1000) на обычный метод search(), не на arrow field. Для DI в Nest — emitDecoratorMetadata + reflect-metadata в main.ts.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну декоратор — обёртка на определении класса/метода, не при вызове. angular @Component, nest @Get — контракты фреймворка. одноразовую логику лучше обычной функцией, не магией @",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Декоратор @Log на классе вызывается каждый раз при new UserService() и логирует имя экземпляра.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Method decorator модифицирует desc.value и не возвращает descriptor — esbuild всё равно корректно применит обёртку. @Throttle(1000) на search = () => {} работает как на обычном методе.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Reflect.getMetadata достаточно включить experimentalDecorators. Декоратор класса видит параметры конструктора напрямую. Стек @A @B применяется сверху вниз: сначала A, потом B.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "decorator_definition",
+      "exampleType": "good",
+      "exampleText": "Декоратор — функция, применяемая через @ к классу, методу, свойству или параметру; модифицирует определение на этапе компиляции.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "decorator_definition",
+      "exampleType": "good",
+      "exampleText": "типа аннотация-обёртка: @Logger вешается на класс, компилятор превращает в вызов функции",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "decorator_definition",
+      "exampleType": "bad",
+      "exampleText": "Декоратор — это макрос, который выполняется в браузере при каждом вызове декорированного метода.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "compiler_transform",
+      "exampleType": "good",
+      "exampleText": "`@Logger class User {}` → `User = Logger(User)` на emit-фазе; experimentalDecorators в tsconfig обязателен.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "compiler_transform",
+      "exampleType": "good",
+      "exampleText": "emitDecoratorMetadata + reflect-metadata — Angular/Nest инжектят типы через Reflect.metadata, без спецрантайма TS",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "compiler_transform",
+      "exampleType": "bad",
+      "exampleText": "Декораторы — нативная фича JS, TypeScript только проверяет типы, не переписывает код.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "execution_timing",
+      "exampleType": "good",
+      "exampleText": "@LogCreation на UserService логирует «Class defined» при парсинге модуля; new UserService('Alice') ничего дополнительно не пишет.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "execution_timing",
+      "exampleType": "good",
+      "exampleText": "в nest первый раз увидел — думал декоратор при new, а он при load файла срабатывает",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "execution_timing",
+      "exampleType": "bad",
+      "exampleText": "Декоратор класса срабатывает в конструкторе при каждом создании экземпляра — поэтому удобно логировать id пользователя.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "method_decorator_api",
+      "exampleType": "good",
+      "exampleText": "Method decorator: (target, propertyKey, descriptor) — меняю desc.value, обязательно return desc для esbuild.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "method_decorator_api",
+      "exampleType": "good",
+      "exampleText": "для instance-метода target — прототип класса, для static — конструктор; descriptor.value — сама функция метода",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "method_decorator_api",
+      "exampleType": "bad",
+      "exampleText": "Декоратор метода получает четыре аргумента включая args вызова; return descriptor опционален.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "decorator_factories_stacking",
+      "exampleType": "good",
+      "exampleText": "Throttle(ms) возвращает декоратор — @Throttle(1000) задаёт задержку per method. @A @B: фабрики A() B() сверху вниз, применение B потом A.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "decorator_factories_stacking",
+      "exampleType": "good",
+      "exampleText": "фабрика нужна чтоб параметры передать — без Throttle(1000) delay не настроить",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "decorator_factories_stacking",
+      "exampleType": "bad",
+      "exampleText": "@A @B method() — A применяется первым, потом B оборачивает результат A. Class decorator читает constructor args из metadata автоматически.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "@Throttle на search = () => {} — desc.value undefined, throttle молча не работает; нужен обычный метод search().",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Reflect.getMetadata undefined — проверь emitDecoratorMetadata И import reflect-metadata в entry. #private поле не декорируется — используй TS private.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "ребёнок override родительский decorated method без @ — версия ребёнка без декоратора",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Забыл experimentalDecorators — TS всё равно скомпилирует @Log. Arrow field и обычный метод одинаковы для method decorator.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "framework_usage",
+      "exampleType": "good",
+      "exampleText": "NestJS: @Controller + @Get пишут metadata, bootstrapper регистрирует Express routes. Angular @Component/@Injectable — DI и метаданные компонента.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "framework_usage",
+      "exampleType": "good",
+      "exampleText": "typeorm @Entity @Column, class-validator @IsEmail на dto — декораторы для контрактов, не для разовой логики",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "framework_usage",
+      "exampleType": "bad",
+      "exampleText": "Декораторы нужны везде — даже для одной функции лучше @Wrapper чем plain function. @Get сам вызывает app.get в Express при загрузке декоратора.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "what-are-decorators-in-typescript",
+    "apiUrl": "https://api.itlead.org/api/questions/what-are-decorators-in-typescript",
+    "pageUrl": "https://itlead.org/interview-questions/typescript/what-are-decorators-in-typescript",
+    "difficulty": "MIDDLE",
+    "titleEn": "What are decorators in TypeScript?",
+    "categorySlug": "typescript",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

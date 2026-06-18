@@ -1,0 +1,552 @@
+{
+  "topic": {
+    "code": "what_are_generators_in_javascript",
+    "name": "Генераторы в JavaScript",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое генераторы (generators) в JavaScript и как они работают?",
+    "shortAnswer": "Генераторы — функции с синтаксисом `function*`, которые приостанавливают выполнение на каждом `yield` и возобновляют его при вызове `.next()`. Вызов `function*` сразу возвращает объект-итератор; тело выполняется лениво — по одному значению за `.next()`. Каждый `.next()` возвращает `{ value, done }`.",
+    "idealAnswer": "Генераторы — функции JavaScript, объявляемые через `function*`, которые могут приостанавливать выполнение посередине и возобновлять его с того же места, выдавая значения по одному через ключевое слово `yield`. В отличие от обычной функции, которая при вызове сразу выполняется до конца и возвращает одно значение, генератор при вызове мгновенно возвращает объект-итератор — тело функции не запускается, пока не вызовут первый `.next()`. Каждый `.next()` возобновляет выполнение с последнего `yield`, возвращает `{ value, done }` и снова останавливается на следующем `yield` или `return`. После `return` все последующие `.next()` дают `{ value: undefined, done: true }`. Это ленивые вычисления (lazy evaluation): значения производятся только по запросу, а не заранее. Итерировать генератор можно через `for...of` (автоматически вызывает `.next()` до `done: true`), spread (`[...gen]`) или ручной цикл `while (!result.done)`. Когда использовать: большие или бесконечные последовательности (пагинация API, обход дерева, числовые диапазоны без массива), state machines (многошаговые процессы без класса), двусторонняя коммуникация через `.next(value)` — аргумент второго и последующих `.next(arg)` становится результатом предыдущего `yield`-выражения (паттерн Redux-Saga). Для простых одноразовых вычислений генератор избыточен — достаточно обычной функции. Типичные ошибки: ожидать, что генератор выполнится при создании (`const g = gen()` — это итератор, код не бежит); не проверять `done: true` после исчерпания; делить внешнее замыкание между экземплярами вместо локального state внутри генератора; передавать аргумент в первый `.next()` — он игнорируется, потому что ещё нет `yield`, который его примет. `yield*` делегирует другому итерируемому объекту или генератору и последовательно отдаёт все его значения. Ошибки можно инжектировать через `.throw(err)` в текущую точку `yield` — если внутри `try/catch`, генератор обработает и продолжит, иначе ошибка уйдёт вызывающему. Память: массив из миллиона элементов аллоцирует всё сразу; генератор выдаёт одно значение за `.next()`, переиспользуя контекст выполнения — для бесконечных последовательностей массив вообще невозможен. V8 компилирует `function*` в state machine: каждый `yield` — точка перехода состояния, объект генератора хранит указатель на приостановленный execution context. `async function*` объединяет генераторы с промисами: `yield` может ждать async-операцию, итерация через `for await...of`. Реальное применение: Redux-Saga (middleware шлёт resolved values через `.next()`), Node.js streams с `Symbol.asyncIterator`, пагинированные запросы к БД батчами, фабрики ID и тестовых данных.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "generator_definition",
+      "title": "Понимает синтаксис и механику генератора",
+      "expected": "Кандидат объясняет: `function*` + `yield`; вызов возвращает итератор; `.next()` возобновляет с последнего `yield` и возвращает `{ value, done }`; после `return` — `done: true`.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — function*, yield, .next(), {value, done}",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "function*",
+              "yield",
+              ".next()"
+            ],
+            "ask": "что возвращает вызов генератора и что делает первый .next()"
+          }
+        ],
+        "mustConcepts": [
+          "function*",
+          "yield",
+          ".next()",
+          "next",
+          "value",
+          "done",
+          "итератор",
+          "iterator",
+          "Generator",
+          "приостанов",
+          "возобнов",
+          "return",
+          "undefined",
+          "done: true",
+          "done: false",
+          "генератор"
+        ],
+        "falseClaims": [
+          "function* — синтаксический сахар без семантики",
+          "yield возвращает значение вызывающему напрямую без .next()",
+          "генератор при вызове сразу выполняет всё тело",
+          "после return .next() продолжает выдавать новые yield-значения"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "lazy_vs_regular",
+      "title": "Отличает генератор от обычной функции",
+      "expected": "Кандидат объясняет: обычная функция выполняется целиком при вызове; генератор возвращает итератор сразу, тело стартует только на первом `.next()`; lazy evaluation — значения по запросу.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевое отличие lazy vs run-to-completion",
+        "confusionPairs": [
+          {
+            "checkpointKey": "lazy_vs_regular",
+            "oftenConfusedWith": [
+              "generator_definition"
+            ],
+            "anchorTermsExpected": [
+              "lazy",
+              "ленив",
+              "итератор сразу",
+              "первый .next()",
+              "run to completion"
+            ],
+            "anchorTermsWrongTopic": [
+              "генератор возвращает массив",
+              "yield это return"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "lazy",
+              "ленив",
+              "по одному"
+            ],
+            "ask": "чем lazy evaluation генератора отличается от обычной функции, возвращающей массив"
+          }
+        ],
+        "mustConcepts": [
+          "lazy",
+          "ленив",
+          "evaluation",
+          "обычн",
+          "regular function",
+          "run to completion",
+          "до конца",
+          "итератор сразу",
+          "без запуска тела",
+          "первый .next()",
+          "по запросу",
+          "не заранее",
+          "не upfront",
+          "одно значение",
+          "за вызов"
+        ],
+        "falseClaims": [
+          "генератор и обычная функция работают одинаково при вызове",
+          "генератор всегда строит полный массив в памяти",
+          "lazy evaluation означает async/await",
+          "тело генератора выполняется синхронно до первого yield при вызове gen()"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "iteration_patterns",
+      "title": "Знает способы итерации по генератору",
+      "expected": "Кандидат называет: `for...of` (авто `.next()` до done), spread `[...gen]`, ручной `while (!result.done)`; понимает когда нужен массив vs потоковая итерация.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "follow-up из ITLead — три способа итерации",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "for...of",
+              "spread",
+              "while"
+            ],
+            "ask": "как итерировать генератор и когда spread лучше не использовать"
+          }
+        ],
+        "mustConcepts": [
+          "for...of",
+          "spread",
+          "...gen",
+          "while",
+          "!result.done",
+          "done",
+          "автоматич",
+          "ручн",
+          "цикл",
+          "массив",
+          "convert",
+          "итерац",
+          "Symbol.iterator",
+          "перебор",
+          "exhausted",
+          "исчерп"
+        ],
+        "falseClaims": [
+          "генератор можно итерировать только через while",
+          "for...of не работает с генераторами",
+          "spread сохраняет lazy semantics при больших последовательностях",
+          "forEach работает с generator object напрямую"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда использовать генераторы",
+      "expected": "Кандидат называет: большие/бесконечные данные, пагинация, state machines, двусторонняя коммуникация (Redux-Saga); для простых one-shot вычислений — обычная функция.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use из ITLead — практический выбор инструмента",
+        "mustConcepts": [
+          "больш",
+          "infinite",
+          "бесконеч",
+          "пагинац",
+          "batch",
+          "батч",
+          "state machine",
+          "стейт-машин",
+          "Redux-Saga",
+          "saga",
+          "память",
+          "memory",
+          "10k",
+          "500k",
+          "прост",
+          "one-shot",
+          "обычн функц"
+        ],
+        "falseClaims": [
+          "генераторы нужны для любой функции",
+          "генераторы заменяют Promises",
+          "для простого сложения двух чисел нужен generator",
+          "генераторы быстрее обычных функций всегда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с генераторами",
+      "expected": "Кандидат называет: код не бежит при `gen()` — только после `.next()`; не проверять `done`; shared closure между экземплярами; аргумент первого `.next()` игнорируется.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — частые ловушки на middle",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "создан",
+              "gen()",
+              "не запуск"
+            ],
+            "ask": "почему const g = gen() не даёт значение 1 сразу"
+          },
+          {
+            "match": [
+              "done",
+              "undefined",
+              "исчерп"
+            ],
+            "ask": "что вернёт g.next() после того как генератор завершился"
+          },
+          {
+            "match": [
+              "первый .next",
+              "аргумент",
+              "игнор"
+            ],
+            "ask": "почему аргумент первого .next(value) не попадает в yield"
+          }
+        ],
+        "mustConcepts": [
+          "не запуск",
+          "при создан",
+          "gen()",
+          "итератор",
+          "done: true",
+          "undefined",
+          "исчерп",
+          "while",
+          "shared",
+          "замыкан",
+          "closure",
+          "count",
+          "внутри",
+          "локальн state",
+          "первый .next",
+          "игнор",
+          "аргумент"
+        ],
+        "falseClaims": [
+          "gen() сразу выполняет yield и возвращает value",
+          "после done: false генератор можно вызывать бесконечно с новыми значениями",
+          "внешняя переменная count даёт независимые экземпляры генератора",
+          "аргумент первого .next(100) становится результатом первого yield"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "two_way_next_value",
+      "title": "Понимает двустороннюю коммуникацию через .next(value)",
+      "expected": "Кандидат объясняет: аргумент `.next(arg)` со второго вызова — результат предыдущего `yield`-выражения внутри генератора; паттерн Redux-Saga middleware.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Advanced auction example — главная middle+ ловушка",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "generator_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              ".next(",
+              "yield",
+              "bid",
+              "инжект"
+            ],
+            "ask": "как значение 100 из .next(100) попадает в const bid = yield ..."
+          },
+          {
+            "match": [
+              "Redux-Saga",
+              "middleware",
+              "resolved"
+            ],
+            "ask": "как saga middleware использует .next() для async результатов"
+          }
+        ],
+        "mustConcepts": [
+          ".next(value)",
+          ".next(arg)",
+          "аргумент",
+          "yield expression",
+          "yield-выраж",
+          "результат",
+          "предыдущ",
+          "второй вызов",
+          "двусторон",
+          "Redux-Saga",
+          "middleware",
+          "resolved",
+          "promises",
+          "auction",
+          "bid",
+          "инжект",
+          "передач назад"
+        ],
+        "falseClaims": [
+          "аргумент .next() передаётся в следующий yield, а не в предыдущий",
+          "значения можно передавать в генератор только через yield наружу",
+          "первый .next(100) устанавливает bid в auctionGen",
+          ".next(value) работает как второй параметр function*"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "yield_star_and_errors",
+      "title": "Знает yield*, .throw() и связь с async iteration",
+      "expected": "Кандидат объясняет: `yield*` делегирует другому iterable/generator; `.throw(err)` инжектирует ошибку в текущий yield; `async function*` + `for await...of` для async последовательностей.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "follow-up senior bonus — yield*, throw, async function*",
+        "mustConcepts": [
+          "yield*",
+          "делег",
+          "delegat",
+          "iterable",
+          ".throw",
+          "throw(err)",
+          "try/catch",
+          "async function*",
+          "for await",
+          "промис",
+          "async iteration",
+          "память",
+          "миллион"
+        ],
+        "falseClaims": [
+          "yield и yield* работают абсолютно одинаково",
+          ".throw() всегда завершает генератор без catch",
+          "async function* не связан с генераторами",
+          "yield* создаёт новый независимый генератор без делегирования"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Генератор — `function*` с `yield`. Вызов `numberGen()` сразу возвращает итератор, код не бежит. Каждый `.next()` даёт `{ value, done }` и останавливается на следующем yield. Для миллиона записей из БД — generator с батчами по 500 вместо массива на всё: память плоская.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Делаю `function* range(start, end)` — for...of перебирает без массива. Для Redux-Saga middleware шлёт resolved promise через `.next(result)` — внутри saga читаю как синхронное присваивание после yield call(). Первый .next() без аргумента — аргумент игнорируется, это частая ловушка.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Lazy: значения только когда просят. Пагинация — yield страницы, следующая fetch только на .next(). State machine формы — yield шаг1, yield шаг2 без класса. Простое сложение — обычная функция, generator overkill.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Генератор — это async/await. При вызове gen() сразу получаю все yield-значения массивом. function* — просто синтаксический сахар для return [1,2,3].",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "const g = gen(); console.log(g) — это 1, потому что генератор сразу выполнился. После done: true .next() снова вернёт последнее value. Первый .next(100) передаёт 100 в первый yield.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Генераторы нужны везде вместо функций. yield* и yield одно и то же. .throw() нельзя использовать — только try/catch снаружи.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "generator_definition",
+      "exampleType": "good",
+      "exampleText": "function* numberGen() { yield 1; yield 2; return 4; } — gen.next() → { value: 1, done: false }; после return — done: true.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "generator_definition",
+      "exampleType": "good",
+      "exampleText": "ну генератор — function* плюс yield, next() возвращает value и done, пауза между yield",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "generator_definition",
+      "exampleType": "bad",
+      "exampleText": "yield — это return, генератор при вызове сразу отдаёт все значения.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "lazy_vs_regular",
+      "exampleType": "good",
+      "exampleText": "Обычная функция — run to completion, один return. Генератор — итератор сразу, тело на первом .next(), lazy — по одному значению.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "lazy_vs_regular",
+      "exampleType": "good",
+      "exampleText": "вендинговый автомат: .next() — монета, yield — одна позиция, не всё сразу",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "lazy_vs_regular",
+      "exampleType": "bad",
+      "exampleText": "Генератор при gen() сразу вычисляет все yield и кладёт в массив в памяти.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "iteration_patterns",
+      "exampleType": "good",
+      "exampleText": "for...of range(1,5) — авто .next() до done. Spread [...gen] — в массив, теряем lazy. while (!result.done) — ручной контроль.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "iteration_patterns",
+      "exampleType": "good",
+      "exampleText": "для потоковой обработки — for...of; если нужен массив маленький — spread ок",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "iteration_patterns",
+      "exampleType": "bad",
+      "exampleText": "Генератор итерируется только через map и filter как массив.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "500k записей — generator с pageSize 500, yield каждой страницы. Infinite ID — yield++. Простой sum(a,b) — обычная функция.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "state machine wizard без класса, redux-saga для async координации — generators уместны",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Любую функцию лучше писать как generator — так modern JS.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "const g = gen() — Generator {}, не 1. Код до первого .next() не выполняется. После done все .next() — undefined, done true.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "let count снаружи — g1 и g2 делят count. Правильно: let count = 0 внутри function*. Первый .next(99) — аргумент выброшен.",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "gen() сразу yield 1 в console. done можно не проверять — value всегда валиден.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "two_way_next_value",
+      "exampleType": "good",
+      "exampleText": "auction.next() → Waiting; auction.next(100) — 100 в const bid = yield ...; auction.next(150) — counterBid. Значение идёт в предыдущий yield-expression.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "two_way_next_value",
+      "exampleType": "good",
+      "exampleText": "saga middleware: yield call(fetch) → pause; promise resolve → .next(data) → data как результат yield внутри saga",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "two_way_next_value",
+      "exampleType": "bad",
+      "exampleText": ".next(100) передаёт 100 в следующий yield вперёд, не в предыдущий. Первый .next(50) устанавливает переменную bid.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "yield_star_and_errors",
+      "exampleType": "good",
+      "exampleText": "yield* innerGen() — все значения inner по очереди. gen.throw(err) — ошибка в текущий yield, try/catch внутри ловит.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "yield_star_and_errors",
+      "exampleType": "good",
+      "exampleText": "async function* — yield await fetch; for await...of на клиенте. Память: один контекст vs массив на миллион.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "yield_star_and_errors",
+      "exampleType": "bad",
+      "exampleText": "yield* возвращает только первый элемент. .throw всегда kill generator без catch.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "what-are-generators-in-javascript",
+    "apiUrl": "https://api.itlead.org/api/questions/what-are-generators-in-javascript",
+    "pageUrl": "https://itlead.org/interview-questions/javascript/what-are-generators-in-javascript",
+    "difficulty": "MIDDLE",
+    "titleEn": "What are generators in JavaScript?",
+    "categorySlug": "javascript",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

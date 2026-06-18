@@ -1,0 +1,583 @@
+{
+  "topic": {
+    "code": "parallel_routes_in_nextjs",
+    "name": "Parallel routes и intercepting routes в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как работают parallel routes и intercepting routes в Next.js App Router?",
+    "shortAnswer": "Parallel routes позволяют рендерить несколько независимых страниц в одном layout через именованные слоты `@folder`, каждый со своими loading и error. Intercepting routes используют синтаксис `(.)folder` для перехвата навигации к дочернему сегменту и показа модалки вместо полной страницы.",
+    "idealAnswer": "Parallel routes рендерят несколько независимых страниц внутри одного layout через именованные слоты `@folder`. Next.js передаёт их как отдельные React props в ближайший родительский layout: `@stats` → prop `stats`, `page.tsx` → `children`. Каждый слот — полноценное RSC-поддерево с независимым fetch, своим `loading.tsx` и `error.tsx`; ошибка в одном слоте не ломает остальные при per-slot error boundary. Intercepting routes не добавляют новое место в layout — они перехватывают рендеринг совпавшего сегмента и показывают overlay/модалку. Префиксы: `(.)segment` — тот же уровень, `(..)segment` — на уровень выше, `(..)(..)segment` — два уровня, `(...)segment` — от корня app. URL меняется на перехваченный путь (например `/photo/123`), но при client navigation из родителя рендерится модалка; при прямом заходе по URL перехват не срабатывает — полная страница. Ключевая разница: parallel — несколько слотов одновременно на одном URL-уровне; intercepting — подмена рендера дочернего сегмента в зависимости от способа навигации. Когда parallel: multi-panel dashboard, auth-conditional layout (dashboard vs login на одном URL). Когда intercepting: модалка/drawer с shareable URL, закрытие кнопкой «назад». Канонический паттерн Instagram: слот `@modal` в feed layout + `(.)photo/[id]` внутри слота. Типичные ошибки: нет `default.tsx` в слоте → 404 при переходе на URL без matching segment (fix: `default.tsx` с `return null`); нет per-slot `loading.tsx` — медленный слот блокирует весь layout; intercepting без `(.)` — обычный nested route, модалка не появится; нет `error.tsx` в intercept folder — падает весь layout; `<Link href=\"/dashboard/@stats\">` — слоты не navigable paths. Data fetching: каждый слот — независимый RSC fetch без waterfall; nested page ждёт parent fetch. Senior: `default.tsx` рендерится eagerly без streaming — тяжёлый default блокирует stream слота даже когда main content готов; используй только null или лёгкий skeleton.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "react"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "parallel_routes_definition",
+      "title": "Понимает parallel routes и слоты @folder",
+      "expected": "Кандидат объясняет: parallel routes рендерят несколько страниц в одном layout через `@folder`; слоты передаются как props в layout; каждый слот независим по data/loading/error.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — @folder slots и multi-panel layout",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "parallel_routes_definition",
+            "oftenConfusedWith": [
+              "slots_mechanics",
+              "parallel_vs_intercepting"
+            ],
+            "anchorTermsExpected": [
+              "@folder",
+              "слот",
+              "parallel",
+              "layout",
+              "props",
+              "несколько страниц"
+            ],
+            "anchorTermsWrongTopic": [
+              "intercepting это parallel",
+              "слот это URL path",
+              "@stats в href"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "@folder",
+              "слот",
+              "parallel"
+            ],
+            "ask": "как @stats и @notifications попадают в layout как props"
+          }
+        ],
+        "mustConcepts": [
+          "parallel routes",
+          "параллельн",
+          "@folder",
+          "слот",
+          "named slot",
+          "layout",
+          "props",
+          "children",
+          "несколько страниц",
+          "одновременно",
+          "независим",
+          "loading.tsx",
+          "error.tsx",
+          "RSC",
+          "App Router",
+          "dashboard"
+        ],
+        "falseClaims": [
+          "parallel routes — это просто CSS grid с двумя колонками",
+          "слот @stats — navigable URL segment",
+          "parallel routes требуют отдельный layout на каждый слот",
+          "все слоты делят один fetch и один error boundary по умолчанию"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "intercepting_routes_definition",
+      "title": "Понимает intercepting routes",
+      "expected": "Кандидат объясняет: `(.)folder`, `(..)folder`, `(...)folder` перехватывают навигацию к сегменту; URL меняется, но рендерится модалка при client navigation; прямой заход — полная страница.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро intercepting — modal + back button + URL behavior",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "intercepting_routes_definition",
+            "oftenConfusedWith": [
+              "parallel_vs_intercepting",
+              "combine_pattern"
+            ],
+            "anchorTermsExpected": [
+              "intercepting",
+              "(.)",
+              "модал",
+              "перехват",
+              "URL",
+              "back button"
+            ],
+            "anchorTermsWrongTopic": [
+              "intercepting добавляет новый слот",
+              "URL не меняется при intercept",
+              "прямой заход всегда показывает модалку"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "(.)",
+              "(..)",
+              "intercept"
+            ],
+            "ask": "чем (.)photo отличается от (..)photo и когда срабатывает перехват"
+          },
+          {
+            "match": [
+              "модал",
+              "back",
+              "назад"
+            ],
+            "ask": "какой URL при открытии модалки и что при прямом /photo/123"
+          }
+        ],
+        "mustConcepts": [
+          "intercepting routes",
+          "перехват",
+          "(.)",
+          "(..)",
+          "(..)(..)",
+          "(...)",
+          "модал",
+          "overlay",
+          "segment matching",
+          "URL меняется",
+          "client navigation",
+          "прямой заход",
+          "полная страница",
+          "back button",
+          "назад"
+        ],
+        "falseClaims": [
+          "intercepting routes не меняют URL",
+          "при прямом открытии /photo/123 всегда показывается модалка",
+          "intercepting добавляет новый named slot в layout",
+          "(.) и (..) взаимозаменяемы без разницы в matching"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "parallel_vs_intercepting",
+      "title": "Отличает parallel routes от intercepting routes",
+      "expected": "Кандидат сравнивает: parallel — несколько слотов одновременно, независимый fetch per slot; intercepting — подмена рендера дочернего сегмента, shareable modal URL, разный UI при link vs direct visit.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "таблица сравнения ITLead — частая путаница на senior",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "parallel_routes_definition",
+            "floorFraction": 0.45
+          },
+          {
+            "checkpointKey": "intercepting_routes_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "parallel",
+              "intercepting",
+              "разниц"
+            ],
+            "ask": "dashboard с @stats/@notifications vs photo modal — что за что отвечает"
+          }
+        ],
+        "mustConcepts": [
+          "parallel",
+          "intercepting",
+          "несколько слотов",
+          "подмена рендера",
+          "независимый fetch",
+          "shareable URL",
+          "модал",
+          "dashboard",
+          "одновременно",
+          "segment",
+          "link navigation",
+          "direct visit",
+          "разный UI",
+          "error isolation",
+          "parent context"
+        ],
+        "falseClaims": [
+          "parallel и intercepting решают одну задачу",
+          "intercepting рендерит несколько панелей параллельно",
+          "parallel routes меняют URL при открытии модалки",
+          "intercepting даёт независимый fetch на каждый слот как @stats"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "slots_mechanics",
+      "title": "Знает механику слотов и default.tsx",
+      "expected": "Кандидат описывает: `@folder` → prop в layout; `default.tsx` заполняет слот когда нет matching segment; без default — 404; default с null — стандартный fix.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовая file convention из Quick Example",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "default.tsx",
+              "404",
+              "null"
+            ],
+            "ask": "почему /dashboard/settings даёт 404 для @stats без default.tsx"
+          }
+        ],
+        "mustConcepts": [
+          "default.tsx",
+          "404",
+          "matching segment",
+          "нет сегмента",
+          "return null",
+          "prop name",
+          "@stats",
+          "layout props",
+          "file convention",
+          "eager",
+          "streaming",
+          "skeleton",
+          "лёгк"
+        ],
+        "falseClaims": [
+          "default.tsx обязателен только для intercepting routes",
+          "без default.tsx Next.js автоматически рендерит пустой div",
+          "тяжёлый компонент в default.tsx не влияет на streaming слота",
+          "имя prop может отличаться от имени @folder"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки parallel/intercepting",
+      "expected": "Кандидат называет: нет default.tsx → 404; нет per-slot loading → блок layout; intercept без (.) → нет модалки; нет error.tsx в intercept; Link на /dashboard/@stats ломает routing.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "slots_mechanics",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "loading.tsx",
+              "Suspense",
+              "блок"
+            ],
+            "ask": "почему медленный @stats блокирует весь dashboard без per-slot loading"
+          },
+          {
+            "match": [
+              "Link",
+              "@stats",
+              "href"
+            ],
+            "ask": "почему нельзя линковать на /dashboard/@stats"
+          }
+        ],
+        "mustConcepts": [
+          "default.tsx",
+          "404",
+          "loading.tsx",
+          "per-slot",
+          "Suspense boundary",
+          "блокирует layout",
+          "(.)",
+          "префикс",
+          "error.tsx",
+          "intercept",
+          "layout crash",
+          "Link",
+          "@stats",
+          "navigable",
+          "слот не path"
+        ],
+        "falseClaims": [
+          "один loading.tsx в root layout достаточен для всех слотов",
+          "intercepting route без (.) всё равно покажет модалку",
+          "ошибка в intercept folder изолирована без local error.tsx",
+          "можно навигировать на URL с @folder в path"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "combine_pattern",
+      "title": "Умеет комбинировать parallel + intercepting",
+      "expected": "Кандидат описывает Instagram-паттерн: `@modal` slot в feed layout + `(.)photo/[id]` внутри слота; client nav — модалка, direct URL — full page; `@modal/default.tsx` → null.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "канонический пример из ITLead Examples",
+        "mustConcepts": [
+          "@modal",
+          "(.)photo",
+          "feed layout",
+          "Instagram",
+          "комбин",
+          "client navigation",
+          "модал",
+          "полная страница",
+          "photo/[id]",
+          "default null",
+          "shareable URL",
+          "back button"
+        ],
+        "falseClaims": [
+          "parallel и intercepting нельзя использовать вместе",
+          "для photo modal достаточно только intercepting без @modal slot",
+          "при комбинации URL не меняется на /photo/id",
+          "@modal/default.tsx должен рендерить полную страницу фото"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "data_fetching_slots",
+      "title": "Понимает независимый fetch в слотах",
+      "expected": "Кандидат объясняет: каждый слот — независимый RSC fetch без waterfall; nested page ждёт parent layout fetch; parallel RSC requests на navigation.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "follow-up Q из ITLead — отличие от nested page",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "fetch",
+              "waterfall",
+              "независим"
+            ],
+            "ask": "чем fetch в @stats отличается от fetch во вложенной page под тем же layout"
+          }
+        ],
+        "mustConcepts": [
+          "независимый fetch",
+          "RSC",
+          "waterfall",
+          "параллельн",
+          "слот",
+          "nested page",
+          "parent layout",
+          "блокирует",
+          "no-store",
+          "error isolation",
+          "отдельный API"
+        ],
+        "falseClaims": [
+          "все слоты ждут завершения fetch children перед своим render",
+          "parallel slots всегда создают waterfall как nested routes",
+          "intercepting route fetch полностью изолирован от parent context",
+          "один slow slot не влияет на другие без loading.tsx"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Parallel routes — это @stats и @notifications как props в dashboard layout: каждый слот свой fetch, loading и error. Intercepting — (.)photo/[id] в @modal: клик из feed меняет URL на /photo/123, но рендерится модалка; прямой заход — полная страница photo/[id].",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для Vercel-style dashboard беру parallel: sidebar stats и header notifications независимо. Для quick search как в Linear — intercepting modal поверх project view, закрывается back. Без default.tsx в @stats получил 404 на /dashboard/settings — добавил default.tsx с null.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Instagram feed: layout с children + modal slot, внутри @modal — (.)photo/[id]. Auth layout: @dashboard и @login оба грузят данные, layout выбирает user ? dashboard : login. Per-slot loading.tsx — отдельные Suspense boundaries.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Parallel routes и intercepting routes — одно и то же, оба просто показывают модалку поверх страницы без изменения URL.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Линкую на /feed/@modal чтобы открыть модалку. Intercepting работает без префикса (.) — достаточно положить page.tsx рядом с profile.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Один loading.tsx в root layout покрывает все слоты. default.tsx не нужен — Next.js сам рендерит пустой слот. Ошибка в (.)profile без error.tsx затронет только overlay, layout останется.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "parallel_routes_definition",
+      "exampleType": "good",
+      "exampleText": "В layout.tsx принимаю children, stats, notifications — это @folder слоты, рендерятся одновременно в одном URL.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "parallel_routes_definition",
+      "exampleType": "good",
+      "exampleText": "ну parallel — несколько панелей в одном layout, @stats отдельно фетчит api, свой loading и error",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "parallel_routes_definition",
+      "exampleType": "bad",
+      "exampleText": "Parallel routes — это когда делаю две колонки через flexbox в одном page.tsx, @folder только для стилей.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "intercepting_routes_definition",
+      "exampleType": "good",
+      "exampleText": "(.)photo перехватывает переход на /photo/id из feed: URL /photo/123, но UI — модалка. Прямой /photo/123 — full page без перехвата.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "intercepting_routes_definition",
+      "exampleType": "good",
+      "exampleText": "intercepting для drawer с shareable url — back закрывает. (..)profile — на уровень выше, (...) — от app root",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "intercepting_routes_definition",
+      "exampleType": "bad",
+      "exampleText": "Intercepting routes не меняют URL — адрес остаётся /feed при открытии фото. Прямой заход на /photo/123 тоже показывает модалку.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "parallel_vs_intercepting",
+      "exampleType": "good",
+      "exampleText": "Parallel — multi-panel dashboard, каждый слот свой API. Intercepting — подмена child segment для modal, не добавляет слот в layout.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "parallel_vs_intercepting",
+      "exampleType": "good",
+      "exampleText": "dashboard @stats+@notifications — parallel; search overlay modal с url — intercepting; можно вместе: @modal + (.)photo",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "parallel_vs_intercepting",
+      "exampleType": "bad",
+      "exampleText": "Intercepting routes рендерят @stats и @notifications параллельно. Parallel routes открывают модалку при клике по Link.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "slots_mechanics",
+      "exampleType": "good",
+      "exampleText": "@stats → prop stats в layout. На /dashboard/settings у @stats нет segment — без default.tsx Next.js 404, с default return null — ок.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "slots_mechanics",
+      "exampleType": "good",
+      "exampleText": "default.tsx рендерится eagerly — держу там null или лёгкий skeleton, не тяжёлый chart",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "slots_mechanics",
+      "exampleType": "bad",
+      "exampleText": "Имя prop в layout может быть любым — @stats передаётся как notifications. default.tsx опционален, Next.js подставляет fragment.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Добавил @stats/loading.tsx и @notifications/loading.tsx отдельно — медленная stats не блокирует header. (.)profile вместо profile/page — иначе модалки нет.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "error.tsx в (.)profile — invalid userId падает только overlay, не весь settings layout. Не линкую на /dashboard/@stats.",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Per-slot loading не нужен — root Suspense хватит. Можно <Link href=\"/dashboard/@stats\"> для быстрого перехода к статистике.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "combine_pattern",
+      "exampleType": "good",
+      "exampleText": "feed/layout: children + modal. @modal/(.)photo/[id] — intercept, @modal/default.tsx null. photo/[id]/page — full page на direct visit.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "combine_pattern",
+      "exampleType": "good",
+      "exampleText": "классика из next docs — @modal слот + (.)photo, back закрывает модалку",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "combine_pattern",
+      "exampleType": "bad",
+      "exampleText": "Для photo modal достаточно только app/photo/[id] без @modal и без (.) — intercepting и parallel взаимоисключающие.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "data_fetching_slots",
+      "exampleType": "good",
+      "exampleText": "@stats и main chart fetch параллельно как независимые RSC — нет waterfall. Nested page под layout ждёт parent fetch.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "data_fetching_slots",
+      "exampleType": "good",
+      "exampleText": "stats api упал — @stats/error.tsx, notifications и children живы. каждый слот свой cache: no-store",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "data_fetching_slots",
+      "exampleType": "bad",
+      "exampleText": "Все parallel slots выполняют fetch строго последовательно после children page. Intercepting slot fetch полностью изолирован от parent session.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "parallel-routes-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/parallel-routes-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/parallel-routes-in-nextjs",
+    "difficulty": "SENIOR",
+    "titleEn": "Parallel routes and intercepting routes in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

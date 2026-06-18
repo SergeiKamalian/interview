@@ -1,0 +1,666 @@
+{
+  "topic": {
+    "code": "nextjs_streaming_and_loading_ui_in_nextjs",
+    "name": "Streaming и loading UI в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как работает streaming и loading UI в Next.js?",
+    "shortAnswer": "Streaming в Next.js отправляет HTML браузеру частями по мере готовности каждого блока, снижая TTFB вместо ожидания всех данных. `loading.tsx` — автоматический fallback на весь маршрут; для дашбордов с несколькими источниками данных оборачивают каждый медленный компонент в свой `Suspense`, чтобы секции появлялись независимо.",
+    "idealAnswer": "Streaming в Next.js отправляет HTML браузеру чанками по мере готовности каждого фрагмента — пользователь видит контент прогрессивно, а не пустой экран. Без streaming сервер ждёт завершения всех запросов (даже при Promise.all — TTFB определяет самый медленный), затем отдаёт полный HTML; TTFB может быть несколько секунд. С streaming оболочка страницы (layout, навигация, skeleton) уходит сразу, данные подставляются по мере завершения server queries. `loading.tsx` рядом с `page.tsx` — файловая конвенция: Next.js автоматически оборачивает страницу в Suspense boundary с этим компонентом как fallback; нулевая дополнительная настройка. Для дашбордов с несколькими медленными запросами один `loading.tsx` на весь route блокирует быстрые секции — нужны отдельные `<Suspense fallback={...}>` вокруг каждого async server component; границы не ждут друг друга. Под капотом: одно HTTP-соединение остаётся открытым; сервер шлёт начальный HTML со skeleton, при resolve query — flush `<script>$RC(\"$stats\", \"S:1\")</script>`, React заменяет placeholder; второго HTTP-запроса нет. `loading.tsx` vs `Suspense`: loading.tsx — scope всей страницы, один fallback, автоматически; Suspense — per-component, несколько независимых fallback, ручная обёртка; оба используют один механизм, loading.tsx — shortcut на route level. Типичные ошибки: (1) один Suspense вокруг всего дашборда — быстрые компоненты ждут медленные; (2) loading.tsx для multi-source dashboard — пользователь видит полный skeleton пока один блок грузится 3 секунды; (3) streaming с client components — `'use client'` + useEffect fetch даёт waterfall после hydration, skeleton не покрывает реальную загрузку данных; streaming работает только когда компонент await'ит данные на сервере (async server component). Реальные кейсы: дашборды (widget за Suspense), блог (статья сразу, комментарии в фоне), e-commerce (детали товара первыми, отзывы отдельно). Follow-up: streaming требует App Router — getServerSideProps (Pages Router) не поддерживает Suspense boundaries так же; ошибка async component — ближайший `error.tsx`; вложенные Suspense — inner resolve первыми; SEO — Googlebot индексирует streamed HTML (полный body в ответе); streaming vs ISR — ISR кеширует HTML и revalidate по расписанию (меньше server load), streaming генерирует свежий HTML на каждый запрос прогрессивно (ниже TTFB для dynamic pages) — разные задачи.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "react"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "streaming_definition",
+      "title": "Понимает streaming в Next.js",
+      "expected": "Кандидат объясняет: HTML отправляется чанками по мере готовности; пользователь видит контент прогрессивно; TTFB снижается вместо ожидания всех данных; оболочка и skeleton приходят сразу.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — streaming vs блокирующий SSR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "streaming_definition",
+            "oftenConfusedWith": [
+              "streaming_vs_isr",
+              "ssr_blocking_problem"
+            ],
+            "anchorTermsExpected": [
+              "чанк",
+              "chunk",
+              "TTFB",
+              "прогрессив",
+              "skeleton",
+              "HTML частями"
+            ],
+            "anchorTermsWrongTopic": [
+              "streaming это ISR",
+              "streaming только для client components",
+              "streaming отменяет hydration"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "streaming",
+              "стрім",
+              "чанк",
+              "TTFB"
+            ],
+            "ask": "чем streaming отличается от классического SSR, который ждёт все данные"
+          }
+        ],
+        "mustConcepts": [
+          "streaming",
+          "стрім",
+          "чанк",
+          "chunk",
+          "HTML частями",
+          "прогрессив",
+          "TTFB",
+          "skeleton",
+          "скелет",
+          "оболочка",
+          "layout",
+          "данные подстав",
+          "не ждёт все",
+          "first paint",
+          "пустой экран",
+          "server query",
+          "запрос на сервер"
+        ],
+        "falseClaims": [
+          "streaming отправляет HTML только после всех запросов",
+          "streaming работает без App Router",
+          "streaming заменяет hydration на клиенте",
+          "streaming — это кеширование HTML как ISR",
+          "streaming требует несколько HTTP-запросов от браузера"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "ssr_blocking_problem",
+      "title": "Понимает блокировку классического SSR",
+      "expected": "Кандидат объясняет: даже при Promise.all сервер ждёт самый медленный запрос перед отправкой HTML; один slow dependency блокирует всю страницу; TTFB = время slowest query.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "контраст «до streaming» из ITLead theory",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "streaming_definition",
+            "floorFraction": 0.4
+          }
+        ],
+        "mustConcepts": [
+          "Promise.all",
+          "самый медленн",
+          "slowest",
+          "блокир",
+          "ждёт все",
+          "TTFB",
+          "один запрос",
+          "dependency",
+          "зависимост",
+          "dashboard",
+          "дашборд",
+          "несколько источник",
+          "data source",
+          "параллельн",
+          "весь HTML",
+          "один байт"
+        ],
+        "falseClaims": [
+          "Promise.all отправляет HTML по мере готовности каждого запроса",
+          "быстрые запросы рендерятся раньше slowest при классическом SSR",
+          "TTFB не зависит от самого медленного запроса",
+          "streaming и Promise.all решают одну и ту же проблему одинаково"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "loading_tsx_convention",
+      "title": "Знает loading.tsx",
+      "expected": "Кандидат описывает: файл `loading.tsx` рядом с `page.tsx`; Next.js автоматически создаёт Suspense boundary на уровне route; fallback — skeleton/pulse; без дополнительных import.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "quick example и file convention из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "loading.tsx",
+              "loading",
+              "файлов"
+            ],
+            "ask": "как подключить loading UI для route без ручного Suspense"
+          }
+        ],
+        "mustConcepts": [
+          "loading.tsx",
+          "loading",
+          "page.tsx",
+          "файлов",
+          "конвенц",
+          "convention",
+          "автомат",
+          "Suspense boundary",
+          "fallback",
+          "skeleton",
+          "animate-pulse",
+          "route level",
+          "уровень маршрут",
+          "без import",
+          "обёртк",
+          "shortcut"
+        ],
+        "falseClaims": [
+          "loading.tsx нужно импортировать в page.tsx вручную",
+          "loading.tsx работает в Pages Router с getServerSideProps",
+          "loading.tsx создаёт отдельный HTTP-запрос",
+          "loading.tsx заменяет async server components"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "suspense_granular",
+      "title": "Использует Suspense для гранулярного streaming",
+      "expected": "Кандидат объясняет: отдельный Suspense вокруг каждого медленного async server component; границы независимы; быстрые секции рендерятся раньше slow; пример dashboard с UserStats/RecentActivity.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевой паттерн для multi-source dashboards",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "loading_tsx_convention",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "suspense_granular",
+            "oftenConfusedWith": [
+              "loading_vs_suspense",
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "отдельный Suspense",
+              "независим",
+              "async server component",
+              "fallback per component"
+            ],
+            "anchorTermsWrongTopic": [
+              "один Suspense на весь dashboard",
+              "Suspense только для client components"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Suspense",
+              "dashboard",
+              "дашборд",
+              "границ"
+            ],
+            "ask": "как разложить dashboard с тремя запросами 2s/800ms/1.5s по Suspense boundaries"
+          }
+        ],
+        "mustConcepts": [
+          "Suspense",
+          "границ",
+          "boundary",
+          "независим",
+          "async server component",
+          "async function",
+          "await",
+          "fallback",
+          "StatsSkeleton",
+          "dashboard",
+          "дашборд",
+          "медленн",
+          "быстр",
+          "не ждёт друг",
+          "per-component",
+          "компонент",
+          "RecentActivity",
+          "UserStats"
+        ],
+        "falseClaims": [
+          "один Suspense вокруг всего dashboard — оптимальный паттерн",
+          "Suspense boundaries всегда ждут друг друга",
+          "Suspense работает только с client-side fetch",
+          "loading.tsx даёт такую же гранулярность как per-component Suspense"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "streaming_internals",
+      "title": "Понимает механизм streaming под капотом",
+      "expected": "Кандидат описывает: одно HTTP-соединение; начальный HTML со skeleton placeholders; при resolve — flush script `$RC`; React заменяет placeholder; второй запрос не нужен.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "under the hood — senior depth из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "$RC",
+              "script",
+              "flush",
+              "placeholder"
+            ],
+            "ask": "что происходит в Network tab: один long-lived request и несколько чанков"
+          }
+        ],
+        "mustConcepts": [
+          "HTTP",
+          "соединен",
+          "connection",
+          "один запрос",
+          "long-lived",
+          "flush",
+          "script",
+          "$RC",
+          "placeholder",
+          "заглушк",
+          "skeleton HTML",
+          "hidden id",
+          "замен",
+          "replace",
+          "React internal",
+          "второй запрос",
+          "не делает",
+          "Network tab",
+          "чанк"
+        ],
+        "falseClaims": [
+          "каждый Suspense boundary делает отдельный HTTP-запрос",
+          "браузер polling'ом запрашивает новые чанки",
+          "streaming работает через WebSocket",
+          "$RC — публичный API React для приложений"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "loading_vs_suspense",
+      "title": "Сравнивает loading.tsx и Suspense",
+      "expected": "Кандидат сравнивает: loading.tsx — вся страница, один fallback, автоматически; Suspense — per-component, несколько fallback, вручную; оба — один механизм; loading.tsx для простых страниц, Suspense для dashboards.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "таблица сравнения из ITLead",
+        "confusionPairs": [
+          {
+            "checkpointKey": "loading_vs_suspense",
+            "oftenConfusedWith": [
+              "suspense_granular"
+            ],
+            "anchorTermsExpected": [
+              "loading.tsx",
+              "вся страница",
+              "per-component",
+              "автомат",
+              "ручн"
+            ],
+            "anchorTermsWrongTopic": [
+              "loading.tsx и Suspense разные механизмы",
+              "Suspense только для error handling"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "loading.tsx",
+          "Suspense",
+          "вся страница",
+          "page.tsx",
+          "компонент",
+          "грануляр",
+          "один fallback",
+          "несколько fallback",
+          "автомат",
+          "ручн",
+          "file convention",
+          "route level",
+          "один механизм",
+          "shortcut",
+          "прост",
+          "дашборд",
+          "single data source"
+        ],
+        "falseClaims": [
+          "loading.tsx и Suspense используют разные внутренние механизмы",
+          "loading.tsx даёт per-widget fallback",
+          "Suspense нельзя использовать в App Router",
+          "loading.tsx заменяет error.tsx"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки streaming",
+      "expected": "Кандидат называет: один Suspense на весь dashboard; loading.tsx для multi-source; client component + useEffect fetch вместо async server component; waterfall после hydration без skeleton на реальную загрузку.",
+      "score": 2,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — критичные production pitfalls",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "suspense_granular",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "use client",
+              "useEffect",
+              "fetch"
+            ],
+            "ask": "почему client component с useEffect fetch не стримит данные"
+          },
+          {
+            "match": [
+              "один Suspense",
+              "DashboardSkeleton",
+              "loading.tsx"
+            ],
+            "ask": "почему loading.tsx плох для dashboard где один блок 3 секунды, два других 500ms"
+          }
+        ],
+        "mustConcepts": [
+          "один Suspense",
+          "весь dashboard",
+          "loading.tsx",
+          "multi-source",
+          "несколько источник",
+          "use client",
+          "client component",
+          "useEffect",
+          "fetch",
+          "waterfall",
+          "hydration",
+          "гидрат",
+          "async server component",
+          "await на сервер",
+          "skeleton 3 секунд",
+          "быстрые блок",
+          "DashboardSkeleton",
+          "не стримит"
+        ],
+        "falseClaims": [
+          "client component с useEffect fetch стримит skeleton как async server component",
+          "loading.tsx подходит для dashboard с пятью независимыми API",
+          "один Suspense вокруг всего page — best practice для streaming",
+          "streaming работает с getServerSideProps в Pages Router",
+          "use client async function стримит данные с сервера"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "streaming_followups",
+      "title": "Знает error.tsx, App Router, SEO и streaming vs ISR",
+      "expected": "Кандидат упоминает: streaming только App Router (не getServerSideProps); error.tsx ловит ошибки async component; вложенные Suspense; SEO — Googlebot индексирует streamed HTML; streaming vs ISR — разные задачи (fresh progressive vs cached revalidate).",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "follow-up questions — бонус senior",
+        "mustConcepts": [
+          "App Router",
+          "getServerSideProps",
+          "Pages Router",
+          "error.tsx",
+          "reset",
+          "вложен",
+          "nested Suspense",
+          "SEO",
+          "Googlebot",
+          "индекс",
+          "ISR",
+          "revalidate",
+          "кеш",
+          "fresh HTML",
+          "TTFB dynamic"
+        ],
+        "falseClaims": [
+          "streaming работает с getServerSideProps",
+          "без error.tsx streaming ошибки безопасны для уже отправленного shell",
+          "streaming и ISR решают одну проблему",
+          "Googlebot не индексирует streamed HTML"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Streaming шлёт HTML чанками: layout и skeleton сразу, UserStats подставляется через 2 секунды когда await resolve. loading.tsx — fallback на весь route; для dashboard каждый widget в свой Suspense — RecentActivity появится на 500ms, не дожидаясь UserStats.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На product page статью и цену стримлю сразу, отзывы — отдельный Suspense с ReviewsSkeleton. Client fetch через useEffect тут не подходит: waterfall после hydration, skeleton не покрывает реальный fetch. Один HTTP-запрос, в Network видно long-lived response с несколькими flush.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Классический SSR с Promise.all — TTFB = slowest query, вся страница блокируется. Streaming: shell за ~200ms, $RC script подменяет placeholder. error.tsx рядом с page ловит падение async component; getServerSideProps streaming не даёт — нужен App Router.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Streaming — это когда Next.js кеширует HTML как ISR и отдаёт из кеша. loading.tsx нужно импортировать в page и оборачивать вручную.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для dashboard достаточно одного Suspense вокруг всех виджетов — streaming всё равно покажет быстрые блоки раньше. Client component с useEffect fetch стримит skeleton так же хорошо.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Streaming работает в Pages Router через getServerSideProps. Каждый Suspense делает отдельный HTTP-запрос к серверу. Googlebot не индексирует streamed контент.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "streaming_definition",
+      "exampleType": "good",
+      "exampleText": "Streaming отправляет HTML частями по мере готовности — TTFB ниже, пользователь видит skeleton и layout сразу, данные догружаются в фоне.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "streaming_definition",
+      "exampleType": "good",
+      "exampleText": "ну стриминг — html кусками, не ждём все запросы, сразу оболочка видна",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "streaming_definition",
+      "exampleType": "bad",
+      "exampleText": "Streaming ждёт все server queries и только потом отправляет HTML — как обычный SSR, но быстрее за счёт кеша.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "ssr_blocking_problem",
+      "exampleType": "good",
+      "exampleText": "Даже Promise.all блокирует: TTFB = время самого медленного из трёх запросов — 2 секунды, хотя activity готов за 500ms.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "ssr_blocking_problem",
+      "exampleType": "good",
+      "exampleText": "один slow dependency держит весь html — классическая проблема dashboard до streaming",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "ssr_blocking_problem",
+      "exampleType": "bad",
+      "exampleText": "Promise.all в SSR отправляет HTML по мере готовности каждого fetch — streaming не нужен.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "loading_tsx_convention",
+      "exampleType": "good",
+      "exampleText": "Кладу loading.tsx рядом с page.tsx — Next.js сам оборачивает route в Suspense, skeleton с animate-pulse без import.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "loading_tsx_convention",
+      "exampleType": "good",
+      "exampleText": "loading.tsx — file convention, один fallback на весь маршрут, zero setup",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "loading_tsx_convention",
+      "exampleType": "bad",
+      "exampleText": "loading.tsx надо импортировать в page и обернуть return в <Suspense fallback={<Loading />}>.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "suspense_granular",
+      "exampleType": "good",
+      "exampleText": "Три Suspense на dashboard: RecentActivity ~800ms, RoadmapProgress ~1.5s, UserStats ~2s — каждый рендерится когда свой await resolve, не ждут друг друга.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "suspense_granular",
+      "exampleType": "good",
+      "exampleText": "медленный виджет — свой suspense с отдельным skeleton, быстрые не блокируются",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "suspense_granular",
+      "exampleType": "bad",
+      "exampleText": "Один Suspense вокруг UserStats, RecentActivity и RoadmapProgress — оптимально для streaming dashboard.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "streaming_internals",
+      "exampleType": "good",
+      "exampleText": "Один HTTP connection: начальный div со skeleton, потом script $RC заменяет placeholder — второго request нет, видно в Network как chunks.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "streaming_internals",
+      "exampleType": "good",
+      "exampleText": "сервер flush script когда query готов — react $RC подменяет заглушку, connection живой",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "streaming_internals",
+      "exampleType": "bad",
+      "exampleText": "Каждый resolved Suspense boundary инициирует новый fetch от браузера к серверу.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "loading_vs_suspense",
+      "exampleType": "good",
+      "exampleText": "loading.tsx — автомат, вся page, один skeleton; Suspense — ручная обёртка per-component для dashboards с разной скоростью запросов.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "loading_vs_suspense",
+      "exampleType": "good",
+      "exampleText": "оба один механизм внутри, loading.tsx — shortcut на route level",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "loading_vs_suspense",
+      "exampleType": "bad",
+      "exampleText": "loading.tsx и Suspense — совершенно разные API, loading не использует Suspense под капотом.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "'use client' UserStats с useEffect fetch — waterfall: hydrate, потом fetch, skeleton loading.tsx уже исчез. Нужен async server component с await db.getStats().",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "loading.tsx на dashboard — 3 секунды полный skeleton, хотя два блока готовы за 500ms; надо per-component Suspense",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Client component fetch после hydration — правильный паттерн для streaming в Next.js App Router.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "streaming_followups",
+      "exampleType": "good",
+      "exampleText": "Streaming только App Router; error.tsx с reset ловит падение async section; streaming ≠ ISR — fresh progressive HTML vs cached revalidate.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "streaming_followups",
+      "exampleType": "good",
+      "exampleText": "googlebot индексирует streamed html, nested suspense — inner первыми",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "streaming_followups",
+      "exampleType": "bad",
+      "exampleText": "getServerSideProps поддерживает Suspense streaming так же как App Router.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "nextjs-streaming-and-loading-ui-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/nextjs-streaming-and-loading-ui-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/nextjs-streaming-and-loading-ui-in-nextjs",
+    "difficulty": "SENIOR",
+    "titleEn": "Streaming and loading UI in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

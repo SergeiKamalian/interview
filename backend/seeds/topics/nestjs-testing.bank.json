@@ -1,0 +1,591 @@
+{
+  "topic": {
+    "code": "nestjs_testing",
+    "name": "Тестирование NestJS приложений",
+    "skillCode": "nestjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как тестировать NestJS приложение?",
+    "shortAnswer": "NestJS использует Jest и пакет `@nestjs/testing`: unit-тесты собирают изолированный DI-контейнер через `Test.createTestingModule()` с моками зависимостей; e2e-тесты поднимают полное приложение через `createNestApplication()` и шлют HTTP-запросы через Supertest. Ключевое: мокать только нужные провайдеры и всегда вызывать `await app.init()` перед первым e2e-запросом.",
+    "idealAnswer": "Тестирование NestJS строится на `@nestjs/testing` и Jest по умолчанию. Unit-тесты создают лёгкий DI-контейнер через `Test.createTestingModule({ providers, controllers }).compile()`, подменяют реальные зависимости через `{ provide: TOKEN, useValue: mock }` (например `getRepositoryToken(User)` для TypeORM) и получают тестируемый класс через `module.get()`. HTTP-сервер не поднимается — тест изолирован, без I/O, обычно <50 ms. E2e-тесты вызывают `module.createNestApplication()`, настраивают то же, что в `main.ts` (`useGlobalPipes(new ValidationPipe())`), затем `await app.init()` и запросы через Supertest к `app.getHttpServer()`. Guards, pipes, interceptors и middleware реально выполняются — это единственный способ проверить validation, auth и HTTP-слой. Когда unit: сервис с запросами к БД — мок репозитория; контроллер — мок сервиса; guard в изоляции — мок ExecutionContext. Когда e2e: login flow POST /auth → JWT → GET /profile; multi-step journey; запись в реальную тестовую БД. `Test.createTestingModule()` сканирует reflect-metadata и резолвит токены как в prod, но без HTTP listener. `overrideProvider()` меняет любой injectable по токену; `overrideGuard()`, `overridePipe()`, `overrideInterceptor()` — после DI для route-bound компонентов. Типичные ошибки: забытый `await app.init()` → ECONNREFUSED; отсутствие global ValidationPipe в e2e → 201 вместо 400 на невалидном body; общая тестовая БД без truncate в beforeEach; `jest.mock('./users.service')` ломает DI вместо точечного `{ provide: UsersService, useValue: mock }`; REQUEST-scoped провайдеры не резолвятся в unit без HTTP-контекста — e2e или `overrideProvider` с DEFAULT-scoped моком, в NestJS v10 есть `overrideScope`. E2e: обязательный `afterAll(() => app.close())`, иначе Jest зависает. Prisma — мок `PrismaService`; BullMQ — `overrideProvider(Queue).useValue(mockQueue)`; GraphQL e2e — raw query через Supertest. CI-падения e2e: нет globalSetup для миграций, другой DATABASE_URL, race в beforeAll.",
+    "maxScore": 10,
+    "skills": [
+      "nestjs",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "testing_module_core",
+      "title": "Знает Test.createTestingModule и unit setup",
+      "expected": "Кандидат описывает: Test.createTestingModule() собирает изолированный DI-контейнер, compile(), module.get(), моки через jest.fn() и useValue; HTTP-сервер не поднимается, тест без I/O.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро unit-тестирования — createTestingModule и моки",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "testing_module_core",
+            "oftenConfusedWith": [
+              "unit_vs_e2e",
+              "e2e_supertest_flow"
+            ],
+            "anchorTermsExpected": [
+              "createTestingModule",
+              "compile",
+              "module.get",
+              "useValue",
+              "jest.fn",
+              "без HTTP"
+            ],
+            "anchorTermsWrongTopic": [
+              "createNestApplication для unit",
+              "Supertest в unit-тесте сервиса"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "createTestingModule",
+              "compile",
+              "module.get"
+            ],
+            "ask": "как собрать unit-тест сервиса с моком репозитория через createTestingModule"
+          }
+        ],
+        "mustConcepts": [
+          "@nestjs/testing",
+          "Test.createTestingModule",
+          "TestingModule",
+          "compile",
+          "module.get",
+          "jest.fn",
+          "useValue",
+          "providers",
+          "изолирован",
+          "DI-контейнер",
+          "без HTTP",
+          "без I/O",
+          "миллисекунд",
+          "Jest",
+          "describe",
+          "beforeEach"
+        ],
+        "falseClaims": [
+          "unit-тест обязан поднимать HTTP-сервер",
+          "createTestingModule эквивалентен NestFactory.create для unit",
+          "module.get работает без compile()",
+          "jest.mock всего модуля — рекомендуемый способ в NestJS"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "unit_vs_e2e",
+      "title": "Различает unit и e2e тесты",
+      "expected": "Кандидат сравнивает: unit изолирует один provider без сети и БД; e2e поднимает Express/Fastify, Supertest шлёт реальные HTTP-запросы, работают guards/pipes/interceptors; e2e медленнее, но проверяет end-to-end.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "фундаментальный выбор стратегии тестирования",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "testing_module_core",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "unit_vs_e2e",
+            "oftenConfusedWith": [
+              "when_to_use"
+            ],
+            "anchorTermsExpected": [
+              "unit",
+              "e2e",
+              "Supertest",
+              "createNestApplication",
+              "HTTP",
+              "изоляц"
+            ],
+            "anchorTermsWrongTopic": [
+              "unit-тест всегда с реальной БД",
+              "e2e не запускает guards"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "unit",
+              "e2e",
+              "Supertest"
+            ],
+            "ask": "чем unit-тест NestJS отличается от e2e и что реально выполняется в каждом"
+          }
+        ],
+        "mustConcepts": [
+          "unit",
+          "e2e",
+          "end-to-end",
+          "Supertest",
+          "createNestApplication",
+          "HTTP-запрос",
+          "Express",
+          "Fastify",
+          "guard",
+          "pipe",
+          "interceptor",
+          "middleware",
+          "изоляц",
+          "без сет",
+          "полный сервер",
+          "I/O"
+        ],
+        "falseClaims": [
+          "unit-тесты в NestJS всегда ходят в реальную БД",
+          "e2e не запускает guards и ValidationPipe",
+          "Supertest используют только в unit-тестах сервиса",
+          "unit и e2e дают одинаковое покрытие HTTP-слоя"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Выбирает unit или e2e по сценарию",
+      "expected": "Кандидат называет: сервис с БД — unit с мок репозитория; контроллер с validation — unit с мок сервиса или e2e с ValidationPipe; login/auth flow и multi-step journey — e2e; guard в изоляции — unit с мок ExecutionContext.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "практическая матрица when to use из ITLead",
+        "mustConcepts": [
+          "мок репозитор",
+          "мок сервис",
+          "ValidationPipe",
+          "login flow",
+          "auth",
+          "JWT",
+          "POST /auth",
+          "GET /profile",
+          "multi-step",
+          "ExecutionContext",
+          "guard",
+          "реальная сеть",
+          "тестовая база",
+          "иначе unit"
+        ],
+        "falseClaims": [
+          "любой тест с БД должен быть unit с jest.mock",
+          "auth flow достаточно покрыть unit-тестом сервиса без HTTP",
+          "validation контроллера проверяют только e2e",
+          "e2e нужен для каждого метода сервиса"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "di_mocking_tokens",
+      "title": "Мокает зависимости через DI-токены",
+      "expected": "Кандидат объясняет: provide + useValue/useFactory заменяет injectable по токену; getRepositoryToken(Entity) для TypeORM; overrideProvider для сервисов, PrismaService, ConfigService; механизм как в prod DI.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевой паттерн подмены репозиториев и сервисов",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "getRepositoryToken",
+              "provide",
+              "useValue"
+            ],
+            "ask": "как замокать TypeORM Repository в unit-тесте сервиса"
+          },
+          {
+            "match": [
+              "overrideProvider",
+              "ConfigService",
+              "PrismaService"
+            ],
+            "ask": "как подменить ConfigService или PrismaService в тестовом модуле"
+          }
+        ],
+        "mustConcepts": [
+          "provide",
+          "useValue",
+          "useFactory",
+          "inject",
+          "getRepositoryToken",
+          "overrideProvider",
+          "injection token",
+          "токен",
+          "TypeORM",
+          "Repository",
+          "PrismaService",
+          "ConfigService",
+          "reflect-metadata",
+          "DI",
+          "подмен"
+        ],
+        "falseClaims": [
+          "jest.mock('./service') сохраняет Nest DI контекст",
+          "getRepositoryToken не нужен — достаточно jest.spyOn на класс",
+          "overrideProvider не работает для репозиториев",
+          "мокать нужно весь AppModule целиком"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "override_guards_pipes",
+      "title": "Переопределяет guards, pipes и interceptors",
+      "expected": "Кандидат описывает: overrideGuard/overridePipe/overrideInterceptor после createTestingModule; overrideProvider — любой injectable по токену; пример JwtAuthGuard canActivate: () => true для unit контроллера.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "обход auth и route-bound компонентов в unit-тестах",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "overrideGuard",
+              "overridePipe",
+              "overrideInterceptor"
+            ],
+            "ask": "чем overrideGuard отличается от overrideProvider и когда что использовать"
+          }
+        ],
+        "mustConcepts": [
+          "overrideGuard",
+          "overridePipe",
+          "overrideInterceptor",
+          "overrideProvider",
+          "canActivate",
+          "JwtAuthGuard",
+          "ParseIntPipe",
+          "route-bound",
+          "после DI",
+          "useValue",
+          "контроллер",
+          "unit-тест",
+          "обход авторизац"
+        ],
+        "falseClaims": [
+          "overrideProvider заменяет guard на route так же надёжно как overrideGuard",
+          "guard нельзя мокать в unit-тесте контроллера",
+          "overridePipe работает только в e2e",
+          "overrideGuard меняет injection token сервиса"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки NestJS-тестов",
+      "expected": "Кандидат называет: забытый await app.init() → ECONNREFUSED; нет global ValidationPipe в e2e → ложные 201; общая БД без cleanup; jest.mock модуля ломает DI; REQUEST-scoped в unit — e2e или overrideProvider/overrideScope.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "production и CI pitfalls — senior must-know",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "e2e_supertest_flow",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "app.init",
+              "ECONNREFUSED"
+            ],
+            "ask": "почему e2e падает с ECONNREFUSED без await app.init()"
+          },
+          {
+            "match": [
+              "ValidationPipe",
+              "201",
+              "400"
+            ],
+            "ask": "почему e2e пропускает невалидный body если не добавить global ValidationPipe"
+          },
+          {
+            "match": [
+              "REQUEST",
+              "scope",
+              "overrideScope"
+            ],
+            "ask": "почему REQUEST-scoped provider не резолвится в unit и как обойти"
+          }
+        ],
+        "mustConcepts": [
+          "app.init",
+          "ECONNREFUSED",
+          "ValidationPipe",
+          "useGlobalPipes",
+          "201",
+          "400",
+          "truncate",
+          "beforeEach",
+          "общая база",
+          "jest.mock",
+          "DI-контекст",
+          "REQUEST-scoped",
+          "overrideScope",
+          "overrideProvider",
+          "globalSetup",
+          "DATABASE_URL",
+          "CI",
+          "race condition",
+          "beforeAll"
+        ],
+        "falseClaims": [
+          "app.init() опционален — Supertest сам поднимет сервер",
+          "ValidationPipe из main.ts автоматически попадает в e2e",
+          "общая тестовая БД без очистки — нормальная практика",
+          "REQUEST-scoped провайдеры работают в unit как DEFAULT"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "e2e_supertest_flow",
+      "title": "Настраивает e2e с Supertest",
+      "expected": "Кандидат описывает flow: createTestingModule({ imports: [AppModule] }) → createNestApplication() → дублировать main.ts (ValidationPipe) → await app.init() → request(app.getHttpServer()) → afterAll app.close().",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый e2e bootstrap из ITLead examples",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "createNestApplication",
+              "getHttpServer",
+              "supertest"
+            ],
+            "ask": "опиши beforeAll для e2e auth-теста с ValidationPipe и Supertest"
+          }
+        ],
+        "mustConcepts": [
+          "createNestApplication",
+          "INestApplication",
+          "getHttpServer",
+          "supertest",
+          "request",
+          "beforeAll",
+          "afterAll",
+          "app.close",
+          "app.init",
+          "AppModule",
+          "imports",
+          "main.ts",
+          "дублиров",
+          "status",
+          "expect"
+        ],
+        "falseClaims": [
+          "afterAll app.close() не нужен — Jest сам завершит процесс",
+          "e2e не требует импорта AppModule",
+          "Supertest работает без getHttpServer()",
+          "createNestApplication автоматически вызывает init()"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Unit: Test.createTestingModule с UsersService и мок getRepositoryToken(User), compile, module.get. E2e: AppModule, createNestApplication, useGlobalPipes как в main.ts, await app.init(), Supertest на getHttpServer(), afterAll close.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Сервис с TypeORM — unit с jest.fn на findOneBy. Login POST register → token → GET profile — e2e. Контроллер unit: overrideGuard JwtAuthGuard canActivate true, мок UsersService. Не jest.mock весь файл — только provide useValue.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "createTestingModule без HTTP — миллисекунды. E2e — guards и ValidationPipe реально. Без app.init ECONNREFUSED. Без ValidationPipe в e2e invalid email даёт 201 — ложный pass. Truncate таблиц в beforeEach если пишем в БД.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Unit-тест сервиса: createNestApplication и Supertest на каждый метод findAll. jest.mock('./users.service') — Nest DI сам разберётся.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "E2e: createNestApplication и сразу request без app.init — норм, Supertest подождёт. ValidationPipe из prod подтянется сам. afterAll не нужен.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "REQUEST-scoped сервис тестирую в unit через module.get — HTTP контекст не нужен. Общая dev база для e2e — быстрее, cleanup лишний.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "testing_module_core",
+      "exampleType": "good",
+      "exampleText": "beforeEach: module = await Test.createTestingModule({ providers: [UsersService, { provide: getRepositoryToken(User), useValue: mockRepo }] }).compile(); service = module.get(UsersService).",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "testing_module_core",
+      "exampleType": "good",
+      "exampleText": "ну createTestingModule — мини-модуль только с тем что тестируем, compile и get, без поднятия сервера",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "testing_module_core",
+      "exampleType": "bad",
+      "exampleText": "Для unit UsersService вызываю NestFactory.create(AppModule) — так ближе к prod.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "unit_vs_e2e",
+      "exampleType": "good",
+      "exampleText": "Unit — один provider, мок deps, без HTTP. E2e — createNestApplication, Supertest, guards/pipes/middleware реально отрабатывают.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "unit_vs_e2e",
+      "exampleType": "good",
+      "exampleText": "e2e медленнее но ловит validation и auth; unit — быстрая логика сервиса с мок репо",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "unit_vs_e2e",
+      "exampleType": "bad",
+      "exampleText": "E2e и unit в NestJS одно и то же — оба через Supertest без разницы.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "findAll с TypeORM — unit + mockRepo. POST /auth/register с JWT — e2e. Guard canActivate — unit с мок ExecutionContext.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "если нужен реальный HTTP или запись в тестовую БД — e2e, иначе unit с точечными моками",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Login flow достаточно unit-тестом AuthService.login без HTTP — e2e для auth не нужен.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "di_mocking_tokens",
+      "exampleType": "good",
+      "exampleText": "{ provide: getRepositoryToken(User), useValue: { findOneBy: jest.fn(), save: jest.fn() } } — Nest подставит мок везде где инжектится этот токен.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "di_mocking_tokens",
+      "exampleType": "good",
+      "exampleText": "ConfigService: useValue { get: jest.fn().mockReturnValue('test-key') } или useFactory с inject",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "di_mocking_tokens",
+      "exampleType": "bad",
+      "exampleText": "jest.mock('./users.service') в начале spec — правильный Nest-паттерн, module.get сохранится.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "override_guards_pipes",
+      "exampleType": "good",
+      "exampleText": "Test.createTestingModule({ controllers: [UsersController], providers: [...] }).overrideGuard(JwtAuthGuard).useValue({ canActivate: () => true }).compile()",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "override_guards_pipes",
+      "exampleType": "good",
+      "exampleText": "overrideProvider — сервисы и репо по токену; overrideGuard — guards на route после DI",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "override_guards_pipes",
+      "exampleType": "bad",
+      "exampleText": "JwtAuthGuard мокаю через overrideProvider(UsersService) — guard и сервис один токен.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Забыл app.init — ECONNREFUSED. Нет ValidationPipe в e2e — 201 на invalid body. jest.mock ломает DI. REQUEST scope — только e2e или overrideScope.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "CI падает: другой DATABASE_URL, нет globalSetup миграций, race в beforeAll — фиксим явной синхронизацией схемы",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "ValidationPipe из AppModule автоматически в e2e если импортировали модуль — useGlobalPipes дублировать не надо.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "e2e_supertest_flow",
+      "exampleType": "good",
+      "exampleText": "beforeAll: module compile → app = createNestApplication() → useGlobalPipes(ValidationPipe) → await app.init(). afterAll: app.close(). request(app.getHttpServer()).post('/auth/register').",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "e2e_supertest_flow",
+      "exampleType": "good",
+      "exampleText": "expect(res.status).toBe(201); access_token defined — supertest после init",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "e2e_supertest_flow",
+      "exampleType": "bad",
+      "exampleText": "E2e без afterAll — Jest иногда зависает, но это баг Jest, app.close не помогает.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-testing",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-testing",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-testing",
+    "difficulty": "SENIOR",
+    "titleEn": "How to test a NestJS application?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

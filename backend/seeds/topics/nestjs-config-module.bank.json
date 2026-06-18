@@ -1,0 +1,490 @@
+{
+  "topic": {
+    "code": "nestjs_config_module",
+    "name": "ConfigModule в NestJS",
+    "skillCode": "nestjs",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Как управлять конфигурацией в NestJS с помощью ConfigModule?",
+    "shortAnswer": "`@nestjs/config` загружает переменные из `.env` в DI-контейнер NestJS и отдаёт их через singleton `ConfigService`. В `AppModule` вызывают `ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env', cache: true })`, затем инжектируют `ConfigService` и читают `config.get<T>('KEY', defaultValue)`. Joi `validationSchema` останавливает приложение на старте, если обязательные переменные отсутствуют или невалидны.",
+    "idealAnswer": "ConfigModule из `@nestjs/config` при bootstrap читает `.env` (или массив файлов в `envFilePath`), парсит пары KEY=value через dotenv и кладёт результат в singleton ConfigService внутри DI NestJS. В отличие от ручного dotenv, который засоряет `process.env` глобально и даёт только строки без типов, ConfigModule даёт типизированные чтения, значения по умолчанию, кэш и валидацию на старте. Базовая настройка: `npm install @nestjs/config`, в AppModule `ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env', cache: true })` — после этого ConfigService доступен в любом injectable без повторного импорта. `config.get<T>('KEY', default)` возвращает значение с приведением типа и fallback; при `cache: true` первое чтение кэшируется. `isGlobal: true` обязателен для удобства — иначе каждый модуль должен импортировать ConfigModule, иначе provider-not-found при инжекции. Для крупных приложений `registerAs('database', () => ({ host, port }))` группирует связанные переменные; доступ через `config.get('database.host')` — dot notation работает только для вложенных объектов из `registerAs` или `load[]`, не для плоских ключей `DB_HOST`. Массив в `envFilePath` обрабатывается слева направо, первый найденный ключ побеждает; в Kubernetes/production часто `ignoreEnvFile: true`, реальные env vars из Secrets. `validationSchema: Joi.object({...})` с `validationOptions: { abortEarly: false }` — приложение не стартует при ошибках, показывает полный список. Без валидации `config.get('JWT_SECRET')` вернёт undefined, приложение запустится, а краш случится позже при первом запросе. Типичные ошибки: забыть `isGlobal`; нет Joi — NaN для `DB_PORT='abc'`; жёсткий `envFilePath: '.env'` в K8s; `config.get` в конструкторе без cache в high-traffic. Интеграции: TypeOrmModule.forRootAsync с useFactory и ConfigService; тесты — mock ConfigService или `ConfigModule.forRoot({ ignoreEnvFile: true, cache: false })` + `process.env`.",
+    "maxScore": 10,
+    "skills": [
+      "nestjs",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "config_module_basics",
+      "title": "Понимает ConfigModule и ConfigService",
+      "expected": "Кандидат объясняет: ConfigModule загружает `.env` при bootstrap, парсит переменные и регистрирует singleton ConfigService в DI; ConfigService инжектируется в сервисы для чтения конфигурации вместо разбросанных `process.env`.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — что делает ConfigModule и зачем ConfigService",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ConfigModule",
+              "ConfigService",
+              ".env"
+            ],
+            "ask": "чем ConfigService лучше прямых вызовов process.env в каждом сервисе"
+          }
+        ],
+        "mustConcepts": [
+          "ConfigModule",
+          "ConfigService",
+          "@nestjs/config",
+          ".env",
+          "переменн",
+          "средовищ",
+          "environment",
+          "DI",
+          "контейнер",
+          "singleton",
+          "инжекц",
+          "bootstrap",
+          "dotenv",
+          "парс",
+          "KEY=value",
+          "forRoot",
+          "загруз",
+          "чтение конфиг"
+        ],
+        "falseClaims": [
+          "ConfigModule читает .env при каждом HTTP-запросе заново",
+          "ConfigService — это глобальный process.env без DI",
+          "ConfigModule работает без установки @nestjs/config",
+          "ConfigService нельзя инжектировать в guards и pipes"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "global_setup",
+      "title": "Знает настройку forRoot и isGlobal",
+      "expected": "Кандидат описывает `ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env', cache: true })` в AppModule; без isGlobal каждый модуль должен импортировать ConfigModule; cache ускоряет повторные get().",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "isGlobal и cache — ключевые опции quick setup",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "config_module_basics",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "isGlobal",
+              "forRoot",
+              "cache"
+            ],
+            "ask": "что произойдёт если забыть isGlobal: true и инжектировать ConfigService в feature-модуль"
+          }
+        ],
+        "mustConcepts": [
+          "forRoot",
+          "isGlobal",
+          "AppModule",
+          "envFilePath",
+          "cache",
+          "глобальн",
+          "импорт",
+          "provider not found",
+          "повторн",
+          "Map",
+          "O(1)",
+          "один раз",
+          "доступ везде",
+          "feature module",
+          "настройк"
+        ],
+        "falseClaims": [
+          "isGlobal не обязателен — ConfigService всегда доступен глобально по умолчанию",
+          "forRoot нужно вызывать в каждом feature-модуле",
+          "cache: true перечитывает .env при каждом get()",
+          "envFilePath по умолчанию читает несколько файлов автоматически"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "config_get_api",
+      "title": "Знает API config.get с типами и дефолтами",
+      "expected": "Кандидат объясняет `config.get<T>('KEY', defaultValue)`: типизация, fallback при отсутствии ключа; без default и без валидации вернётся undefined; приведение строки к number.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый паттерн чтения DB_HOST/DB_PORT из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "get<",
+              "default",
+              "undefined"
+            ],
+            "ask": "что вернёт config.get('DB_PORT') если ключа нет в .env и default не передан"
+          }
+        ],
+        "mustConcepts": [
+          "get",
+          "config.get",
+          "тип",
+          "generic",
+          "default",
+          "дефолт",
+          "fallback",
+          "undefined",
+          "DB_HOST",
+          "DB_PORT",
+          "string",
+          "number",
+          "приведен",
+          "coerce",
+          "отсутств",
+          "ключ",
+          "параметр типа"
+        ],
+        "falseClaims": [
+          "config.get всегда бросает ошибку если ключ отсутствует",
+          "config.get<number>('DB_PORT') автоматически валидирует что значение — число",
+          "default value применяется только при пустой строке, не при отсутствии ключа",
+          "config.get без generic всегда возвращает number"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "register_as_namespaced",
+      "title": "Знает registerAs и dot notation",
+      "expected": "Кандидат описывает registerAs('database', () => ({ host, port })), load: [databaseConfig] в forRoot; чтение `config.get('database.host')`; dot notation не работает для плоских ключей DB_HOST в .env.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "namespaced config — ключевой паттерн для средних приложений",
+        "confusionPairs": [
+          {
+            "checkpointKey": "register_as_namespaced",
+            "oftenConfusedWith": [
+              "config_get_api"
+            ],
+            "anchorTermsExpected": [
+              "registerAs",
+              "database.host",
+              "load",
+              "dot notation"
+            ],
+            "anchorTermsWrongTopic": [
+              "config.get('DB.HOST') для плоского .env",
+              "registerAs заменяет Joi"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "registerAs",
+              "database.host",
+              "load"
+            ],
+            "ask": "почему config.get('DB.HOST') не работает с плоским .env и как правильно сгруппировать настройки БД"
+          }
+        ],
+        "mustConcepts": [
+          "registerAs",
+          "load",
+          "namespaced",
+          "именован",
+          "database",
+          "database.host",
+          "database.port",
+          "dot notation",
+          "крапк",
+          "вложен",
+          "объект",
+          "групп",
+          "factory",
+          "parseInt",
+          "DB_HOST",
+          "плоск",
+          "flat key",
+          "app.stripeKey",
+          "зона ответствен"
+        ],
+        "falseClaims": [
+          "config.get('DB.HOST') работает с плоским .env файлом",
+          "registerAs не требует load в forRoot",
+          "dot notation автоматически разбивает DB_HOST на вложенный объект",
+          "registerAs пишет напрямую в process.env минуя ConfigService"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "validation_joi",
+      "title": "Знает валидацию через Joi на старте",
+      "expected": "Кандидат описывает validationSchema: Joi.object({...}), приложение не стартует при ошибках; abortEarly: false показывает все ошибки; без валидации undefined и поздний краш.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "validation at startup — главная защита от 3am incidents",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "config_get_api",
+            "floorFraction": 0.35
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Joi",
+              "validationSchema",
+              "abortEarly"
+            ],
+            "ask": "что случится если JWT_SECRET отсутствует — с Joi и без validationSchema"
+          }
+        ],
+        "mustConcepts": [
+          "Joi",
+          "validationSchema",
+          "validationOptions",
+          "abortEarly",
+          "required",
+          "старт",
+          "bootstrap",
+          "не запуск",
+          "ошибк",
+          "валидац",
+          "JWT_SECRET",
+          "DB_PORT",
+          "NaN",
+          "undefined",
+          "runtime",
+          "поздн",
+          "краш",
+          "читабельн",
+          "сообщен",
+          "список ошибок"
+        ],
+        "falseClaims": [
+          "без validationSchema приложение не стартует при отсутствии JWT_SECRET",
+          "Joi по умолчанию показывает все ошибки валидации сразу",
+          "validationSchema выполняется при каждом config.get",
+          "Joi в ConfigModule заменяет class-validator в DTO"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки ConfigModule",
+      "expected": "Кандидат называет: забыть isGlobal; нет валидации; жёсткий envFilePath в K8s (нужен ignoreEnvFile); DB_PORT='abc' даёт NaN; тесты без mock ConfigService.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common mistakes блок ITLead — provider-not-found и late crash",
+        "mustConcepts": [
+          "isGlobal",
+          "валидац",
+          "ignoreEnvFile",
+          "Kubernetes",
+          "K8s",
+          "envFilePath",
+          "production",
+          "NaN",
+          "provider not found",
+          "unit test",
+          "mock",
+          "useValue",
+          "jest.fn",
+          "ignoreEnvFile",
+          "cache: false",
+          "process.env",
+          "Secrets",
+          "ConfigMap"
+        ],
+        "falseClaims": [
+          "в production на K8s всегда нужен файл .env в контейнере",
+          "без isGlobal ConfigService всё равно инжектируется в любой модуль",
+          "DB_PORT='abc' с get<number> бросает ошибку на старте без Joi",
+          "тестировать ConfigService можно только через реальный .env файл"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "ConfigModule.forRoot в AppModule с isGlobal: true загружает .env в ConfigService. В DatabaseService инжектирую ConfigService и читаю config.get<string>('DB_HOST', 'localhost'). Joi validationSchema с abortEarly: false — если JWT_SECRET короче 32 символов, приложение не стартует и показывает все ошибки сразу.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Один раз forRoot с isGlobal и cache — дальше ConfigService везде. Для БД registerAs('database') и config.get('database.host'). На проде в K8s ignoreEnvFile: true, секреты из env vars. TypeOrmModule.forRootAsync с useFactory и inject ConfigService.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "@nestjs/config кладёт env в DI как singleton. Не process.env по всему коду. get с default — если DB_PORT нет, вернёт 5432. Без Joi missing JWT_SECRET даст undefined и краш при первом запросе, не на старте.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "ConfigModule — это просто обёртка над process.env, isGlobal не нужен, ConfigService доступен автоматически во всех модулях без импорта.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В production на Kubernetes обязательно envFilePath: '.env' внутри образа. config.get('DB.HOST') читает плоский ключ DB_HOST из .env. Joi не нужен — Nest сам валидирует типы при get<number>.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Без validationSchema приложение не запустится если переменная отсутствует. registerAs не требует load в forRoot. abortEarly: true показывает все ошибки валидации за один раз.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "config_module_basics",
+      "exampleType": "good",
+      "exampleText": "ConfigModule при старте парсит .env и регистрирует ConfigService в DI — инжектирую в любой @Injectable вместо process.env.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "config_module_basics",
+      "exampleType": "good",
+      "exampleText": "ну config module грузит env в nest di, configservice синглтон — читаешь ключи типизированно",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "config_module_basics",
+      "exampleType": "bad",
+      "exampleText": "ConfigService — это глобальный объект process.env, DI тут ни при чём.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "global_setup",
+      "exampleType": "good",
+      "exampleText": "ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env', cache: true }) один раз в AppModule — ConfigService доступен без re-import в feature modules.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "global_setup",
+      "exampleType": "good",
+      "exampleText": "без isGlobal в тестах ловил provider not found — добавил isGlobal в forRoot и всё ок",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "global_setup",
+      "exampleType": "bad",
+      "exampleText": "forRoot вызываю в каждом модуле где нужен ConfigService, isGlobal только для AppModule необязателен.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "config_get_api",
+      "exampleType": "good",
+      "exampleText": "config.get<number>('DB_PORT', 5432) — тип number и fallback если ключа нет в .env.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "config_get_api",
+      "exampleType": "good",
+      "exampleText": "get с default — DB_HOST нет в env, вернёт localhost, не undefined",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "config_get_api",
+      "exampleType": "bad",
+      "exampleText": "config.get('JWT_SECRET') без default всегда бросает исключение если ключ отсутствует.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "register_as_namespaced",
+      "exampleType": "good",
+      "exampleText": "registerAs('database', () => ({ host: process.env.DB_HOST })) + load: [databaseConfig]; читаю config.get('database.host'), не DB.HOST для плоского .env.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "register_as_namespaced",
+      "exampleType": "good",
+      "exampleText": "app и database конфиги раздельно — payment читает app.stripeKey, db сервис database.host",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "register_as_namespaced",
+      "exampleType": "bad",
+      "exampleText": "В плоском .env config.get('database.host') работает так же как config.get('DB_HOST') без registerAs.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "validation_joi",
+      "exampleType": "good",
+      "exampleText": "validationSchema: Joi.object({ JWT_SECRET: Joi.string().min(32).required() }) — приложение падает на bootstrap с понятным списком, не через 10 минут на DB connect.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "validation_joi",
+      "exampleType": "good",
+      "exampleText": "abortEarly: false — вижу все пять missing vars за один рестарт, не по одной",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "validation_joi",
+      "exampleType": "bad",
+      "exampleText": "Joi validationSchema проверяется при каждом HTTP-запросе в runtime, не на старте.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "На K8s ignoreEnvFile: true — секреты из env, не ищем .env в контейнере. В тестах mock ConfigService через useValue с jest.fn().",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "забыл isGlobal — provider not found в UsersModule; DB_PORT=abc без Joi дал NaN тихо",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "В unit-тестах всегда нужен реальный .env файл на диске, mock ConfigService запрещён NestJS.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-config-module",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-config-module",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-config-module",
+    "difficulty": "JUNIOR",
+    "titleEn": "How to manage configuration in NestJS with configmodule?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

@@ -1,0 +1,571 @@
+{
+  "topic": {
+    "code": "virtual_dom_in_react",
+    "name": "Virtual DOM в React",
+    "skillCode": "react",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое Virtual DOM в React и как он помогает эффективно обновлять UI?",
+    "shortAnswer": "Virtual DOM — in-memory JavaScript-представление реального DOM; React строит новое дерево при изменении state, выполняет diff с предыдущим и патчит только изменившиеся узлы реального DOM, избегая лишних reflow и layout.",
+    "idealAnswer": "Virtual DOM — JavaScript-объекты в памяти, описывающие UI (результат React.createElement / jsx-runtime), а не прямое дерево браузера. Аналогия: набросок на бумаге перед покраской стены — меняем только нужные мазки. React обновляет копию в памяти вместо синхронных вызовов document.getElementById, которые триггерят дорогие layout/painting/reflow. При setState/useState: (1) Trigger — React планирует re-render; (2) Render phase — компоненты вызываются, строится новое Virtual DOM дерево; (3) Commit phase — diff с преvious fiber tree, минимальные DOM-мутации через commitRoot. Batching группирует несколько setState в один commit; React 18 батчит даже в setTimeout и native handlers. Diff O(n) по двум эвристикам: разный тип элемента (<div>→<span>) — снос поддерева и rebuild; в списках key отслеживает move/add/remove — без key сравнение по индексу и remount при reorder. Counter: меняется только text node в <h1>, <button> и <div> не трогаются. Reconciler (react-reconciler) строит fiber tree; React 18 делает render прерываемым — high-priority input может прервать тяжёлый re-render. Virtual DOM не всегда быстрее прямого DOM: один toggle — getElementById быстрее; сложные списки с batching — React выигрывает. Типичные ошибки: index как key при sort/filter/insert; мутация state (push + тот же reference — skip re-render); 10k строк без react-window; parent re-render без React.memo. Когда React: частые state updates, динамические списки. Когда нет: статичный HTML без интерактива. useMemo/React.memo поверх diff — пропуск поддерева при том же reference. Next.js/Preact/React Native используют тот же механизм с разными commit targets.",
+    "maxScore": 10,
+    "skills": [
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "vdom_definition",
+      "title": "Понимает что такое Virtual DOM",
+      "expected": "Кандидат объясняет: Virtual DOM — in-memory JS-представление UI (объекты из createElement), не реальный DOM; React diff двух деревьев и патчит только delta.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — определение и delta-патч",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Virtual DOM",
+              "virtual dom",
+              "в памят"
+            ],
+            "ask": "чем Virtual DOM отличается от реального DOM в браузере"
+          }
+        ],
+        "mustConcepts": [
+          "Virtual DOM",
+          "virtual dom",
+          "в памят",
+          "in-memory",
+          "JavaScript",
+          "объект",
+          "createElement",
+          "jsx",
+          "дерев",
+          "реальн",
+          "DOM",
+          "diff",
+          "delta",
+          "патч",
+          "минимальн",
+          "обновлен",
+          "представлен"
+        ],
+        "falseClaims": [
+          "Virtual DOM — это копия DOM в браузере как shadow DOM",
+          "Virtual DOM и реальный DOM — одно и то же",
+          "React пишет сразу в DOM без промежуточного дерева",
+          "Virtual DOM существует только на сервере при SSR"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "vdom_purpose",
+      "title": "Знает зачем нужен Virtual DOM",
+      "expected": "Кандидат объясняет: batch изменений, diff перед commit, избегание лишних reflow/layout/painting; прямой DOM быстрее для тривиальных операций.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "trade-off VDOM vs direct DOM из ITLead",
+        "confusionPairs": [
+          {
+            "checkpointKey": "vdom_purpose",
+            "oftenConfusedWith": [
+              "when_to_use"
+            ],
+            "anchorTermsExpected": [
+              "reflow",
+              "layout",
+              "batch",
+              "diff",
+              "дорог"
+            ],
+            "anchorTermsWrongTopic": [
+              "Virtual DOM всегда быстрее",
+              "React не делает reflow"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "reflow",
+          "layout",
+          "painting",
+          "repaint",
+          "batch",
+          "батч",
+          "diff",
+          "дорог",
+          "синхрон",
+          "getElementById",
+          "прямой DOM",
+          "document",
+          "минимальн",
+          "неизмен",
+          "узл",
+          "накладн",
+          "overhead"
+        ],
+        "falseClaims": [
+          "Virtual DOM всегда быстрее прямого DOM",
+          "React никогда не вызывает reflow",
+          "Virtual DOM убирает необходимость diff",
+          "прямой DOM всегда медленнее для любых операций"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "update_flow",
+      "title": "Знает flow обновления: trigger → render → commit",
+      "expected": "Кандидат описывает: setState/useState → render phase (новое Virtual DOM) → commit phase (diff + commitRoot); batching нескольких updates в один commit; React 18 auto-batching.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Update Flow из ITLead — три фазы",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "render phase",
+              "commit phase",
+              "commitRoot"
+            ],
+            "ask": "что происходит в render phase vs commit phase"
+          },
+          {
+            "match": [
+              "batch",
+              "setTimeout",
+              "React 18"
+            ],
+            "ask": "как React 18 батчит несколько setState"
+          }
+        ],
+        "mustConcepts": [
+          "setState",
+          "useState",
+          "trigger",
+          "триггер",
+          "render phase",
+          "фаза рендер",
+          "commit phase",
+          "фаза commit",
+          "commitRoot",
+          "Virtual DOM",
+          "fiber",
+          "batch",
+          "батч",
+          "React 18",
+          "setTimeout",
+          "flush",
+          "schedule",
+          "очеред"
+        ],
+        "falseClaims": [
+          "каждый setState сразу пишет в DOM",
+          "render phase изменяет реальный DOM",
+          "commit phase вызывает компоненты заново",
+          "React 18 не батчит в setTimeout"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "diffing_keys",
+      "title": "Понимает diff и роль key в списках",
+      "expected": "Кандидат объясняет: diff O(n); разный тип — tear down поддерева; key отслеживает identity при reorder; без key — index comparison и remount; Counter патчит только text node.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Diffing algorithm + keys — ключевой middle-паттерн",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "vdom_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "O(n)",
+              "разный тип",
+              "div",
+              "span"
+            ],
+            "ask": "что происходит когда div на корне меняется на span"
+          },
+          {
+            "match": [
+              "key",
+              "index",
+              "reorder"
+            ],
+            "ask": "почему index key ломает drag-reorder списка из 100 элементов"
+          },
+          {
+            "match": [
+              "Counter",
+              "text node",
+              "h1"
+            ],
+            "ask": "какие DOM-узлы меняются при increment в Counter"
+          }
+        ],
+        "mustConcepts": [
+          "diff",
+          "O(n)",
+          "разный тип",
+          "тип элемента",
+          "поддерев",
+          "tear down",
+          "unmount",
+          "key",
+          "ключ",
+          "index",
+          "индекс",
+          "reorder",
+          "перестанов",
+          "remount",
+          "reuse",
+          "text node",
+          "Counter",
+          "патч",
+          "минимальн"
+        ],
+        "falseClaims": [
+          "без key React сравнивает элементы по id из props",
+          "разный тип элемента — React diff только атрибуты",
+          "index key безопасен при sort и filter",
+          "при increment Counter remount всё дерево"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки Virtual DOM",
+      "expected": "Кандидат называет: index как key; мутация state (push + тот же reference); миф «VDOM всегда быстрее»; 10k rows без virtualization; parent re-render без React.memo; duplicate/missing keys.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — частые production-баги",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "diffing_keys",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "push",
+              "мутац",
+              "reference"
+            ],
+            "ask": "почему state.items.push + setState(state) может не вызвать re-render"
+          },
+          {
+            "match": [
+              "react-window",
+              "virtual",
+              "10000"
+            ],
+            "ask": "почему Virtual DOM не спасает таблицу из 10k строк без virtualization"
+          },
+          {
+            "match": [
+              "React.memo",
+              "Profiler",
+              "parent"
+            ],
+            "ask": "когда React.memo нужен поверх Virtual DOM diff"
+          }
+        ],
+        "mustConcepts": [
+          "index",
+          "key",
+          "мутац",
+          "push",
+          "reference",
+          "immutab",
+          "неизмен",
+          "spread",
+          "react-window",
+          "virtual",
+          "виртуализац",
+          "React.memo",
+          "Profiler",
+          "parent",
+          "re-render",
+          "duplicate key",
+          "missing key",
+          "фокус",
+          "локальн state"
+        ],
+        "falseClaims": [
+          "можно мутировать state если потом вызвать setState",
+          "Virtual DOM делает 10k rows бесплатными",
+          "React.memo не нужен — Virtual DOM всё оптимизирует",
+          "duplicate keys выбрасывают ошибку и ломают render"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда React/VDOM уместен",
+      "expected": "Кандидат называет: частые state updates, динамические списки + key, memo/useMemo для тяжёлых поддеревьев; статичный HTML без интерактива — plain HTML/direct DOM быстрее.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "When to Use из ITLead",
+        "mustConcepts": [
+          "част",
+          "state update",
+          "real-time",
+          "динамическ",
+          "список",
+          "React.memo",
+          "useMemo",
+          "статич",
+          "HTML",
+          "интерактив",
+          "skip React",
+          "plain HTML",
+          "500",
+          "производитель"
+        ],
+        "falseClaims": [
+          "React нужен для любой веб-страницы",
+          "статичный лендинг всегда быстрее с React",
+          "useMemo заменяет Virtual DOM",
+          "Virtual DOM не нужен для форм с user input"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "fiber_react18",
+      "title": "Знает Fiber и прерываемый render",
+      "expected": "Кандидат упоминает react-reconciler, fiber tree, прерываемый render в React 18; startTransition для low-priority; high-priority input прерывает тяжёлый re-render.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Fiber + concurrent follow-up — бонус middle",
+        "mustConcepts": [
+          "Fiber",
+          "fiber",
+          "react-reconciler",
+          "прерыва",
+          "interrupt",
+          "React 18",
+          "startTransition",
+          "low-priority",
+          "high-priority",
+          "scheduler",
+          "Concurrent",
+          "linked-list"
+        ],
+        "falseClaims": [
+          "Fiber заменил Virtual DOM",
+          "startTransition меняет diff-алгоритм",
+          "Fiber делает render синхронным как в React 15",
+          "Virtual DOM tree другой в concurrent mode"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Virtual DOM — JS-объекты в памяти, описывающие UI. При setCount React строит новое дерево, diff с предыдущим, патчит только text в <h1>. Batching группирует updates; React 18 батчит даже в setTimeout.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В TodoList key={todo.id} — при filter React reuse li nodes. Index key — remount каждого li. Для 10k строк — react-window, Virtual DOM не спасает. Статичный brochure site — plain HTML без React overhead.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Trigger → render phase (createElement tree) → commit phase (diff fiber + commitRoot). Прямой getElementById быстрее для одного toggle; React выигрывает на сложных списках с batching. Fiber делает render прерываемым — keystroke важнее тяжёлой таблицы.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Virtual DOM — shadow DOM в браузере. React каждый render пересоздаёт весь DOM с нуля без diff.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Virtual DOM всегда быстрее document.getElementById. Index key ок для drag-sort. state.items.push + setState(state) — нормальный immutable паттерн.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Render phase пишет в DOM, commit phase только вызывает компоненты. Fiber убрал Virtual DOM в React 18.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "vdom_definition",
+      "exampleType": "good",
+      "exampleText": "Virtual DOM — in-memory JS tree из createElement; React diff двух деревьев и патчит delta в real DOM.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "vdom_definition",
+      "exampleType": "good",
+      "exampleText": "ну виртуальный дом — объекты в памяти, не настоящий dom браузера, react сравнивает старое и новое",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "vdom_definition",
+      "exampleType": "bad",
+      "exampleText": "Virtual DOM — это кэш HTML в localStorage, который React читает при каждом render.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "vdom_purpose",
+      "exampleType": "good",
+      "exampleText": "React batch изменений и diff перед commit — меньше reflow. Один toggle — getElementById быстрее из-за overhead diff.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "vdom_purpose",
+      "exampleType": "good",
+      "exampleText": "vdom чтобы не дёргать layout на каждый setState — сначала diff в памяти, потом минимальный патч",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "vdom_purpose",
+      "exampleType": "bad",
+      "exampleText": "Virtual DOM полностью убирает reflow и всегда быстрее любого прямого DOM.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "update_flow",
+      "exampleType": "good",
+      "exampleText": "setState → schedule render → render phase строит Virtual DOM → commit phase diff + commitRoot одним batch.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "update_flow",
+      "exampleType": "good",
+      "exampleText": "два setState подряд — один commit в react 18 даже в setTimeout",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "update_flow",
+      "exampleType": "bad",
+      "exampleText": "Каждый useState flush сразу в DOM, render и commit — одна фаза.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "diffing_keys",
+      "exampleType": "good",
+      "exampleText": "Counter: меняется только text node в h1, button не трогается. key={item.id} при drag — swap fiber nodes; key={index} — 100 unmount+mount.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "diffing_keys",
+      "exampleType": "good",
+      "exampleText": "div→span — tear down subtree. списки без key — match по индексу, reorder ломает identity",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "diffing_keys",
+      "exampleType": "bad",
+      "exampleText": "React diff O(n³) и всегда remount весь Counter при +1.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "items.push + setState(state) — same reference, skip render. Index key при insert в начало — remount всех li, потеря focus.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "10k rows — react-window, не надеяться на vdom. Profiler покажет где memo реально нужен",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Duplicate keys — React throw Error и white screen. Мутация массива безопасна если вызвать setState.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Dashboard с realtime — React + VDOM batching. Brochure без JS — static HTML. Тяжёлый child — React.memo/useMemo поверх diff.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "частые input updates — react ок; одностраничный pdf-viewer без форм — html быстрее",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Любой сайт должен быть на React ради Virtual DOM performance.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "fiber_react18",
+      "exampleType": "good",
+      "exampleText": "Fiber — linked-list reconciler, render прерываемый. startTransition — low-priority, keystroke commit первым.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "fiber_react18",
+      "exampleType": "good",
+      "exampleText": "react-reconciler строит fiber, scheduler решает когда commit — vdom tree тот же",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "fiber_react18",
+      "exampleType": "bad",
+      "exampleText": "React 18 concurrent mode убрал diff и Virtual DOM полностью.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "virtual-dom-in-react",
+    "apiUrl": "https://api.itlead.org/api/questions/virtual-dom-in-react",
+    "pageUrl": "https://itlead.org/interview-questions/react/virtual-dom-in-react",
+    "difficulty": "MIDDLE",
+    "titleEn": "Virtual DOM in React",
+    "categorySlug": "react",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

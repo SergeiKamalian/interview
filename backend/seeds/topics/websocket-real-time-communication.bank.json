@@ -1,0 +1,606 @@
+{
+  "topic": {
+    "code": "websocket_real_time_communication",
+    "name": "WebSocket и real-time коммуникация",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое WebSocket и как он работает?",
+    "shortAnswer": "WebSocket — протокол, который апгрейдит HTTP-соединение в постоянный полнодуплексный TCP-канал: клиент и сервер отправляют сообщения в любой момент без повторных запросов. Handshake начинается как HTTP GET с Upgrade: websocket, сервер отвечает 101 Switching Protocols, дальше идут WebSocket-фреймы. Используют для чата, игр, торговых дашбордов; в production — только wss://.",
+    "idealAnswer": "WebSocket апгрейдит HTTP в постоянное full-duplex TCP-соединение: после handshake обе стороны шлют фреймы независимо, без циклов request-response. В отличие от HTTP (stateless, каждый запрос — новое соединение) и polling (клиент спрашивает «есть новости?» каждую секунду, latency 150–200ms+), WebSocket даёт server push с latency <10ms. Handshake: клиент GET /path HTTP/1.1 с Upgrade: websocket и Sec-WebSocket-Key; сервер 101 Switching Protocols + Sec-WebSocket-Accept (SHA1 ключа + фиксированный GUID, base64); клиент проверяет хеш — дальше WebSocket framing, HTTP закончен. Фреймы: opcode (text/binary/ping/pong/close), MASK у клиента, FIN для последнего фрейма сообщения; ping/pong — heartbeat. Браузерный API: new WebSocket(url), onopen/onmessage/onerror/onclose, ws.send(), readyState (OPEN/CLOSING/CLOSED). Когда WebSocket: live chat, multiplayer 60fps, trading с ордерами от клиента, collaborative editing. Когда не нужен: односторонние уведомления — SSE проще (auto-reconnect); редкие обновления раз в минуту — HTTP polling. Сравнение: polling/long poll — только client-initiated; SSE — server→client; WebSocket — full-duplex, минимальный overhead. Типичные ошибки: нет reconnect в onclose (код 1006 при обрыве сети, API не переподключает сам); ws.send(object) без JSON.stringify → [object Object]; нет heartbeat — Nginx/прокси рвут idle через 60s; нет лимита размера message на сервере; ws:// на HTTPS (mixed content blocked). Production: exponential backoff reconnect; ping каждые 30s; wss://; Nginx proxy_http_version 1.1 + Upgrade/Connection upgrade; масштаб — sticky sessions + Redis pub/sub между нодами. React: useRef для сокета, cleanup close в useEffect, send только при readyState === OPEN. Библиотеки: нативный ws (Node), Socket.io (fallback polling + rooms), Phoenix Channels, ActionCable.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "websocket_definition",
+      "title": "Понимает суть WebSocket",
+      "expected": "Кандидат объясняет: протокол апгрейдит HTTP в постоянный full-duplex TCP-канал; обе стороны шлют сообщения без повторных HTTP-запросов; latency субсекундная vs polling.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — persistent bidirectional channel",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "websocket_definition",
+            "oftenConfusedWith": [
+              "vs_http_alternatives",
+              "handshake_upgrade"
+            ],
+            "anchorTermsExpected": [
+              "full-duplex",
+              "постоянн",
+              "bidirectional",
+              "двусторон",
+              "upgrade",
+              "без запрос",
+              "push"
+            ],
+            "anchorTermsWrongTopic": [
+              "SSE двусторонний",
+              "WebSocket это long polling",
+              "каждый send это новый HTTP"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "WebSocket",
+              "full-duplex",
+              "постоянн"
+            ],
+            "ask": "чем WebSocket отличается от обычного HTTP request-response"
+          }
+        ],
+        "mustConcepts": [
+          "WebSocket",
+          "full-duplex",
+          "полнодуплекс",
+          "постоянн",
+          "persistent",
+          "TCP",
+          "bidirectional",
+          "двусторон",
+          "upgrade",
+          "апгрейд",
+          "без повторн",
+          "без запрос",
+          "push",
+          "пуш",
+          "real-time",
+          "latency",
+          "onopen",
+          "onmessage"
+        ],
+        "falseClaims": [
+          "WebSocket это обычный HTTP long polling",
+          "каждое сообщение WebSocket открывает новое TCP-соединение",
+          "WebSocket только server→client как SSE",
+          "WebSocket не использует TCP",
+          "после connect нужен fetch на каждое сообщение"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "handshake_upgrade",
+      "title": "Знает handshake и 101 Switching Protocols",
+      "expected": "Кандидат описывает: HTTP GET с Upgrade: websocket и Sec-WebSocket-Key; ответ 101 + Sec-WebSocket-Accept (SHA1 key+GUID, base64); после проверки — WebSocket framing.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "механизм upgrade из ITLead handshake section",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "websocket_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "101",
+              "Switching Protocols",
+              "Sec-WebSocket"
+            ],
+            "ask": "что содержит ответ 101 Switching Protocols и как клиент проверяет сервер"
+          }
+        ],
+        "mustConcepts": [
+          "handshake",
+          "рукопожат",
+          "101",
+          "Switching Protocols",
+          "Upgrade",
+          "websocket",
+          "Sec-WebSocket-Key",
+          "Sec-WebSocket-Accept",
+          "SHA1",
+          "GUID",
+          "base64",
+          "HTTP GET",
+          "framing",
+          "фрейм",
+          "проверк"
+        ],
+        "falseClaims": [
+          "handshake WebSocket — это POST с body",
+          "после 101 соединение закрывается и открывается новое TCP",
+          "Sec-WebSocket-Accept — случайная строка без проверки",
+          "handshake работает без заголовка Upgrade",
+          "101 означает обычный HTTP redirect"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "vs_http_alternatives",
+      "title": "Сравнивает с polling, long polling, SSE и HTTP",
+      "expected": "Кандидат сравнивает направление (full-duplex vs client-only vs server-only), overhead, latency; понимает что HTTP/2 multiplex — request-response streams, не bidirectional push.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "таблица сравнения и follow-up HTTP/2 vs WebSocket",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "vs_http_alternatives",
+            "oftenConfusedWith": [
+              "when_to_use"
+            ],
+            "anchorTermsExpected": [
+              "polling",
+              "long polling",
+              "SSE",
+              "full-duplex",
+              "HTTP/2",
+              "overhead"
+            ],
+            "anchorTermsWrongTopic": [
+              "SSE bidirectional",
+              "polling быстрее WebSocket",
+              "HTTP/2 заменяет WebSocket для чата"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "SSE",
+              "WebSocket",
+              "polling"
+            ],
+            "ask": "когда SSE достаточно, а когда нужен WebSocket"
+          },
+          {
+            "match": [
+              "HTTP/2",
+              "multiplex"
+            ],
+            "ask": "чем WebSocket отличается от HTTP/2 multiplexing"
+          }
+        ],
+        "mustConcepts": [
+          "polling",
+          "long polling",
+          "SSE",
+          "Server-Sent Events",
+          "full-duplex",
+          "client-initiated",
+          "server push",
+          "overhead",
+          "накладн",
+          "latency",
+          "HTTP/2",
+          "multiplex",
+          "request-response",
+          "stateless",
+          "persistent",
+          "auto-reconnect",
+          "EventSource"
+        ],
+        "falseClaims": [
+          "SSE поддерживает отправку данных от клиента по протоколу",
+          "polling даёт такую же latency как WebSocket",
+          "long polling позволяет серверу пушить без ограничений как WebSocket",
+          "HTTP/2 полностью заменяет WebSocket для real-time чата",
+          "WebSocket хуже polling по overhead"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда использовать WebSocket",
+      "expected": "Кандидат называет: chat, multiplayer games, trading dashboards, collaborative editing; для one-way notifications — SSE; для редких обновлений — HTTP polling.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use из таблицы ITLead",
+        "mustConcepts": [
+          "chat",
+          "чат",
+          "Slack",
+          "Discord",
+          "multiplayer",
+          "игр",
+          "trading",
+          "дашборд",
+          "collaborative",
+          "Figma",
+          "typing indicator",
+          "уведомлен",
+          "SSE",
+          "polling",
+          "редк",
+          "wss://",
+          "production"
+        ],
+        "falseClaims": [
+          "WebSocket нужен для любого real-time сценария",
+          "SSE лучше для двустороннего чата с частыми сообщениями от клиента",
+          "polling оптимален для 60fps игр",
+          "ws:// нормален на HTTPS production",
+          "раз в минуту обновления требуют WebSocket"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки production",
+      "expected": "Кандидат называет: нет reconnect (1006, exponential backoff); send object без JSON.stringify; нет heartbeat/ping — Nginx рвёт idle; нет лимита размера message; ws:// на HTTPS.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — частые production failures",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "frames_heartbeat",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "reconnect",
+              "onclose",
+              "1006"
+            ],
+            "ask": "что делать при обрыве сети и коде 1006"
+          },
+          {
+            "match": [
+              "heartbeat",
+              "ping",
+              "Nginx"
+            ],
+            "ask": "почему WebSocket падает через 60 секунд за Nginx без heartbeat"
+          },
+          {
+            "match": [
+              "JSON.stringify",
+              "object Object"
+            ],
+            "ask": "почему ws.send({msg:'hi'}) ломает протокол"
+          }
+        ],
+        "mustConcepts": [
+          "reconnect",
+          "переподключ",
+          "onclose",
+          "1006",
+          "exponential backoff",
+          "JSON.stringify",
+          "object Object",
+          "heartbeat",
+          "ping",
+          "Nginx",
+          "idle",
+          "proxy",
+          "message size",
+          "лимит",
+          "ws://",
+          "wss://",
+          "mixed content",
+          "readyState",
+          "OPEN"
+        ],
+        "falseClaims": [
+          "WebSocket API автоматически переподключается при обрыве",
+          "ws.send принимает объекты и сам сериализует в JSON",
+          "heartbeat не нужен если соединение стабильно на localhost",
+          "размер message на сервере не важен",
+          "ws:// работает на HTTPS странице"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "frames_heartbeat",
+      "title": "Понимает фреймы, ping/pong и readyState",
+      "expected": "Кандидат объясняет: opcode text/binary/ping/pong/close, MASK у клиента; ping/pong как heartbeat; readyState OPEN перед send; isAlive pattern на сервере.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "internals frames и heartbeat из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ping",
+              "pong",
+              "heartbeat"
+            ],
+            "ask": "как ping/pong обнаруживает мёртвое соединение"
+          }
+        ],
+        "mustConcepts": [
+          "frame",
+          "фрейм",
+          "opcode",
+          "text",
+          "binary",
+          "ping",
+          "pong",
+          "close",
+          "MASK",
+          "mask",
+          "FIN",
+          "heartbeat",
+          "readyState",
+          "OPEN",
+          "isAlive",
+          "terminate",
+          "0x9",
+          "0xA"
+        ],
+        "falseClaims": [
+          "клиент не маскирует исходящие фреймы",
+          "ping/pong нужно обрабатывать вручную в браузере",
+          "можно send при любом readyState",
+          "heartbeat заменяет reconnect",
+          "сервер шлёт masked frames клиенту"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "production_patterns",
+      "title": "Знает production-паттерны: React, Nginx, масштаб",
+      "expected": "Кандидат упоминает: useRef + cleanup close в React; Nginx Upgrade headers; sticky sessions + Redis pub/sub для масштаба; Socket.io/ws библиотеки.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "examples + follow-up nginx/scaling из ITLead",
+        "mustConcepts": [
+          "useRef",
+          "useEffect",
+          "cleanup",
+          "close",
+          "unmount",
+          "Nginx",
+          "proxy_http_version",
+          "Upgrade",
+          "Connection upgrade",
+          "sticky",
+          "Redis",
+          "pub/sub",
+          "Socket.io",
+          "ws",
+          "broadcast",
+          "consistent hashing",
+          "scale"
+        ],
+        "falseClaims": [
+          "PM2 сам маршрутизирует сообщения между процессами WebSocket",
+          "Nginx проксирует WebSocket без специальных заголовков",
+          "хранить WebSocket в useState — нормальный React паттерн",
+          "миллион соединений на одной ноде без pub/sub — стандарт",
+          "не нужно закрывать сокет при unmount компонента"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "WebSocket апгрейдит HTTP в постоянный full-duplex канал: handshake 101 Switching Protocols, потом фреймы в обе стороны. Для чата и игр — WebSocket; для односторонних уведомлений — SSE. В production wss://, reconnect в onclose с backoff, ping каждые 30s чтобы Nginx не рвал idle.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Polling каждую секунду — 200ms latency и пустые ответы. WebSocket после upgrade сервер пушит сразу. send только строки/бинарь — JSON.stringify. React: useRef для ws, close в cleanup, readyState OPEN перед send.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Sec-WebSocket-Accept — SHA1 ключа плюс GUID. Клиент проверяет и переходит на framing. На сервере ws: лимит размера message, ping/pong isAlive, broadcast через wss.clients. За Nginx — proxy_set_header Upgrade и Connection upgrade.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "WebSocket — это когда клиент каждую секунду делает fetch. SSE и WebSocket одинаково двусторонние. API сам переподключится при обрыве, onclose не нужен.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "ws.send({type:'join'}) нормально — браузер сам JSON сделает. На HTTPS можно ws://. Heartbeat только для слабого интернета, Nginx idle timeout не трогает WebSocket.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "101 Switching Protocols закрывает TCP и открывает новый сокет. HTTP/2 multiplex полностью заменяет WebSocket в чатах. Масштаб — просто PM2 cluster без Redis.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "websocket_definition",
+      "exampleType": "good",
+      "exampleText": "WebSocket — persistent full-duplex TCP после HTTP upgrade; client и server push без новых HTTP-запросов.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "websocket_definition",
+      "exampleType": "good",
+      "exampleText": "ну это как звонок — линия открыта, оба шлют когда хотят, не как polling с fetch каждую секунду",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "websocket_definition",
+      "exampleType": "bad",
+      "exampleText": "WebSocket — долгий HTTP GET, сервер отвечает когда захочет, потом новый GET на каждое сообщение.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "handshake_upgrade",
+      "exampleType": "good",
+      "exampleText": "GET с Upgrade: websocket и Sec-WebSocket-Key → 101 + Sec-WebSocket-Accept (SHA1+GUID base64) → WebSocket frames.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "handshake_upgrade",
+      "exampleType": "good",
+      "exampleText": "рукопожатие как обычный http get, потом 101 и проверка accept хеша — дальше уже не http",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "handshake_upgrade",
+      "exampleType": "bad",
+      "exampleText": "Handshake — POST /websocket с JSON body, сервер отвечает 200 OK и сразу шлёт данные.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "vs_http_alternatives",
+      "exampleType": "good",
+      "exampleText": "Polling — client only, высокий overhead. SSE — server→client, auto-reconnect. WebSocket — full-duplex, минимальная latency для чата и игр.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "vs_http_alternatives",
+      "exampleType": "good",
+      "exampleText": "HTTP/2 мультиплексирует request-response стримы — не замена bidirectional push; для server-initiated messages WebSocket, для параллельных API — HTTP/2.",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "vs_http_alternatives",
+      "exampleType": "bad",
+      "exampleText": "SSE двусторонний, WebSocket только server push как notifications stream.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Discord чат и trading с ордерами — WebSocket. GitHub-style notifications one-way — SSE. Дашборд раз в 30s — polling достаточно.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "figma курсоры и 60fps игры — только websocket, sse не потянет двусторонний поток",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Всегда WebSocket, SSE и polling устарели. ws:// на production HTTPS — ок.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "onclose → setTimeout reconnect с exponential backoff; код 1006 без close frame. ws.send(JSON.stringify(obj)). ping каждые 30s за Nginx.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "на сервере if (raw.length > 1_000_000) close 1009 — иначе 1GB frame убьёт процесс",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "new WebSocket(url) без onclose — норм, браузер сам переподключит. send объекта без stringify — сервер поймёт.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "frames_heartbeat",
+      "exampleType": "good",
+      "exampleText": "Сервер ws.ping(), on pong isAlive=true; нет pong за 30s — terminate. Браузер маскирует исходящие фреймы.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "frames_heartbeat",
+      "exampleType": "good",
+      "exampleText": "перед send проверяю readyState === OPEN, иначе во время reconnect упадёт",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "frames_heartbeat",
+      "exampleType": "bad",
+      "exampleText": "ping/pong в браузере надо вручную в onmessage обрабатывать, иначе не работает.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "production_patterns",
+      "exampleType": "good",
+      "exampleText": "React: ws в useRef, useEffect return () => ws.close(). Nginx: proxy_http_version 1.1; Upgrade и Connection upgrade. Scale: sticky + Redis pub/sub между нодами.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "production_patterns",
+      "exampleType": "good",
+      "exampleText": "socket.io — fallback polling и rooms; нативный ws для express internal dashboard",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "production_patterns",
+      "exampleType": "bad",
+      "exampleText": "WebSocket в useState — правильно, cleanup не нужен. PM2 решает маршрутизацию между миллионом conn.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "websocket-real-time-communication",
+    "apiUrl": "https://api.itlead.org/api/questions/websocket-real-time-communication",
+    "pageUrl": "https://itlead.org/interview-questions/general/websocket-real-time-communication",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is WebSocket and how does it work?",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

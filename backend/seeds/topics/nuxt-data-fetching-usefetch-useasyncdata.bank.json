@@ -1,0 +1,592 @@
+{
+  "topic": {
+    "code": "nuxt_data_fetching_usefetch_useasyncdata",
+    "name": "useFetch и useAsyncData в Nuxt",
+    "skillCode": "nuxt",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "В чём разница между useFetch и useAsyncData в Nuxt и когда какой composable выбирать?",
+    "shortAnswer": "useFetch — сокращение для HTTP-запросов: автоматически генерирует ключ кеша из URL и опций, удобен для простых вызовов одного endpoint. useAsyncData требует ручной строковый ключ, но принимает любую async-функцию — для фильтрации, объединения нескольких запросов и произвольной логики. Правило: один URL — useFetch; кастомная логика или несколько вызовов — useAsyncData.",
+    "idealAnswer": "useFetch — composable-обёртка над $fetch для HTTP: автоматически хеширует URL и опции запроса в ключ кеша, реагирует на смену маршрута без ручных watcher. useAsyncData — универсальный composable: вы передаёте строковый ключ и любую async-функцию; кеширование и дедупликация идут по вашему ключу. Оба регистрируют async-задачи при SSR, приостанавливают рендер страницы до resolve и сериализуют результат в HTML payload для гидратации — на клиенте повторный сетевой запрос не выполняется, если ключ уже есть в payload.data. Когда useFetch: прямой GET/POST к одному endpoint (`useFetch('/api/posts')`), динамические данные маршрута (URL меняется — refetch автоматически), реактивные query-параметры через опцию query. Когда useAsyncData: фильтрация/трансформация ответа, Promise.all нескольких API, Nuxt Content (`queryContent()`), Supabase с RLS, client-only данные с `server: false`. Сравнение: useFetch — ключ auto (hash URL+options), handler — URL, fetcher по умолчанию $fetch; useAsyncData — ключ manual (обязательная строка), handler — любая async-функция, реактивность через смену ключа. Типичные ошибки: вызов useAsyncData без ключа (в Nuxt 3 ключ обязателен); статический ключ `'posts'` для динамического id — при навигации между записями остаются данные первого fetch (watch не поможет, проблема в ключе); useFetch когда нужна фильтрация — лучше useAsyncData с явным ключом. Инвалидация: refreshNuxtData('key') для refetch, clearNuxtData('key') для удаления из кеша; useFetch также возвращает refresh(). Если два компонента вызывают useAsyncData с одним ключом — второй получит результат первого (полезно для shared data, опасно при разных handlers). server: false пропускает handler на SSR, выполняет только на клиенте — для browser API и данных вне HTML payload.",
+    "maxScore": 10,
+    "skills": [
+      "nuxt",
+      "javascript",
+      "vue"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "core_difference",
+      "title": "Понимает ключевую разницу useFetch и useAsyncData",
+      "expected": "Кандидат объясняет: useFetch — shorthand для HTTP с автоматическим ключом кеша из URL и опций; useAsyncData — любая async-функция с ручным строковым ключом; оба кешируют результат, но механизм ключа разный.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — auto key vs manual key + handler type",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "core_difference",
+            "oftenConfusedWith": [
+              "when_to_use",
+              "cache_key_mechanism"
+            ],
+            "anchorTermsExpected": [
+              "useFetch",
+              "useAsyncData",
+              "автомат",
+              "ручн",
+              "ключ",
+              "URL",
+              "async-функц"
+            ],
+            "anchorTermsWrongTopic": [
+              "useFetch принимает любую async-функцию",
+              "useAsyncData автоматически хеширует URL"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useFetch",
+              "useAsyncData",
+              "ключ",
+              "кеш"
+            ],
+            "ask": "чем useFetch отличается от useAsyncData по ключу кеша и типу handler"
+          }
+        ],
+        "mustConcepts": [
+          "useFetch",
+          "useAsyncData",
+          "автомат",
+          "ручн",
+          "ключ",
+          "кеш",
+          "URL",
+          "опци",
+          "hash",
+          "async-функц",
+          "handler",
+          "обработчик",
+          "$fetch",
+          "composable",
+          "сокращен",
+          "HTTP",
+          "результат",
+          "кешир"
+        ],
+        "falseClaims": [
+          "useFetch и useAsyncData не кешируют данные",
+          "useAsyncData автоматически генерирует ключ из URL",
+          "useFetch принимает произвольную async-функцию как handler",
+          "разница только в названии — поведение идентично",
+          "useFetch не использует $fetch под капотом"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Знает когда выбирать useFetch, а когда useAsyncData",
+      "expected": "Кандидат называет: один endpoint / один URL → useFetch; фильтрация, join, несколько параллельных запросов, Nuxt Content, client-only с server: false → useAsyncData; правило «один URL = useFetch».",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "decision shortcut из ITLead When to use",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "core_difference",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "один URL",
+              "endpoint",
+              "фильтр",
+              "Promise.all"
+            ],
+            "ask": "когда достаточно useFetch, а когда нужен useAsyncData — приведи примеры"
+          },
+          {
+            "match": [
+              "server: false",
+              "WebSocket",
+              "client-only"
+            ],
+            "ask": "для client-only данных какой composable и какая опция"
+          }
+        ],
+        "mustConcepts": [
+          "один endpoint",
+          "один URL",
+          "useFetch",
+          "useAsyncData",
+          "фильтр",
+          "трансформ",
+          "Promise.all",
+          "параллельн",
+          "несколько запрос",
+          "join",
+          "server: false",
+          "client-only",
+          "WebSocket",
+          "queryContent",
+          "Nuxt Content",
+          "динамическ",
+          "маршрут",
+          "route"
+        ],
+        "falseClaims": [
+          "для любой задачи лучше useFetch — меньше кода",
+          "useAsyncData нужен только когда нет URL",
+          "server: false работает только в useFetch",
+          "для POST всегда нужен useAsyncData",
+          "Promise.all возможен только через useFetch"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "cache_key_mechanism",
+      "title": "Понимает механизм ключей кеша и реактивность",
+      "expected": "Кандидат объясняет: useFetch хеширует URL+options → auto key, реагирует на route/query; useAsyncData — manual string key, реактивность через смену ключа; один ключ + разные data shapes → stale/wrong output.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Key difference + static key mistake — частая production-ошибка",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "статическ",
+              "posts-${id}",
+              "динамическ",
+              "ключ"
+            ],
+            "ask": "почему статический ключ 'posts' ломает навигацию между записями с разным id"
+          },
+          {
+            "match": [
+              "query",
+              "реактив",
+              "route"
+            ],
+            "ask": "как useFetch реагирует на смену route.params или reactive query"
+          }
+        ],
+        "mustConcepts": [
+          "ключ",
+          "кеш",
+          "hash",
+          "URL",
+          "опци",
+          "автомат",
+          "ручн",
+          "строк",
+          "реактив",
+          "route",
+          "маршрут",
+          "query",
+          "динамическ",
+          "id",
+          "stale",
+          "устарев",
+          "уникальн",
+          "data shape",
+          "форма данных",
+          "refetch",
+          "watch"
+        ],
+        "falseClaims": [
+          "useAsyncData автоматически обновляет данные при смене id без смены ключа",
+          "watch на id заменяет динамический ключ в useAsyncData",
+          "два компонента с одним ключом но разными handlers всегда получают свои данные",
+          "useFetch не реагирует на смену URL при навигации",
+          "ключ кеша в useFetch задаётся вручную строкой"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "ssr_payload_caching",
+      "title": "Понимает SSR payload и дедупликацию запросов",
+      "expected": "Кандидат описывает: оба composable регистрируют async-задачи при SSR, suspend рендер до resolve, сериализуют в payload.data; на клиенте при наличии ключа повторный запрос не выполняется.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "How caching works — SSR suspend + hydration dedup",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "payload",
+              "SSR",
+              "гидрат",
+              "suspend"
+            ],
+            "ask": "что происходит с данными useFetch/useAsyncData при SSR и на клиенте после гидратации"
+          }
+        ],
+        "mustConcepts": [
+          "SSR",
+          "payload",
+          "payload.data",
+          "useNuxtApp",
+          "suspend",
+          "приостанов",
+          "рендер",
+          "сериализ",
+          "гидрат",
+          "hydration",
+          "HTML",
+          "клиент",
+          "повторн",
+          "дедупликац",
+          "второй запрос",
+          "async-задач",
+          "resolve",
+          "кеш"
+        ],
+        "falseClaims": [
+          "на клиенте useFetch всегда делает второй сетевой запрос",
+          "SSR payload не включает данные useAsyncData",
+          "useFetch не участвует в SSR suspend",
+          "данные composable не попадают в HTML",
+          "гидратация всегда перезапрашивает API"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки useFetch/useAsyncData",
+      "expected": "Кандидат называет: отсутствие ключа в useAsyncData; статический ключ для динамических данных; useFetch когда нужна трансформация; один ключ для разных handlers.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — missing key, static key, wrong composable",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "без ключа",
+              "missing key",
+              "Nuxt 3"
+            ],
+            "ask": "что не так с useAsyncData(async () => $fetch(...)) без строкового ключа"
+          },
+          {
+            "match": [
+              "filter",
+              "transform",
+              "useFetch"
+            ],
+            "ask": "когда useFetch для /api/search с POST и фильтрацией results — плохой выбор"
+          }
+        ],
+        "mustConcepts": [
+          "ключ обязател",
+          "отсутств",
+          "статическ",
+          "динамическ",
+          "id",
+          "watch",
+          "не обновл",
+          "трансформ",
+          "фильтр",
+          "useFetch",
+          "useAsyncData",
+          "handler",
+          "один ключ",
+          "разные",
+          "Nuxt 3",
+          "code review",
+          "навигац",
+          "запис"
+        ],
+        "falseClaims": [
+          "в Nuxt 3 ключ useAsyncData опционален",
+          "watch на route.params исправляет статический ключ без его смены",
+          "useFetch нельзя использовать с POST body",
+          "фильтрация в template после useFetch — лучший паттерн чем useAsyncData",
+          "один ключ 'posts' корректен для /api/posts/1 и /api/posts/2"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "cache_invalidation",
+      "title": "Знает инвалидацию кеша после мутаций",
+      "expected": "Кандидат называет refreshNuxtData('key') для refetch, clearNuxtData('key') для удаления; refresh() из useFetch; связь с ключом useAsyncData.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Real-world usage — refreshNuxtData/clearNuxtData из ITLead",
+        "mustConcepts": [
+          "refreshNuxtData",
+          "clearNuxtData",
+          "refresh",
+          "инвалидац",
+          "мутац",
+          "refetch",
+          "повторн",
+          "удал",
+          "кеш",
+          "ключ",
+          "useFetch",
+          "useAsyncData",
+          "optimistic",
+          "оптимист"
+        ],
+        "falseClaims": [
+          "после POST данные useAsyncData обновляются автоматически без refreshNuxtData",
+          "clearNuxtData и refreshNuxtData делают одно и то же",
+          "refresh() есть только у useAsyncData",
+          "инвалидация работает без знания строкового ключа",
+          "кеш composable нельзя сбросить программно"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "shared_key_and_options",
+      "title": "Понимает shared key, POST и server: false",
+      "expected": "Кандидат упоминает: один ключ — shared cache между компонентами (второй вызов reuse); useFetch поддерживает POST с method/body; server: false — только клиент, вне SSR payload.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Follow-up questions — shared key, POST, server:false",
+        "mustConcepts": [
+          "shared",
+          "общий ключ",
+          "reuse",
+          "переиспольз",
+          "POST",
+          "method",
+          "body",
+          "server: false",
+          "клиент",
+          "SSR",
+          "browser API",
+          "дашборд",
+          "компонент"
+        ],
+        "falseClaims": [
+          "useFetch не поддерживает POST",
+          "server: false выполняет handler и на сервере и на клиенте",
+          "два useAsyncData с одним ключом всегда запускают оба handler",
+          "POST запросы нельзя кешировать через useFetch",
+          "server: false добавляет данные в HTML payload"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "useFetch — shorthand для HTTP: ключ кеша auto из URL и опций, refetch при смене route. useAsyncData — любая async-функция и ручной ключ. Один endpoint — useFetch; фильтрация, Promise.all или Nuxt Content — useAsyncData. При SSR оба кладут результат в payload — на клиенте без второго запроса.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На products/[category] беру useFetch — URL уже содержит category и query. Дашборд с тремя API и merge через allSettled — useAsyncData(`dashboard-${userId}`, handler). После создания поста — refreshNuxtData('posts'). Live WebSocket — useAsyncData с server: false.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Статический ключ 'posts' при `/api/posts/${id}` — классическая ошибка: при переходе между записями данные не меняются, watch не спасёт. Нужен ключ `posts-${id}`. useAsyncData без строкового ключа в Nuxt 3 невалиден.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "useFetch и useAsyncData — одно и то же, разница только в синтаксисе. Ключ кеша всегда задаётся вручную.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для динамического id достаточно useAsyncData('posts', () => $fetch(`/api/posts/${id}`)) и watch на id — ключ менять не нужно.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "После SSR useFetch всегда повторно ходит в API на клиенте. refreshNuxtData не существует — кеш сбросить нельзя.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "core_difference",
+      "exampleType": "good",
+      "exampleText": "useFetch auto-key из hash(URL+options), handler — URL строка. useAsyncData — manual key + любая async-функция, кеш по вашему имени.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "core_difference",
+      "exampleType": "good",
+      "exampleText": "ну useFetch как заказ по url — сам трекает; useAsyncData — сам готовишь рецепт и сам называешь ключ",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "core_difference",
+      "exampleType": "bad",
+      "exampleText": "useAsyncData автоматически хеширует URL так же как useFetch — ключи одинаковые.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "/api/auth/me — useFetch. Фильтр active users после fetch — useAsyncData('active-users', ...). Три параллельных endpoint в dashboard — useAsyncData с Promise.allSettled.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "один url — fetch; кастомная логика или несколько вызовов — async data",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Для Supabase select с RLS и userId всегда useFetch('/api/posts') — async data не нужен.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "cache_key_mechanism",
+      "exampleType": "good",
+      "exampleText": "useFetch следит за URL и reactive query — refetch без watcher. useAsyncData(`posts-${id}`) — ключ меняется с id, иначе stale cache первой записи.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "cache_key_mechanism",
+      "exampleType": "good",
+      "exampleText": "два компонента с ключом 'users' но разными handlers — второй получит кеш первого, нужны уникальные ключи под data shape",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "cache_key_mechanism",
+      "exampleType": "bad",
+      "exampleText": "При смене route.params category useFetch не refetch — нужен ручной watch на весь проект.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "ssr_payload_caching",
+      "exampleType": "good",
+      "exampleText": "SSR suspend до resolve handler → данные в payload.data → клиент гидратирует без повторного $fetch если ключ уже есть.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "ssr_payload_caching",
+      "exampleType": "good",
+      "exampleText": "оба composable регистрируют async task, сериализуют в html payload, на клиенте дедуп по ключу",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "ssr_payload_caching",
+      "exampleType": "bad",
+      "exampleText": "useAsyncData не участвует в SSR — данные только на клиенте всегда.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Wrong: useAsyncData(async () => $fetch('/api/posts')). Correct: useAsyncData('posts', async () => $fetch('/api/posts')).",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "search с POST и filter published — useAsyncData('search-nuxt', ...) явнее чем сырой useFetch без трансформации",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Добавил watch(id) на useAsyncData('posts', ...) — данные обновятся при навигации между постами.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "cache_invalidation",
+      "exampleType": "good",
+      "exampleText": "После create post: refreshNuxtData('posts') refetch; clearNuxtData('posts') сбросить значение. useFetch возвращает refresh() для локального refetch.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "cache_invalidation",
+      "exampleType": "good",
+      "exampleText": "мутация → refreshNuxtData по тому же ключу что в useAsyncData",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "cache_invalidation",
+      "exampleType": "bad",
+      "exampleText": "Кеш useAsyncData живёт вечно — после мутации UI сам обновится без refreshNuxtData.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "shared_key_and_options",
+      "exampleType": "good",
+      "exampleText": "Два layout с useAsyncData('session', ...) — shared cache, один fetch. POST: useFetch('/api/search', { method: 'POST', body }). Live widget: useAsyncData(..., { server: false }).",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "shared_key_and_options",
+      "exampleType": "good",
+      "exampleText": "server false — только клиент, не в html payload, для browser api",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "shared_key_and_options",
+      "exampleType": "bad",
+      "exampleText": "useFetch не умеет POST — только GET URL строкой.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nuxt-data-fetching-usefetch-useasyncdata",
+    "apiUrl": "https://api.itlead.org/api/questions/nuxt-data-fetching-usefetch-useasyncdata",
+    "pageUrl": "https://itlead.org/interview-questions/nuxt/nuxt-data-fetching-usefetch-useasyncdata",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is the difference between useFetch and useAsyncData in Nuxt?",
+    "categorySlug": "nuxt",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

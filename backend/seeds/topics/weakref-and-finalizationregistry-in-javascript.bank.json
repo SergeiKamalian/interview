@@ -1,0 +1,633 @@
+{
+  "topic": {
+    "code": "weakref_and_finalizationregistry_javascript",
+    "name": "WeakRef и FinalizationRegistry в JavaScript",
+    "skillCode": "javascript",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое WeakRef и FinalizationRegistry в JavaScript и когда их использовать?",
+    "shortAnswer": "WeakRef создаёт слабое посылание на объект — он не препятствует сборке мусора. Метод `.deref()` возвращает объект, если он ещё жив, или `undefined`, если уже собран. FinalizationRegistry запускает callback после того, как зарегистрированный объект реально собран GC, но время вызова не гарантировано и может откладываться на секунды или больше.",
+    "idealAnswer": "WeakRef держит ссылку на объект без удержания его в памяти: сборщик мусора не считает WeakRef при определении достижимости. Сильные ссылки удерживают объект; когда все сильные ссылки убраны, объект eligible для сборки независимо от числа WeakRef на него. `.deref()` — единственный способ получить объект: возвращает живой объект или `undefined`, заранее неизвестно что. WeakRef работает только с объектами — `new WeakRef(42)` или `new WeakRef('hello')` бросает TypeError, потому что примитивы не имеют стабильной object identity для GC. FinalizationRegistry регистрирует объект и получает callback, когда GC физически освободил память — но callback ставится в очередь на будущий цикл GC, не в момент снятия последней сильной ссылки. V8, SpiderMonkey и JavaScriptCore ведут отдельную таблицу weak references, не влияющую на reachability. Когда использовать WeakRef: кэши, где записи должны исчезать, когда оригинальный объект больше нигде не нужен; observer-паттерны, где listeners не должны удерживать subject; отслеживание DOM-узлов во внутренней логике фреймворков. FinalizationRegistry: логирование eviction кэша, освобождение native resources в Node.js add-ons, cleanup subscriptions в observable-библиотеках без явного unsubscribe. Никогда для time-critical cleanup: закрытие file handles, release locks — только явный `.close()`. Типичные ошибки: ожидать мгновенный callback FinalizationRegistry; `registry.register(obj, obj)` — held value создаёт сильную ссылку и блокирует сбор; не обрабатывать `undefined` из `.deref()` — TypeError на `.setting`; сохранять результат `.deref()` в сильной переменной — объект остаётся живым; callback в closure держит ссылку на собранный объект — цикл блокирует GC. WeakRef vs WeakMap: WeakMap автоматически удаляет entry при сборе ключа; WeakRef — явный handle с ручной проверкой `.deref()`. WeakMap для «метаданные об объекте»; WeakRef для «этот конкретный объект ещё жив?». Реальный код: React DOM refs, Node.js streams, Electron window handles, Web Workers pool, RxJS cleanup. Senior cache design: WeakRef для values + FinalizationRegistry для cleanup + LRU strong refs для size cap; edge cases: callback после уничтожения кеша, замыкание на кеш блокирует GC, callback после замены entry под тем же ключом.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "weakref_definition",
+      "title": "Понимает WeakRef и слабые ссылки",
+      "expected": "Кандидат объясняет: WeakRef — слабое посылание, не препятствует GC; сильные ссылки удерживают объект; когда все сильные убраны — объект eligible для сборки независимо от WeakRef.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — weak reference не удерживает объект в памяти",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "weakref_definition",
+            "oftenConfusedWith": [
+              "weakref_vs_weakmap",
+              "deref_method"
+            ],
+            "anchorTermsExpected": [
+              "WeakRef",
+              "слаб",
+              "weak",
+              "GC",
+              "сборщик",
+              "сильн",
+              "не удержива",
+              "не блокир"
+            ],
+            "anchorTermsWrongTopic": [
+              "WeakRef держит объект живым",
+              "WeakRef это WeakMap",
+              "слабая ссылка сильнее сильной"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "WeakRef",
+              "слаб",
+              "weak"
+            ],
+            "ask": "чем слабая ссылка отличается от сильной и как GC считает reachability"
+          }
+        ],
+        "mustConcepts": [
+          "WeakRef",
+          "слаб",
+          "weak reference",
+          "сильн",
+          "strong reference",
+          "garbage collection",
+          "сборщик мусора",
+          "GC",
+          "не удержива",
+          "не блокир",
+          "не препятств",
+          "eligible",
+          "достижим",
+          "reachability",
+          "считает ссылки",
+          "удерживает в памяти"
+        ],
+        "falseClaims": [
+          "WeakRef удерживает объект в памяти как обычная ссылка",
+          "WeakRef добавляется к счётчику сильных ссылок GC",
+          "объект с WeakRef никогда собирается GC",
+          "WeakRef заменяет WeakMap для метаданных"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "deref_method",
+      "title": "Знает метод .deref()",
+      "expected": "Кандидат объясняет: `.deref()` возвращает объект если жив, или `undefined` если собран; заранее неизвестно; нужно безопасно обрабатывать через optional chaining или проверку перед доступом.",
+      "score": 1,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый API из quick example ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "deref",
+              "undefined",
+              "optional"
+            ],
+            "ask": "что возвращает deref() если объект уже собран и как безопасно читать свойства"
+          }
+        ],
+        "mustConcepts": [
+          "deref",
+          ".deref()",
+          "undefined",
+          "жив",
+          "alive",
+          "собран",
+          "collected",
+          "optional chaining",
+          "?.",
+          "проверка",
+          "безопасн",
+          "TypeError",
+          "заранее неизвестно"
+        ],
+        "falseClaims": [
+          "deref() всегда возвращает объект если WeakRef создан",
+          "deref() бросает исключение если объект собран",
+          "можно вызывать deref().property без проверки",
+          "deref() синхронно запускает GC"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "finalization_registry",
+      "title": "Понимает FinalizationRegistry",
+      "expected": "Кандидат объясняет: FinalizationRegistry регистрирует объект и вызывает callback после физической сборки GC; timing не гарантирован — секунды или больше; callback в будущем цикле GC, не при снятии последней сильной ссылки.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро — registry callback и негарантированный timing",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "weakref_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "finalization_registry",
+            "oftenConfusedWith": [
+              "registry_timing_pitfalls"
+            ],
+            "anchorTermsExpected": [
+              "FinalizationRegistry",
+              "callback",
+              "register",
+              "не гарантирован",
+              "timing",
+              "после GC"
+            ],
+            "anchorTermsWrongTopic": [
+              "callback как деструктор",
+              "callback синхронно при null",
+              "registry гарантирует cleanup"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "FinalizationRegistry",
+              "register",
+              "callback"
+            ],
+            "ask": "когда именно выполняется callback FinalizationRegistry и почему timing не гарантирован"
+          }
+        ],
+        "mustConcepts": [
+          "FinalizationRegistry",
+          "register",
+          "callback",
+          "held value",
+          "после сборки",
+          "after collection",
+          "не гарантирован",
+          "not guaranteed",
+          "timing",
+          "откладыва",
+          "delayed",
+          "секунд",
+          "цикл GC",
+          "GC cycle",
+          "очередь",
+          "queue"
+        ],
+        "falseClaims": [
+          "FinalizationRegistry callback выполняется синхронно при obj = null",
+          "callback гарантированно запускается в каждом runtime",
+          "FinalizationRegistry заменяет явный cleanup для file handles",
+          "callback срабатывает в момент снятия последней сильной ссылки"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Знает когда использовать WeakRef и FinalizationRegistry",
+      "expected": "Кандидат называет: WeakRef — кэши без утечек, observer без удержания subject, DOM tracking; FinalizationRegistry — логирование eviction, native bindings, RxJS cleanup без unsubscribe; НЕ для критичного cleanup (file handles, locks).",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use из ITLead — caches, observers, не critical cleanup",
+        "mustConcepts": [
+          "кэш",
+          "cache",
+          "observer",
+          "listener",
+          "DOM",
+          "логирован",
+          "logging",
+          "metrics",
+          "native",
+          "Node.js",
+          "RxJS",
+          "unsubscribe",
+          "не критичн",
+          "non-critical",
+          "file handle",
+          "lock",
+          "явный cleanup",
+          "explicit"
+        ],
+        "falseClaims": [
+          "FinalizationRegistry подходит для закрытия file handles в реальном времени",
+          "WeakRef нужен для всех кэшей вместо Map",
+          "FinalizationRegistry гарантирует корректность time-critical операций",
+          "WeakRef заменяет try/finally для ресурсов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "registry_timing_pitfalls",
+      "title": "Понимает негарантированный timing callback",
+      "expected": "Кандидат объясняет: объект может быть unreachable секунды до callback; GC откладывает на несколько циклов; callback не деструктор; для гарантированного cleanup — явный `.close()` / `unsubscribe()`.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "самая частая senior-пастка — callback как деструктор",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "finalization_registry",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "деструктор",
+              "destructor",
+              "мгновен",
+              "синхрон"
+            ],
+            "ask": "почему FinalizationRegistry callback не подходит для закрытия file handle"
+          },
+          {
+            "match": [
+              "collected",
+              "false",
+              "temp = null"
+            ],
+            "ask": "почему после temp = null collected ещё false и callback может не запуститься в коротком скрипте"
+          }
+        ],
+        "mustConcepts": [
+          "не мгновен",
+          "not immediate",
+          "секунд",
+          "откладыва",
+          "defer",
+          "деструктор",
+          "destructor",
+          "явный",
+          "explicit",
+          "close",
+          "unsubscribe",
+          "гарантирован",
+          "guaranteed",
+          "короткий скрипт",
+          "short-lived",
+          "не запустится",
+          "heap pressure",
+          "давление на кучу"
+        ],
+        "falseClaims": [
+          "callback FinalizationRegistry выполняется сразу после obj = null",
+          "FinalizationRegistry callbacks работают как C++ деструкторы",
+          "в коротком скрипте callback всегда успевает выполниться",
+          "GC запускается по команде разработчика при null"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки WeakRef и registry",
+      "expected": "Кандидат называет: register(obj, obj) — сильная ссылка в held value; не обрабатывать undefined из deref; WeakRef на примитивы — TypeError; сохранять deref() в сильной переменной; closure в callback держит объект — memory leak.",
+      "score": 2,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — held value, primitives, deref leak",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "register",
+              "obj",
+              "held value"
+            ],
+            "ask": "почему registry.register(obj, obj) блокирует сбор объекта"
+          },
+          {
+            "match": [
+              "примитив",
+              "42",
+              "string",
+              "TypeError"
+            ],
+            "ask": "почему new WeakRef(42) бросает TypeError"
+          },
+          {
+            "match": [
+              "deref",
+              "сильн",
+              "leak",
+              "утечк"
+            ],
+            "ask": "как создать memory leak сохранив результат deref() в переменную"
+          }
+        ],
+        "mustConcepts": [
+          "register(obj, obj)",
+          "held value",
+          "сильная ссылка",
+          "strong reference",
+          "идентификатор",
+          "metadata",
+          "undefined",
+          "deref().setting",
+          "TypeError",
+          "примитив",
+          "primitive",
+          "42",
+          "string",
+          "interned",
+          "memory leak",
+          "утечк",
+          "closure",
+          "замыкание",
+          "deref результат"
+        ],
+        "falseClaims": [
+          "held value может быть сам объект без блокировки GC",
+          "WeakRef работает с числами и строками",
+          "результат deref() можно хранить в const без удержания объекта",
+          "FinalizationRegistry callback не может создать утечку через closure"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "weakref_vs_weakmap",
+      "title": "Отличает WeakRef от WeakMap",
+      "expected": "Кандидат сравнивает: WeakMap — слабые ключи, entry удаляется автоматически при сборе ключа; WeakRef — явный handle, ручная проверка через `.deref()`; WeakMap для метаданных об объекте, WeakRef для «объект ещё жив?».",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Mistake 5 ITLead — частая путаница на senior",
+        "confusionPairs": [
+          {
+            "checkpointKey": "weakref_vs_weakmap",
+            "oftenConfusedWith": [
+              "weakref_definition"
+            ],
+            "anchorTermsExpected": [
+              "WeakMap",
+              "WeakRef",
+              "метаданные",
+              "deref",
+              "автоматич",
+              "ключ"
+            ],
+            "anchorTermsWrongTopic": [
+              "WeakRef и WeakMap одно и то же",
+              "WeakMap требует ручной deref",
+              "WeakRef автоматически удаляет entry"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "WeakMap",
+              "WeakRef",
+              "метаданные"
+            ],
+            "ask": "когда WeakMap и когда WeakRef — metadata vs проверка «жив ли объект»"
+          }
+        ],
+        "mustConcepts": [
+          "WeakMap",
+          "WeakRef",
+          "слабые ключи",
+          "weak keys",
+          "автоматич",
+          "automatically",
+          "entry",
+          "запись",
+          "deref",
+          "ручн",
+          "manual",
+          "метаданные",
+          "metadata",
+          "ещё жив",
+          "still alive",
+          "ключ",
+          "key"
+        ],
+        "falseClaims": [
+          "WeakRef и WeakMap решают одну задачу",
+          "WeakMap требует вызова deref() для проверки ключа",
+          "WeakRef автоматически удаляет Map entry при сборе",
+          "WeakMap — для проверки «объект ещё существует»"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "WeakRef — слабая ссылка, GC не считает её при reachability. deref() даёт объект или undefined. FinalizationRegistry callback после реальной сборки, но timing не гарантирован — для file handles только явный close(). register(obj, obj.id) — held value не должен быть сам объект.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В кэше Map хранит WeakRef на value — когда снаружи obj = null, get через deref() вернёт undefined и я удалю stale key. FinalizationRegistry для логов eviction, не для закрытия файлов. WeakMap — метаданные DOM-узла; WeakRef — «этот конкретный узел ещё в DOM?»",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "SimpleWeakCache: set кладёт WeakRef, get всегда deref с проверкой и delete stale entry. AutoCache + FinalizationRegistry с key как held value — callback удаляет Map entry, но может прийти через несколько GC циклов.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "WeakRef удерживает объект в памяти как обычная const ref. FinalizationRegistry callback срабатывает синхронно когда я ставлю obj = null — идеально для закрытия file handle.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "registry.register(stream, stream) — норм, held value может быть сам объект. new WeakRef(42) работает для кэша чисел. deref().property без проверки — ок, deref всегда живой.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "WeakRef и WeakMap одно и то же — слабые ссылки на объекты. Для метаданных объекта всегда WeakRef, WeakMap не нужен.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "weakref_definition",
+      "exampleType": "good",
+      "exampleText": "WeakRef не добавляется к счётчику сильных ссылок — когда obj = null и нет других strong refs, объект eligible для GC независимо от WeakRef.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "weakref_definition",
+      "exampleType": "good",
+      "exampleText": "ну weak ref — как записка с номером, не держит человека в городе, gc может собрать объект",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "weakref_definition",
+      "exampleType": "bad",
+      "exampleText": "WeakRef — сильная ссылка, объект живёт пока существует WeakRef.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "deref_method",
+      "exampleType": "good",
+      "exampleText": "const target = config.deref(); const value = target?.setting — безопасно undefined если объект собран.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "deref_method",
+      "exampleType": "good",
+      "exampleText": "weakRef.deref()?.id — optional chaining, может 2 или undefined после gc",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "deref_method",
+      "exampleType": "bad",
+      "exampleText": "config.deref().setting — deref всегда объект, проверка не нужна.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "finalization_registry",
+      "exampleType": "good",
+      "exampleText": "FinalizationRegistry((key) => cache.delete(key)) — callback после физической сборки value, held value key а не сам объект.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "finalization_registry",
+      "exampleType": "good",
+      "exampleText": "registry.register(value, key) — когда session собран gc, callback получит key и удалит entry из map",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "finalization_registry",
+      "exampleType": "bad",
+      "exampleText": "FinalizationRegistry callback выполняется в тот же тик когда последняя strong ref снята.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "WeakRef — кэш без утечек и observer listeners не держат subject. FinalizationRegistry — метрики eviction и RxJS cleanup без unsubscribe, не для locks.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "react dom refs через weakref, electron window handles — optional tracking, не критичный cleanup",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Для закрытия database connection использую FinalizationRegistry — гарантированно и быстро.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "registry_timing_pitfalls",
+      "exampleType": "good",
+      "exampleText": "temp = null; console.log(collected) — false, callback не синхронный. FileStream.close() явно — registry для fileHandle.close() опасно.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "registry_timing_pitfalls",
+      "exampleType": "good",
+      "exampleText": "в коротком cli скрипте callback может вообще не выполниться — gc по heap pressure, не по моему null",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "registry_timing_pitfalls",
+      "exampleType": "bad",
+      "exampleText": "FinalizationRegistry callbacks — деструкторы C++ стиля, срабатывают мгновенно при unreachable.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "registry.register(obj, obj) — wrong, held value держит strong ref. Right: registry.register(obj, obj.id).",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "new WeakRef(42) TypeError — только объекты. const alive = weakRef.deref() в глобальной переменной — leak, объект не соберётся.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "held value всегда сам объект — так registry знает что собрали. WeakRef на строки для interned cache.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "weakref_vs_weakmap",
+      "exampleType": "good",
+      "exampleText": "WeakMap: wm.set(user, {role}) — entry пропадает при сборе user. WeakRef: wr.deref() — я сам проверяю жив ли конкретный объект.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "weakref_vs_weakmap",
+      "exampleType": "good",
+      "exampleText": "метаданные dom node — weakmap, «этот ref ещё указывает на живый узел?» — weakref + deref",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "weakref_vs_weakmap",
+      "exampleType": "bad",
+      "exampleText": "WeakRef заменяет WeakMap для metadata — одна и та же механика автоматического удаления.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "weakref-and-finalizationregistry-in-javascript",
+    "apiUrl": "https://api.itlead.org/api/questions/weakref-and-finalizationregistry-in-javascript",
+    "pageUrl": "https://itlead.org/interview-questions/javascript/weakref-and-finalizationregistry-in-javascript",
+    "difficulty": "SENIOR",
+    "titleEn": "WeakRef and finalizationregistry in JavaScript",
+    "categorySlug": "javascript",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

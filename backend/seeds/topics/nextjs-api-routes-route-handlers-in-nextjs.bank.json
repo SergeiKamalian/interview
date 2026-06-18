@@ -1,0 +1,532 @@
+{
+  "topic": {
+    "code": "nextjs_api_routes_route_handlers_nextjs",
+    "name": "API-маршруты (Route Handlers) в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как создавать API-маршруты (Route Handlers) в Next.js?",
+    "shortAnswer": "Route Handlers — это файлы `route.ts` в директории `app`, которые экспортируют именованные функции HTTP-методов (`GET`, `POST`, `DELETE` и т.д.) и работают как серверные API-эндпоинты. Обычно их кладут в `app/api/`. Для публичных API и webhooks — Route Handlers; для мутаций из собственного UI — Server Actions.",
+    "idealAnswer": "Route Handlers (в Pages Router они назывались API Routes) — серверные эндпоинты в App Router: файл `route.ts` внутри `app` экспортирует именованные async-функции `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`, которые Next.js связывает с HTTP-методами. По соглашению путь `app/api/users/route.ts` → `/api/users`, но любая подпапка в `app` подходит. Базовый паттерн: `export async function GET() { return NextResponse.json(data) }` и `export async function POST(request: Request) { const body = await request.json(); ... }`. Динамические сегменты: папка `[id]` передаёт `params` вторым аргументом; в Next.js 15 `params` — Promise, нужен `await params`. Чтение запроса — стандартный Web `Request`: `new URL(request.url).searchParams`, `await request.json()`, `await request.text()`; cookies и headers — хелперы `cookies()` и `headers()` из `next/headers`. Кеширование: GET без аргумента `request` считается статическим и может кешироваться на build; как только читаешь что-то из запроса — маршрут становится динамическим. Управление: `export const dynamic = 'force-dynamic'` или `export const revalidate = 300`. Route Handlers vs Server Actions: Handlers — полноценные HTTP API для любых клиентов (fetch, curl, mobile, webhooks); Server Actions — только POST из React-компонентов, progressive enhancement для форм. Типичные ошибки: не await params в Next.js 15; думать что GET всегда динамический и получить stale data после deploy; `route.ts` и `page.tsx` в одном сегменте — конфликт; отсутствие try/catch — необработанная ошибка БД даёт 500 с пустым телом. Практика: REST для mobile, Stripe/GitHub webhooks (raw body через `request.text()` для signature), OAuth callbacks, upload, cron triggers. Из Server Component вызывать Route Handler бессмысленно — лишний HTTP round-trip, лучше напрямую к БД. Auth — `middleware.ts` на группу маршрутов или wrapper вокруг handler. `NextResponse` расширяет нативный `Response` методами `.json()`, cookies, redirects; для простых ответов подходит `new Response(null, { status: 204 })`.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "route_handler_basics",
+      "title": "Понимает основы Route Handlers",
+      "expected": "Кандидат объясняет: `route.ts` в `app` экспортирует именованные функции HTTP-методов; это серверные API-эндпоинты; обычно живут в `app/api/`.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "TL;DR ITLead — ядро темы: route.ts и named HTTP exports",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "route.ts",
+              "GET",
+              "POST",
+              "app/api"
+            ],
+            "ask": "как Next.js связывает экспортированные функции с HTTP-методами"
+          }
+        ],
+        "mustConcepts": [
+          "route.ts",
+          "Route Handler",
+          "app directory",
+          "app/api",
+          "GET",
+          "POST",
+          "DELETE",
+          "PUT",
+          "PATCH",
+          "именован",
+          "экспорт",
+          "HTTP-метод",
+          "серверн",
+          "эндпоинт",
+          "API Routes",
+          "Pages Router",
+          "App Router"
+        ],
+        "falseClaims": [
+          "Route Handlers работают только в Pages Router",
+          "нужен отдельный Express-сервер для API в Next.js",
+          "route.ts экспортирует default function вместо named methods",
+          "Route Handlers выполняются в браузере"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "nextresponse_crud_pattern",
+      "title": "Знает паттерн GET/POST и NextResponse",
+      "expected": "Кандидат описывает: `NextResponse.json(data)` с 200 по умолчанию; POST читает `request.json()`, возвращает 201; валидация входа и статус-коды ошибок.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "базовый CRUD из quick example ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "route_handler_basics",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "NextResponse",
+              "201",
+              "request.json"
+            ],
+            "ask": "как вернуть JSON с нужным статусом и прочитать тело POST"
+          }
+        ],
+        "mustConcepts": [
+          "NextResponse",
+          "NextResponse.json",
+          "request.json",
+          "status 201",
+          "status 200",
+          "await",
+          "body",
+          "тело запроса",
+          "валидац",
+          "400",
+          "404",
+          "500",
+          "Response",
+          "next/server"
+        ],
+        "falseClaims": [
+          "NextResponse.json всегда возвращает 201",
+          "request.json синхронный без await",
+          "GET handler обязан принимать request как аргумент",
+          "NextResponse и Response — полностью разные API без связи"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "dynamic_routes_params",
+      "title": "Знает динамические маршруты и params",
+      "expected": "Кандидат описывает: папка `[id]` → второй аргумент `{ params }`; в Next.js 15 `params` — Promise, нужен `await params`; 404 при отсутствии записи; DELETE может вернуть 204 без тела.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "dynamic [id] и Next.js 15 params Promise — частая ловушка",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "[id]",
+              "params",
+              "await"
+            ],
+            "ask": "как получить id из URL и что изменилось в Next.js 15 с params"
+          }
+        ],
+        "mustConcepts": [
+          "[id]",
+          "динамич",
+          "params",
+          "Promise",
+          "await params",
+          "Next.js 15",
+          "undefined",
+          "сегмент",
+          "404",
+          "Not found",
+          "204",
+          "DELETE",
+          "второй аргумент",
+          "route segment"
+        ],
+        "falseClaims": [
+          "params.id доступен синхронно в Next.js 15 без await",
+          "динамический сегмент задаётся через query string ?id=",
+          "DELETE обязан возвращать JSON body",
+          "params передаётся первым аргументом handler"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "reading_request_data",
+      "title": "Читает данные запроса",
+      "expected": "Кандидат называет: `Request` API — `searchParams` из URL, `request.json()`, `request.text()`; cookies/headers через `next/headers`; webhook raw body — text, не json.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Request API + next/headers — ежедневная практика",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "searchParams",
+              "request.url",
+              "cookies"
+            ],
+            "ask": "как прочитать query param, cookie и header в Route Handler"
+          },
+          {
+            "match": [
+              "request.text",
+              "webhook",
+              "signature"
+            ],
+            "ask": "почему Stripe webhook читают через request.text(), а не json"
+          }
+        ],
+        "mustConcepts": [
+          "Request",
+          "searchParams",
+          "request.url",
+          "URL",
+          "request.json",
+          "request.text",
+          "cookies",
+          "headers",
+          "next/headers",
+          "query param",
+          "raw body",
+          "webhook",
+          "signature",
+          "stripe-signature",
+          "user-agent"
+        ],
+        "falseClaims": [
+          "для query string нужен Next.js-specific API вместо URL",
+          "request.json() подходит для проверки Stripe signature на raw bytes",
+          "cookies() работает только в middleware, не в route handler",
+          "headers() возвращает обычный JavaScript object без get()"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "caching_behavior",
+      "title": "Понимает кеширование GET handlers",
+      "expected": "Кандидат объясняет: GET без `request` — статический, может кешироваться на build; чтение request делает маршрут dynamic; `dynamic = 'force-dynamic'`, `revalidate = 300`.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "caching surprise — типичная production-ошибка из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "caching_behavior",
+            "oftenConfusedWith": [
+              "route_handler_basics"
+            ],
+            "anchorTermsExpected": [
+              "кеш",
+              "static",
+              "dynamic",
+              "force-dynamic",
+              "revalidate",
+              "request argument"
+            ],
+            "anchorTermsWrongTopic": [
+              "GET всегда dynamic",
+              "Server Actions кешируют GET"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "кеш",
+              "static",
+              "build time"
+            ],
+            "ask": "когда GET handler кешируется и как получить stale data после deploy"
+          }
+        ],
+        "mustConcepts": [
+          "кеш",
+          "static",
+          "dynamic",
+          "build time",
+          "force-dynamic",
+          "revalidate",
+          "request argument",
+          "GET без request",
+          "stale",
+          "устарев",
+          "segment config",
+          "export const dynamic",
+          "export const revalidate",
+          "каждый запрос"
+        ],
+        "falseClaims": [
+          "GET handler всегда выполняется на каждый запрос",
+          "чтение searchParams не делает маршрут dynamic",
+          "revalidate = 0 то же что force-dynamic без нюансов",
+          "POST handlers кешируются на build time как GET"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "vs_server_actions",
+      "title": "Отличает Route Handlers от Server Actions",
+      "expected": "Кандидат сравнивает: Handlers — любые HTTP-методы, вызов из любого клиента, webhooks/public API; Server Actions — POST из React UI, progressive enhancement форм.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to pick — таблица ITLead",
+        "mustConcepts": [
+          "Server Actions",
+          "Route Handler",
+          "webhook",
+          "public API",
+          "mobile",
+          "curl",
+          "fetch",
+          "POST only",
+          "progressive enhancement",
+          "форма",
+          "кнопка",
+          "UI mutation",
+          "внешний сервис",
+          "third-party"
+        ],
+        "falseClaims": [
+          "Server Actions заменяют Route Handlers для webhooks",
+          "Route Handlers вызываются только из React компонентов",
+          "Server Actions поддерживают GET и DELETE",
+          "для Stripe webhook лучше Server Action"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки Route Handlers",
+      "expected": "Кандидат называет: await params в Next 15; stale GET без force-dynamic; конфликт route.ts + page.tsx в одном сегменте; try/catch для ошибок БД; не вызывать handler из Server Component — лишний HTTP.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Common mistakes блок ITLead — бонусный checkpoint",
+        "mustConcepts": [
+          "await params",
+          "Next.js 15",
+          "route.ts",
+          "page.tsx",
+          "конфликт",
+          "try/catch",
+          "500",
+          "Server Component",
+          "round-trip",
+          "middleware",
+          "wrapper",
+          "auth"
+        ],
+        "falseClaims": [
+          "route.ts и page.tsx можно держать в одной папке app/users",
+          "из Server Component обязательно вызывать Route Handler",
+          "необработанная ошибка БД всегда возвращает понятный JSON",
+          "params синхронный объект во всех версиях Next.js"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Route Handler — `app/api/users/route.ts` с export async function GET/POST. NextResponse.json для ответа. GET без request может кешироваться на build — для свежих данных из БД ставлю force-dynamic. Webhook Stripe читаю request.text(), не json, иначе signature ломается.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для mobile API и Stripe webhook — Route Handler. Для submit формы в своём UI — Server Action, меньше boilerplate. Динамический `[id]`: в Next 15 await params, иначе undefined. Auth — middleware на /api/admin/* или wrapper verifySession.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "GET /api/search?q= — searchParams из request.url. Cookies через cookies().get('session'). POST валидирую title, 400 если пусто, 201 при create. route.ts не кладу рядом с page.tsx — конфликт сегмента.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Route Handlers — это то же что Server Actions, оба для форм в React. GET всегда dynamic, кеширование не влияет. params.id работает без await в Next.js 15.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Stripe webhook парсю через request.json() — signature verify потом. app/users/route.ts и page.tsx в одной папке — нормально. Из Server Component fetch('/api/users') — правильный паттерн вместо прямого db.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Route Handlers только в Pages Router через pages/api. Для query string нужен отдельный пакет, Request API не поддерживается.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "route_handler_basics",
+      "exampleType": "good",
+      "exampleText": "route.ts в app/api экспортирует GET, POST — Next.js мапит на HTTP методы, серверный эндпоинт без отдельного роутера.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "route_handler_basics",
+      "exampleType": "good",
+      "exampleText": "ну это файлы route.ts в app, named exports GET POST DELETE — серверные api точки",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "route_handler_basics",
+      "exampleType": "bad",
+      "exampleText": "Route Handlers — client-side fetch wrapper, выполняются в браузере после hydration.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "nextresponse_crud_pattern",
+      "exampleType": "good",
+      "exampleText": "GET: NextResponse.json(users). POST: body = await request.json(), create, return NextResponse.json(user, { status: 201 }).",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "nextresponse_crud_pattern",
+      "exampleType": "good",
+      "exampleText": "без title — 400 json error, успех — 201 с созданным post",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "nextresponse_crud_pattern",
+      "exampleType": "bad",
+      "exampleText": "POST handler возвращает 200 и не читает request — данные из глобальной переменной.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "dynamic_routes_params",
+      "exampleType": "good",
+      "exampleText": "app/api/users/[id]/route.ts — второй аргумент { params: Promise<{id}> }, const { id } = await params; нет user — 404.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "dynamic_routes_params",
+      "exampleType": "good",
+      "exampleText": "DELETE после db.user.delete — new Response(null, { status: 204 }), тело не нужно",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "dynamic_routes_params",
+      "exampleType": "bad",
+      "exampleText": "В Next.js 15 params.id синхронный — await не нужен, undefined значит неверный URL.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "reading_request_data",
+      "exampleType": "good",
+      "exampleText": "searchParams.get('q') из new URL(request.url); session из cookies().get('session'); webhook — await request.text() для raw bytes.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "reading_request_data",
+      "exampleType": "good",
+      "exampleText": "headers().get('stripe-signature') + request.text() — constructEvent, json до verify сломает подпись",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "reading_request_data",
+      "exampleType": "bad",
+      "exampleText": "Для Stripe сначала request.json(), потом проверяю signature — так и должно быть.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "caching_behavior",
+      "exampleType": "good",
+      "exampleText": "GET() без request — static cache на build; GET(request) с searchParams — dynamic каждый запрос. Свежая БД — export const dynamic = 'force-dynamic'.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "caching_behavior",
+      "exampleType": "good",
+      "exampleText": "revalidate 300 — кеш 5 минут потом refetch, для полупубличных данных ок",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "caching_behavior",
+      "exampleType": "bad",
+      "exampleText": "GET handler с db.findMany всегда dynamic — кеш Next.js на build не применяется никогда.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "vs_server_actions",
+      "exampleType": "good",
+      "exampleText": "Webhook GitHub — Route Handler POST. Submit комментария в форме — Server Action, progressive enhancement.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "vs_server_actions",
+      "exampleType": "good",
+      "exampleText": "mobile app дергает /api/* через fetch — только Route Handler, Server Action с curl не вызовешь",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "vs_server_actions",
+      "exampleType": "bad",
+      "exampleText": "Публичный REST API для third-party — делаю через Server Actions, Route Handlers устарели.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "try/catch вокруг db — 500 с { error: 'Database error' }, не пустое тело. Handler в app/api, не рядом с page.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Server Component — напрямую db, не fetch('/api/profile') — лишний hop",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Ошибку БД не ловлю — Next.js сам вернёт понятный JSON клиенту.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nextjs-api-routes-route-handlers-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/nextjs-api-routes-route-handlers-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/nextjs-api-routes-route-handlers-in-nextjs",
+    "difficulty": "MIDDLE",
+    "titleEn": "API routes (route handlers) in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

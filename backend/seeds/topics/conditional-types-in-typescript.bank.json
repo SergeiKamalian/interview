@@ -1,0 +1,654 @@
+{
+  "topic": {
+    "code": "conditional_types_typescript",
+    "name": "Условные типы в TypeScript",
+    "skillCode": "typescript",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое conditional types в TypeScript и как работает синтаксис `T extends U ? X : Y`?",
+    "shortAnswer": "Conditional types выбирают один из двух типов на этапе компиляции по принципу assignability: если `T` можно присвоить `U`, результат — `X`, иначе — `Y`. Когда `T` — «голый» generic, условие распределяется по каждому члену union отдельно; ключевое слово `infer` позволяет захватить подтип прямо в условии.",
+    "idealAnswer": "Conditional types в TypeScript — механизм выбора типа по структурной совместимости на compile time: `T extends U ? X : Y`. Если T assignable к U — получаем X, иначе Y. Это не union перечисления вариантов, а проверка с одним конкретным результатом — поэтому на conditionals построены `ReturnType`, `Exclude`, `Extract`, `NonNullable`, `Parameters`. Синтаксис `T extends string` проверяет structural assignability: литерал `\"hi\"` проходит как подтип `string`. Когда в conditional передаётся union и T стоит «голым» generic-параметром, TypeScript распределяет (distributes) условие по каждому члену union: `Wrap<string | number>` превращается в `Wrap<string> | Wrap<number>`. Чтобы отключить distribution, оборачивают T в кортеж: `[T] extends [U] ? X : Y` — union обрабатывается как единый тип. Ключевое слово `infer` объявляет type variable внутри ветки условия и захватывает подходящий подтип: `T extends Promise<infer U> ? U : T` разворачивает Promise; `T extends (...args: infer P) => infer R` — основа `Parameters` и `ReturnType`. Компилятор разрешает conditionals структурно за один проход; zero runtime cost — всё стирается при компиляции. Внутри generic-функции conditional может оставаться unevaluated до конкретного call site. Типичные ошибки: ожидать distribution когда T обёрнут (`Array<T> extends any` не разбивает union); использовать `any` в условии — литералы расширяются до `string`, лучше `unknown`; забывать что `never extends U` всегда true — `never` bottom type, члены union ставшие `never` выпадают из результата (поведение `Exclude`). Практика: фильтрация union (`T extends string ? T : never`), трансформация только object-типов (`T extends object ? DeepPartial<T> : T`), извлечение return/params через infer вместо ручных overloads. В экосистеме: React Query unwrap async types, Zod `z.infer`, tRPC typed Result, stdlib utilities. Комбинируют с mapped types: `{ [K in keyof T]: T[K] extends U ? T[K] : never }` для фильтрации ключей объекта.",
+    "maxScore": 10,
+    "skills": [
+      "typescript",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "conditional_syntax",
+      "title": "Понимает синтаксис conditional types",
+      "expected": "Кандидат объясняет: `T extends U ? X : Y` — compile-time выбор типа по assignability; structural check, не identity; zero runtime cost.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — синтаксис и compile-time семантика из TL;DR ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "conditional_syntax",
+            "oftenConfusedWith": [
+              "conditional_vs_union",
+              "union_distribution"
+            ],
+            "anchorTermsExpected": [
+              "extends",
+              "assignab",
+              "compile",
+              "компил",
+              "ternary",
+              "тернар"
+            ],
+            "anchorTermsWrongTopic": [
+              "runtime if",
+              "union перечисл",
+              "identity check"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "extends",
+              "assignab",
+              "компил"
+            ],
+            "ask": "чем `T extends U ? X : Y` отличается от обычного union `X | Y`"
+          }
+        ],
+        "mustConcepts": [
+          "conditional",
+          "условн",
+          "extends",
+          "assignab",
+          "присво",
+          "compile time",
+          "компил",
+          "этап компил",
+          "ternary",
+          "тернар",
+          "X",
+          "Y",
+          "structural",
+          "структур",
+          "zero runtime",
+          "без runtime",
+          "стира"
+        ],
+        "falseClaims": [
+          "conditional types выполняются в runtime",
+          "extends проверяет идентичность типов, не assignability",
+          "conditional types — это просто union двух вариантов",
+          "T extends U работает только для примитивов"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "conditional_vs_union",
+      "title": "Отличает conditional от union",
+      "expected": "Кандидат объясняет: union перечисляет варианты; conditional выполняет проверку и даёт один результат; union не может извлечь return type функции.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевое отличие из ITLead — почему ReturnType невозможен через union",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "conditional_syntax",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "conditional_vs_union",
+            "oftenConfusedWith": [
+              "conditional_syntax",
+              "union_distribution"
+            ],
+            "anchorTermsExpected": [
+              "union",
+              "проверк",
+              "один результат",
+              "ReturnType",
+              "извлеч"
+            ],
+            "anchorTermsWrongTopic": [
+              "union всегда лучше",
+              "conditional это union"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "union",
+          "объедин",
+          "перечисл",
+          "вариант",
+          "проверк",
+          "один результат",
+          "конкретн",
+          "ReturnType",
+          "извлеч",
+          "механизм",
+          "intersection",
+          "пересеч",
+          "plain union",
+          "замен"
+        ],
+        "falseClaims": [
+          "union `string | number` может заменить conditional type для извлечения return type",
+          "conditional type и union решают одну и ту же задачу",
+          "любую conditional можно переписать простым union без потери смысла"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "infer_keyword",
+      "title": "Использует infer для захвата подтипов",
+      "expected": "Кандидат объясняет `infer`: объявляет type variable в ветке условия; примеры UnwrapPromise, Head tuple, Params/ReturnType pattern.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "infer — центральный инструмент senior conditional types",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "infer",
+              "ReturnType",
+              "Parameters"
+            ],
+            "ask": "напиши conditional type для извлечения типа возврата функции через infer"
+          },
+          {
+            "match": [
+              "Promise",
+              "infer U",
+              "Unwrap"
+            ],
+            "ask": "как развернуть Promise<T> через conditional с infer"
+          }
+        ],
+        "mustConcepts": [
+          "infer",
+          "захват",
+          "capture",
+          "ReturnType",
+          "Parameters",
+          "Promise",
+          "infer U",
+          "infer R",
+          "infer P",
+          "кортеж",
+          "tuple",
+          "Head",
+          "функц",
+          "return",
+          "возврат",
+          "параметр",
+          "never",
+          "не callable"
+        ],
+        "falseClaims": [
+          "infer работает в runtime как обычная переменная",
+          "infer можно использовать вне conditional type",
+          "infer захватывает значение, а не тип",
+          "ReturnType реализован без conditional types"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "union_distribution",
+      "title": "Понимает distribution по union",
+      "expected": "Кандидат объясняет: при голом generic T union разбивается и условие выполняется per member; `Wrap<string | number>` → `[string] | [number]`.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "distribution — частая senior-ловушка и основа Exclude/Extract",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "disable_distribution",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "distrib",
+              "распредел",
+              "union",
+              "голый",
+              "naked"
+            ],
+            "ask": "что произойдёт с `T extends any ? [T] : never` когда T = string | number"
+          },
+          {
+            "match": [
+              "Exclude",
+              "Extract",
+              "never",
+              "фильтр"
+            ],
+            "ask": "как distribution связан с поведением Exclude и Extract"
+          }
+        ],
+        "mustConcepts": [
+          "distribution",
+          "distrib",
+          "распредел",
+          "union",
+          "голый",
+          "naked",
+          "bare",
+          "generic",
+          "per member",
+          "кажд",
+          "член",
+          "Wrap",
+          "разби",
+          "split",
+          "Exclude",
+          "Extract",
+          "OnlyStrings",
+          "never выпад"
+        ],
+        "falseClaims": [
+          "conditional types никогда не распределяются по union",
+          "distribution срабатывает когда T обёрнут в Array<T>",
+          "union всегда обрабатывается как один тип без разбиения"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "disable_distribution",
+      "title": "Знает как отключить distribution",
+      "expected": "Кандидат объясняет паттерн `[T] extends [U] ? X : Y`: кортеж меняет позицию generic и останавливает distribution; union обрабатывается целиком.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "стандартный opt-out паттерн из ITLead WrapFixed",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "[T]",
+              "кортеж",
+              "tuple",
+              "отключ"
+            ],
+            "ask": "чем отличается `T extends U ? X : Y` от `[T] extends [U] ? X : Y`"
+          }
+        ],
+        "mustConcepts": [
+          "[T]",
+          "кортеж",
+          "tuple",
+          "отключ",
+          "disable",
+          "opt out",
+          "WrapFixed",
+          "один тип",
+          "целиком",
+          "без разби",
+          "позиц",
+          "generic",
+          "structural change"
+        ],
+        "falseClaims": [
+          "distribution отключается заменой `any` на `unknown` в правой части extends",
+          "[T] extends [U] тоже распределяет union по членам",
+          "оборачивание в Array<T> отключает distribution"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки conditional types",
+      "expected": "Кандидат называет: distribution только при голом T; `any` в условии расширяет литералы — лучше `unknown`; `never extends U` всегда true (bottom type).",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — any/unknown/never",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "union_distribution",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "any",
+              "unknown",
+              "литерал",
+              "widening"
+            ],
+            "ask": "почему `T extends any ? T[] : never` даёт string[] вместо \"a\"[] | \"b\"[]"
+          },
+          {
+            "match": [
+              "never extends",
+              "bottom",
+              "true"
+            ],
+            "ask": "почему `never extends string` даёт true и как это влияет на Exclude"
+          }
+        ],
+        "mustConcepts": [
+          "any",
+          "unknown",
+          "литерал",
+          "widening",
+          "расшир",
+          "never extends",
+          "bottom type",
+          "низ",
+          "подтип",
+          "subtype",
+          "ToArray",
+          "ToArraySafe",
+          "голый T",
+          "Array<T>",
+          "обёрнут",
+          "фильтр",
+          "Exclude"
+        ],
+        "falseClaims": [
+          "`never extends string` возвращает false",
+          "`any` и `unknown` ведут себя одинаково в conditional distribution",
+          "distribution срабатывает когда T внутри Array<T> в левой части extends"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда нужны conditional types",
+      "expected": "Кандидат называет кейсы: infer return/params, фильтрация union, трансформация только object, utility вместо overloads; не использовать если хватает union/intersection.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use и DeepPartial паттерн из ITLead",
+        "mustConcepts": [
+          "infer",
+          "return type",
+          "параметр",
+          "фильтр",
+          "union",
+          "object",
+          "DeepPartial",
+          "рекурс",
+          "overload",
+          "перегруз",
+          "utility",
+          "patch",
+          "transformation",
+          "plain union",
+          "intersection",
+          "не нужен"
+        ],
+        "falseClaims": [
+          "conditional types нужны для любой задачи типизации",
+          "plain union всегда хуже conditional",
+          "DeepPartial невозможен без conditional types и mapped types"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "stdlib_utilities",
+      "title": "Связывает с stdlib и экосистемой",
+      "expected": "Кандидат упоминает ReturnType, Exclude, Extract, NonNullable, Parameters; опционально React Query, Zod infer, tRPC, mapped+conditional combo.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "бонус — real-world и stdlib из ITLead",
+        "mustConcepts": [
+          "ReturnType",
+          "Exclude",
+          "Extract",
+          "NonNullable",
+          "Parameters",
+          "stdlib",
+          "стандарт",
+          "Zod",
+          "infer",
+          "React Query",
+          "tRPC",
+          "mapped",
+          "Filter"
+        ],
+        "falseClaims": [
+          "ReturnType реализован через mapped types без conditionals",
+          "Exclude не использует distribution",
+          "stdlib utilities работают в runtime"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Conditional type — `T extends U ? X : Y` на compile time: если T assignable к U, получаем X. С голым generic union распределяется по членам. `infer` захватывает подтип: `T extends Promise<infer U> ? U : T`. Чтобы отключить distribution — `[T] extends [U]`. На этом построены ReturnType и Exclude.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Нужно вытащить return type API-функции — пишу `type R = T extends (...args: any[]) => infer Ret ? Ret : never`. Union фильтрую через `T extends string ? T : never` — distribution сам выкинет never. Для patch DTO делаю DeepPartial рекурсивно: `T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T`.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Conditional — не union: union перечисляет варианты, conditional проверяет и даёт один результат. `never extends string` — true, bottom type; поэтому Exclude работает. В условии лучше unknown чем any — литералы не расширяются.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Conditional types — это union двух типов X | Y. Они выполняются в runtime как обычный тернарный оператор JavaScript.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Distribution всегда включена, даже когда T обёрнут в Array<T>. `never extends string` — false, потому что never ничему не assignable.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "infer — runtime переменная для захвата значений. ReturnType и Exclude реализованы без conditional types, просто через mapped types.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "conditional_syntax",
+      "exampleType": "good",
+      "exampleText": "`T extends U ? X : Y` — compile-time проверка assignability; structural, не identity; результат стирается при компиляции.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "conditional_syntax",
+      "exampleType": "good",
+      "exampleText": "ну это тернарник для типов — t подходит к u, берём x, иначе y, всё на этапе компиляции",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "conditional_syntax",
+      "exampleType": "bad",
+      "exampleText": "Conditional types проверяют строгое равенство типов и работают в runtime при вызове generic-функции.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "conditional_vs_union",
+      "exampleType": "good",
+      "exampleText": "Union `string | number` — список вариантов. Conditional выполняет тест и возвращает один тип — поэтому ReturnType<T> возможен только через conditional с infer.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "conditional_vs_union",
+      "exampleType": "good",
+      "exampleText": "union не умеет «если функция — вытащи return», conditional умеет через extends и infer",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "conditional_vs_union",
+      "exampleType": "bad",
+      "exampleText": "ReturnType можно заменить union всех возможных return types без conditional.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "infer_keyword",
+      "exampleType": "good",
+      "exampleText": "`type MyReturnType<T> = T extends (...args: any[]) => infer R ? R : never` — R захватывается в ветке true; для Promise: `T extends Promise<infer U> ? U : T`.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "infer_keyword",
+      "exampleType": "good",
+      "exampleText": "Params через infer P в (...args: infer P) => any — получаю кортеж параметров функции",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "infer_keyword",
+      "exampleType": "bad",
+      "exampleText": "infer объявляет обычную JS-переменную внутри type alias и работает только с примитивами.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "union_distribution",
+      "exampleType": "good",
+      "exampleText": "`Wrap<T> = T extends any ? [T] : never` при T = string | number даёт `[string] | [number]` — условие per member.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "union_distribution",
+      "exampleType": "good",
+      "exampleText": "OnlyStrings на mixed union — string остаётся, number/boolean → never и выпадают, как Extract",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "union_distribution",
+      "exampleType": "bad",
+      "exampleText": "При T = string | number conditional всегда обрабатывает union как один тип без разбиения на члены.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "disable_distribution",
+      "exampleType": "good",
+      "exampleText": "`[T] extends [any] ? T[] : never` при string | number даёт `(string | number)[]` — distribution отключена кортежом.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "disable_distribution",
+      "exampleType": "good",
+      "exampleText": "оборачиваю t в [t] extends [u] — union не разбивается, один результат",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "disable_distribution",
+      "exampleType": "bad",
+      "exampleText": "Distribution отключается заменой extends any на extends unknown в правой части, кортеж не нужен.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "`T extends any ? T[]` на \"a\" | \"b\" даёт string[] — any расширяет литералы; с unknown сохраняются \"a\"[] | \"b\"[].",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "never extends string — true, bottom type; Exclude опирается на это — never выпадает из union",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Array<T> extends any распределяет union по T — distribution срабатывает при любой обёртке generic.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Conditional когда нужен infer, фильтр union или DeepPartial только для object; если хватает union/intersection — не усложняю.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "patch endpoint — DeepPartial рекурсивно через T extends object, примитивы as-is",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Conditional types обязательны для любого generic — даже простой union string | number лучше через ternary type.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "stdlib_utilities",
+      "exampleType": "good",
+      "exampleText": "ReturnType, Exclude, Extract, NonNullable, Parameters — built-in conditional types; Zod z.infer и React Query тоже на infer.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "stdlib_utilities",
+      "exampleType": "good",
+      "exampleText": "Filter keys: mapped + conditional `{ [K in keyof T]: T[K] extends U ? T[K] : never }`",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "stdlib_utilities",
+      "exampleType": "bad",
+      "exampleText": "Exclude не использует distribution и работает только с object types.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "conditional-types-in-typescript",
+    "apiUrl": "https://api.itlead.org/api/questions/conditional-types-in-typescript",
+    "pageUrl": "https://itlead.org/interview-questions/typescript/conditional-types-in-typescript",
+    "difficulty": "SENIOR",
+    "titleEn": "Conditional types in TypeScript",
+    "categorySlug": "typescript",
+    "syncedAt": "2026-06-18T15:00:00.000Z"
+  }
+}

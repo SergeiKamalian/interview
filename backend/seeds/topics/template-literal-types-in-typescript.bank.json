@@ -1,0 +1,595 @@
+{
+  "topic": {
+    "code": "template_literal_types_typescript",
+    "name": "Типы шаблонных литералов в TypeScript",
+    "skillCode": "typescript",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое template literal types в TypeScript и как они работают?",
+    "shortAnswer": "Template literal types генерируют новые строковые литеральные типы через шаблонный синтаксис `` `${A}-${B}` `` на этапе компиляции. TypeScript дистрибутивно разворачивает каждую комбинацию членов union — например, `` `${\"small\" | \"large\"}-${\"red\" | \"blue\"}` `` даёт ровно четыре конкретных литерала. Расширение происходит только в type checker, без runtime-стоимости.",
+    "idealAnswer": "Template literal types (типы шаблонных литералов) строятся поверх string literal types и используют синтаксис обратных кавычек на уровне типов для конкатенации строк. Ключевое поведение — дистрибутивное: `` `${A | B}-${C}` `` раскрывается в `\"A-C\" | \"B-C\"`, декартово произведение всех комбинаций. Нулевая runtime-стоимость: типы стираются до `string`, расширение только в компиляторе (TypeScript 4.1+, март 2021). В отличие от статических union, где каждый член пишут вручную, template literal types генерируют полный набор из частей — три размера × три цвета = девять строк при шести объявленных значениях. Они проверяют формат, не только значение: `` `user/${number}/profile` `` принимает `\"user/123/profile\"`, но отклоняет `\"user/abc/profile\"`. Когда использовать: генерируемые наборы ключей (event names, CSS-классы, getter/setter пары), API route patterns, type-safe event emitters (`onEventName`). Не нужны для простых статических строк (<5 вариантов) и для runtime-генерации — там обычные template strings. Компилятор рекурсивно подставляет каждый член union в placeholder и нормализует результат. Если placeholder получает `string` вместо конечного union, результат схлопывается в паттерн `` `${string}-suffix` ``. Встроенные утилиты Uppercase, Lowercase, Capitalize, Uncapitalize цепляются слева направо: `` `on${Capitalize<\"click\" | \"focus\">}` `` → `\"onClick\" | \"onFocus\"`. Типичные ошибки: (1) ожидание работы в runtime — `ReturnType<typeof makeKey>` даёт `string`, не template literal type; (2) смешение `string` в union — `${Prefix | string}-suffix` поглощает конкретные литералы; (3) `number` как бесконечный placeholder — нет autocomplete и exhaustiveness; (4) глубокая рекурсия — «Type instantiation is excessively deep» на ~10–20 уровнях. Продакшен-паттерны: React Router v6 typed paths, TanStack Query keys, tRPC procedure paths, GraphQL Codegen `` `Query.${Keys}` ``, Tailwind-like `` `p${Direction}-${Spacing}` ``, mapped types с key remapping `` [K in keyof Events as `on${Capitalize<string & K>}`] ``. Senior: `infer` внутри template literal — `` type ExtractPrefix<T extends `${string}-${string}`> = T extends `${infer P}-${string}` ? P : never ``; рекурсивный ExtractRouteParams для `:userId/:postId` в type-safe routers.",
+    "maxScore": 10,
+    "skills": [
+      "typescript",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "tpl_definition",
+      "title": "Понимает template literal types и дистрибутивность",
+      "expected": "Кандидат объясняет: синтаксис `` `${UnionA}-${UnionB}` ``, дистрибутивное декартово произведение union-членов, compile-time only, zero runtime cost, TypeScript 4.1.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — Mad Libs union expansion",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "tpl_definition",
+            "oftenConfusedWith": [
+              "tpl_vs_unions",
+              "compiler_behavior"
+            ],
+            "anchorTermsExpected": [
+              "template literal type",
+              "дистрибутив",
+              "декартов",
+              "union",
+              "compile-time",
+              "runtime cost"
+            ],
+            "anchorTermsWrongTopic": [
+              "runtime template string",
+              "as const генерирует union",
+              "Virtual DOM"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "дистрибутив",
+              "cartesian",
+              "декартов",
+              "комбинац"
+            ],
+            "ask": "что значит дистрибутивное поведение — пример `${\"a\"|\"b\"}-${\"x\"|\"y\"}`"
+          }
+        ],
+        "mustConcepts": [
+          "template literal type",
+          "шаблонн",
+          "литерал",
+          "union",
+          "дистрибутив",
+          "декартов",
+          "комбинац",
+          "compile-time",
+          "компиляц",
+          "runtime",
+          "zero cost",
+          "стиран",
+          "string",
+          "TypeScript 4.1",
+          "обратн",
+          "кавыч",
+          "placeholder"
+        ],
+        "falseClaims": [
+          "template literal types выполняются в runtime",
+          "расширение union происходит в emitted JavaScript",
+          "дистрибутивность — это zip, а не cartesian product",
+          "template literal types заменяют обычные template strings в runtime"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "tpl_vs_unions",
+      "title": "Отличает от plain string unions и проверяет формат",
+      "expected": "Кандидат сравнивает: plain union — статический список вручную; template literal — генерация из частей; проверка формата `` `user/${number}/profile` `` vs только значения.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "format constraint vs static listing — ключ ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "tpl_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "tpl_vs_unions",
+            "oftenConfusedWith": [
+              "when_to_use"
+            ],
+            "anchorTermsExpected": [
+              "plain union",
+              "формат",
+              "number",
+              "profile",
+              "генерац",
+              "вручную"
+            ],
+            "anchorTermsWrongTopic": [
+              "enum numeric",
+              "structural typing"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "plain union",
+          "статическ",
+          "вручную",
+          "генерац",
+          "из частей",
+          "формат",
+          "pattern",
+          "number",
+          "user/",
+          "profile",
+          "отклон",
+          "accept",
+          "значен",
+          "constraint",
+          "ограничен"
+        ],
+        "falseClaims": [
+          "plain string union может проверить формат user/123/profile",
+          "template literal types не дают exhaustiveness над сгенерированным union",
+          "формат и значение — одно и то же для TypeScript"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "builtin_utilities",
+      "title": "Знает Uppercase, Capitalize и композицию",
+      "expected": "Кандидат называет Uppercase, Lowercase, Capitalize, Uncapitalize; цепочка с template literal: `` `on${Capitalize<Event>}` `` → onClick | onFocus.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "встроенные intrinsic types из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Capitalize",
+              "Uppercase",
+              "onClick"
+            ],
+            "ask": "как `on${Capitalize<\"click\"|\"focus\">}` даёт onClick и onFocus"
+          }
+        ],
+        "mustConcepts": [
+          "Uppercase",
+          "Lowercase",
+          "Capitalize",
+          "Uncapitalize",
+          "intrinsic",
+          "цепоч",
+          "compose",
+          "onClick",
+          "onFocus",
+          "Handler",
+          "Event",
+          "слева направо"
+        ],
+        "falseClaims": [
+          "Capitalize работает только на runtime строках",
+          "Uppercase и Capitalize — одно и то же",
+          "утилиты нельзя комбинировать внутри template literal type"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда использовать и когда нет",
+      "expected": "Кандидат называет: event keys, CSS classes, API routes, type-safe emitters; не нужны для <5 статических строк и runtime string build.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use таблица ITLead",
+        "mustConcepts": [
+          "event name",
+          "CSS class",
+          "API route",
+          "emitter",
+          "onEvent",
+          "getter",
+          "setter",
+          "React Router",
+          "TanStack Query",
+          "tRPC",
+          "GraphQL Codegen",
+          "Tailwind",
+          "runtime",
+          "статическ",
+          "прост"
+        ],
+        "falseClaims": [
+          "template literal types нужны для любой строки в коде",
+          "runtime string construction заменяется template literal types",
+          "для двух статических вариантов всегда лучше template literal type"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки и ловушки",
+      "expected": "Кандидат называет: runtime vs compile-time (ReturnType → string); string поглощает union; number без exhaustiveness; recursion depth limit ~10–20.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — частые production pitfalls senior",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "compiler_behavior",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ReturnType",
+              "runtime",
+              "makeKey"
+            ],
+            "ask": "почему ReturnType<typeof makeKey> даёт string, а не template literal type"
+          },
+          {
+            "match": [
+              "string",
+              "suffix",
+              "поглощ",
+              "absorb"
+            ],
+            "ask": "что даёт `${Prefix | string}-suffix` вместо a-suffix | b-suffix"
+          },
+          {
+            "match": [
+              "excessively deep",
+              "рекурс",
+              "10",
+              "20"
+            ],
+            "ask": "когда recursive template literal types падают с excessively deep"
+          }
+        ],
+        "mustConcepts": [
+          "runtime",
+          "compile-time",
+          "ReturnType",
+          "makeKey",
+          "string",
+          "поглощ",
+          "absorb",
+          "finite union",
+          "number",
+          "autocomplete",
+          "exhaustiveness",
+          "excessively deep",
+          "рекурс",
+          "instantiation",
+          "mapped type",
+          "глубин"
+        ],
+        "falseClaims": [
+          "функция (prefix: string) => `key-${prefix}` сохраняет template literal type в return",
+          "number в placeholder даёт конечный union всех числовых строк",
+          "string в union с литералами сохраняет конкретные a-suffix | b-suffix",
+          "рекурсия template literal types безлимитна"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "compiler_behavior",
+      "title": "Понимает работу компилятора и pattern types",
+      "expected": "Кандидат объясняет: checker подставляет union members, каждая ветка независимо; erase to string; `${string}-suffix` когда placeholder — string.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "How compiler handles — normalize и pattern collapse",
+        "mustConcepts": [
+          "type checker",
+          "подстав",
+          "substitut",
+          "normalize",
+          "ветк",
+          "branch",
+          "erase",
+          "стиран",
+          "emitted",
+          "JavaScript",
+          "pattern type",
+          "${string}",
+          "suffix",
+          "placeholder",
+          "finite",
+          "конечн"
+        ],
+        "falseClaims": [
+          "компилятор генерирует runtime код для каждой комбинации union",
+          "pattern `${string}-suffix` — баг компилятора",
+          "template literal types остаются в .js output"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "infer_and_advanced",
+      "title": "Применяет infer, mapped types и route params",
+      "expected": "Кандидат показывает: infer в template literal (ExtractPrefix); mapped type с `as` и Capitalize для EventEmitter; ExtractRouteParams с рекурсией для :param.",
+      "score": 2,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Senior follow-ups — infer, key remapping, typed router",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "tpl_definition",
+            "floorFraction": 0.35
+          },
+          {
+            "checkpointKey": "builtin_utilities",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "infer",
+              "ExtractPrefix",
+              "ExtractRouteParams"
+            ],
+            "ask": "как infer внутри `${infer P}-${string}` извлекает prefix"
+          },
+          {
+            "match": [
+              "mapped",
+              "as",
+              "onUserCreated",
+              "key remapping"
+            ],
+            "ask": "как [K in keyof Events as `on${Capitalize<string & K>}`] синхронизирует emitter"
+          },
+          {
+            "match": [
+              "RouteParams",
+              ":userId",
+              "navigate",
+              "Record"
+            ],
+            "ask": "как ExtractRouteParams типизирует params для /users/:userId/posts/:postId"
+          }
+        ],
+        "mustConcepts": [
+          "infer",
+          "ExtractPrefix",
+          "ExtractRouteParams",
+          "mapped type",
+          "key remapping",
+          "as",
+          "Capitalize",
+          "string & K",
+          "EventEmitter",
+          "onUserCreated",
+          "route param",
+          ":userId",
+          "Record",
+          "navigate",
+          "рекурс",
+          "React Router",
+          "typed path"
+        ],
+        "falseClaims": [
+          "infer работает только в conditional types без template literal",
+          "mapped type без `as` автоматически добавляет on-prefix к ключам",
+          "ExtractRouteParams требует runtime парсинг path"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "`` type TShirt = `${Size}-${Color}` `` с Size и Color как union — TypeScript дистрибутивно даёт все комбинации small-red и т.д. Только compile-time, в JS всё стирается в string. ReturnType функции makeKey — string, не literal union.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Для event map делаю [K in keyof Events as `on${Capitalize<string & K>}`] — onUserCreated типизирован data из Events. Route params через recursive infer: ExtractRouteParams<\"/users/:userId/posts/:postId\"> → userId | postId. `${Prefix | string}-suffix` не трогаю — string съест литералы.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "`` `user/${number}/profile` `` проверяет формат, не только значение — abc в сегменте не пройдёт. Capitalize цепляется: onClick | onFocus из click | focus. Глубокая рекурсия >15 уровней — excessively deep, flatten или mapped с фиксированной глубиной.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Template literal types — это обычные backticks в runtime, TypeScript выполняет их при запуске приложения. ReturnType<(p: string) => `key-${p}`> даёт key-a | key-b автоматически.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Добавлю string в union placeholder — всё равно получу a-suffix и b-suffix отдельно. number в `user-${number}` перечисляет все числа для autocomplete.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Plain union `\"small-red\"|\"large-blue\"` и template literal type — одно и то же, формат user/abc/profile пройдёт если добавить в union вручную. infer нельзя использовать внутри backtick types.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "tpl_definition",
+      "exampleType": "good",
+      "exampleText": "`` `${\"a\"|\"b\"}-${\"x\"|\"y\"}` `` → a-x | a-y | b-x | b-y — cartesian product, не zip. Только type checker, zero runtime.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "tpl_definition",
+      "exampleType": "good",
+      "exampleText": "ну это как mad libs — union части подставляются, все комбинации отдельные literal types, в js их нет",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "tpl_definition",
+      "exampleType": "bad",
+      "exampleText": "Template literal types генерируют массив строк в runtime при старте приложения.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "tpl_vs_unions",
+      "exampleType": "good",
+      "exampleText": "Три size × три color — девять строк из шести union-значений; plain union пришлось бы писать все девять руками.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "tpl_vs_unions",
+      "exampleType": "good",
+      "exampleText": "`` `user/${number}/profile` `` отсекает abc в сегменте — plain union так не проверит формат.",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "tpl_vs_unions",
+      "exampleType": "bad",
+      "exampleText": "Plain union и template literal type всегда эквивалентны, разница только в синтаксисе.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "builtin_utilities",
+      "exampleType": "good",
+      "exampleText": "`` `on${Capitalize<\"click\"|\"focus\"|\"blur\">}` `` → onClick | onFocus | onBlur — intrinsic types внутри шаблона.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "builtin_utilities",
+      "exampleType": "good",
+      "exampleText": "Uppercase Lowercase Capitalize Uncapitalize — встроенные, цепляются слева направо в template literal",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "builtin_utilities",
+      "exampleType": "bad",
+      "exampleText": "Capitalize — runtime функция, в типах не работает, только .toUpperCase() в коде.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "TanStack Query key `user-${id}-profile`, tRPC paths, Tailwind-like p${Direction}-${Spacing} — template literal types. Две статические строки OK/Cancel — обычные литералы.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "event emitter onUserCreated из map Events — да; runtime concat prefix+suffix в функции — обычный string",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Любая строка в проекте должна быть template literal type, иначе TypeScript не type-safe.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "const makeKey = (p: string) => `key-${p}`; type Key = ReturnType<typeof makeKey> // string — тип объявляю отдельно: `key-${\"a\"|\"b\"}`.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "`` `${\"a\"|\"b\"|string}-suffix` `` → `${string}-suffix`, конкретные a-suffix пропали — string поглотил union.",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "ReturnType сохраняет template literal type из тела стрелочной функции с string parameter.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "compiler_behavior",
+      "exampleType": "good",
+      "exampleText": "Checker подставляет каждый union member независимо, normalize в union literals; в .js только string, без enum-like runtime.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "compiler_behavior",
+      "exampleType": "good",
+      "exampleText": "placeholder string вместо finite union — pattern `${string}-suffix`, не баг, by design",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "compiler_behavior",
+      "exampleType": "bad",
+      "exampleText": "TypeScript emit-ит отдельные константы для каждого члена template literal union в JavaScript.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "infer_and_advanced",
+      "exampleType": "good",
+      "exampleText": "type ExtractPrefix<T extends `${string}-${string}`> = T extends `${infer P}-${string}` ? P : never — Result small-red → small.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "infer_and_advanced",
+      "exampleType": "good",
+      "exampleText": "ExtractRouteParams рекурсивно снимает :userId/:postId — navigate типизирует Record params; mapped Events as on${Capitalize<K>}",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "infer_and_advanced",
+      "exampleType": "bad",
+      "exampleText": "infer в template literal требует runtime regex match, без conditional type не работает.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "template-literal-types-in-typescript",
+    "apiUrl": "https://api.itlead.org/api/questions/template-literal-types-in-typescript",
+    "pageUrl": "https://itlead.org/interview-questions/typescript/template-literal-types-in-typescript",
+    "difficulty": "SENIOR",
+    "titleEn": "Template literal types in TypeScript",
+    "categorySlug": "typescript",
+    "syncedAt": "2026-06-18T18:00:00.000Z"
+  }
+}

@@ -1,0 +1,726 @@
+{
+  "topic": {
+    "code": "shcho_take_dead_letter_queue",
+    "name": "Dead Letter Queue (DLQ)",
+    "skillCode": "javascript",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Что такое dead letter queue (DLQ) и зачем она нужна в системах с очередями сообщений?",
+    "shortAnswer": "Dead letter queue (DLQ) — отдельная очередь, куда попадают сообщения, которые consumer не смог обработать после исчерпания всех попыток retry. Вместо блокировки основной очереди или потери данных проблемные сообщения изолируются в DLQ для анализа и повторной обработки (re-drive). DLQ не устраняет первопричину — она сохраняет «сломанные» сообщения, пока основной поток продолжает работать.",
+    "idealAnswer": "Dead letter queue (DLQ) — отдельная очередь, хранящая сообщения, которые consumer не обработал после исчерпания лимита retry (обычно 3–5 попыток с exponential backoff). DLQ перехватывает failed messages, чтобы основная очередь не останавливалась: это не fix root cause, а изоляция для inspection и reprocessing. Типичный flow: Payments публикует PaymentSucceeded → Subscriptions создаёт подписку и шлёт welcome email → email-провайдер возвращает 502 → retry 1/2/3 с backoff → max retries exceeded → сообщение в DLQ → после восстановления провайдера re-drive возвращает его в main queue. Бесконечные retry блокируют очередь: consumer-слоты заняты одним сообщением, новые копятся сзади. Poison pill — валидное на вид сообщение, которое раз за разом валит consumer; без DLQ оно останавливает весь pipeline, с DLQ изолируется после N попыток. Механизм: consumer получает message → при ошибке nack → broker re-queue → после retry limit broker перемещает в DLQ вместо повторной постановки. Конфигурация по платформам: AWS SQS — RedrivePolicy с maxReceiveCount и deadLetterTargetArn; RabbitMQ — x-dead-letter-exchange и x-max-redeliveries; Apache Kafka — нативного DLQ нет, вручную публикуешь в топик *.DLT (конвенция Spring Kafka/Confluent). Re-drive — отправка сообщений из DLQ обратно в исходную очередь после fix бага; в SQS Console есть кнопка, для RabbitMQ/Kafka — скрипт. Перед re-drive inspect payload: bad message (wrong schema, missing field) не пройдёт сколько ни retry — fix или discard. Типичные ошибки: maxReceiveCount=1 (transient hiccup сразу в DLQ) — старт с 3–5; не мониторить DLQ depth (молча копится = потеря заказов); re-drive до fix consumer; одна DLQ на все сервисы; игнор порядка при FIFO main + non-FIFO DLQ. DLQ vs retry queue: retry — временная задержка перед следующей попыткой; DLQ — финальная остановка после всех retry. DLQ vs poison pill: poison pill — проблемное сообщение, DLQ — инфраструктура, которая его ловит. DLQ не может иметь свою DLQ (SQS запрещает). Если DLQ переполнена — SQS reject, RabbitMQ может drop — мониторинг обязателен. Где встречается: SQS+Lambda/ECS, RabbitMQ (amqplib, NestJS queues), Kafka (kafkajs), GCP Pub/Sub (dead letter topic), Azure Service Bus (dead-letter subqueue). В Node.js consumer удаляет message только после полного success — иначе SQS считает failed delivery.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "dlq_definition",
+      "title": "Понимает определение DLQ",
+      "expected": "Кандидат объясняет: DLQ — отдельная очередь для сообщений, которые consumer не обработал после исчерпания retry; изоляция failed messages, основной поток продолжается; DLQ не fix root cause, а хранит для анализа и re-drive.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — определение и назначение из ITLead TL;DR",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "dlq_definition",
+            "oftenConfusedWith": [
+              "retry_to_dlq_flow",
+              "dlq_vs_retry_queue"
+            ],
+            "anchorTermsExpected": [
+              "DLQ",
+              "dead letter",
+              "отдельн",
+              "очеред",
+              "retry",
+              "изоля",
+              "re-drive",
+              "не fix"
+            ],
+            "anchorTermsWrongTopic": [
+              "DLQ это retry queue",
+              "DLQ исправляет баг consumer",
+              "DLQ заменяет основную очередь"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "DLQ",
+              "dead letter",
+              "очеред"
+            ],
+            "ask": "что такое DLQ и зачем она нужна, если сообщение не обработалось"
+          }
+        ],
+        "mustConcepts": [
+          "DLQ",
+          "dead letter",
+          "dead letter queue",
+          "отдельн",
+          "очеред",
+          "consumer",
+          "не обработ",
+          "retry",
+          "повтор",
+          "исчерп",
+          "лимит",
+          "изоля",
+          "failed message",
+          "основн",
+          "main queue",
+          "re-drive",
+          "анализ",
+          "не fix",
+          "не устран",
+          "первопричин"
+        ],
+        "falseClaims": [
+          "DLQ автоматически исправляет ошибку consumer",
+          "DLQ — это та же основная очередь с задержкой",
+          "сообщения в DLQ удаляются без возможности восстановления",
+          "DLQ блокирует основную очередь так же, как бесконечный retry",
+          "DLQ и retry queue — одно и то же"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "retry_to_dlq_flow",
+      "title": "Знает flow retry → DLQ",
+      "expected": "Кандидат описывает: consumer получает message → ошибка → nack → broker re-queue → после maxReceiveCount/max retries → перемещение в DLQ; упоминает exponential backoff и что delete/ack только после полного success.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "центральный механизм из ITLead How the Retry-to-DLQ Flow Works",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "dlq_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "retry_to_dlq_flow",
+            "oftenConfusedWith": [
+              "platform_config",
+              "redrive"
+            ],
+            "anchorTermsExpected": [
+              "nack",
+              "maxReceiveCount",
+              "re-queue",
+              "retry limit",
+              "delete",
+              "ack"
+            ],
+            "anchorTermsWrongTopic": [
+              "сообщение сразу в DLQ без retry",
+              "re-drive это nack",
+              "ack при ошибке перемещает в DLQ"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "nack",
+              "retry",
+              "maxReceiveCount"
+            ],
+            "ask": "опиши шаг за шагом, как сообщение попадает из main queue в DLQ"
+          },
+          {
+            "match": [
+              "delete",
+              "ack",
+              "ReceiptHandle"
+            ],
+            "ask": "когда consumer должен удалять сообщение из очереди при обработке"
+          }
+        ],
+        "mustConcepts": [
+          "nack",
+          "negative acknowledgment",
+          "re-queue",
+          "повторн",
+          "retry",
+          "maxReceiveCount",
+          "retry limit",
+          "лимит",
+          "exponential backoff",
+          "backoff",
+          "broker",
+          "перемещ",
+          "DLQ",
+          "delete",
+          "ack",
+          "успех",
+          "ошибк",
+          "failed delivery",
+          "не удал"
+        ],
+        "falseClaims": [
+          "сообщение попадает в DLQ после первой ошибки без retry",
+          "nack сразу отправляет в DLQ минуя main queue",
+          "delete message при ошибке — правильный паттерн",
+          "broker сам исправляет payload перед re-queue",
+          "re-drive происходит автоматически при каждой ошибке"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "poison_pill_why_dlq",
+      "title": "Понимает poison pill и почему не retry forever",
+      "expected": "Кандидат объясняет: бесконечные retry блокируют очередь и занимают consumer-слоты; poison pill — сообщение, которое раз за разом валит consumer; DLQ изолирует его после N попыток, остальная очередь движется.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Why Not Retry Forever + poison pill из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "poison pill",
+              "бесконечн",
+              "блокир"
+            ],
+            "ask": "что такое poison pill и почему бесконечный retry опасен для очереди"
+          }
+        ],
+        "mustConcepts": [
+          "poison pill",
+          "бесконечн",
+          "retry",
+          "блокир",
+          "очеред",
+          "consumer slot",
+          "слот",
+          "занят",
+          "накоп",
+          "pipeline",
+          "пайплайн",
+          "изоля",
+          "N попыт",
+          "валит",
+          "crash",
+          "останов",
+          "остальн",
+          "движ"
+        ],
+        "falseClaims": [
+          "poison pill и DLQ — одно и то же",
+          "бесконечный retry не влияет на throughput очереди",
+          "poison pill всегда имеет невалидный JSON",
+          "DLQ создаёт poison pill",
+          "одно bad message не может остановить весь pipeline без DLQ"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "redrive",
+      "title": "Знает re-drive и когда его применять",
+      "expected": "Кандидат объясняет: re-drive — возврат сообщений из DLQ в исходную очередь для повторной обработки после fix бага; перед re-drive inspect payload; bad message (schema, missing field) fix или discard, не бесконечный re-drive.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "DLQ Re-drive секция ITLead",
+        "confusionPairs": [
+          {
+            "checkpointKey": "redrive",
+            "oftenConfusedWith": [
+              "retry_to_dlq_flow",
+              "common_mistakes"
+            ],
+            "anchorTermsExpected": [
+              "re-drive",
+              "redrive",
+              "исходн",
+              "fix",
+              "inspect",
+              "payload"
+            ],
+            "anchorTermsWrongTopic": [
+              "re-drive до fix бага",
+              "re-drive это автоматический retry broker",
+              "re-drive удаляет сообщение навсегда"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "re-drive",
+              "redrive",
+              "повторн обработ"
+            ],
+            "ask": "что такое re-drive и что проверить перед возвратом сообщений из DLQ"
+          }
+        ],
+        "mustConcepts": [
+          "re-drive",
+          "redrive",
+          "возврат",
+          "исходн",
+          "main queue",
+          "повторн",
+          "обработ",
+          "fix",
+          "исправ",
+          "баг",
+          "inspect",
+          "payload",
+          "schema",
+          "missing field",
+          "discard",
+          "удал",
+          "bad message",
+          "SQS Console",
+          "скрипт"
+        ],
+        "falseClaims": [
+          "re-drive без fix consumer — нормальная практика",
+          "любое сообщение из DLQ успешно обработается после re-drive",
+          "re-drive и retry broker — одно и то же",
+          "inspect payload перед re-drive не нужен",
+          "re-drive автоматически исправляет malformed payload"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "platform_config",
+      "title": "Знает конфигурацию DLQ по платформам",
+      "expected": "Кандидат называет: AWS SQS — RedrivePolicy, maxReceiveCount, deadLetterTargetArn; RabbitMQ — x-dead-letter-exchange, x-max-redeliveries; Kafka — нет native DLQ, ручная публикация в *.DLT topic с headers (original topic, error).",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "platform-specific config из ITLead Theory",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "SQS",
+              "RedrivePolicy",
+              "maxReceiveCount"
+            ],
+            "ask": "как настроить DLQ в AWS SQS"
+          },
+          {
+            "match": [
+              "Kafka",
+              "DLT",
+              "native"
+            ],
+            "ask": "как реализовать DLQ в Kafka, если нативной поддержки нет"
+          }
+        ],
+        "mustConcepts": [
+          "AWS SQS",
+          "SQS",
+          "RedrivePolicy",
+          "maxReceiveCount",
+          "deadLetterTargetArn",
+          "RabbitMQ",
+          "x-dead-letter-exchange",
+          "x-max-redeliveries",
+          "Kafka",
+          "DLT",
+          "native",
+          "натив",
+          "вручную",
+          "topic",
+          "headers",
+          "x-original-topic",
+          "kafkajs",
+          "Spring Kafka",
+          "Confluent",
+          "Pub/Sub",
+          "Azure Service Bus"
+        ],
+        "falseClaims": [
+          "Kafka имеет встроенный DLQ как SQS",
+          "RabbitMQ использует RedrivePolicy",
+          "SQS перемещает в DLQ без настройки RedrivePolicy",
+          "DLT в Kafka создаётся автоматически broker",
+          "все брокеры одинаково настраивают DLQ"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки с DLQ",
+      "expected": "Кандидат называет: maxReceiveCount слишком низкий (старт 3–5); не мониторить DLQ depth; re-drive до fix; одна DLQ на все сервисы; игнор порядка FIFO main + non-FIFO DLQ.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Common Mistakes — критично для senior production",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "monitoring_dlq",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "maxReceiveCount",
+              "1",
+              "transient"
+            ],
+            "ask": "почему maxReceiveCount=1 опасен и с чего начать"
+          },
+          {
+            "match": [
+              "FIFO",
+              "порядок",
+              "ordering"
+            ],
+            "ask": "почему порядок сообщений ломается при re-drive из non-FIFO DLQ"
+          }
+        ],
+        "mustConcepts": [
+          "maxReceiveCount",
+          "слишком низк",
+          "transient",
+          "network hiccup",
+          "3-5",
+          "exponential backoff",
+          "re-drive",
+          "fix",
+          "монитор",
+          "DLQ depth",
+          "алерт",
+          "одна DLQ",
+          "все сервис",
+          "FIFO",
+          "порядок",
+          "ordering",
+          "re-drive без",
+          "дебаг",
+          "заказ"
+        ],
+        "falseClaims": [
+          "maxReceiveCount=1 — best practice для production",
+          "DLQ без алертов достаточна — сообщения не теряются",
+          "одна общая DLQ упрощает debugging в микросервисах",
+          "порядок FIFO сохраняется после re-drive из любой DLQ",
+          "re-drive сразу после алерта без проверки consumer"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "monitoring_dlq",
+      "title": "Понимает мониторинг DLQ",
+      "expected": "Кандидат объясняет: DLQ без мониторинга = потеря сообщений; алерт на depth > 0; CloudWatch alarm на ApproximateNumberOfMessagesVisible; переполненная DLQ — SQS reject / RabbitMQ drop.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Monitoring DLQ Depth — production must-have из ITLead Examples",
+        "mustConcepts": [
+          "монитор",
+          "алерт",
+          "DLQ depth",
+          "глубин",
+          "CloudWatch",
+          "ApproximateNumberOfMessagesVisible",
+          "threshold",
+          "порог",
+          "переполн",
+          "reject",
+          "drop",
+          "потер",
+          "infrastructure theater",
+          "production",
+          "CDK",
+          "метрик"
+        ],
+        "falseClaims": [
+          "DLQ можно не мониторить — сообщения всё равно обработаются",
+          "переполненная DLQ автоматически расширяется без потерь",
+          "алерт только если DLQ > 1000 сообщений",
+          "мониторинг DLQ заменяет re-drive",
+          "SQS никогда не отклоняет message при полной DLQ"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "dlq_vs_retry_queue",
+      "title": "Отличает DLQ от retry queue и poison pill",
+      "expected": "Кандидат объясняет: retry queue — временная задержка перед следующей попыткой; DLQ — финальная остановка после всех retry; poison pill — проблемное сообщение, DLQ — инфраструктура; DLQ не может иметь свою DLQ.",
+      "score": 0.5,
+      "sortOrder": 7,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "follow-up questions ITLead — частая путаница на собеседовании",
+        "confusionPairs": [
+          {
+            "checkpointKey": "dlq_vs_retry_queue",
+            "oftenConfusedWith": [
+              "dlq_definition",
+              "poison_pill_why_dlq"
+            ],
+            "anchorTermsExpected": [
+              "retry queue",
+              "временн",
+              "финальн",
+              "poison pill",
+              "инфраструктур"
+            ],
+            "anchorTermsWrongTopic": [
+              "DLQ это delay queue",
+              "poison pill это DLQ",
+              "DLQ может иметь nested DLQ"
+            ]
+          }
+        ],
+        "mustConcepts": [
+          "retry queue",
+          "DLQ",
+          "временн",
+          "задержк",
+          "delay",
+          "финальн",
+          "terminal",
+          "poison pill",
+          "инфраструктур",
+          "nested DLQ",
+          "рекурс",
+          "SQS запрещ"
+        ],
+        "falseClaims": [
+          "DLQ и retry queue выполняют одну функцию",
+          "poison pill — это название DLQ",
+          "DLQ может иметь свою DLQ для overflow",
+          "retry queue — это финальная остановка",
+          "AWS SQS разрешает DLQ для DLQ"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "DLQ — отдельная очередь для сообщений после исчерпания retry. Payments шлёт PaymentSucceeded, Subscriptions падает на email 502 три раза — SQS по RedrivePolicy перемещает в DLQ. После fix провайдера делаем re-drive. DLQ не чинит баг — изолирует, чтобы main queue не стояла.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На SQS maxReceiveCount: 3, delete только после полного success. Kafka — нет native DLQ, кидаю в topic.DLT с headers x-original-topic и x-error-message. CloudWatch alarm на DLQ depth > 0 — иначе недели заказов в DLQ и никто не знает.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Poison pill блокирует consumer без DLQ — один message занимает все retry. DLQ забирает его после N попыток. Retry queue — пауза перед повтором, DLQ — конец линии. Re-drive только после fix и inspect payload.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "DLQ автоматически исправляет malformed JSON и возвращает в main queue. Retry forever безопаснее — очередь сама разберётся.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "maxReceiveCount=1 чтобы быстрее находить баги. Одна DLQ на весь кластер — проще дебажить. Re-drive сразу при алерте, fix consumer потом.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Kafka имеет встроенный DLQ как SQS. Poison pill и DLQ — синонимы. DLQ может иметь nested DLQ на AWS.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "dlq_definition",
+      "exampleType": "good",
+      "exampleText": "DLQ хранит failed messages после всех retry — основная очередь не блокируется, сообщения не теряются, можно re-drive после fix.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "dlq_definition",
+      "exampleType": "good",
+      "exampleText": "ну dead letter queue — куда складывают то, что consumer так и не смог обработать, чтобы остальные сообщения шли дальше",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "dlq_definition",
+      "exampleType": "bad",
+      "exampleText": "DLQ — это очередь с задержкой перед retry, она сама чинит consumer.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "retry_to_dlq_flow",
+      "exampleType": "good",
+      "exampleText": "Consumer nack при ошибке → broker re-queue → после maxReceiveCount SQS сам кладёт в DLQ. DeleteMessage только когда subscription создана и email отправлен.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "retry_to_dlq_flow",
+      "exampleType": "good",
+      "exampleText": "три фейла с backoff — на четвёртый receive SQS redrive в DLQ, код consumer менять не надо если RedrivePolicy настроен",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "retry_to_dlq_flow",
+      "exampleType": "bad",
+      "exampleText": "При ошибке сразу DeleteMessage и вручную кладём копию в DLQ — так SQS считает success.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "poison_pill_why_dlq",
+      "exampleType": "good",
+      "exampleText": "Poison pill выглядит валидно, но каждый раз валит handler — без DLQ весь pipeline стоит на одном message.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "poison_pill_why_dlq",
+      "exampleType": "good",
+      "exampleText": "бесконечный retry — все worker'ы крутятся на одном битом сообщении, новые payment events копятся в хвосте",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "poison_pill_why_dlq",
+      "exampleType": "bad",
+      "exampleText": "Poison pill — это когда JSON невалидный; DLQ и poison pill одно и то же.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "redrive",
+      "exampleType": "good",
+      "exampleText": "Re-drive после fix email provider: смотрю payload в DLQ, отбрасываю bad schema, остальное — SQS Console re-drive в main queue.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "redrive",
+      "exampleType": "good",
+      "exampleText": "сначала деплой fix, потом re-drive — иначе сообщения снова улетят в DLQ",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "redrive",
+      "exampleType": "bad",
+      "exampleText": "Re-drive каждый час по cron — fix не нужен, message сам пройдёт.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "platform_config",
+      "exampleType": "good",
+      "exampleText": "SQS: RedrivePolicy maxReceiveCount 3 + deadLetterTargetArn. RabbitMQ: x-dead-letter-exchange на DLX. Kafka: catch → producer.send в payments-events.DLT с headers.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "platform_config",
+      "exampleType": "good",
+      "exampleText": "в kafkajs нет native dlq — сам публикую в topic.DLT, headers x-original-topic и x-error-message для дебага",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "platform_config",
+      "exampleType": "bad",
+      "exampleText": "Kafka автоматически создаёт .DLT при ошибке consumer — настраивать не нужно.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "maxReceiveCount стартую с 3–5 и backoff — иначе transient 502 сразу в DLQ. Отдельная DLQ на каждую main queue. FIFO main — DLQ тоже FIFO если порядок важен.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "не делаю re-drive пока не задеплоил fix — иначе ping-pong между main и DLQ",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Одна DLQ на payments, subscriptions и notifications — меньше инфраструктуры, дебаг проще.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "monitoring_dlq",
+      "exampleType": "good",
+      "exampleText": "CloudWatch Alarm на dlq.metricApproximateNumberOfMessagesVisible threshold 1 — любое сообщение в DLQ будит on-call.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "monitoring_dlq",
+      "exampleType": "good",
+      "exampleText": "dlq без алерта — театр, сообщения копятся неделями пока клиент не пожалуется",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "monitoring_dlq",
+      "exampleType": "bad",
+      "exampleText": "DLQ мониторить не нужно — SQS сам re-drive когда очередь опустеет.",
+      "sortOrder": 36
+    },
+    {
+      "checkpointKey": "dlq_vs_retry_queue",
+      "exampleType": "good",
+      "exampleText": "Retry queue — delay перед следующей попыткой; DLQ — terminal после всех retry. Poison pill — bad message, DLQ — инфраструктура которая его ловит.",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "dlq_vs_retry_queue",
+      "exampleType": "good",
+      "exampleText": "dlq финальная точка, retry queue временная; nested dlq sqs не даёт",
+      "sortOrder": 25
+    },
+    {
+      "checkpointKey": "dlq_vs_retry_queue",
+      "exampleType": "bad",
+      "exampleText": "Retry queue и DLQ — синонимы, разницы нет. DLQ для DLQ нужна при overflow.",
+      "sortOrder": 37
+    }
+  ],
+  "itlead": {
+    "slug": "shcho-take-dead-letter-queue",
+    "apiUrl": "https://api.itlead.org/api/questions/shcho-take-dead-letter-queue",
+    "pageUrl": "https://itlead.org/interview-questions/javascript/shcho-take-dead-letter-queue",
+    "difficulty": "SENIOR",
+    "titleEn": "What is a dead letter queue?",
+    "categorySlug": "javascript",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

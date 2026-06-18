@@ -1,0 +1,422 @@
+{
+  "topic": {
+    "code": "shcho_take_abortcontroller",
+    "name": "AbortController",
+    "skillCode": "react",
+    "interviewWeight": 2
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "junior",
+    "difficulty": "basic",
+    "questionText": "Что такое AbortController и как его использовать в React?",
+    "shortAnswer": "AbortController — браузерное Web API, которое создаёт AbortSignal для отмены fetch-запросов до прихода ответа. Передаёшь `signal` в fetch, вызываешь `controller.abort()` — сокет закрывается, выбрасывается AbortError. В React типичный паттерн: новый контроллер на каждый запрос и `return () => controller.abort()` в cleanup useEffect.",
+    "idealAnswer": "AbortController — браузерное Web API для программной отмены асинхронных операций, в первую очередь fetch. `new AbortController()` создаёт объект с полем `signal` (AbortSignal) и методом `abort()`. Передаёшь `signal` в `fetch(url, { signal })` — запрос привязан к контроллеру. `controller.abort()` синхронно выставляет флаг `aborted: true`, диспатчит событие abort, и fetch закрывает TCP-сокет до буферизации ответа. Главный сценарий в React: отмена API-вызова при размонтировании компонента или смене зависимостей useEffect — иначе поздний ответ вызовет setState на размонтированном компоненте. Паттерн: в useEffect создать `const controller = new AbortController()`, запустить fetch с `signal`, в cleanup вернуть `() => controller.abort()`. При смене `productId` или `query` React сначала вызывает cleanup предыдущего эффекта — старый запрос отменяется, state обновляет только последний ответ. AbortError — не сетевая ошибка; перед показом toast пользователю проверяй `err.name !== 'AbortError'`. Скасованный signal нельзя переиспользовать — всегда `new AbortController()` на каждый запрос. До AbortController отмену имитировали setTimeout — таймер гадает длительность заранее; AbortController отменяет в точный момент по решению приложения. Когда использовать: запрос >500ms, компонент может размонтироваться раньше ответа, live search при каждом keystroke, гонка между вкладками. Не нужен для запросов <100ms или API без поддержки AbortSignal. `AbortSignal.timeout(5000)` — статический shorthand для автоотмены по таймеру без ручного `abort()`. Axios принимает `signal` только с v1.6+; старые версии молча игнорируют. В экосистеме: React Query, SWR и RTK Query автоматически передают signal и отменяют in-flight запросы при unmount. Node.js 15+ поддерживает нативно через undici. Если `abort()` вызван после получения ответа — ничего не происходит; отмена работает только до буферизации response.",
+    "maxScore": 10,
+    "skills": [
+      "react",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "abortcontroller_definition",
+      "title": "Понимает AbortController и AbortSignal",
+      "expected": "Кандидат объясняет: AbortController создаёт AbortSignal; signal передаётся в fetch; abort() отменяет запрос до прихода ответа; один контроллер на запрос.",
+      "score": 2,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "ядро TL;DR — определение API и связь controller/signal/fetch",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "AbortController",
+              "AbortSignal",
+              "signal"
+            ],
+            "ask": "как signal связывает fetch с контроллером и что происходит при abort()"
+          }
+        ],
+        "mustConcepts": [
+          "AbortController",
+          "AbortSignal",
+          "signal",
+          "fetch",
+          "abort",
+          "отмен",
+          "скасов",
+          "controller.signal",
+          "новый контроллер",
+          "на каждый запрос",
+          "Web API",
+          "браузерн"
+        ],
+        "falseClaims": [
+          "AbortController отменяет уже полученный ответ",
+          "можно переиспользовать скасованный signal для нового fetch",
+          "AbortController работает только в React",
+          "signal передаётся отдельно от fetch без привязки к контроллеру"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "useeffect_cleanup",
+      "title": "Знает паттерн cleanup в useEffect",
+      "expected": "Кандидат описывает: controller в useEffect, fetch с signal, return () => controller.abort() при unmount или смене deps; предотвращает setState на размонтированном компоненте.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "главный React-сценарий из ITLead — unmount и смена productId/query",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useEffect",
+              "cleanup",
+              "unmount",
+              "return"
+            ],
+            "ask": "почему без return () => controller.abort() React выдаёт warning про unmounted component"
+          },
+          {
+            "match": [
+              "productId",
+              "query",
+              "deps",
+              "зависимост"
+            ],
+            "ask": "что происходит при смене productId или query — порядок cleanup и нового эффекта"
+          }
+        ],
+        "mustConcepts": [
+          "useEffect",
+          "cleanup",
+          "return",
+          "controller.abort",
+          "unmount",
+          "размонтир",
+          "setState on unmounted",
+          "productId",
+          "query",
+          "зависимост",
+          "deps",
+          "последний ответ",
+          "старый запрос"
+        ],
+        "falseClaims": [
+          "достаточно создать controller без cleanup return",
+          "cleanup вызывается только при unmount, не при смене deps",
+          "можно хранить один глобальный AbortController на всё приложение",
+          "React сам отменяет fetch при unmount без AbortController"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "abort_error_handling",
+      "title": "Различает AbortError и реальные ошибки",
+      "expected": "Кандидат объясняет: AbortError — намеренная отмена, не сбой сети; проверка err.name !== 'AbortError' перед toast/логированием ошибки пользователю.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевое правило из TL;DR — не показывать toast при intentional cancel",
+        "mustConcepts": [
+          "AbortError",
+          "err.name",
+          "не сетевая",
+          "намеренн",
+          "отмен",
+          "showErrorToast",
+          "catch",
+          "не ошибка",
+          "intentional",
+          "проверк"
+        ],
+        "falseClaims": [
+          "AbortError нужно показывать пользователю как сбой сети",
+          "AbortError означает timeout сервера",
+          "можно ловить все ошибки fetch одинаково без проверки name",
+          "AbortError возникает только при сетевом обрыве"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки AbortController",
+      "expected": "Кандидат называет: забытый cleanup return, переиспользование aborted controller, AbortError как failure, axios без signal в старых версиях; знает исправления.",
+      "score": 2.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — частые production-ловушки",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "переиспольз",
+              "reus",
+              "aborted",
+              "новый"
+            ],
+            "ask": "почему fetch с уже aborted signal падает мгновенно"
+          },
+          {
+            "match": [
+              "axios",
+              "v1.6",
+              "signal"
+            ],
+            "ask": "когда axios реально отменяет запрос по signal"
+          }
+        ],
+        "mustConcepts": [
+          "cleanup return",
+          "переиспольз",
+          "aborted signal",
+          "новый AbortController",
+          "AbortError toast",
+          "axios",
+          "v1.6",
+          "игнорир",
+          "setTimeout",
+          "без cleanup",
+          "мгновенно падает"
+        ],
+        "falseClaims": [
+          "aborted controller можно сбросить и использовать снова",
+          "axios всегда поддерживает signal во всех версиях",
+          "setTimeout — лучшая замена AbortController для отмены fetch",
+          "забытый cleanup безопасен — React отменит fetch сам"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Понимает когда применять AbortController",
+      "expected": "Кандидат называет: unmount до ответа, live search, гонка вкладок; пропускает для быстрых <100ms запросов; знает AbortSignal.timeout для простых таймаутов.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use и decision rule >500ms из ITLead",
+        "mustConcepts": [
+          "unmount",
+          "live search",
+          "поиск",
+          "гонк",
+          "race",
+          "500ms",
+          "100ms",
+          "AbortSignal.timeout",
+          "таймаут",
+          "вкладк",
+          "keystroke",
+          "ввод"
+        ],
+        "falseClaims": [
+          "AbortController нужен для каждого fetch без исключений",
+          "AbortSignal.timeout заменяет cleanup useEffect",
+          "для запросов 50ms всё равно обязателен AbortController",
+          "AbortController отменяет setTimeout"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "abort_mechanism",
+      "title": "Понимает внутренний механизм abort",
+      "expected": "Кандидат описывает: aborted флаг false→true, синхронное abort-событие, закрытие TCP-сокета; abort после получения response не имеет эффекта; Node.js 15+ / undici.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "how it works internally — бонус junior с follow-up Q&A",
+        "mustConcepts": [
+          "aborted",
+          "флаг",
+          "синхронн",
+          "abort event",
+          "TCP",
+          "сокет",
+          "закрыт",
+          "после ответа",
+          "буфериз",
+          "Node.js",
+          "undici",
+          "ничего не происходит"
+        ],
+        "falseClaims": [
+          "abort() асинхронно ждёт завершения fetch",
+          "abort после response откатывает уже применённый setState",
+          "AbortController нужен polyfill во всех современных браузерах",
+          "один abort() отменяет только первый из нескольких fetch с тем же signal"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "AbortController создаёт signal для fetch. В useEffect делаю новый controller, передаю signal, в cleanup — controller.abort(). AbortError не показываю пользователю — это намеренная отмена при unmount или смене query.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В live search на каждый keystroke cleanup отменяет старый fetch — пользователь видит результаты последнего ввода, а не промежуточного. Без return () => abort() ловил warning setState on unmounted component.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "controller.abort() синхронно закрывает сокет до ответа. Если ответ уже пришёл — abort ничего не делает. На каждый запрос — new AbortController(), скасованный signal не переиспользую.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "AbortController — это React-хук для отмены компонентов. Один controller на всё приложение, в catch показываю toast на любую ошибку включая AbortError.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Создал controller, вызвал abort(), потом тем же signal сделал новый fetch — нормально, signal сбрасывается. Cleanup в useEffect не обязателен.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "AbortController отменяет запрос даже после того как данные уже в setState. Axios всегда сам подхватывает signal без проверки версии.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "abortcontroller_definition",
+      "exampleType": "good",
+      "exampleText": "new AbortController() → signal в fetch options → abort() отменяет in-flight запрос до буферизации response.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "abortcontroller_definition",
+      "exampleType": "good",
+      "exampleText": "ну это как пожарная кнопка для fetch — дёрнул abort, сокет закрылся, ответ не дойдёт до компонента",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "abortcontroller_definition",
+      "exampleType": "bad",
+      "exampleText": "AbortController отменяет уже обработанный JSON и откатывает state в React.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "useeffect_cleanup",
+      "exampleType": "good",
+      "exampleText": "useEffect(() => { const c = new AbortController(); fetch(url, { signal: c.signal }).then(setData); return () => c.abort(); }, [id]);",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "useeffect_cleanup",
+      "exampleType": "good",
+      "exampleText": "при смене productId react сначала abort старого fetch в cleanup, потом стартует новый — state только от последнего id",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "useeffect_cleanup",
+      "exampleType": "bad",
+      "exampleText": "controller создаю в useEffect, но return не нужен — React сам не даст setState после unmount.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "abort_error_handling",
+      "exampleType": "good",
+      "exampleText": ".catch(err => { if (err.name !== 'AbortError') showErrorToast(err); }) — отмена не ошибка для пользователя.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "abort_error_handling",
+      "exampleType": "good",
+      "exampleText": "AbortError в catch — просто лог 'запрос отменён', не красный toast",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "abort_error_handling",
+      "exampleType": "bad",
+      "exampleText": "Любой reject fetch — показываю ошибку сети, AbortError тоже.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Ошибка: controller.abort() и потом тот же signal в новом fetch — сразу AbortError. Фикс: new AbortController() на каждый запрос.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "axios 0.27 signal молча игнорит — проверяю версию или беру native fetch для отмены",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "Один AbortController на модуль — переиспользую после abort, React Query сам всё починит.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "UserSearch: каждый query change → cleanup abort → свежий fetch; для ping <50ms не заморачиваюсь.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "долгий запрос и компонент может уйти со страницы — abort в cleanup; для простого таймаута 5с — AbortSignal.timeout(5000)",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "AbortController обязателен даже для GET /health за 20ms и для setTimeout отмены.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "abort_mechanism",
+      "exampleType": "good",
+      "exampleText": "abort() синхронно: aborted=true, событие abort, fetch закрывает TCP. После res.json() abort уже бесполезен.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "abort_mechanism",
+      "exampleType": "good",
+      "exampleText": "один signal на три параллельных fetch — один abort() рубит все три, но теряешь независимую отмену",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "abort_mechanism",
+      "exampleType": "bad",
+      "exampleText": "abort() ждёт await fetch и потом удаляет данные из памяти браузера.",
+      "sortOrder": 35
+    }
+  ],
+  "itlead": {
+    "slug": "shcho-take-abortcontroller",
+    "apiUrl": "https://api.itlead.org/api/questions/shcho-take-abortcontroller",
+    "pageUrl": "https://itlead.org/interview-questions/react/shcho-take-abortcontroller",
+    "difficulty": "JUNIOR",
+    "titleEn": "What is AbortController?",
+    "categorySlug": "react",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

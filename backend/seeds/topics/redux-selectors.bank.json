@@ -1,0 +1,583 @@
+{
+  "topic": {
+    "code": "redux_selectors",
+    "name": "Selectors в Redux",
+    "skillCode": "redux",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое selectors в Redux, чем отличаются простые и мемоизированные селекторы и когда использовать Reselect?",
+    "shortAnswer": "Selectors в Redux — чистые функции, которые читают данные из state store. Простой selector пересчитывается при каждом рендере; createSelector из Reselect кеширует результат и пропускает вычисление, если входные данные не изменились. Reselect нужен для любых производных данных: отфильтрованных списков, сумм, сортировки.",
+    "idealAnswer": "Selectors в Redux — чистые функции вида (state) => slice, которые читают конкретные данные из store и при необходимости трансформируют их до того, как компонент их получит через useSelector. Простой selector вроде state => state.users выполняется при каждом обновлении store — для прямого доступа к полю это нормально. Как только добавляется .filter(), .map() или любое вычисление, работа повторяется на каждом рендере, даже если исходный slice не менялся — частая причина лишних re-render и O(n) на каждый dispatch. Reselect и createSelector оборачивают вычисление в кеш: сначала запускаются input selectors, их результаты сравниваются с предыдущими по ссылке (reference equality); если все совпали — возвращается закешированное значение без вызова result function. Когда использовать: прямой доступ к полю без трансформации — plain selector; производные значения (фильтрация, суммы, сортировка) — мемоизированный через createSelector; одни и те же данные в нескольких компонентах — shared memoized selector; большой state tree с частыми рендерами — мемоизация снижает каскадные re-render. Внутри createSelector массив input selectors + result function; размер кеша по умолчанию 1 (только последний результат). Для per-item selectors в списках — factory pattern: makeUserSelector(id) => createSelector(...). Композиция: выход одного selector становится входом следующего; каждый уровень мемоизируется независимо; изменение в источнике поднимается только через зависимые selectors. Пересчёт memoized selector — когда любой input вернул новую ссылку; мутация in-place без immer не триггерит пересчёт — типичный баг. Типичные ошибки: мутация state внутри selector (ломает purity и reference equality); пропуск input selectors в массиве createSelector (лишние аргументы не отслеживаются); создание createSelector внутри компонента (новый инстанс и сброс кеша на каждый render); useSelector без shallowEqual для объектов, когда selector возвращает новый объект каждый раз. useSelector по умолчанию сравнивает по ссылке — новый массив/объект с теми же данными вызовет re-render. Реальные кейсы: getCartTotal в e-commerce, getVisibleTodos с visibility filter (официальный Redux todos), normalized store — выборка entities по ID и join из slices. RTK Query генерирует tag-based selectors для cache entries (loading, error); Reselect оставляют для domain-логики вне API — фильтрация и сортировка уже закешированных данных. Zustand для малых приложений с <10 selectors; Redux + Reselect для normalized store со сложным derived state.",
+    "maxScore": 10,
+    "skills": [
+      "redux",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "selector_definition",
+      "title": "Понимает что такое selector",
+      "expected": "Кандидат объясняет: selector — чистая функция (state) => slice; читает данные из store; может трансформировать перед useSelector; аналогия «заказать из меню, а не весь склад».",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — selector как pure function чтения state",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "selector",
+              "селектор",
+              "state",
+              "useSelector"
+            ],
+            "ask": "что такое selector в Redux и как он связан с useSelector"
+          }
+        ],
+        "mustConcepts": [
+          "selector",
+          "селектор",
+          "чистая функция",
+          "pure",
+          "state",
+          "store",
+          "slice",
+          "срез",
+          "useSelector",
+          "читает",
+          "трансформ",
+          "производн",
+          "derived",
+          "компонент",
+          "данные из store"
+        ],
+        "falseClaims": [
+          "selector мутирует store напрямую",
+          "selector это middleware Redux",
+          "selector заменяет reducer",
+          "selector выполняет side effects и dispatch"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "plain_vs_memoized",
+      "title": "Отличает plain и memoized selectors",
+      "expected": "Кандидат сравнивает: plain selector пересчитывается при каждом обновлении store/useSelector; memoized (Reselect) кеширует результат и пропускает .filter/.map если входные ссылки не изменились; без Reselect новый массив на каждый вызов → лишние re-render.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевой trade-off plain vs createSelector из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "selector_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "plain_vs_memoized",
+            "oftenConfusedWith": [
+              "reselect_mechanism"
+            ],
+            "anchorTermsExpected": [
+              "plain",
+              "memoized",
+              "createSelector",
+              "кеш",
+              "filter",
+              "re-render"
+            ],
+            "anchorTermsWrongTopic": [
+              "plain selector кеширует автоматически",
+              "Reselect нужен для state.users без трансформации"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "plain",
+              "memoized",
+              "createSelector",
+              "Reselect"
+            ],
+            "ask": "когда достаточно plain selector, а когда нужен createSelector"
+          }
+        ],
+        "mustConcepts": [
+          "plain",
+          "простой",
+          "memoized",
+          "мемоиз",
+          "createSelector",
+          "Reselect",
+          "кеш",
+          "cache",
+          "filter",
+          "map",
+          "re-render",
+          "каждый render",
+          "каждый dispatch",
+          "reference",
+          "ссылка",
+          "новый массив",
+          "O(n)"
+        ],
+        "falseClaims": [
+          "plain selector автоматически мемоизируется Redux",
+          "createSelector нужен для чтения одного поля без трансформации",
+          "memoized selector пересчитывается на каждый render всегда",
+          "Reselect сравнивает значения deep equal по умолчанию"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "reselect_mechanism",
+      "title": "Знает как работает createSelector",
+      "expected": "Кандидат описывает: массив input selectors + result function; reference equality на выходах inputs; cache hit пропускает result function; размер кеша 1; factory pattern для per-item selectors в списках.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "внутренний механизм Reselect — ключ middle+",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "input selector",
+              "result function",
+              "reference equality"
+            ],
+            "ask": "как createSelector решает пересчитывать result function или вернуть кеш"
+          },
+          {
+            "match": [
+              "factory",
+              "makeUserSelector",
+              "per-item"
+            ],
+            "ask": "зачем factory pattern когда cache size = 1"
+          }
+        ],
+        "mustConcepts": [
+          "createSelector",
+          "input selector",
+          "result function",
+          "reference equality",
+          "равенство по ссылке",
+          "shallow",
+          "кеш",
+          "cache hit",
+          "cache size",
+          "размер кеша",
+          "factory pattern",
+          "makeUserSelector",
+          "per-item",
+          "список",
+          "последний результат"
+        ],
+        "falseClaims": [
+          "createSelector хранит бесконечный кеш всех комбинаций inputs",
+          "createSelector делает deep compare объектов по умолчанию",
+          "result function вызывается на каждый вызов selector независимо от inputs",
+          "factory pattern не нужен для selectors в map по id"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Выбирает plain vs memoized по сценарию",
+      "expected": "Кандидат называет: raw field без трансформации → plain; derived (filter, sum, sort) → createSelector; shared logic в нескольких компонентах → shared memoized; большой store + частые renders → memoization; примеры getCartTotal, getVisibleTodos, normalized entities.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "when to use таблица из ITLead",
+        "mustConcepts": [
+          "raw",
+          "поле",
+          "без трансформации",
+          "derived",
+          "производн",
+          "filter",
+          "sum",
+          "sort",
+          "shared",
+          "несколько компонентов",
+          "getCartTotal",
+          "getVisibleTodos",
+          "normalized",
+          "entities",
+          "e-commerce",
+          "todo",
+          "Zustand",
+          "малый app"
+        ],
+        "falseClaims": [
+          "Reselect нужен всегда даже для state.userId",
+          "plain selector лучше для filtered list из 10k элементов",
+          "shared selector не нужен если логика в одном компоненте",
+          "Redux selectors заменяют RTK Query для loading state"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки selectors",
+      "expected": "Кандидат называет: мутация state внутри selector; пропуск input selectors в массиве createSelector; createSelector внутри компонента; useSelector без shallowEqual для объектов; объясняет последствия — stale data, сброс кеша, лишние re-render.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "четыре anti-pattern из ITLead Common mistakes",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "reselect_mechanism",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "мутац",
+              "mutat",
+              "users[0]"
+            ],
+            "ask": "почему мутация массива внутри createSelector ломает мемоизацию"
+          },
+          {
+            "match": [
+              "внутри компонента",
+              "inside component",
+              "createSelector в render"
+            ],
+            "ask": "что не так с createSelector внутри функционального компонента"
+          },
+          {
+            "match": [
+              "shallowEqual",
+              "новый объект",
+              "complexObject"
+            ],
+            "ask": "когда useSelector нужен второй аргумент shallowEqual"
+          }
+        ],
+        "mustConcepts": [
+          "мутац",
+          "mutat",
+          "purity",
+          "чистота",
+          "input selectors",
+          "массив inputs",
+          "пропущен",
+          "внутри компонента",
+          "новый инстанс",
+          "сброс кеша",
+          "shallowEqual",
+          "react-redux",
+          "новый объект",
+          "reference equality",
+          "stale",
+          "лишние re-render",
+          "immer"
+        ],
+        "falseClaims": [
+          "можно мутировать users[0] внутри selector — Reselect сам обновит кеш",
+          "getPosts как второй аргумент createSelector отслеживается так же как input в массиве",
+          "createSelector внутри компонента нормален — кеш сохраняется между render",
+          "useSelector всегда делает shallow compare объектов по умолчанию"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "composition_recompute",
+      "title": "Понимает композицию и пересчёт",
+      "expected": "Кандидат объясняет: output одного selector — input следующего; независимая мемоизация на каждом уровне; пересчёт когда любой input вернул новую ссылку; мутация in-place без immer не триггерит recompute; новый массив из useSelector без Reselect → re-render на каждый dispatch.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "follow-up questions composition + recompute из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "композиц",
+              "composition",
+              "getVisible",
+              "getCount"
+            ],
+            "ask": "как работает композиция selectors и что происходит при изменении источника"
+          },
+          {
+            "match": [
+              "пересчёт",
+              "recompute",
+              "новая ссылка",
+              "immer"
+            ],
+            "ask": "когда memoized selector пересчитывается и почему мутация in-place опасна"
+          }
+        ],
+        "mustConcepts": [
+          "композиц",
+          "composition",
+          "output",
+          "input",
+          "независим",
+          "уровень",
+          "пересчёт",
+          "recompute",
+          "новая ссылка",
+          "reference",
+          "мутация in-place",
+          "immer",
+          "useSelector",
+          "новый массив",
+          "dispatch",
+          "bubble",
+          "зависим"
+        ],
+        "falseClaims": [
+          "изменение в корневом slice пересчитывает все selectors в store всегда",
+          "композиция selectors отключает мемоизацию на промежуточных уровнях",
+          "мутация in-place всегда триггерит recompute memoized selector",
+          "useSelector без Reselect не вызывает re-render если данные идентичны по значению"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "rtk_query_vs_reselect",
+      "title": "Отличает RTK Query selectors от Reselect",
+      "expected": "Кандидат упоминает: RTK Query auto-generates tag-based selectors для cache (loading, error); Reselect для domain logic вне API — filter/sort уже закешированных данных.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "senior follow-up из ITLead — бонус middle",
+        "mustConcepts": [
+          "RTK Query",
+          "tag-based",
+          "loading",
+          "error",
+          "cache entry",
+          "Reselect",
+          "domain logic",
+          "filter",
+          "sort",
+          "API",
+          "автогенерац"
+        ],
+        "falseClaims": [
+          "RTK Query полностью заменяет Reselect для derived state",
+          "Reselect генерирует loading и error states для API",
+          "RTK Query selectors не привязаны к cache entries"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Selector — чистая функция (state) => slice. Для state.users достаточно plain selector. Для active users — createSelector с getUsers и filter: кеш по ссылке на users, без лишнего O(n) на каждый dispatch. Определяю selectors вне компонента, не мутирую state внутри.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В дашборде был selector который каждый render возвращал новый массив — 200 re-render в секунду. Перевёл на createSelector, inputs сравниваются по reference, filter бежит только когда users реально меняется. Для getVisibleTodos — два input: todos и visibilityFilter.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "getCartTotal — shared memoized selector для e-commerce. Normalized store: selectEntityById + join из другого slice через композицию. RTK Query беру для loading/error API; Reselect — фильтрация уже в cache данных.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Selector — это reducer который меняет store. Reselect нужен даже для state.theme без вычислений. createSelector внутри компонента норм — Redux сам мемоизирует.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Мутирую users[0].name прямо в selector — так быстрее. getPosts передаю вторым аргументом в createSelector, Reselect его отслеживает. useSelector всегда deep equal.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Plain selector с .filter() кеширует результат автоматически. RTK Query заменяет Reselect для getVisibleTodos. Factory pattern не нужен для selectors в map.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "selector_definition",
+      "exampleType": "good",
+      "exampleText": "Selector — pure function: state => нужный slice, компонент читает через useSelector.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "selector_definition",
+      "exampleType": "good",
+      "exampleText": "ну селектор как меню — берёшь только users, а не весь store целиком",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "selector_definition",
+      "exampleType": "bad",
+      "exampleText": "Selector dispatch'ит action и мутирует reducer напрямую из компонента.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "plain_vs_memoized",
+      "exampleType": "good",
+      "exampleText": "state.users — plain ок. users.filter(u => u.active) — createSelector, иначе новый массив каждый render и лишний re-render.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "plain_vs_memoized",
+      "exampleType": "good",
+      "exampleText": "без Reselect filter гоняется на каждый dispatch даже если users тот же reference",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "plain_vs_memoized",
+      "exampleType": "bad",
+      "exampleText": "createSelector обязателен для чтения state.userId. Plain selector с map автоматически кеширует.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "reselect_mechanism",
+      "exampleType": "good",
+      "exampleText": "createSelector([getUsers], users => filter) — сначала getUsers, reference compare, cache hit → filter не бежит.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "reselect_mechanism",
+      "exampleType": "good",
+      "exampleText": "cache size 1 — для списка делаю makeUserById = id => createSelector([getUsers], u => u[id])",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "reselect_mechanism",
+      "exampleType": "bad",
+      "exampleText": "createSelector deep equal все поля объектов, кеш бесконечный на все id.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Одно поле — plain. Filtered todos, cart total, sort — memoized shared selector в selectors.ts.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "getVisibleTodos из redux todos example — filter + visibilityFilter, логика в одном месте",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Reselect для всего включая state.loading boolean. Shared selector не нужен если два компонента дублируют filter.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Wrong: users[0].name = 'x' в selector. Right: map с новым объектом. Иначе stale cache и сломан reference equality.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "createSelector внутри MyComponent — каждый render новый selector, кеш мёртв. Выношу getFilteredUsers наружу.",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "useSelector(s => ({ a: s.x, b: s.y }), shallowEqual) — иначе новый object literal каждый раз",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "createSelector([getUsers], getPosts, fn) — getPosts в массиве не нужен, Reselect и так следит за всеми аргументами.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "composition_recompute",
+      "exampleType": "good",
+      "exampleText": "getVisibleTodos → getVisibleCount: каждый уровень memoized; filter string изменился — пересчёт только зависимых.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "composition_recompute",
+      "exampleType": "good",
+      "exampleText": "мутация todos[i].done без immer — reference тот же, selector не пересчитается, UI stale",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "composition_recompute",
+      "exampleType": "bad",
+      "exampleText": "любой dispatch пересчитывает все memoized selectors в приложении. композиция отключает кеш.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "rtk_query_vs_reselect",
+      "exampleType": "good",
+      "exampleText": "RTK Query — selectors для isLoading, error, data по endpoint; Reselect — getSortedProducts из normalized entities.",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "rtk_query_vs_reselect",
+      "exampleType": "good",
+      "exampleText": "api кеш rtk query, domain filter/sort — reselect поверх уже загруженного",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "rtk_query_vs_reselect",
+      "exampleType": "bad",
+      "exampleText": "RTK Query полностью заменяет Reselect, getVisibleTodos делать через endpoints.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "redux-selectors",
+    "apiUrl": "https://api.itlead.org/api/questions/redux-selectors",
+    "pageUrl": "https://itlead.org/interview-questions/redux/redux-selectors",
+    "difficulty": "MIDDLE",
+    "titleEn": "What are selectors in Redux?",
+    "categorySlug": "redux",
+    "syncedAt": "2026-06-18T15:30:00.000Z"
+  }
+}

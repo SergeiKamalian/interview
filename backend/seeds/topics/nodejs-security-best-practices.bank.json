@@ -1,0 +1,663 @@
+{
+  "topic": {
+    "code": "nodejs_security_best_practices",
+    "name": "Практики безопасности в Node.js",
+    "skillCode": "nodejs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Какие ключевые практики безопасности применяют в Node.js backend-приложениях?",
+    "shortAnswer": "Практики безопасности в Node.js включают валидацию входа на границе, защиту от инъекций, хеширование паролей и аудит зависимостей. Три строки защищают большинство Express-маршрутов: `helmet()` для security headers, `express.json({ limit: '10kb' })` от oversized payload и `rateLimit()` от брутфорса. Валидируй на границе; никогда не доверяй сырому `req.body`.",
+    "idealAnswer": "Node.js выполняет JS на сервере без браузерной песочницы и CSP — несанитизированный ввод из `req.body` может дойти до `eval()`, `exec()` или MongoDB-оператора напрямую; event loop обрабатывает запрос синхронно в момент парсинга, поэтому ReDoS или гигантский JSON могут заморозить процесс для всех пользователей. Базовая линия защиты: `app.use(helmet())` — CSP, HSTS, X-Frame-Options и другие заголовки одной строкой; `express.json({ limit: '10kb' })` — лимит тела до парсинга; `rateLimit()` на публичных endpoint (login/signup). Валидация на границе через express-validator/Joi до любых вызовов БД — malformed input не доходит до query layer. Инъекции: SQL — только parameterized queries (`$1`, placeholders), никогда конкатенация строк; NoSQL — `{ \"password\": { \"$gt\": \"\" } }` обходит проверку если передать сырой `req.body` в find — cast к String и schema validation; command injection — `exec()` вызывает shell, `execFile('ls', [dir])` с массивом аргументов без интерполяции. Prototype pollution: `{ \"__proto__\": { \"isAdmin\": true } }` мутирует `Object.prototype` глобально до restart (CVE-2019-10744 в lodash < 4.17.21) — блокировать ключи `__proto__`, `constructor`, `prototype` при merge; безопаснее `Object.create(null)` без цепочки прототипов. Аутентификация: bcrypt с 12+ rounds, MD5/SHA-1 для паролей недопустимы; JWT — короткий access (15 мин), httpOnly cookies вместо localStorage, refresh в Redis с revocation list; RS256 вместо HS256 для ротации signing key без redeploy всех сервисов. Зависимости: `npm audit --audit-level=high` в CI, `npm ci --only=production` — dev deps не в prod (70% уязвимостей Snyk — из dev-дерева); Snyk глубже для transitive. DoS: rate limiting первая линия, body size limit вторая, ReDoS третья — опасные regex типа `/^(a+)+$/` зависают на backtracking, `re2` гарантирует линейное время; `safe-regex` в CI для флага. Секреты: `process.env.JWT_SECRET`, fail-fast если не задан; не коммитить `.env`; secrets manager (Vault, AWS Secrets Manager) в prod; не запускать от root — RCE = root на машине, `process.setuid('nobody')` или отдельный user. Типичные ошибки: `JSON.parse(req.body)` без schema validation; template literals в `exec()`; root-процесс; dev dependencies в production; `express.json()` без limit. Production-паттерны: Netflix/PayPal — helmet + body limit первым middleware; NestJS — RateLimitGuard + class-validator; Hapi — JWT strategy; Discord bots — express-session + RedisStore.",
+    "maxScore": 10,
+    "skills": [
+      "nodejs",
+      "javascript",
+      "expressjs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "validation_boundary",
+      "title": "Валидирует вход на границе",
+      "expected": "Кандидат объясняет: в Node нет браузерной песочницы; сырой req.body может дойти до eval/exec/БД; валидация middleware до handler и до query layer; express-validator/Joi на boundary; never trust req.body.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — validate at boundary, Node без sandbox",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "validation_boundary",
+            "oftenConfusedWith": [
+              "injection_prevention"
+            ],
+            "anchorTermsExpected": [
+              "границ",
+              "boundary",
+              "req.body",
+              "валидац",
+              "express-validator",
+              "Joi",
+              "до БД"
+            ],
+            "anchorTermsWrongTopic": [
+              "CSP в Node",
+              "браузер сам санитизирует",
+              "helmet заменяет валидацию"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "границ",
+              "boundary",
+              "req.body"
+            ],
+            "ask": "почему в Node нельзя полагаться на клиентскую валидацию и где именно валидировать"
+          }
+        ],
+        "mustConcepts": [
+          "границ",
+          "boundary",
+          "валидац",
+          "validate",
+          "req.body",
+          "express-validator",
+          "Joi",
+          "санитиз",
+          "sanitize",
+          "до handler",
+          "до БД",
+          "query layer",
+          "не довер",
+          "never trust",
+          "sandbox",
+          "песочниц",
+          "сервер",
+          "middleware",
+          "malformed"
+        ],
+        "falseClaims": [
+          "клиентская валидация достаточна для Node backend",
+          "helmet() заменяет input validation",
+          "можно безопасно передавать req.body напрямую в MongoDB find",
+          "браузер CSP защищает Node.js сервер",
+          "валидация нужна только на POST, GET безопасен всегда"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "injection_prevention",
+      "title": "Защищается от инъекций",
+      "expected": "Кандидат описывает SQL injection (parameterized queries), NoSQL injection (cast/schema, не сырой req.body), command injection (execFile vs exec, массив аргументов без shell).",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "три варианта injection — критичный senior-блок ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "validation_boundary",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "injection_prevention",
+            "oftenConfusedWith": [
+              "prototype_pollution"
+            ],
+            "anchorTermsExpected": [
+              "parameterized",
+              "SQL",
+              "NoSQL",
+              "execFile",
+              "$gt",
+              "конкатенац"
+            ],
+            "anchorTermsWrongTopic": [
+              "__proto__",
+              "prototype pollution",
+              "helmet XSS"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "SQL",
+              "parameterized",
+              "$1"
+            ],
+            "ask": "как предотвратить SQL injection при запросе по id из req.params"
+          },
+          {
+            "match": [
+              "NoSQL",
+              "MongoDB",
+              "$gt"
+            ],
+            "ask": "как атакующий обходит password check через { \"$gt\": \"\" } и как защититься"
+          },
+          {
+            "match": [
+              "exec",
+              "execFile",
+              "command"
+            ],
+            "ask": "почему exec(`ls ${dir}`) опасен и чем заменить"
+          }
+        ],
+        "mustConcepts": [
+          "SQL injection",
+          "parameterized",
+          "placeholder",
+          "$1",
+          "конкатенац",
+          "NoSQL",
+          "MongoDB",
+          "$gt",
+          "req.body",
+          "cast",
+          "String",
+          "command injection",
+          "exec",
+          "execFile",
+          "shell",
+          "интерпол",
+          "массив аргумент",
+          "OR 1=1",
+          "schema validator"
+        ],
+        "falseClaims": [
+          "NoSQL базы не подвержены injection",
+          "execFile всё равно вызывает shell при массиве аргументов",
+          "экранирование кавычек надёжнее parameterized queries",
+          "MongoDB operator injection невозможен при JSON body",
+          "SQL injection возможен только в legacy PHP, не в Node"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "prototype_pollution",
+      "title": "Предотвращает prototype pollution",
+      "expected": "Кандидат объясняет: __proto__/constructor/prototype в JSON мутирует Object.prototype глобально до restart; safeMerge с blocklist ключей; Object.create(null); CVE lodash; тихая глобальная мутация.",
+      "score": 2,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "часто пропускают на code review — global silent mutation ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "__proto__",
+              "prototype pollution",
+              "Object.prototype"
+            ],
+            "ask": "как prototype pollution распространяется между модулями и почему баг проявляется далеко от места атаки"
+          },
+          {
+            "match": [
+              "Object.create(null)",
+              "safeMerge",
+              "lodash"
+            ],
+            "ask": "чем Object.create(null) безопаснее обычного merge и что делать с lodash < 4.17.21"
+          }
+        ],
+        "mustConcepts": [
+          "prototype pollution",
+          "__proto__",
+          "constructor",
+          "prototype",
+          "Object.prototype",
+          "глобальн",
+          "мутац",
+          "safeMerge",
+          "Object.create(null)",
+          "blocklist",
+          "lodash",
+          "CVE-2019-10744",
+          "4.17.21",
+          "JSON.parse",
+          "наслед",
+          "for...in",
+          "Object.keys",
+          "restart",
+          "тих",
+          "isAdmin"
+        ],
+        "falseClaims": [
+          "prototype pollution локальна только для одного объекта",
+          "JSON.parse автоматически блокирует __proto__",
+          "Object.freeze(Object.prototype) — стандартная production-практика без trade-off",
+          "prototype pollution видна сразу в stack trace",
+          "lodash merge всегда безопасен в любой версии"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "auth_password_jwt",
+      "title": "Безопасно хранит пароли и JWT",
+      "expected": "Кандидат: bcrypt 12+ rounds, не MD5/SHA-1; JWT короткий access, httpOnly cookies, refresh в Redis с revocation; RS256 vs HS256 для ротации ключей.",
+      "score": 1.5,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "authentication block — bcrypt + JWT patterns ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "bcrypt",
+              "hash",
+              "12"
+            ],
+            "ask": "почему MD5/SHA-1 не подходят для паролей и сколько rounds bcrypt"
+          },
+          {
+            "match": [
+              "httpOnly",
+              "localStorage",
+              "RS256",
+              "refresh"
+            ],
+            "ask": "где хранить JWT access/refresh и чем RS256 лучше HS256 при микросервисах"
+          }
+        ],
+        "mustConcepts": [
+          "bcrypt",
+          "hash",
+          "compare",
+          "12 rounds",
+          "соль",
+          "salt",
+          "MD5",
+          "SHA-1",
+          "JWT",
+          "access token",
+          "refresh",
+          "httpOnly",
+          "cookie",
+          "localStorage",
+          "Redis",
+          "revocation",
+          "отзыв",
+          "RS256",
+          "HS256",
+          "15 минут",
+          "signing key",
+          "ротац"
+        ],
+        "falseClaims": [
+          "SHA-256 без salt достаточен для паролей",
+          "JWT в localStorage безопаснее httpOnly cookie",
+          "HS256 лучше RS256 для микросервисной ротации ключей",
+          "refresh token не нужен если access token на 24 часа",
+          "bcrypt с 4 rounds достаточен для production"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "helmet_dos_middleware",
+      "title": "Настраивает helmet, rate limit и body limit",
+      "expected": "Кандидат: helmet() — CSP, HSTS, X-Frame-Options одной строкой; express.json({ limit }); rateLimit на login/signup/API; защита от brute force и memory exhaustion.",
+      "score": 1.5,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "три строки ITLead quick example — helmet + limit + rateLimit",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "helmet",
+              "CSP",
+              "HSTS"
+            ],
+            "ask": "какие заголовки ставит helmet() и зачем первым middleware"
+          },
+          {
+            "match": [
+              "rateLimit",
+              "rate limit",
+              "10kb"
+            ],
+            "ask": "как rate limit и body size limit защищают от DoS и brute force"
+          }
+        ],
+        "mustConcepts": [
+          "helmet",
+          "CSP",
+          "HSTS",
+          "X-Frame-Options",
+          "X-Content-Type-Options",
+          "security headers",
+          "заголовк",
+          "rateLimit",
+          "rate limit",
+          "brute force",
+          "брутфорс",
+          "windowMs",
+          "max",
+          "express.json",
+          "limit",
+          "10kb",
+          "payload",
+          "memory",
+          "памят",
+          "middleware",
+          "первым"
+        ],
+        "falseClaims": [
+          "helmet защищает от SQL injection",
+          "express.json без limit безопасен для любого размера JSON",
+          "rate limit нужен только на /login, не на API",
+          "CSP заголовки не влияют на XSS в API-only backend",
+          "body limit можно ставить после route handler"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "dependency_secrets",
+      "title": "Аудирует зависимости и управляет секретами",
+      "expected": "Кандидат: npm audit --audit-level=high в CI; npm ci --only=production; Snyk для transitive; process.env для секретов, fail-fast; не root; secrets manager; не коммитить .env.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "dependency + env block — production hygiene ITLead",
+        "mustConcepts": [
+          "npm audit",
+          "audit-level",
+          "high",
+          "CI",
+          "npm ci",
+          "only=production",
+          "dev dependencies",
+          "transitive",
+          "Snyk",
+          "process.env",
+          "JWT_SECRET",
+          "secrets manager",
+          "Vault",
+          "AWS Secrets Manager",
+          ".env",
+          "git",
+          "root",
+          "setuid",
+          "nobody",
+          "www-data",
+          "RCE",
+          "ротац"
+        ],
+        "falseClaims": [
+          "npm install в production безопаснее npm ci",
+          "dev dependencies не попадают в production attack surface",
+          "hardcoded secret в коде допустим для internal API",
+          "запуск Node от root нормален в Docker",
+          "npm audit не нужен если нет прямых уязвимостей"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки безопасности Node.js",
+      "expected": "Кандидат называет: JSON.parse без schema; template literals в exec(); root-процесс; dev deps в prod; express.json без limit; ReDoS — re2/safe-regex; file upload — Multer limits + MIME filter.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Common mistakes section ITLead — бонусный checkpoint",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ReDoS",
+              "re2",
+              "regex"
+            ],
+            "ask": "как предотвратить ReDoS без переписывания всей кодовой базы"
+          },
+          {
+            "match": [
+              "Multer",
+              "file upload",
+              "MIME"
+            ],
+            "ask": "как защитить file upload в Express"
+          }
+        ],
+        "mustConcepts": [
+          "JSON.parse",
+          "schema",
+          "exec",
+          "template literal",
+          "root",
+          "dev dependencies",
+          "express.json",
+          "limit",
+          "ReDoS",
+          "re2",
+          "safe-regex",
+          "backtracking",
+          "Multer",
+          "fileSize",
+          "MIME",
+          "ClamAV",
+          "constructor prototype"
+        ],
+        "falseClaims": [
+          "ReDoS возможен только в браузере, не в Node",
+          "file upload безопасен если проверять расширение .jpg",
+          "JSON.parse безопасен для любого req.body",
+          "nodemon в production не увеличивает attack surface"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "На границе: helmet(), express.json({ limit: '10kb' }), rateLimit на /login. express-validator до handler — email isEmail, password isStrongPassword. SQL только parameterized $1. bcrypt 12 rounds. npm audit в CI, секреты из process.env, процесс не от root.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Node без sandbox — req.body может дойти до exec или Mongo $gt. Три слоя до роута: helmet, body limit, rate limit. NoSQL — cast username в String, пароль только через bcrypt.compare. Merge userData через safeMerge + Object.create(null), блок __proto__. JWT в httpOnly, refresh в Redis.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну базово helmet rateLimit validator на signup, пароли bcrypt 12, sql параметры не конкатенация, lodash обновить если старый, npm ci --only=production, .env не в git",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Клиент уже валидирует форму — на сервере можно сразу db.users.find(req.body). Пароли хеширую SHA-256, JWT кладу в localStorage. npm install на prod с devDependencies — так проще дебажить.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Prototype pollution — локальная проблема одного объекта, перезапуск не нужен. exec(`ls ${dir}`) безопасен если dir из query только буквы. helmet() защищает от SQL injection.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "express.json() без limit — ок для internal API. Root в Docker контейнере норма. npm audit можно раз в год. ReDoS только frontend проблема.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "validation_boundary",
+      "exampleType": "good",
+      "exampleText": "Валидация express-validator до async handler — malformed email не доходит до INSERT; Node не имеет CSP как браузер.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "validation_boundary",
+      "exampleType": "good",
+      "exampleText": "never trust req.body — validator chain на boundary, потом уже бизнес-логика",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "validation_boundary",
+      "exampleType": "bad",
+      "exampleText": "React форма уже проверила email — на Express можно сразу save(req.body).",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "injection_prevention",
+      "exampleType": "good",
+      "exampleText": "SQL: db.query('SELECT * FROM users WHERE id = $1', [req.params.id]). NoSQL: String(req.body.username), password только bcrypt.compare. Shell: execFile('ls', [dir], { encoding: 'utf8' }).",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "injection_prevention",
+      "exampleType": "good",
+      "exampleText": "admin' OR 1=1 не пройдёт isEmail; $gt injection не сработает если body прошёл Joi schema до find",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "injection_prevention",
+      "exampleType": "bad",
+      "exampleText": "MongoDB NoSQL injection невозможен — это document store. exec с template string ок если dir из whitelist query param.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "prototype_pollution",
+      "exampleType": "good",
+      "exampleText": "safeMerge пропускает __proto__/constructor/prototype; req.user = safeMerge(Object.create(null), req.body.userData). lodash >= 4.17.21 или npm audit fix.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "prototype_pollution",
+      "exampleType": "good",
+      "exampleText": "pollution мутирует Object.prototype глобально — {}.isAdmin станет true во всех модулях до restart, баг далеко от merge",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "prototype_pollution",
+      "exampleType": "bad",
+      "exampleText": "JSON.parse блокирует __proto__ в Node 18 — merge lodash без проверок безопасен.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "auth_password_jwt",
+      "exampleType": "good",
+      "exampleText": "bcrypt.hash(password, 12); compare на login. Access JWT 15 мин в httpOnly cookie; refresh в Redis store с revocation list; RS256 для ротации без redeploy всех сервисов.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "auth_password_jwt",
+      "exampleType": "good",
+      "exampleText": "md5 для паролей нет, sha1 тоже; jwt в localStorage — xss украдёт, httpOnly лучше",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "auth_password_jwt",
+      "exampleType": "bad",
+      "exampleText": "SHA-256(password) достаточно быстрый hash. JWT в localStorage удобнее для SPA. HS256 проще RS256 — всегда беру HS256 в микросервисах.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "helmet_dos_middleware",
+      "exampleType": "good",
+      "exampleText": "app.use(helmet()); app.use(express.json({ limit: '10kb' })); loginLimiter max 5 per 15 min на /login — первые middleware до роутов.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "helmet_dos_middleware",
+      "exampleType": "good",
+      "exampleText": "500mb json без limit парсится sync и валит память — limit 10kb до controller; rate limit на публичный api",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "helmet_dos_middleware",
+      "exampleType": "bad",
+      "exampleText": "helmet только для SSR страниц, REST API headers не нужны. rate limit после auth middleware достаточно.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "dependency_secrets",
+      "exampleType": "good",
+      "exampleText": "CI: npm audit --audit-level=high fail on high. Prod: npm ci --only=production. JWT_SECRET из env с throw если missing; Vault в prod; process.setuid('nobody') before listen.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "dependency_secrets",
+      "exampleType": "good",
+      "exampleText": "snyk на transitive, .npmrc production=true, .env в gitignore, секреты ротируем когда dev уходит",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "dependency_secrets",
+      "exampleType": "bad",
+      "exampleText": "const secret = 'my-jwt-secret' в repo ок для staging. npm install на prod быстрее ci. devDependencies jest не влияют на security.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "ReDoS: safe-regex в CI, опасные паттерны заменить на re2. Upload: Multer fileSize + MIME filter + ClamAV scan.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "не exec(`ls ${dir}`), не json.parse без joi, не root listen, не express.json() без limit",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "ReDoS лечится try/catch вокруг regex.test. File upload — достаточно проверить расширение .png в имени файла.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nodejs-security-best-practices",
+    "apiUrl": "https://api.itlead.org/api/questions/nodejs-security-best-practices",
+    "pageUrl": "https://itlead.org/interview-questions/nodejs/nodejs-security-best-practices",
+    "difficulty": "SENIOR",
+    "titleEn": "What are the key security best practices in Node.js?",
+    "categorySlug": "nodejs",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

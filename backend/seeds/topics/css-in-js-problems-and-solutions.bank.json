@@ -1,0 +1,645 @@
+{
+  "topic": {
+    "code": "css_in_js_problems_and_solutions",
+    "name": "Проблемы и решения CSS-in-JS",
+    "skillCode": "html-css",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Какие проблемы и решения у CSS-in-JS?",
+    "shortAnswer": "CSS-in-JS даёт scoped стили, динамику через props и изоляцию, но три реальные проблемы: производительность рендера (вставка стилей в DOM при каждом render), размер бандла runtime-библиотеки (~10–50KB gzipped) и SSR hydration mismatch / FOUC без серверной экстракции стилей. Решения: мемоизация динамических стилей, ServerStyleSheet/extractCritical для SSR, для статики — CSS Modules или Tailwind; для zero-runtime SSR — Linaria или Vanilla Extract.",
+    "idealAnswer": "CSS-in-JS — паттерн, где CSS живёт в JS (template literals или объекты) внутри компонентов; библиотека генерирует уникальные хешированные class names в runtime. Плюсы: scoped styles без collision, динамические стили через props, изоляция, theme support через ThemeProvider/context. Три главные проблемы: (1) Render performance — styled-components и Emotion вставляют стили в DOM при выполнении JS: parse → style functions → hash → insertRule(). В списке 1000 элементов без memoization — тысячи insertRule() на render, fps падает с 60 до ~10. Кеш StyleSheet Map: shallow-equal props → reuse hash, без DOM write. (2) Bundle size — styled-components ~20KB gzipped runtime; Tailwind после PurgeCSS ~10KB без runtime. На mobile product listing разница заметна. (3) SSR hydration — если стили только на клиенте, сервер шлёт HTML без class definitions → FOUC после hydrate. Фикс: ServerStyleSheet.collectStyles() в styled-components, extractCritical в Emotion, inline <style> в <head> до hydration. Правило выбора: динамические стили >~20% приложения — CSS-in-JS; в основном статика — CSS Modules или Tailwind; SSR-heavy с first paint — Linaria/Vanilla Extract (zero runtime). Сравнение: runtime CSS-in-JS — native dynamic via props, но runtime JS; CSS Modules — build-time local IDs, zero runtime; Tailwind — utilities, ~10KB purge. Внутри: Babel plugin extract literals, hashObject(), CSSStyleSheet.insertRule(), кеш Map. Типичные ошибки: стили в loop без useMemo/memo; пропуск SSR extraction; shouldForwardProp для non-DOM props; runtime CSS-in-JS с React Server Components — нужен build-time extract (Linaria/Vanilla Extract). Zero-runtime Linaria не eval props.color в build — динамика через CSS custom properties var(--color) inline. Реальные кейсы: Vercel dashboard styled-components + ThemeProvider; Chakra Emotion + shouldForwardProp; Remix Linaria static CSS; Module Federation — shared StyleSheet.getInstance() singleton.",
+    "maxScore": 10,
+    "skills": [
+      "html-css",
+      "css",
+      "react"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "css_in_js_definition",
+      "title": "Понимает что такое CSS-in-JS",
+      "expected": "Кандидат объясняет: стили в JS внутри компонентов, runtime hashed class names, scoped isolation, динамика через props, ThemeProvider/context.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — определение и плюсы из TL;DR ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "css_in_js_definition",
+            "oftenConfusedWith": [
+              "when_to_use"
+            ],
+            "anchorTermsExpected": [
+              "CSS-in-JS",
+              "template literal",
+              "hashed class",
+              "scoped",
+              "props",
+              "ThemeProvider"
+            ],
+            "anchorTermsWrongTopic": [
+              "CSS-in-JS это только Tailwind",
+              "inline styles и CSS-in-JS одно и то же",
+              "глобальные классы без изоляции"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "CSS-in-JS",
+              "styled",
+              "template"
+            ],
+            "ask": "чем CSS-in-JS отличается от обычного CSS файла и inline styles"
+          }
+        ],
+        "mustConcepts": [
+          "CSS-in-JS",
+          "стили в JS",
+          "template literal",
+          "объект стилей",
+          "hashed",
+          "хеш",
+          "class name",
+          "scoped",
+          "изоляц",
+          "collision",
+          "динамич",
+          "props",
+          "ThemeProvider",
+          "context",
+          "runtime",
+          "компонент"
+        ],
+        "falseClaims": [
+          "CSS-in-JS — это только inline style={{}}",
+          "CSS-in-JS не даёт scoped styles",
+          "class names в CSS-in-JS глобальные и конфликтуют",
+          "CSS-in-JS работает без JavaScript runtime"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "render_performance",
+      "title": "Понимает проблему производительности рендера",
+      "expected": "Кандидат объясняет: insertRule при каждом render, StyleSheet cache, промахи кеша в списках, useMemo/memo, fps drop на больших списках.",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "главная production-проблема #1 из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "insertRule",
+              "performance",
+              "рендер",
+              "список"
+            ],
+            "ask": "почему CSS-in-JS тормозит большой список и как insertRule связан с render"
+          },
+          {
+            "match": [
+              "useMemo",
+              "memo",
+              "кеш",
+              "cache"
+            ],
+            "ask": "как мемоизация снижает количество insertRule при динамических стилях"
+          }
+        ],
+        "mustConcepts": [
+          "insertRule",
+          "CSSOM",
+          "CSSStyleSheet",
+          "runtime",
+          "hash",
+          "хеш",
+          "кеш",
+          "cache",
+          "StyleSheet",
+          "Map",
+          "shallow-equal",
+          "промах кеша",
+          "useMemo",
+          "memo",
+          "React.memo",
+          "список",
+          "1000",
+          "fps",
+          "render",
+          "рендер",
+          "DOM write",
+          "пересчёт стилей"
+        ],
+        "falseClaims": [
+          "CSS-in-JS не влияет на performance render",
+          "insertRule вызывается только один раз при mount",
+          "кеш styled-components работает без shallow-equal props",
+          "мемоизация не нужна — библиотека сама всё оптимизирует"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "bundle_size",
+      "title": "Знает проблему размера бандла",
+      "expected": "Кандидат сравнивает: styled-components ~20KB gzipped runtime vs Tailwind ~10KB после purge без runtime; trade-off на mobile/critical pages.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "проблема #2 — bundle impact из ITLead",
+        "mustConcepts": [
+          "bundle",
+          "бандл",
+          "20KB",
+          "10KB",
+          "gzipped",
+          "runtime",
+          "styled-components",
+          "Tailwind",
+          "PurgeCSS",
+          "purge",
+          "zero runtime",
+          "mobile",
+          "product listing",
+          "dashboard",
+          "JS должен выполниться",
+          "parse time"
+        ],
+        "falseClaims": [
+          "CSS-in-JS всегда меньше Tailwind по бандлу",
+          "styled-components не добавляет runtime JS",
+          "размер бандла CSS-in-JS не влияет на first paint",
+          "Tailwind без purge весит столько же как styled-components"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "ssr_hydration_fouc",
+      "title": "Понимает SSR hydration и FOUC",
+      "expected": "Кандидат объясняет: стили только client-side → HTML без классов → FOUC; ServerStyleSheet.collectStyles, extractCritical, <style> в head до hydrate.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "проблема #3 — SSR mismatch/FOUC из ITLead",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "common_mistakes",
+            "floorFraction": 0.35
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "ssr_hydration_fouc",
+            "oftenConfusedWith": [
+              "render_performance"
+            ],
+            "anchorTermsExpected": [
+              "FOUC",
+              "ServerStyleSheet",
+              "hydration",
+              "extractCritical",
+              "head"
+            ],
+            "anchorTermsWrongTopic": [
+              "FOUC это только про картинки",
+              "SSR CSS-in-JS работает без настройки"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "FOUC",
+              "hydration",
+              "SSR"
+            ],
+            "ask": "почему без SSR extraction пользователь видит FOUC и как это связано с hydration"
+          },
+          {
+            "match": [
+              "ServerStyleSheet",
+              "extractCritical",
+              "collectStyles"
+            ],
+            "ask": "как ServerStyleSheet или extractCritical решают проблему стилей на сервере"
+          }
+        ],
+        "mustConcepts": [
+          "SSR",
+          "hydration",
+          "гидрат",
+          "FOUC",
+          "unstyled",
+          "нестилиз",
+          "flash",
+          "ServerStyleSheet",
+          "collectStyles",
+          "extractCritical",
+          "Emotion",
+          "styled-components",
+          "head",
+          "style tag",
+          "класс",
+          "class definition",
+          "сервер",
+          "клиент",
+          "mismatch",
+          "первый paint",
+          "Next.js",
+          "_document"
+        ],
+        "falseClaims": [
+          "CSS-in-JS SSR работает из коробки без конфигурации",
+          "FOUC в CSS-in-JS невозможен при SSR",
+          "стили на сервере не нужны — клиент сам всё вставит без видимого flash",
+          "hydration mismatch в стилях не влияет на UX"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Знает когда CSS-in-JS vs альтернативы",
+      "expected": "Кандидат сравнивает runtime CSS-in-JS, CSS Modules, Tailwind; правило ~20% dynamic; theme-heavy → Emotion/styled; static → Modules/Tailwind; SSR first paint → Linaria.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "decision rule и comparison table из ITLead",
+        "mustConcepts": [
+          "CSS Modules",
+          "Tailwind",
+          "динамич",
+          "статич",
+          "theme",
+          "тема",
+          "runtime",
+          "zero runtime",
+          "Linaria",
+          "Vanilla Extract",
+          "прототип",
+          "MVP",
+          "marketing",
+          "блог",
+          "SSR-heavy",
+          "first paint",
+          "20%",
+          "utility",
+          "build-time"
+        ],
+        "falseClaims": [
+          "CSS-in-JS всегда лучше CSS Modules",
+          "Tailwind не подходит для прототипов",
+          "для любого SSR нужен только runtime CSS-in-JS",
+          "CSS Modules не поддерживают scoping"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки CSS-in-JS",
+      "expected": "Кандидат называет: стили в loop без memo; пропуск SSR extraction; shouldForwardProp; runtime CSS-in-JS с RSC — нужен build-time extract.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes из ITLead — loops, SSR, props, RSC",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "loop",
+              "цикл",
+              "useMemo",
+              "ListItem"
+            ],
+            "ask": "почему генерация css в цикле без memo — главный source slowdown"
+          },
+          {
+            "match": [
+              "shouldForwardProp",
+              "forward",
+              "DOM attribute"
+            ],
+            "ask": "зачем shouldForwardProp и что ломается без него"
+          },
+          {
+            "match": [
+              "Server Components",
+              "RSC",
+              "Linaria"
+            ],
+            "ask": "почему styled-components не работает в React Server Components"
+          }
+        ],
+        "mustConcepts": [
+          "useMemo",
+          "memo",
+          "цикл",
+          "loop",
+          "ListItem",
+          "новый хеш",
+          "SSR extraction",
+          "экстракц",
+          "ServerStyleSheet",
+          "shouldForwardProp",
+          "withConfig",
+          "DOM attribute",
+          "проп в HTML",
+          "isVisible",
+          "Server Components",
+          "RSC",
+          "без браузерного JS",
+          "Linaria",
+          "Vanilla Extract",
+          "build time",
+          "ThemeProvider без SSR"
+        ],
+        "falseClaims": [
+          "в цикле можно создавать css без memo — библиотека кеширует всё",
+          "shouldForwardProp не нужен — React сам фильтрует props",
+          "styled-components работает в Server Components как на клиенте",
+          "SSR extraction опциональна и не влияет на FOUC"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "zero_runtime_alternatives",
+      "title": "Знает zero-runtime альтернативы",
+      "expected": "Кандидат объясняет: Linaria/Vanilla Extract extract CSS at build; zero runtime cost; динамика через CSS variables var(--color) inline вместо props interpolation.",
+      "score": 1,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Linaria/Vanilla Extract и trade-off dynamic props из ITLead",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Linaria",
+              "Vanilla Extract",
+              "zero-runtime"
+            ],
+            "ask": "как zero-runtime CSS-in-JS решает bundle и SSR без insertRule"
+          },
+          {
+            "match": [
+              "custom property",
+              "var(--",
+              "CSS variable"
+            ],
+            "ask": "как в Linaria передать динамический color если props interpolation недоступна"
+          }
+        ],
+        "mustConcepts": [
+          "Linaria",
+          "Vanilla Extract",
+          "zero-runtime",
+          "zero runtime",
+          "build time",
+          "сборка",
+          "extract",
+          "статический CSS",
+          "static file",
+          "insertRule",
+          "без runtime",
+          "CSS custom property",
+          "var(--",
+          "inline",
+          "props.color",
+          "динамич",
+          "interpolation",
+          "Remix",
+          "Module Federation",
+          "StyleSheet.getInstance",
+          "singleton"
+        ],
+        "falseClaims": [
+          "Linaria поддерживает props.color в template literal как styled-components",
+          "zero-runtime CSS-in-JS не может иметь динамические цвета",
+          "Vanilla Extract требует runtime JS для каждого render",
+          "переход на Linaria не меняет подход к динамическим стилям"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "CSS-in-JS — стили в JS, hashed scoped классы, динамика через props. Три проблемы: insertRule на каждый render в больших списках, ~20KB runtime бандл vs Tailwind 10KB, FOUC без ServerStyleSheet на SSR. Фикс: useMemo для динамических стилей, collectStyles в _document, для статики — CSS Modules.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На дашборде с темой беру Emotion + ThemeProvider. MetricCard с memo и useMemo на color — без этого 20 карточек обновляются каждую секунду и тысячи insertRule. SSR в Next — ServerStyleSheet в getInitialProps, стили в head до hydrate. Статический лендинг — Tailwind, CSS-in-JS не нужен.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Runtime CSS-in-JS хеширует template literal, кеширует в StyleSheet Map. Промах — новый hash каждый render. SSR без extraction — HTML без классов, FOUC. Zero-runtime Linaria extract на build, динамика через var(--color) inline.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "CSS-in-JS не влияет на performance, insertRule вызывается один раз. SSR работает из коробки, FOUC только у картинок. Tailwind всегда тяжелее styled-components.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В списке 1000 элементов создаю css в map без memo — библиотека сама оптимизирует. shouldForwardProp не нужен, React уберёт isVisible из DOM.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для SSR-heavy приложения оставляю styled-components без ServerStyleSheet — клиент быстро вставит стили, пользователь не заметит. Linaria и runtime styled-components работают одинаково с props.color.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "css_in_js_definition",
+      "exampleType": "good",
+      "exampleText": "CSS-in-JS — template literals в компоненте, библиотека генерирует sc-xyz123 hashed class, scoped без collision с глобальным CSS.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "css_in_js_definition",
+      "exampleType": "good",
+      "exampleText": "ну стили живут в js рядом с компонентом, props.primary меняет background, ThemeProvider даёт theme через context",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "css_in_js_definition",
+      "exampleType": "bad",
+      "exampleText": "CSS-in-JS — это когда пишу style={{ color: 'red' }} inline, без scoped классов.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "render_performance",
+      "exampleType": "good",
+      "exampleText": "1000 ListItem без memo — каждый render новый hash и insertRule, fps ~10. useMemo на css по id + React.memo снижает DOM writes до near zero.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "render_performance",
+      "exampleType": "good",
+      "exampleText": "StyleSheet Map кеширует hash при shallow-equal props — без memo props каждый раз новые, кеш бесполезен",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "render_performance",
+      "exampleType": "bad",
+      "exampleText": "insertRule вызывается только при первом mount компонента, re-render не трогает CSSOM.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "bundle_size",
+      "exampleType": "good",
+      "exampleText": "styled-components ~20KB gzipped runtime, JS должен выполниться до стилей. Tailwind после purge ~10KB, zero runtime — на mobile listing разница чувствительна.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "bundle_size",
+      "exampleType": "good",
+      "exampleText": "в динамическом app с сотнями уникальных runtime стилей total CSS от CSS-in-JS может быть меньше — неиспользованные правила просто не генерируются",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "bundle_size",
+      "exampleType": "bad",
+      "exampleText": "CSS-in-JS всегда 0KB runtime, bundle size не проблема никогда.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "ssr_hydration_fouc",
+      "exampleType": "good",
+      "exampleText": "Без ServerStyleSheet Next шлёт DOM без styled class definitions — hydrate, стили вставляются, FOUC. collectStyles в renderPage → getStyleElement в head до клиента.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "ssr_hydration_fouc",
+      "exampleType": "good",
+      "exampleText": "Emotion extractCritical на сервере — style block в head, клиент match pre-rendered HTML, без flash unstyled",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "ssr_hydration_fouc",
+      "exampleType": "bad",
+      "exampleText": "SSR CSS-in-JS работает автоматически, FOUC невозможен если использую ThemeProvider.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "Theme-heavy dashboard — Emotion/styled-components. Статический блог — CSS Modules. Прототип MVP — Tailwind. SSR first paint measured — Linaria zero-runtime.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "если >20% UI динамические стили через props — css-in-js; в основном layout статика — modules или tailwind",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Всегда CSS-in-JS для любого проекта, CSS Modules и Tailwind устарели.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "ListItem в loop: css`color: hsl(${id})` без useMemo — новый hash каждый parent re-render. Fix: memo + useMemo([id]).",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Box с isVisible prop без shouldForwardProp — React warning unknown DOM attribute, prop в HTML. withConfig shouldForwardProp prop !== 'isVisible'.",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "styled-components в RSC не inject стили — Server Components без browser JS. Switch Linaria/Vanilla Extract build-time static CSS.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "ThemeProvider без SSR setup ок — стили появятся после hydrate, FOUC не проблема.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "zero_runtime_alternatives",
+      "exampleType": "good",
+      "exampleText": "Linaria extract CSS at build — zero insertRule, Remix routes static files. Динамический color — style={{ '--color': color }} + css color: var(--color).",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "zero_runtime_alternatives",
+      "exampleType": "good",
+      "exampleText": "Module Federation micro-frontends — shared Emotion StyleSheet.getInstance singleton, без дублирования rules в каждом MFE",
+      "sortOrder": 24
+    },
+    {
+      "checkpointKey": "zero_runtime_alternatives",
+      "exampleType": "bad",
+      "exampleText": "Linaria eval props.color в template literal runtime как styled-components, zero-runtime не меняет API.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "css-in-js-problems-and-solutions",
+    "apiUrl": "https://api.itlead.org/api/questions/css-in-js-problems-and-solutions",
+    "pageUrl": "https://itlead.org/interview-questions/html-css/css-in-js-problems-and-solutions",
+    "difficulty": "MIDDLE",
+    "titleEn": "CSS-in-js problems and solutions",
+    "categorySlug": "html-css",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}

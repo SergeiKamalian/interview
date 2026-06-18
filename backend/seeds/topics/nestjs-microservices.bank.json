@@ -1,0 +1,596 @@
+{
+  "topic": {
+    "code": "nestjs_microservices",
+    "name": "Микросервисы в NestJS",
+    "skillCode": "nestjs",
+    "interviewWeight": 7
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "senior",
+    "difficulty": "advanced",
+    "questionText": "Как работают микросервисы в NestJS?",
+    "shortAnswer": "Микросервисы NestJS — независимые сервисы, которые общаются через транспорты (TCP, Redis, RabbitMQ, Kafka, gRPC) с помощью `@MessagePattern` и `@EventPattern` вместо HTTP-маршрутов. Та же DI и модульная система NestJS, но вместо Express/Koa — message broker и сериализация payload.",
+    "idealAnswer": "NestJS microservices — независимые сервисы, общающиеся через message transports (TCP, Redis, NATS, RabbitMQ, Kafka, gRPC, MQTT), используя те же декораторы и модули, что и HTTP-приложения, но без Express/Koa под капотом. Главное отличие от HTTP: контроллеры не `@Get`/`@Post`, а `@MessagePattern` / `@EventPattern`; клиент — `ClientProxy` с `send()` или `emit()`. Два стиля коммуникации: request-response (`@MessagePattern` + `client.send()` → Observable с ответом) и fire-and-forget (`@EventPattern` + `client.emit()` → void, без ожидания). Bootstrap: `NestFactory.createMicroservice(AppModule, { transport: Transport.TCP, options: { host, port } })` → `app.listen()` — без HTTP-порта. Клиент регистрируют через `ClientsModule.register([{ name: 'MATH_SERVICE', transport, options }])` и инжектят `@Inject('MATH_SERVICE') private client: ClientProxy`. При `client.send({ cmd: 'add' }, [2, 3])` NestJS сериализует payload (JSON по умолчанию, Protobuf для gRPC), отправляет по транспорту, `MessageBroker` матчит pattern с handler, ответ идёт обратно тем же путём. Транспорт можно сменить в `main.ts` без изменения бизнес-логики. Выбор транспорта — trade-off latency/throughput/delivery: TCP — простой internal RPC; Redis — pub/sub; RabbitMQ — ACK и exactly-once; Kafka — event log и replay; gRPC — type-safe Protobuf, ~7× throughput для бинарных payload. Внутри: `Server` per transport (для TCP — Node `net.Server`), десериализация buffer, lookup handler, сериализация ответа; event loop async, streaming transports поддерживают RxJS Observable. Hybrid app: `NestFactory.create` для HTTP + `app.connectMicroservice({ transport, options })` + `await app.startAllMicroservices()` + `await app.listen(3000)` — REST наружу, Redis/TCP внутри; ошибка — передать transport в `create` вместо `connectMicroservice` (TCP молча игнорируется). Типичные ошибки: `@Get` в microservice (нет Express); RabbitMQ без manual ACK (`@Ctx() ctx: RmqContext`, `channel.ack`, `noAck: false`) → infinite redelivery; Buffer через JSON transport ломает данные; shared local cache между инстансами — handlers stateless, state в Redis/DB. Retry: `retryAttempts`, `retryDelay` в client options, RxJS `retryWhen`. Реальные кейсы: internal RPC по TCP в K8s; e-commerce order_created через RabbitMQ; Kafka event log для replay; gRPC gateway для mobile; strangler migration через hybrid app.",
+    "maxScore": 10,
+    "skills": [
+      "nestjs",
+      "nodejs"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "microservices_definition",
+      "title": "Понимает суть NestJS microservices",
+      "expected": "Кандидат объясняет: независимые сервисы через message transports вместо HTTP; createMicroservice без Express; те же модули и DI; паттерны сообщений вместо URL-маршрутов.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — microservices vs HTTP app",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "microservices_definition",
+            "oftenConfusedWith": [
+              "http_vs_microservice_controllers",
+              "message_vs_event_pattern"
+            ],
+            "anchorTermsExpected": [
+              "микросервис",
+              "transport",
+              "createMicroservice",
+              "MessagePattern",
+              "без HTTP",
+              "без Express"
+            ],
+            "anchorTermsWrongTopic": [
+              "microservice это просто отдельный HTTP endpoint",
+              "NestJS microservices всегда используют Express"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "микросервис",
+              "transport",
+              "createMicroservice"
+            ],
+            "ask": "чем NestJS microservice отличается от обычного HTTP-приложения NestJS"
+          }
+        ],
+        "mustConcepts": [
+          "микросервис",
+          "microservice",
+          "transport",
+          "транспорт",
+          "createMicroservice",
+          "MessagePattern",
+          "без HTTP",
+          "без Express",
+          "без Koa",
+          "DI",
+          "модул",
+          "сообщен",
+          "message",
+          "независим",
+          "ClientProxy",
+          "паттерн"
+        ],
+        "falseClaims": [
+          "NestJS microservices работают только через HTTP",
+          "createMicroservice создаёт Express-сервер",
+          "микросервисы NestJS не используют DI и модули",
+          "microservices и HTTP controllers используют одинаковые декораторы маршрутизации"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "message_vs_event_pattern",
+      "title": "Различает MessagePattern и EventPattern",
+      "expected": "Кандидат объясняет: @MessagePattern + client.send() — request-response с Observable; @EventPattern + client.emit() — fire-and-forget без ответа; firstValueFrom/toPromise для await.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "два основных стиля коммуникации из ITLead",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "microservices_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "message_vs_event_pattern",
+            "oftenConfusedWith": [
+              "http_vs_microservice_controllers"
+            ],
+            "anchorTermsExpected": [
+              "MessagePattern",
+              "EventPattern",
+              "send",
+              "emit",
+              "Observable",
+              "fire-and-forget"
+            ],
+            "anchorTermsWrongTopic": [
+              "emit возвращает ответ клиенту",
+              "send не ждёт reply"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "MessagePattern",
+              "EventPattern",
+              "send",
+              "emit"
+            ],
+            "ask": "когда использовать send vs emit и какой декоратор на handler"
+          }
+        ],
+        "mustConcepts": [
+          "MessagePattern",
+          "EventPattern",
+          "send",
+          "emit",
+          "request-response",
+          "запрос-ответ",
+          "fire-and-forget",
+          "без ответа",
+          "Observable",
+          "firstValueFrom",
+          "toPromise",
+          "reply",
+          "ответ",
+          "уведомлен",
+          "query",
+          "команда"
+        ],
+        "falseClaims": [
+          "client.emit() возвращает Observable с ответом",
+          "client.send() не ждёт reply",
+          "EventPattern и MessagePattern взаимозаменяемы",
+          "@EventPattern подходит для fetch user data с ожиданием результата"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "http_vs_microservice_controllers",
+      "title": "Отличает HTTP-контроллеры от microservice",
+      "expected": "Кандидат сравнивает: HTTP — URL + verbs (@Get/@Post); microservice — message pattern + transport; сериализация JSON/Protobuf; transport можно менять без смены handler.",
+      "score": 1,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовое отличие из ITLead Key difference",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Get",
+              "Post",
+              "MessagePattern",
+              "URL"
+            ],
+            "ask": "почему @Get не работает в TCP microservice и чем заменить"
+          }
+        ],
+        "mustConcepts": [
+          "Get",
+          "Post",
+          "HTTP",
+          "URL",
+          "verb",
+          "MessagePattern",
+          "pattern",
+          "сериализ",
+          "JSON",
+          "Protobuf",
+          "gRPC",
+          "Payload",
+          "transport",
+          "handler",
+          "без маршрут"
+        ],
+        "falseClaims": [
+          "@Get работает в createMicroservice TCP mode",
+          "microservice controllers привязаны к URL paths",
+          "нельзя сменить transport без изменения handler",
+          "HTTP и microservice используют один механизм route resolution"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "transport_options",
+      "title": "Знает транспорты и trade-offs",
+      "expected": "Кандидат называет TCP, Redis, NATS, RabbitMQ, Kafka, gRPC, MQTT; сравнивает latency, throughput, delivery guarantees; когда TCP vs Kafka vs gRPC.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "таблица transport options — senior decision making",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "TCP",
+              "Kafka",
+              "RabbitMQ",
+              "gRPC"
+            ],
+            "ask": "когда выбрать TCP, а когда Kafka или RabbitMQ"
+          },
+          {
+            "match": [
+              "latency",
+              "throughput",
+              "delivery",
+              "ACK"
+            ],
+            "ask": "trade-off latency vs durability между транспортами"
+          }
+        ],
+        "mustConcepts": [
+          "TCP",
+          "Redis",
+          "NATS",
+          "RabbitMQ",
+          "Kafka",
+          "gRPC",
+          "MQTT",
+          "Transport",
+          "latency",
+          "throughput",
+          "at-most-once",
+          "at-least-once",
+          "exactly-once",
+          "ACK",
+          "replay",
+          "event log",
+          "Protobuf",
+          "internal RPC",
+          "pub/sub"
+        ],
+        "falseClaims": [
+          "TCP гарантирует exactly-once delivery",
+          "Kafka подходит только для логов, не для RPC",
+          "gRPC использует JSON по умолчанию как TCP",
+          "Redis всегда лучше RabbitMQ для order queues"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "hybrid_application",
+      "title": "Понимает hybrid app и connectMicroservice",
+      "expected": "Кандидат описывает: NestFactory.create для HTTP + connectMicroservice для второго transport + startAllMicroservices + listen; @Get и @MessagePattern в одном процессе.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "API gateway pattern из ITLead hybrid",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "connectMicroservice",
+              "startAllMicroservices",
+              "hybrid"
+            ],
+            "ask": "как в одном процессе запустить HTTP и Redis/TCP listener"
+          }
+        ],
+        "mustConcepts": [
+          "hybrid",
+          "гибрид",
+          "connectMicroservice",
+          "startAllMicroservices",
+          "NestFactory.create",
+          "listen",
+          "HTTP",
+          "gateway",
+          "REST",
+          "Redis",
+          "один процесс",
+          "API gateway",
+          "strangler"
+        ],
+        "falseClaims": [
+          "transport в NestFactory.create вторым аргументом включает microservice listener",
+          "hybrid app требует двух отдельных Node-процессов обязательно",
+          "startAllMicroservices не нужен перед listen",
+          "connectMicroservice заменяет HTTP server"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "internal_mechanism",
+      "title": "Понимает внутренний механизм обработки",
+      "expected": "Кандидат объясняет: Server per transport, MessageBroker, десериализация buffer, match pattern; RxJS Observable для streaming; gRPC через .proto и Protobuf encoding.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "How it works internally из ITLead",
+        "mustConcepts": [
+          "Server",
+          "MessageBroker",
+          "десериализ",
+          "сериализ",
+          "buffer",
+          "JSON",
+          "Protobuf",
+          "net.Server",
+          "event loop",
+          "Observable",
+          "stream",
+          "handler",
+          "pattern match",
+          "gRPC",
+          "proto"
+        ],
+        "falseClaims": [
+          "NestJS microservices используют threads для каждого сообщения",
+          "gRPC handlers не проходят через тот же pattern lookup",
+          "JSON serializer корректно сериализует Buffer",
+          "MessageBroker работает только для HTTP"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки microservices",
+      "expected": "Кандидат называет: @Get в microservice; RabbitMQ без ACK (RmqContext, noAck: false); hybrid без connectMicroservice; Buffer через JSON; shared state между инстансами — handlers stateless.",
+      "score": 2,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes — production pitfalls senior",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "hybrid_application",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "RabbitMQ",
+              "ack",
+              "RmqContext"
+            ],
+            "ask": "почему без manual ACK сообщения redeliver бесконечно"
+          },
+          {
+            "match": [
+              "Buffer",
+              "JSON",
+              "serializer"
+            ],
+            "ask": "что ломается при send Buffer через JSON transport"
+          }
+        ],
+        "mustConcepts": [
+          "Get",
+          "MessagePattern",
+          "RabbitMQ",
+          "ack",
+          "nack",
+          "RmqContext",
+          "noAck",
+          "connectMicroservice",
+          "Buffer",
+          "JSON.stringify",
+          "serializer",
+          "stateless",
+          "кеш",
+          "инстанс",
+          "redeliver",
+          "infinite loop",
+          "shared state"
+        ],
+        "falseClaims": [
+          "@Get('add') работает в TCP microservice",
+          "RabbitMQ автоматически ack без RmqContext",
+          "noAck: true — правильная настройка для manual ack",
+          "локальный кеш на каждом инстансе безопасен под нагрузкой",
+          "Buffer можно безопасно send через стандартный JSON serializer"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "NestJS microservice — createMicroservice с Transport.TCP, handler на @MessagePattern({ cmd: 'add' }). Gateway через ClientsModule и client.send ждёт Observable. Для order_created — @EventPattern и emit без ответа. Hybrid: create + connectMicroservice(REDIS) + startAllMicroservices.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Внутри K8s user-service и order-service на TCP — простой RPC. Когда нужен replay и миллионы событий — Kafka. RabbitMQ для order queue с manual ack через RmqContext. gRPC когда бинарные payload и .proto контракт между языками.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "API gateway: @Get sum → firstValueFrom(mathClient.send({ cmd: 'sum' }, numbers)). Math-service чистый TCP без HTTP. Ошибка которую видел: transport в create() — TCP молча не слушал, помог connectMicroservice.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Microservice в NestJS — это просто отдельный @Controller с @Get на другом порту. emit и send делают одно и то же с ответом.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "В RabbitMQ handler достаточно @MessagePattern без ack — Nest сам гарантирует exactly-once. Buffer через client.send с JSON transport нормально сериализуется.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Hybrid app: NestFactory.create(AppModule, { transport: Transport.TCP }) — и HTTP и TCP сразу работают. Локальный Map-кеш на каждом инстансе microservice — ок для shared user state.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "microservices_definition",
+      "exampleType": "good",
+      "exampleText": "createMicroservice без Express — слушает TCP/Redis, handlers на MessagePattern, та же DI что в HTTP app.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "microservices_definition",
+      "exampleType": "good",
+      "exampleText": "ну микросервис nest — не http роуты, а сообщения по транспорту, модули те же",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "microservices_definition",
+      "exampleType": "bad",
+      "exampleText": "NestJS microservices — это микросервисная архитектура через REST API между сервисами, Express обязателен.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "message_vs_event_pattern",
+      "exampleType": "good",
+      "exampleText": "send + MessagePattern — жду sum через firstValueFrom; emit + EventPattern order_created — fire-and-forget, статус queued сразу.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "message_vs_event_pattern",
+      "exampleType": "good",
+      "exampleText": "запрос данных юзера — send, уведомить склад — emit без reply",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "message_vs_event_pattern",
+      "exampleType": "bad",
+      "exampleText": "EventPattern возвращает Observable, send не блокирует и не ждёт ответа.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "http_vs_microservice_controllers",
+      "exampleType": "good",
+      "exampleText": "HTTP: @Get('users') по path; microservice: @MessagePattern({ cmd: 'get_users' }) — матч по pattern, не URL.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "http_vs_microservice_controllers",
+      "exampleType": "good",
+      "exampleText": "transport с TCP на RabbitMQ меняю в main.ts — handler с @Payload не трогаю",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "http_vs_microservice_controllers",
+      "exampleType": "bad",
+      "exampleText": "@Get('add') в math-service на TCP — Nest зарезолвит маршрут как в Express.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "transport_options",
+      "exampleType": "good",
+      "exampleText": "TCP для internal RPC в одной сети; Kafka когда нужен replay event log; RabbitMQ + ACK для order processing; gRPC когда Protobuf и polyglot.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "transport_options",
+      "exampleType": "good",
+      "exampleText": "redis pub/sub быстро но at-most-once; kafka extreme throughput at-least-once; grpc ~7x json для binary",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "transport_options",
+      "exampleType": "bad",
+      "exampleText": "Всегда Kafka — TCP и RabbitMQ устарели. gRPC сериализует через JSON.stringify как TCP.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "hybrid_application",
+      "exampleType": "good",
+      "exampleText": "create(AppModule) → connectMicroservice(REDIS) → startAllMicroservices() → listen(3000). @Get наружу, @MessagePattern на redis events внутри.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "hybrid_application",
+      "exampleType": "good",
+      "exampleText": "strangler: один процесс http + tcp пока не вынес math-service отдельно",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "hybrid_application",
+      "exampleType": "bad",
+      "exampleText": "NestFactory.create(AppModule, { transport: Transport.TCP, options }) — hybrid готов, connectMicroservice не нужен.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "internal_mechanism",
+      "exampleType": "good",
+      "exampleText": "TCP Server принимает buffer → JSON deserialize → MessageBroker match cmd → handler → serialize response обратно.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "internal_mechanism",
+      "exampleType": "good",
+      "exampleText": "kafka/nats handler может вернуть Observable — nest стримит клиенту; grpc через proto encode не json",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "internal_mechanism",
+      "exampleType": "bad",
+      "exampleText": "Каждое microservice сообщение обрабатывается в отдельном OS thread, MessageBroker только для HTTP.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "RabbitMQ: noAck false + channel.ack после doWork; иначе crash → redeliver loop. Buffer upload — custom serializer или gRPC.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "два инстанса с local cache — рассинхрон; state в redis/db, handlers stateless",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "В microservice @Get работает если указать transport TCP. RabbitMQ ack опционален, Nest ack по умолчанию.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nestjs-microservices",
+    "apiUrl": "https://api.itlead.org/api/questions/nestjs-microservices",
+    "pageUrl": "https://itlead.org/interview-questions/nestjs/nestjs-microservices",
+    "difficulty": "SENIOR",
+    "titleEn": "How do Microservices work in NestJS?",
+    "categorySlug": "nestjs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

@@ -1,0 +1,587 @@
+{
+  "topic": {
+    "code": "nextjs_nextlink_and_navigation_in_nextjs",
+    "name": "Next/link и навигация в Next.js",
+    "skillCode": "nextjs",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как устроена навигация в Next.js: компонент Link, хук useRouter и функция redirect?",
+    "shortAnswer": "`next/link` — основной компонент навигации: рендерит `<a>`, но выполняет client-side переход без полной перезагрузки страницы с автоматическим prefetch. `useRouter().push()` / `replace()` — программная навигация после логики (форма, API). `redirect()` — серверный редирект в Server Components и Server Actions до отправки HTML клиенту.",
+    "idealAnswer": "Next.js предоставляет три инструмента навигации под разные контексты. `Link` из `next/link` — «умный» `<a>`: в DOM обычная ссылка, но при клике Next.js перехватывает событие (`preventDefault`), маршрутизирует через router без full page reload и по умолчанию prefetch'ит маршрут при попадании ссылки во viewport (примерно в пределах трёх высот экрана). Для редко посещаемых страниц — `prefetch={false}` или ручной `router.prefetch(url)` по намерению пользователя. `useRouter` из `next/navigation` (App Router) даёт программную навигацию: `push` добавляет запись в history, `replace` перезаписывает текущую (важно после login — иначе «назад» вернёт на форму), `back`/`forward`, `refresh` перезапрашивает данные текущего маршрута, `prefetch` — ручной prefetch. В App Router нет `router.query` — query string читают через `useSearchParams`. `redirect()` из `next/navigation` работает на сервере в Server Components и Server Actions: бросает внутреннюю ошибку, которую Next.js перехватывает; `'use client'` не нужен; `return` после redirect не обязателен. Правило выбора: клик в UI → `Link`; решение после async-логики → `useRouter`; auth guard или post-mutation на сервере → `redirect()`. Активные пункты меню: `'use client'` + `usePathname()` + сравнение с `href` (для вложенных — `pathname.startsWith(href)`). Prefetch для статических маршрутов загружает полный RSC payload; для dynamic — только до ближайшего `loading.tsx`, shell сразу, данные после перехода. Типичные ошибки: обычный `<a href>` вместо `Link` (полный reload, потеря RSC cache); `router.push` после login вместо `replace`; `useRouter` в Server Component (runtime error — нужен `redirect()`); путаница `next/router` (Pages, есть `router.query`) и `next/navigation` (App, query через `useSearchParams`) — компилируется, ломается в runtime. Loading при programmatic navigation: App Router показывает `loading.tsx`; для fine control — `useTransition` + `isPending`. Intercepting routes и parallel routes: `Link` навигирует свой сегмент; `@modal` slot может оставаться смонтированным.",
+    "maxScore": 10,
+    "skills": [
+      "nextjs",
+      "react"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "link_component_basics",
+      "title": "Понимает компонент Link",
+      "expected": "Кандидат объясняет: Link рендерит `<a>`, перехватывает клик, client-side navigation без full reload; prefetch по умолчанию при viewport entry; `prefetch={false}` для редких маршрутов.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — Link как smart anchor с prefetch",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Link",
+              "next/link",
+              "prefetch"
+            ],
+            "ask": "что происходит при клике на Link и чем он отличается от обычного `<a>`"
+          }
+        ],
+        "mustConcepts": [
+          "Link",
+          "next/link",
+          "anchor",
+          "ссылк",
+          "client-side",
+          "без перезагруз",
+          "full reload",
+          "prefetch",
+          "viewport",
+          "preventDefault",
+          "перехват",
+          "href",
+          "prefetch false",
+          "RSC",
+          "router"
+        ],
+        "falseClaims": [
+          "Link рендерит div вместо anchor",
+          "Link вызывает полную перезагрузку страницы как `<a>`",
+          "prefetch по умолчанию отключён",
+          "Link требует `'use client'` на каждой странице",
+          "Link работает только в Pages Router"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "link_vs_router_vs_redirect",
+      "title": "Различает Link, useRouter и redirect",
+      "expected": "Кандидат сравнивает три инструмента: Link — декларативно в JSX, prefetch; useRouter — программно после логики, client; redirect — сервер до HTML, auth/mutations.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "таблица сравнения ITLead — ключевое решение middle",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "link_component_basics",
+            "floorFraction": 0.45
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "link_vs_router_vs_redirect",
+            "oftenConfusedWith": [
+              "server_redirect",
+              "use_router_methods"
+            ],
+            "anchorTermsExpected": [
+              "Link",
+              "useRouter",
+              "redirect",
+              "client",
+              "server",
+              "prefetch",
+              "JSX"
+            ],
+            "anchorTermsWrongTopic": [
+              "redirect в event handler на клиенте",
+              "Link для post-login",
+              "useRouter в Server Component"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Link",
+              "useRouter",
+              "redirect"
+            ],
+            "ask": "когда Link, когда useRouter, когда redirect — по контексту клика, логики и сервера"
+          }
+        ],
+        "mustConcepts": [
+          "Link",
+          "useRouter",
+          "redirect",
+          "декларатив",
+          "программ",
+          "сервер",
+          "клиент",
+          "prefetch",
+          "JSX",
+          "event handler",
+          "Server Component",
+          "Server Action",
+          "auth guard",
+          "форма",
+          "навигац"
+        ],
+        "falseClaims": [
+          "redirect() вызывают в `'use client'` компоненте для auth guard",
+          "Link заменяет useRouter после submit формы",
+          "useRouter работает в async Server Component",
+          "все три инструмента prefetch'ят одинаково",
+          "redirect добавляет запись в browser history на клиенте"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "prefetch_behavior",
+      "title": "Знает как работает prefetch",
+      "expected": "Кандидат объясняет: prefetch при viewport entry; статика — полный RSC payload; dynamic — до loading.tsx; prefetch={false} и router.prefetch по intent; риск на mobile/low bandwidth.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "prefetch механизм и dynamic routes — частый follow-up",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "prefetch",
+              "dynamic",
+              "loading.tsx"
+            ],
+            "ask": "чем prefetch статического маршрута отличается от dynamic"
+          },
+          {
+            "match": [
+              "prefetch false",
+              "admin",
+              "mobile"
+            ],
+            "ask": "когда отключать prefetch и как prefetch вручную"
+          }
+        ],
+        "mustConcepts": [
+          "prefetch",
+          "viewport",
+          "RSC payload",
+          "кеш",
+          "memory",
+          "static",
+          "dynamic",
+          "loading.tsx",
+          "shell",
+          "prefetch false",
+          "router.prefetch",
+          "admin",
+          "bandwidth",
+          "мобил",
+          "background fetch"
+        ],
+        "falseClaims": [
+          "prefetch всегда загружает полные данные dynamic route",
+          "prefetch={false} отключает client-side navigation",
+          "prefetch работает только по hover, не по viewport",
+          "prefetch кешируется между вкладками навсегда",
+          "dynamic routes не prefetch'ятся вообще"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "use_router_methods",
+      "title": "Знает useRouter и useSearchParams",
+      "expected": "Кандидат перечисляет push/replace/back/forward/refresh/prefetch; replace для login/modal; useSearchParams вместо router.query в App Router; `'use client'` обязателен.",
+      "score": 2,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "методы router и query params — практический middle",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "push",
+              "replace",
+              "history"
+            ],
+            "ask": "разница push и replace и когда replace после login"
+          },
+          {
+            "match": [
+              "useSearchParams",
+              "query"
+            ],
+            "ask": "как читать query string в App Router без router.query"
+          }
+        ],
+        "mustConcepts": [
+          "useRouter",
+          "next/navigation",
+          "push",
+          "replace",
+          "back",
+          "forward",
+          "refresh",
+          "prefetch",
+          "history",
+          "useSearchParams",
+          "query",
+          "searchParams",
+          "use client",
+          "App Router",
+          "programmatic",
+          "форма",
+          "фильтр"
+        ],
+        "falseClaims": [
+          "router.query доступен в App Router useRouter",
+          "replace добавляет новую запись в history stack",
+          "useRouter работает без `'use client'`",
+          "refresh перезагружает всю страницу как location.reload",
+          "useSearchParams работает в Server Component"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "server_redirect",
+      "title": "Понимает redirect() на сервере",
+      "expected": "Кандидат объясняет: redirect из next/navigation в Server Component/Server Action; бросает internal error; без `'use client'`; auth guard до рендера; return после redirect не нужен.",
+      "score": 1,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "базовый server-side паттерн из ITLead examples",
+        "mustConcepts": [
+          "redirect",
+          "next/navigation",
+          "Server Component",
+          "Server Action",
+          "use server",
+          "auth",
+          "guard",
+          "throws",
+          "ошибк",
+          "перехват",
+          "без use client",
+          "до HTML",
+          "mutation",
+          "login"
+        ],
+        "falseClaims": [
+          "redirect() нужно оборачивать в try/catch на клиенте",
+          "после redirect обязателен return null",
+          "redirect работает только в middleware",
+          "redirect выполняется в браузере",
+          "redirect и router.push эквивалентны в Server Action"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "active_links_pathname",
+      "title": "Знает активные ссылки через usePathname",
+      "expected": "Кандидат описывает: usePathname + сравнение с href для active class; `'use client'` для pathname; Link сам client-compatible; startsWith для nested routes.",
+      "score": 1,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "NavLink паттерн из ITLead quick example",
+        "mustConcepts": [
+          "usePathname",
+          "pathname",
+          "active",
+          "className",
+          "href",
+          "startsWith",
+          "вложен",
+          "nested",
+          "nav",
+          "sidebar",
+          "use client",
+          "Link",
+          "подсвет"
+        ],
+        "falseClaims": [
+          "usePathname работает в Server Component без `'use client'`",
+          "Link автоматически добавляет active class",
+          "pathname включает query string по умолчанию для сравнения",
+          "usePathname импортируется из next/router",
+          "active state требует отдельного `<a>` без Link"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки навигации",
+      "expected": "Кандидат называет: `<a>` вместо Link; push вместо replace после login; useRouter в Server Component; путаница next/router vs next/navigation.",
+      "score": 1.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "Common mistakes блок ITLead — production bugs",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "use_router_methods",
+            "floorFraction": 0.4
+          }
+        ],
+        "confusionPairs": [
+          {
+            "checkpointKey": "common_mistakes",
+            "oftenConfusedWith": [
+              "use_router_methods"
+            ],
+            "anchorTermsExpected": [
+              "next/router",
+              "next/navigation",
+              "router.query",
+              "replace",
+              "`<a>`"
+            ],
+            "anchorTermsWrongTopic": [
+              "router.query в App Router",
+              "Link требует useRouter"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "next/router",
+              "next/navigation",
+              "router.query"
+            ],
+            "ask": "чем отличаются импорты useRouter из next/router и next/navigation"
+          },
+          {
+            "match": [
+              "replace",
+              "login",
+              "назад"
+            ],
+            "ask": "почему после login нужен replace, а не push"
+          }
+        ],
+        "mustConcepts": [
+          "`<a>`",
+          "Link",
+          "full reload",
+          "replace",
+          "push",
+          "login",
+          "назад",
+          "history",
+          "useRouter",
+          "Server Component",
+          "redirect",
+          "next/router",
+          "next/navigation",
+          "router.query",
+          "undefined",
+          "runtime",
+          "Pages Router",
+          "App Router"
+        ],
+        "falseClaims": [
+          "`<a href>` в App Router использует тот же RSC cache что Link",
+          "push после login — правильный паттерн для back button",
+          "useRouter из next/router работает в app/ без ошибок",
+          "router.query undefined — ошибка TypeScript, не runtime",
+          "Server Component может вызывать useRouter с async"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Link — для nav и карточек: client-side переход без reload, prefetch во viewport. После submit формы — useRouter().replace('/dashboard'), чтобы «назад» не вернул на login. Auth в Server Component — redirect('/login') до рендера, без `'use client'`. Query в App Router — useSearchParams, не router.query.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "В sidebar все пункты через Link. Активный стиль — usePathname и сравнение href. Admin/settings с prefetch={false}. Поиск с фильтрами — router.push с query после debounce. Dynamic route prefetch'ит только shell до loading.tsx.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "ну link это умная ссылка — клик без перезагрузки, данные уже в кеше. после логина replace, не push. на сервере redirect, useRouter в server component упадёт",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для навигации в Next.js использую обычные `<a href>` — они быстрее Link. После login делаю router.push, чтобы history сохранилась. В Server Component вызываю useRouter().push('/login').",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "router.query в App Router читаю через useRouter из next/navigation — это стандарт. prefetch всегда грузит полный dynamic page. redirect() нужно return после вызова иначе страница отрендерится.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Link и `<a>` одинаковы в App Router, разницы нет. usePathname работает в async Server Component. next/router и next/navigation — один и тот же хук.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "link_component_basics",
+      "exampleType": "good",
+      "exampleText": "Link рендерит `<a>`, перехватывает click, router делает transition без full reload; prefetch при появлении во viewport.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "link_component_basics",
+      "exampleType": "good",
+      "exampleText": "link как обычная ссылка в dom, но клик — client navigation, about prefetch'ится заранее",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "link_component_basics",
+      "exampleType": "bad",
+      "exampleText": "Link — это wrapper div, в DOM не anchor; каждый клик перезагружает страницу.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "link_vs_router_vs_redirect",
+      "exampleType": "good",
+      "exampleText": "Nav bar — Link с prefetch. Submit search — router.push. Auth check в page.tsx — redirect до HTML.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "link_vs_router_vs_redirect",
+      "exampleType": "good",
+      "exampleText": "клик в ui — link, код решил куда идти — userouter, серверный guard — redirect",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "link_vs_router_vs_redirect",
+      "exampleType": "bad",
+      "exampleText": "redirect() вызываю в onClick клиентской кнопки — это server-side navigation.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "prefetch_behavior",
+      "exampleType": "good",
+      "exampleText": "Static /about — полный RSC payload в memory. Dynamic /users/[id] — до loading.tsx, данные после navigate. Admin — prefetch={false}.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "prefetch_behavior",
+      "exampleType": "good",
+      "exampleText": "на мобилке много prefetch бьёт bandwidth — редкие роуты без prefetch, router.prefetch на hover intent",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "prefetch_behavior",
+      "exampleType": "bad",
+      "exampleText": "prefetch={false} отключает client-side routing — Link ведёт себя как full reload.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "use_router_methods",
+      "exampleType": "good",
+      "exampleText": "router.push добавляет history; replace — для login/modal; refresh — re-fetch server data; query через useSearchParams.get('q').",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "use_router_methods",
+      "exampleType": "good",
+      "exampleText": "фильтры — push `/search?q=${q}`; после логина replace dashboard; searchParams.get difficulty",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "use_router_methods",
+      "exampleType": "bad",
+      "exampleText": "В App Router router.query.difficulty — стандартный способ читать query.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "server_redirect",
+      "exampleType": "good",
+      "exampleText": "async DashboardPage: if (!user) redirect('/login') — сервер не отдаёт HTML; redirect throws, return не нужен.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "server_redirect",
+      "exampleType": "good",
+      "exampleText": "server action createPost → db insert → redirect(`/posts/${id}`) без client js",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "server_redirect",
+      "exampleType": "bad",
+      "exampleText": "redirect() в Server Component нужно обернуть в `'use client'` и вызвать после useEffect.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "active_links_pathname",
+      "exampleType": "good",
+      "exampleText": "usePathname(); className pathname === href ? 'font-bold' : 'text-neutral'; Link не требует use client сам по себе.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "active_links_pathname",
+      "exampleType": "good",
+      "exampleText": "для /dashboard/analytics/reports — pathname.startsWith(href), не строгое равенство",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "active_links_pathname",
+      "exampleType": "bad",
+      "exampleText": "Link автоматически ставит aria-current active — usePathname не нужен.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "`<a href='/dashboard'>` — full reload и потеря RSC cache. Login success — router.replace. Server page — redirect, не useRouter.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "import useRouter from next/router в app/ — compile ok, router.query undefined в runtime",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "push после login правильнее replace — back button должен вернуть на login form.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nextjs-nextlink-and-navigation-in-nextjs",
+    "apiUrl": "https://api.itlead.org/api/questions/nextjs-nextlink-and-navigation-in-nextjs",
+    "pageUrl": "https://itlead.org/interview-questions/nextjs/nextjs-nextlink-and-navigation-in-nextjs",
+    "difficulty": "MIDDLE",
+    "titleEn": "Next/link and navigation in Next.js",
+    "categorySlug": "nextjs",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

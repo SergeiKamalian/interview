@@ -1,0 +1,621 @@
+{
+  "topic": {
+    "code": "nuxt_state_management",
+    "name": "Управление состоянием в Nuxt 3",
+    "skillCode": "nuxt",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Как управлять состоянием в Nuxt 3?",
+    "shortAnswer": "В Nuxt 3 для простых общих значений с автоматической SSR-сериализацией используют `useState`, для сторов с actions, getters и DevTools — Pinia. `useState` подходит для 1–5 примитивов (тема, локаль); Pinia — для auth, корзины и API-логики.",
+    "idealAnswer": "Управление состоянием в Nuxt 3 строится на двух инструментах: `useState` для простых общих значений без настройки и Pinia для полноценных сторов с actions, computed getters, плагинами и DevTools. `useState('key', () => initial)` регистрирует реактивный ref в runtime-контексте Nitro при SSR; строковый ключ `'key'` делает значение глобально общим — два компонента, вызывающие composable с одним ключом, получают один и тот же ref, а не отдельные копии. Значение автоматически сериализуется в HTML payload и гидрируется на клиенте без дополнительной конфигурации. Pinia через `@pinia/nuxt` создаёт сторы внутри Vue `effectScope` с изолированной реактивностью, async actions и computed getters; состояние сериализуется в `useNuxtApp().payload` на сервере и восстанавливается на клиенте. Когда что использовать: тема, локаль, простой UI-флаг → `useState`; локальные данные одного компонента → `ref`/`reactive`; auth, корзина, формы с API → Pinia с actions; производные списки и totals → Pinia getters; middleware/plugin state → `useState` или runtime config. Сравнение: useState — нулевой boilerplate, автоматическая SSR-безопасность, 1–5 примитивов; Pinia — defineStore + модуль, DevTools, масштаб до 50+ сторов, persistence через `@pinia-plugin-persistedstate/nuxt`. Типичные ошибки: мутация `useState` только в `onMounted` (server 0, client 5 → hydration mismatch; fix — `useAsyncData`); `ref` вместо `useState` для shared state (отдельные копии, сброс при навигации); отсутствие `@pinia/nuxt` в modules (пустые сторы после hydration); глубоко вложенные объекты в `useState` (частичная сериализация — flatten или Pinia + `toRaw()`). Async данные: `useAsyncData` выполняется на сервере, кладёт результат в payload, клиент читает без mismatch; `onMounted` + `$fetch` — client-only, сервер шлёт null. `useNuxtApp().payload` — статичен на один SSR-запрос; `useState` реактивен и изменяется на клиенте после hydration. В production: Shopsys — Pinia для корзины, useState для темы; Sidebase Auth — Pinia для сессий; island-компоненты — префикс ключей useState (`'cart-' + userId`), избегать глобальных сторов в `<ClientOnly>`.",
+    "maxScore": 10,
+    "skills": [
+      "nuxt",
+      "vue",
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "usestate_vs_pinia_overview",
+      "title": "Понимает useState и Pinia как два основных инструмента",
+      "expected": "Кандидат объясняет: `useState` — простые общие значения с автоматической SSR-сериализацией; Pinia — сторы с actions, getters, DevTools; главное отличие — масштаб и сложность логики.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро темы — TL;DR ITLead: два инструмента и их роли",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "usestate_vs_pinia_overview",
+            "oftenConfusedWith": [
+              "when_to_use",
+              "usestate_sharing_key"
+            ],
+            "anchorTermsExpected": [
+              "useState",
+              "Pinia",
+              "SSR",
+              "actions",
+              "getters",
+              "DevTools",
+              "сериализац"
+            ],
+            "anchorTermsWrongTopic": [
+              "Vuex обязателен",
+              "useState это Pinia store",
+              "ref заменяет useState глобально"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useState",
+              "Pinia",
+              "SSR",
+              "сериализац"
+            ],
+            "ask": "чем useState отличается от Pinia по setup и SSR в Nuxt 3"
+          }
+        ],
+        "mustConcepts": [
+          "useState",
+          "Pinia",
+          "SSR",
+          "сериализац",
+          "гидратац",
+          "actions",
+          "getters",
+          "DevTools",
+          "defineStore",
+          "общий",
+          "shared",
+          "без настройки",
+          "zero boilerplate",
+          "масштаб",
+          "store",
+          "реактивн"
+        ],
+        "falseClaims": [
+          "в Nuxt 3 только Pinia, useState не нужен",
+          "useState и Pinia делают одно и то же для любого масштаба",
+          "Pinia не поддерживает SSR в Nuxt",
+          "useState требует @pinia/nuxt модуль",
+          "Vuex — стандарт для Nuxt 3 state"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "usestate_sharing_key",
+      "title": "Понимает строковый ключ useState и общий ref",
+      "expected": "Кандидат объясняет: строковый ключ `'theme'` делает ref общим между компонентами и вызовами composable; без ключа или с `ref` — отдельные копии.",
+      "score": 1.5,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ключевой нюанс из quick example ITLead — частая ошибка middle",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "usestate_vs_pinia_overview",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ключ",
+              "theme",
+              "counter",
+              "один ref",
+              "shared"
+            ],
+            "ask": "почему два компонента с useState('counter') видят одно значение"
+          },
+          {
+            "match": [
+              "ref",
+              "composable",
+              "копия",
+              "навигац"
+            ],
+            "ask": "чем useState('count') отличается от ref(0) в composable"
+          }
+        ],
+        "mustConcepts": [
+          "строковый ключ",
+          "key",
+          "theme",
+          "counter",
+          "один ref",
+          "shared",
+          "глобально",
+          "composable",
+          "два компонента",
+          "одинаков",
+          "ref внутри",
+          "Nitro",
+          "runtime context",
+          "не две копии",
+          "useTheme",
+          "toggle"
+        ],
+        "falseClaims": [
+          "useState без строкового ключа всё равно shared между компонентами",
+          "каждый вызов useState создаёт новый независимый ref даже с одним ключом",
+          "строковый ключ нужен только на клиенте, не при SSR",
+          "useState('theme') и useState('theme') в разных composable дают разные ref",
+          "ref в composable автоматически shared как useState"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "when_to_use",
+      "title": "Знает когда useState, ref или Pinia",
+      "expected": "Кандидат называет: тема/локаль/флаг → useState; локальные данные компонента → ref/reactive; auth/корзина/API → Pinia; derived totals → Pinia getters.",
+      "score": 1.0,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "таблица when to use из ITLead — практический выбор инструмента",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "тема",
+              "локаль",
+              "auth",
+              "корзина",
+              "ref"
+            ],
+            "ask": "что выбрать для theme toggle vs shopping cart vs локального input"
+          }
+        ],
+        "mustConcepts": [
+          "тема",
+          "locale",
+          "локаль",
+          "UI флаг",
+          "ref",
+          "reactive",
+          "локальн",
+          "компонент",
+          "auth",
+          "корзина",
+          "cart",
+          "API",
+          "actions",
+          "computed getter",
+          "total",
+          "1-5 примитив",
+          "production",
+          "e-commerce"
+        ],
+        "falseClaims": [
+          "для auth всегда достаточно useState",
+          "Pinia нужен для theme toggle в любом приложении",
+          "ref подходит для shared cart между страницами",
+          "useState масштабируется до 50+ связанных сторов без Pinia",
+          "middleware state только через Pinia"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "ssr_internal_mechanics",
+      "title": "Понимает SSR-сериализацию useState и Pinia",
+      "expected": "Кандидат описывает: useState регистрирует ref в Nitro runtime, сериализует в HTML payload, клиент гидрирует; Pinia — effectScope per store, состояние в `useNuxtApp().payload`, init через `$pinia`.",
+      "score": 2.0,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "how it works internally — ключ к SSR-безопасности middle",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "Nitro",
+              "payload",
+              "HTML",
+              "сериализац"
+            ],
+            "ask": "как useState попадает из сервера на клиент без повторного fetch"
+          },
+          {
+            "match": [
+              "effectScope",
+              "$pinia",
+              "defineStore"
+            ],
+            "ask": "как Pinia восстанавливает store state после SSR"
+          }
+        ],
+        "mustConcepts": [
+          "Nitro",
+          "runtime context",
+          "HTML payload",
+          "payload",
+          "сериализац",
+          "гидратац",
+          "hydration",
+          "effectScope",
+          "$pinia",
+          "useNuxtApp",
+          "defineStore",
+          "изолирован",
+          "server",
+          "client",
+          "совпад",
+          "match"
+        ],
+        "falseClaims": [
+          "useState не сериализуется при SSR",
+          "Pinia state живёт только в localStorage на сервере",
+          "payload и useState — одно и то же API",
+          "Pinia не нуждается в инициализации на сервере в Nuxt",
+          "Nitro не участвует в useState"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки state management",
+      "expected": "Кандидат называет: мутация useState в onMounted → mismatch; ref вместо useState для shared; пропуск @pinia/nuxt; глубокие объекты в useState; правильные fix: useAsyncData, useState key, modules, flatten/Pinia.",
+      "score": 2.0,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — еженедельные баги на r/Nuxt",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "shallowAcceptMaxFraction": 0.5,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "async_ssr_patterns",
+            "floorFraction": 0.4
+          },
+          {
+            "checkpointKey": "usestate_sharing_key",
+            "floorFraction": 0.4
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "onMounted",
+              "mismatch",
+              "0",
+              "5"
+            ],
+            "ask": "почему count меняют в onMounted и получают hydration mismatch"
+          },
+          {
+            "match": [
+              "ref",
+              "useState",
+              "навигац",
+              "сброс"
+            ],
+            "ask": "почему ref(0) в composable не shared между ComponentA и ComponentB"
+          },
+          {
+            "match": [
+              "@pinia/nuxt",
+              "modules",
+              "пустой store"
+            ],
+            "ask": "что будет если забыть @pinia/nuxt в nuxt.config"
+          }
+        ],
+        "mustConcepts": [
+          "onMounted",
+          "hydration mismatch",
+          "mismatch",
+          "ref",
+          "useState",
+          "shared",
+          "навигац",
+          "сброс",
+          "@pinia/nuxt",
+          "modules",
+          "nuxt.config",
+          "глубок",
+          "вложен",
+          "flatten",
+          "toRaw",
+          "useAsyncData",
+          "fix",
+          "сервер 0 клиент 5"
+        ],
+        "falseClaims": [
+          "onMounted безопасен для установки начального shared state при SSR",
+          "ref в composable shared между всеми компонентами автоматически",
+          "Pinia работает без @pinia/nuxt если defineStore импортирован",
+          "глубокие nested объекты в useState сериализуются без проблем всегда",
+          "hydration mismatch с useState игнорируется в production"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "async_ssr_patterns",
+      "title": "Знает useAsyncData для async state при SSR",
+      "expected": "Кандидат объясняет: async в onMounted — client-only, server null vs client data → mismatch; `useAsyncData` + `$fetch` выполняется на сервере, сериализуется в payload, клиент читает без расхождения.",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "advanced example ITLead — главный fix hydration mismatch для user data",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "useAsyncData",
+              "$fetch",
+              "user",
+              "profile"
+            ],
+            "ask": "как загрузить user profile SSR-safe без mismatch"
+          },
+          {
+            "match": [
+              "onMounted",
+              "null",
+              "client-only"
+            ],
+            "ask": "почему user = null на сервере и объект на клиенте — ошибка"
+          }
+        ],
+        "mustConcepts": [
+          "useAsyncData",
+          "$fetch",
+          "onMounted",
+          "client-only",
+          "SSR",
+          "server fetch",
+          "payload",
+          "null",
+          "user",
+          "profile",
+          "mismatch",
+          "await",
+          "pages/profile",
+          "сериализ",
+          "без повторного",
+          "правильн"
+        ],
+        "falseClaims": [
+          "onMounted выполняется на сервере при SSR",
+          "useAsyncData только для клиента",
+          "можно безопасно $fetch в onMounted для SSR user data",
+          "useState('user') + onMounted fetch — рекомендуемый SSR паттерн",
+          "server и client могут иметь разный user без последствий"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "payload_vs_usestate",
+      "title": "Отличает useState от payload и знает persistence Pinia",
+      "expected": "Кандидат объясняет: payload статичен на один SSR-запрос; useState реактивен после hydration; для persist Pinia — `@pinia-plugin-persistedstate/nuxt` с `persist: true` (cookies/localStorage, SSR-safe).",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "follow-up вопросы ITLead — бонус middle",
+        "mustConcepts": [
+          "payload",
+          "useNuxtApp",
+          "статич",
+          "один запрос",
+          "реактив",
+          "после hydration",
+          "persist",
+          "persistedstate",
+          "localStorage",
+          "cookies",
+          "island",
+          "префикс ключа",
+          "ClientOnly"
+        ],
+        "falseClaims": [
+          "payload можно мутировать реактивно как useState на клиенте",
+          "useState и payload — синонимы в Nuxt",
+          "Pinia persist работает только на клиенте и ломает SSR всегда",
+          "persist: true не требует отдельного модуля",
+          "глобальный store безопасен внутри island без префикса ключа"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "В Nuxt 3 два инструмента: useState('theme', () => 'light') — shared ref с автоматической SSR-сериализацией для темы и локали; Pinia с @pinia/nuxt — auth, корзина, async actions и DevTools. Строковый ключ делает ref общим между компонентами. Async user — useAsyncData + $fetch, не onMounted.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "На e-commerce: Pinia store cart с items, computed total и addItem с POST /api/cart; theme и locale — useState в composable. SSR: cart пустой на сервере, гидрируется на клиенте после user data. Ошибку «0 на сервере, 5 на клиенте» лечу useAsyncData вместо onMounted для count.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "useState регистрирует ref в Nitro, сериализует в payload — server/client match. Pinia через effectScope, $pinia в payload. ref в composable — не shared, сброс при navigate. Persist сессии — @pinia-plugin-persistedstate/nuxt, persist: true.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Для любого state в Nuxt достаточно ref в composable — useState и Pinia устарели. SSR сам синхронизирует ref между компонентами.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "User загружаю в onMounted через $fetch в useState — это SSR-safe, mismatch только warning. Pinia работает без @pinia/nuxt если store в stores/.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "useNuxtApp().payload и useState — одно и то же реактивное API. Глубокий nested cart object в useState сериализуется полностью без рисков.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "usestate_vs_pinia_overview",
+      "exampleType": "good",
+      "exampleText": "useState — 1–5 примитивов, zero setup, SSR auto; Pinia — actions, getters, DevTools, 50+ stores для production auth/CRUD.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "usestate_vs_pinia_overview",
+      "exampleType": "good",
+      "exampleText": "ну useState как общий холодильник в офисе, pinia — полная кухня с рецептами и devtools",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "usestate_vs_pinia_overview",
+      "exampleType": "bad",
+      "exampleText": "Pinia не поддерживает SSR в Nuxt 3, только useState можно на сервере.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "usestate_sharing_key",
+      "exampleType": "good",
+      "exampleText": "useState('counter', () => 0) — ComponentA и ComponentB через useCounter() делят один ref благодаря ключу 'counter'.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "usestate_sharing_key",
+      "exampleType": "good",
+      "exampleText": "ключ 'theme' в useTheme — два вызова composable, один ref, toggle в одном месте виден везде",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "usestate_sharing_key",
+      "exampleType": "bad",
+      "exampleText": "useState('counter') в каждом composable создаёт свой независимый счётчик — ключ декоративный.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "theme/locale → useState; локальный input → ref; auth + cart + API → Pinia actions; total price → Pinia computed getter.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "good",
+      "exampleText": "фильтры поиска на nuxt.com — useState; Shopsys orders — pinia store",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "when_to_use",
+      "exampleType": "bad",
+      "exampleText": "Shopping cart на ref(0) между страницами — нормальный Nuxt паттерн, Pinia избыточен.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "ssr_internal_mechanics",
+      "exampleType": "good",
+      "exampleText": "SSR: useState ref в Nitro context → serialize в HTML payload → client hydrate без refetch. Pinia store в effectScope → payload через $pinia.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "ssr_internal_mechanics",
+      "exampleType": "good",
+      "exampleText": "nitro сериализует theme при render, клиент читает тот же light/dark — server client всегда match",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "ssr_internal_mechanics",
+      "exampleType": "bad",
+      "exampleText": "useState живёт только в браузере после hydration, сервер его не знает.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Wrong: count useState + onMounted = 5. Fix: useAsyncData('count', () => $fetch('/api/count')). Wrong: ref(0) shared. Fix: useState('count').",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "забыл @pinia/nuxt в modules — cart store пустой после hydration; deep nested object в useState — flatten или pinia",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "ref в composable shared глобально как useState, просто нужен export default.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "async_ssr_patterns",
+      "exampleType": "good",
+      "exampleText": "pages/profile: const { data: user } = await useAsyncData('user', () => $fetch('/api/user')) — fetch на сервере, payload, без mismatch.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "async_ssr_patterns",
+      "exampleType": "good",
+      "exampleText": "useAsyncUserWrong с onMounted — server null, client user object, vue warning; правильно — useAsyncData",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "async_ssr_patterns",
+      "exampleType": "bad",
+      "exampleText": "onMounted(async () => user.value = await $fetch('/api/user')) — рекомендованный SSR паттерн для Nuxt 3.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "payload_vs_usestate",
+      "exampleType": "good",
+      "exampleText": "payload — статичен на SSR-запрос; useState реактивен после hydration. Pinia persist — @pinia-plugin-persistedstate/nuxt, persist: true в store.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "payload_vs_usestate",
+      "exampleType": "good",
+      "exampleText": "islands: префикс useState 'cart-' + userId, не тащить global pinia в ClientOnly",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "payload_vs_usestate",
+      "exampleType": "bad",
+      "exampleText": "useNuxtApp().payload можно toggle как theme после mount — это тот же useState.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "nuxt-state-management",
+    "apiUrl": "https://api.itlead.org/api/questions/nuxt-state-management",
+    "pageUrl": "https://itlead.org/interview-questions/nuxt/nuxt-state-management",
+    "difficulty": "MIDDLE",
+    "titleEn": "How to manage state in Nuxt 3?",
+    "categorySlug": "nuxt",
+    "syncedAt": "2026-06-18T16:00:00.000Z"
+  }
+}

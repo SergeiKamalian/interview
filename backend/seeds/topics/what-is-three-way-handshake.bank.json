@@ -1,0 +1,545 @@
+{
+  "topic": {
+    "code": "what_is_three_way_handshake",
+    "name": "Three-way handshake в TCP",
+    "skillCode": "javascript",
+    "interviewWeight": 5
+  },
+  "question": {
+    "professionCode": "frontend_developer",
+    "level": "middle",
+    "difficulty": "intermediate",
+    "questionText": "Что такое three-way handshake в TCP и как он работает?",
+    "shortAnswer": "Three-way handshake — процесс установки TCP-соединения через три пакета: SYN, SYN-ACK и ACK. Обе стороны согласуют начальные sequence numbers до передачи данных. Происходит автоматически на уровне ядра ОС для каждого TCP-соединения.",
+    "idealAnswer": "Three-way handshake — стандартный механизм установки TCP-соединения между клиентом и сервером. Клиент отправляет SYN с начальным sequence number (ISN); сервер отвечает SYN-ACK — подтверждает ISN клиента (ack = seq + 1) и объявляет свой ISN; клиент отправляет ACK, подтверждая ISN сервера. После этого обе стороны переходят в состояние ESTABLISHED и могут передавать данные. Три шага нужны, а не два: двухшаговый обмен подтвердил бы получение SYN сервером, но клиент не подтвердил бы получение sequence number сервера — третий ACK закрывает эту дыру. Цель handshake — не передача данных, а согласование контекста: обе стороны знают, где начинается байтовый поток друг друга; дальше TCP может обнаруживать потери, дубликаты и восстанавливать порядок. UDP handshake не делает — быстрее, но без гарантии доставки (DNS, видео, игры). Handshake выполняет ядро ОС: в Node.js событие connect срабатывает только после SYN → SYN-ACK → ACK; приложение не трогает отдельные пакеты. HTTP, HTTPS, SSH, БД, WebSockets — всё начинается с TCP handshake; для HTTPS поверх него идёт TLS handshake. Ошибки: ECONNREFUSED — сервер ответил RST, порт закрыт; ETIMEDOUT — SYN-ACK не пришёл (firewall, неверный хост, мёртвый сервер); это разные проблемы с разной диагностикой. Типичные ошибки: socket.write до connect; слишком короткий timeout для удалённых серверов; путать ECONNREFUSED и ETIMEDOUT; считать ISN предсказуемым (современный TCP рандомизирует по RFC 6528). SYN flood — миллионы SYN без завершения ACK, таблица half-open переполняется; защита: SYN cookies (net.ipv4.tcp_syncookies), rate limit на nginx/HAProxy. Потеря финального ACK: сервер в SYN_RECV ретранслирует SYN-ACK ~60 сек; клиент уже ESTABLISHED и шлёт данные — сервер может ответить RST («Connection reset by peer»). TIME_WAIT относится к закрытию (four-way FIN), не к открытию. TCP Fast Open (RFC 7413) позволяет отправить данные в SYN с cookie — минус один round-trip.",
+    "maxScore": 10,
+    "skills": [
+      "javascript"
+    ]
+  },
+  "checkpoints": [
+    {
+      "key": "handshake_definition",
+      "title": "Определяет three-way handshake",
+      "expected": "Кандидат объясняет: процесс установки TCP-соединения через три пакета SYN, SYN-ACK, ACK; обе стороны согласуют ISN до передачи данных; происходит автоматически для каждого TCP-соединения.",
+      "score": 1.5,
+      "sortOrder": 0,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "ядро TL;DR — определение и три пакета",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "confusionPairs": [
+          {
+            "checkpointKey": "handshake_definition",
+            "oftenConfusedWith": [
+              "three_steps_flow",
+              "tcp_vs_udp"
+            ],
+            "anchorTermsExpected": [
+              "SYN",
+              "SYN-ACK",
+              "ACK",
+              "TCP",
+              "sequence",
+              "ISN",
+              "ESTABLISHED"
+            ],
+            "anchorTermsWrongTopic": [
+              "TLS handshake",
+              "HTTP request",
+              "UDP handshake"
+            ]
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "SYN",
+              "SYN-ACK",
+              "ACK",
+              "handshake"
+            ],
+            "ask": "какие три пакета обмениваются и зачем sequence numbers"
+          }
+        ],
+        "mustConcepts": [
+          "three-way handshake",
+          "трёхэтапн",
+          "рукопожат",
+          "SYN",
+          "SYN-ACK",
+          "ACK",
+          "TCP",
+          "sequence number",
+          "ISN",
+          "начальн",
+          "согласован",
+          "ESTABLISHED",
+          "установк",
+          "соединен",
+          "автоматическ",
+          "ядр"
+        ],
+        "falseClaims": [
+          "handshake передаёт HTTP-данные",
+          "three-way handshake это TLS",
+          "UDP тоже делает three-way handshake",
+          "handshake выполняется в коде приложения",
+          "достаточно двух пакетов для полного TCP setup"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "three_steps_flow",
+      "title": "Описывает три шага по порядку",
+      "expected": "Кандидат пошагово: SYN (клиент, ISN) → SYN-ACK (сервер, ack=client_seq+1, свой ISN) → ACK (клиент подтверждает ISN сервера) → ESTABLISHED; может упомянуть tcpdump Flags [S], [S.], [.]",
+      "score": 2,
+      "sortOrder": 1,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "пошаговый flow — ключевой middle checkpoint",
+        "impliesCheckpointFloors": [
+          {
+            "checkpointKey": "handshake_definition",
+            "floorFraction": 0.45
+          }
+        ],
+        "probeConceptGroups": [
+          {
+            "match": [
+              "SYN",
+              "seq",
+              "ack"
+            ],
+            "ask": "что именно в SYN-ACK делает сервер — два действия в одном пакете"
+          },
+          {
+            "match": [
+              "tcpdump",
+              "Flags",
+              "ESTABLISHED"
+            ],
+            "ask": "как выглядит handshake в tcpdump и когда начинаются данные"
+          }
+        ],
+        "mustConcepts": [
+          "шаг 1",
+          "шаг 2",
+          "шаг 3",
+          "SYN",
+          "SYN-ACK",
+          "ACK",
+          "клиент",
+          "сервер",
+          "ISN",
+          "seq",
+          "ack",
+          "seq+1",
+          "ack+1",
+          "ESTABLISHED",
+          "tcpdump",
+          "Flags",
+          "random",
+          "рандом"
+        ],
+        "falseClaims": [
+          "SYN-ACK только подтверждает без своего seq",
+          "данные идут до ACK",
+          "клиент не отправляет ACK",
+          "SYN и ACK — один пакет от клиента"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "why_three_not_two",
+      "title": "Объясняет почему три шага, а не два",
+      "expected": "Кандидат: два шага подтвердили бы SYN на сервере, но клиент не подтвердил бы получение ISN сервера; третий ACK доказывает, что пакеты сервера доходят до клиента.",
+      "score": 1.5,
+      "sortOrder": 2,
+      "evaluationHints": {
+        "complexityTier": "core_plus",
+        "weightRationale": "follow-up Q из ITLead — частый interview probe",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "два",
+              "три",
+              "третий",
+              "ACK"
+            ],
+            "ask": "что сломается если убрать третий ACK"
+          }
+        ],
+        "mustConcepts": [
+          "три шага",
+          "два шага",
+          "недостаточ",
+          "третий",
+          "ACK",
+          "клиент подтвержд",
+          "ISN сервера",
+          "доказательств",
+          "доходят",
+          "получил",
+          "sequence number сервера",
+          "асимметр"
+        ],
+        "falseClaims": [
+          "два шага достаточны для TCP",
+          "третий ACK только для вежливости",
+          "серверу не важно подтверждение клиента",
+          "три шага нужны только для шифрования"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "tcp_vs_udp",
+      "title": "Отличает TCP handshake от UDP",
+      "expected": "Кандидат: UDP без handshake — быстрее, без гарантии доставки; TCP handshake задаёт контекст для надёжной доставки и порядка; примеры UDP: DNS, видео, игры.",
+      "score": 1,
+      "sortOrder": 3,
+      "evaluationHints": {
+        "complexityTier": "basic",
+        "weightRationale": "Key difference from UDP — trade-off latency vs reliability",
+        "mustConcepts": [
+          "UDP",
+          "без handshake",
+          "без рукопожат",
+          "быстре",
+          "гарант",
+          "доставк",
+          "порядок",
+          "потер",
+          "DNS",
+          "видео",
+          "игр",
+          "файл",
+          "TCP",
+          "надёжн"
+        ],
+        "falseClaims": [
+          "UDP делает упрощённый three-way handshake",
+          "TCP быстрее UDP для DNS",
+          "handshake нужен для передачи первого байта в UDP"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.75
+      }
+    },
+    {
+      "key": "connection_errors",
+      "title": "Различает ECONNREFUSED и ETIMEDOUT",
+      "expected": "Кандидат: ECONNREFUSED — SYN дошёл, сервер ответил RST, порт закрыт; ETIMEDOUT — SYN-ACK не пришёл (firewall, неверный хост, мёртвый сервер); разная диагностика и retry-стратегия.",
+      "score": 2,
+      "sortOrder": 4,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "диагностика из ITLead Common mistakes и intermediate example",
+        "probePolicy": {
+          "requireProbeBeforeFinalPartial": true,
+          "minScoreAfterShallowAccept": 0.55
+        },
+        "probeConceptGroups": [
+          {
+            "match": [
+              "ECONNREFUSED",
+              "ETIMEDOUT",
+              "timeout"
+            ],
+            "ask": "ECONNREFUSED vs ETIMEDOUT — на какой фазе handshake ломается и что проверять"
+          }
+        ],
+        "mustConcepts": [
+          "ECONNREFUSED",
+          "ETIMEDOUT",
+          "RST",
+          "порт закрыт",
+          "SYN-ACK",
+          "не приш",
+          "timeout",
+          "таймаут",
+          "firewall",
+          "файрвол",
+          "недоступ",
+          "retry",
+          "диагност",
+          "EHOSTUNREACH",
+          "SYN дош"
+        ],
+        "falseClaims": [
+          "ECONNREFUSED и ETIMEDOUT — одна проблема",
+          "ETIMEDOUT значит порт закрыт",
+          "ECONNREFUSED — сервер мёртв",
+          "retry поможет при ECONNREFUSED с неверным портом"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85,
+        "falseClaimCapFraction": 0
+      }
+    },
+    {
+      "key": "common_mistakes",
+      "title": "Знает типичные ошибки при работе с TCP",
+      "expected": "Кандидат называет: write до connect; слишком короткий timeout; путать коды ошибок; предсказуемые ISN (устарело); отсутствие защиты от SYN flood (SYN cookies, rate limit).",
+      "score": 1.5,
+      "sortOrder": 5,
+      "evaluationHints": {
+        "complexityTier": "intermediate",
+        "weightRationale": "Common mistakes блок ITLead — production pitfalls",
+        "probeConceptGroups": [
+          {
+            "match": [
+              "connect",
+              "write",
+              "до"
+            ],
+            "ask": "почему нельзя socket.write до события connect"
+          },
+          {
+            "match": [
+              "SYN flood",
+              "SYN cookies",
+              "syncookies"
+            ],
+            "ask": "что такое SYN flood и как SYN cookies помогают"
+          }
+        ],
+        "mustConcepts": [
+          "connect event",
+          "до connect",
+          "write рано",
+          "timeout",
+          "100ms",
+          "5000",
+          "удалённ",
+          "ISN",
+          "random",
+          "RFC 6528",
+          "предсказу",
+          "SYN flood",
+          "half-open",
+          "SYN cookies",
+          "syncookies",
+          "rate limit",
+          "nginx",
+          "limit_conn"
+        ],
+        "falseClaims": [
+          "можно писать в socket сразу после createConnection",
+          "100ms timeout достаточен для cross-region",
+          "ISN предсказуем в современном TCP",
+          "SYN flood не влияет на production без DDoS"
+        ],
+        "minMatchedConcepts": 2,
+        "positiveFloorScore": 0.85
+      }
+    },
+    {
+      "key": "os_kernel_level",
+      "title": "Понимает уровень ядра ОС",
+      "expected": "Кандидат: handshake в ядре, не в приложении; connect в Node.js после ESTABLISHED; HTTP/SSH/БД/WebSocket — всё через TCP handshake; connection pooling избегает повторного handshake.",
+      "score": 0.5,
+      "sortOrder": 6,
+      "evaluationHints": {
+        "complexityTier": "mention",
+        "weightRationale": "Real-world usage — бонус middle",
+        "mustConcepts": [
+          "ядр",
+          "kernel",
+          "ОС",
+          "connect",
+          "createConnection",
+          "приложен",
+          "HTTP",
+          "HTTPS",
+          "SSH",
+          "pool",
+          "WebSocket"
+        ],
+        "falseClaims": [
+          "приложение само шлёт SYN пакеты",
+          "handshake только для HTTP",
+          "pooling не связан с TCP setup"
+        ],
+        "minMatchedConcepts": 1,
+        "positiveFloorScore": 0.75
+      }
+    }
+  ],
+  "examples": [
+    {
+      "exampleType": "good",
+      "exampleText": "Three-way handshake — SYN, SYN-ACK, ACK. Клиент и сервер согласуют ISN, потом ESTABLISHED и данные. В Node.js connect срабатывает когда ядро уже всё сделало. ECONNREFUSED — порт закрыт, ETIMEDOUT — SYN-ACK не вернулся, это разные причины.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "Каждый HTTP GET начинается с TCP handshake на уровне ОС — мы его не видим. Для HTTPS поверх TCP ещё TLS. UDP для DNS без handshake — быстрее, но без гарантии. На проде включил syncookies после того как staging load test выглядел как SYN flood.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "good",
+      "exampleText": "SYN с seq=x, сервер SYN-ACK seq=y ack=x+1, клиент ACK ack=y+1 — три шага потому что без ACK сервер не знает, дошёл ли его ISN. Connection pool в БД как раз чтобы не делать handshake на каждый запрос.",
+      "sortOrder": 2
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Three-way handshake — это когда HTTP шлёт GET, POST и OPTIONS. UDP делает то же самое, только быстрее.",
+      "sortOrder": 0
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "ECONNREFUSED и ETIMEDOUT — сервер просто выключен, retry всегда поможет. Можно сразу socket.write после createConnection, ядро буферизует.",
+      "sortOrder": 1
+    },
+    {
+      "exampleType": "bad",
+      "exampleText": "Два пакета достаточно: SYN и SYN-ACK. Третий ACK не нужен, TLS handshake заменяет TCP setup.",
+      "sortOrder": 2
+    },
+    {
+      "checkpointKey": "handshake_definition",
+      "exampleType": "good",
+      "exampleText": "Three-way handshake — установка TCP через SYN, SYN-ACK, ACK; обе стороны договариваются о sequence numbers до данных.",
+      "sortOrder": 10
+    },
+    {
+      "checkpointKey": "handshake_definition",
+      "exampleType": "good",
+      "exampleText": "ну это три пакета при подключении по tcp — syn, syn-ack, ack — прежде чем что-то передать",
+      "sortOrder": 11
+    },
+    {
+      "checkpointKey": "handshake_definition",
+      "exampleType": "bad",
+      "exampleText": "Handshake — это TLS-шифрование перед HTTP, три пакета несут JSON body.",
+      "sortOrder": 30
+    },
+    {
+      "checkpointKey": "three_steps_flow",
+      "exampleType": "good",
+      "exampleText": "Клиент SYN seq=1000000000 → сервер SYN-ACK seq=2000000000 ack=1000000001 → клиент ACK ack=2000000001 → GET / HTTP/1.1.",
+      "sortOrder": 12
+    },
+    {
+      "checkpointKey": "three_steps_flow",
+      "exampleType": "good",
+      "exampleText": "syn-ack одним пакетом и свой seq ставит и ack клиента эхом +1",
+      "sortOrder": 13
+    },
+    {
+      "checkpointKey": "three_steps_flow",
+      "exampleType": "bad",
+      "exampleText": "После SYN сервер сразу шлёт HTTP-ответ, ACK опционален.",
+      "sortOrder": 31
+    },
+    {
+      "checkpointKey": "why_three_not_two",
+      "exampleType": "good",
+      "exampleText": "Два шага — сервер знает что клиент жив, но клиент не подтвердил ISN сервера; третий ACK закрывает эту асимметрию.",
+      "sortOrder": 14
+    },
+    {
+      "checkpointKey": "why_three_not_two",
+      "exampleType": "good",
+      "exampleText": "без третьего ack сервер не уверен что его syn-ack дошёл до клиента",
+      "sortOrder": 15
+    },
+    {
+      "checkpointKey": "why_three_not_two",
+      "exampleType": "bad",
+      "exampleText": "Третий пакет нужен только для совместимости с HTTP/2, TCP работает и с двумя.",
+      "sortOrder": 32
+    },
+    {
+      "checkpointKey": "tcp_vs_udp",
+      "exampleType": "good",
+      "exampleText": "UDP без handshake — DNS query улетел и забыл; TCP для файлов и HTTP — каждый байт с порядком и retransmit.",
+      "sortOrder": 16
+    },
+    {
+      "checkpointKey": "tcp_vs_udp",
+      "exampleType": "good",
+      "exampleText": "видеозвонок udp — пропущенный кадр ок; скачивание файла tcp — handshake + надёжность",
+      "sortOrder": 17
+    },
+    {
+      "checkpointKey": "tcp_vs_udp",
+      "exampleType": "bad",
+      "exampleText": "UDP делает two-way handshake быстрее чем TCP three-way.",
+      "sortOrder": 33
+    },
+    {
+      "checkpointKey": "connection_errors",
+      "exampleType": "good",
+      "exampleText": "ECONNREFUSED — syn дошёл, RST, порт 8080 закрыт. ETIMEDOUT — syn ушёл в никуда, firewall или хост недоступен.",
+      "sortOrder": 18
+    },
+    {
+      "checkpointKey": "connection_errors",
+      "exampleType": "good",
+      "exampleText": "timeout 5s на remote — syn-ack может идти 200-500ms; refused retry бессмыслен если порт неверный",
+      "sortOrder": 19
+    },
+    {
+      "checkpointKey": "connection_errors",
+      "exampleType": "bad",
+      "exampleText": "ETIMEDOUT значит nginx упал, ECONNREFUSED — firewall блокирует все порты одинаково.",
+      "sortOrder": 34
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "Жду socket.on('connect') перед write — иначе handshake не завершён. ISN рандомизируется, не строю логику на предсказании seq.",
+      "sortOrder": 20
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "good",
+      "exampleText": "на проде sysctl tcp_syncookies=1 и limit_conn в nginx — иначе half-open таблица от syn flood",
+      "sortOrder": 21
+    },
+    {
+      "checkpointKey": "common_mistakes",
+      "exampleType": "bad",
+      "exampleText": "timeout 100ms для intercontinental — норм, ISN можно угадать по времени для spoofing.",
+      "sortOrder": 35
+    },
+    {
+      "checkpointKey": "os_kernel_level",
+      "exampleType": "good",
+      "exampleText": "net.createConnection — connect event после kernel SYN/SYN-ACK/ACK; callback createServer тоже только в ESTABLISHED.",
+      "sortOrder": 22
+    },
+    {
+      "checkpointKey": "os_kernel_level",
+      "exampleType": "good",
+      "exampleText": "ssh задержка — tcp handshake плюс key exchange, не только ping; websocket upgrade после tcp established",
+      "sortOrder": 23
+    },
+    {
+      "checkpointKey": "os_kernel_level",
+      "exampleType": "bad",
+      "exampleText": "В Node.js мы вручную формируем SYN-пакеты в net module перед каждым fetch.",
+      "sortOrder": 36
+    }
+  ],
+  "itlead": {
+    "slug": "what-is-three-way-handshake",
+    "apiUrl": "https://api.itlead.org/api/questions/what-is-three-way-handshake",
+    "pageUrl": "https://itlead.org/interview-questions/general/what-is-three-way-handshake",
+    "difficulty": "MIDDLE",
+    "titleEn": "What is three-way handshake?",
+    "categorySlug": "general",
+    "syncedAt": "2026-06-18T12:00:00.000Z"
+  }
+}
