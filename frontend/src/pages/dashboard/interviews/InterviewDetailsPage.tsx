@@ -13,7 +13,7 @@ import { OverallScoreCard } from '@widgets/score/OverallScoreCard';
 import { CategoryBreakdownChart } from '@widgets/score/CategoryBreakdownChart';
 import { RecommendationCard } from '@widgets/score/RecommendationCard';
 import { formatScore, formatUnixDate } from '@shared/lib/format';
-import { Alert, Button, Card, Spinner } from '@shared/ui';
+import { Alert, Button, Card, CheckboxField, Spinner, Tabs, TabsList, TabsTrigger } from '@shared/ui';
 
 type FinalEvaluationDisplay = {
   totalScore: number;
@@ -275,49 +275,45 @@ export function InterviewDetailsPage() {
 
       <Card header="Attempts timeline">
         <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={manualReviewOnly}
-              onChange={(event) => setManualReviewOnly(event.target.checked)}
-            />
-            Только с ручной проверкой
-          </label>
+          <CheckboxField
+            label="Только с ручной проверкой"
+            checked={manualReviewOnly}
+            onCheckedChange={setManualReviewOnly}
+          />
         </div>
-        <div className="flex flex-wrap gap-2">
-          {data.attempts
-            .filter((attempt) => {
-              if (!manualReviewOnly) {
-                return true;
-              }
+        <Tabs
+          value={selectedAttemptId}
+          onValueChange={(attemptId) => {
+            if (!attemptId) {
+              return;
+            }
 
-              if (attempt.attemptId === selectedAttemptId) {
-                return adaptiveReview?.needsManualReview ?? false;
-              }
+            setSearchParams((params) => {
+              params.set('attemptId', String(attemptId));
+              return params;
+            });
+          }}
+        >
+          <TabsList className="h-auto flex-wrap">
+            {data.attempts
+              .filter((attempt) => {
+                if (!manualReviewOnly) {
+                  return true;
+                }
 
-              return false;
-            })
-            .map((attempt) => (
-            <button
-              key={attempt.attemptId}
-              type="button"
-              className={[
-                'rounded-full border px-3 py-1 text-sm',
-                attempt.attemptId === selectedAttemptId
-                  ? 'border-brand-primary bg-brand-primary text-white'
-                  : 'border-slate-200 text-slate-700 hover:bg-slate-50',
-              ].join(' ')}
-              onClick={() =>
-                setSearchParams((params) => {
-                  params.set('attemptId', attempt.attemptId);
-                  return params;
-                })
-              }
-            >
-              {attempt.candidateName} · {attempt.status}
-            </button>
-          ))}
-        </div>
+                if (attempt.attemptId === selectedAttemptId) {
+                  return adaptiveReview?.needsManualReview ?? false;
+                }
+
+                return false;
+              })
+              .map((attempt) => (
+                <TabsTrigger key={attempt.attemptId} value={attempt.attemptId}>
+                  {attempt.candidateName} · {attempt.status}
+                </TabsTrigger>
+              ))}
+          </TabsList>
+        </Tabs>
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-3">

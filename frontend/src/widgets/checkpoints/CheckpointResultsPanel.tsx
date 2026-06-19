@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Card } from '@shared/ui';
+import { Badge, Card, CheckboxField } from '@shared/ui';
 
 type CheckpointItem = {
   id: string;
@@ -24,11 +24,15 @@ type CheckpointResultsPanelProps = {
   onCheckpointClick?: (messageHint: string) => void;
 };
 
-const STATUS_STYLES: Record<string, string> = {
-  met: 'bg-green-100 text-green-800',
-  partially_met: 'bg-amber-100 text-amber-800',
-  not_met: 'bg-red-100 text-red-800',
+const STATUS_VARIANTS: Record<string, 'success' | 'warning' | 'destructive' | 'muted'> = {
+  met: 'success',
+  partially_met: 'warning',
+  not_met: 'destructive',
 };
+
+function checkpointStatusVariant(status: string) {
+  return STATUS_VARIANTS[status] ?? 'muted';
+}
 
 export function CheckpointResultsPanel({
   questionGroups,
@@ -60,18 +64,15 @@ export function CheckpointResultsPanel({
   return (
     <Card header="Checkpoint results">
       <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={issuesOnly}
-            onChange={(event) => setIssuesOnly(event.target.checked)}
-          />
-          Только проблемные checkpoints
-        </label>
+        <CheckboxField
+          label="Только проблемные checkpoints"
+          checked={issuesOnly}
+          onCheckedChange={setIssuesOnly}
+        />
         <div className="flex flex-wrap gap-2 text-xs">
-          <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-800">met</span>
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">partially</span>
-          <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-800">not met</span>
+          <Badge variant="success">met</Badge>
+          <Badge variant="warning">partially</Badge>
+          <Badge variant="destructive">not met</Badge>
         </div>
       </div>
 
@@ -81,9 +82,7 @@ export function CheckpointResultsPanel({
             <div className="mb-2 flex items-start justify-between gap-2">
               <h4 className="text-sm font-medium text-slate-900">{group.questionText}</h4>
               {group.needsManualReview && (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                  manual review
-                </span>
+                <Badge variant="warning">manual review</Badge>
               )}
             </div>
             <div className="space-y-2">
@@ -98,14 +97,9 @@ export function CheckpointResultsPanel({
                 >
                   <div className="mb-1 flex items-center justify-between gap-2">
                     <span className="font-medium text-slate-800">{checkpoint.checkpointTitle}</span>
-                    <span
-                      className={[
-                        'rounded-full px-2 py-0.5 text-xs font-medium',
-                        STATUS_STYLES[checkpoint.status] ?? 'bg-slate-100 text-slate-700',
-                      ].join(' ')}
-                    >
+                    <Badge variant={checkpointStatusVariant(checkpoint.status)}>
                       {checkpoint.status}
-                    </span>
+                    </Badge>
                   </div>
                   <p className="text-xs text-slate-600">
                     {checkpoint.scoreAwarded}/{checkpoint.maxScore} · {checkpoint.reasoningShort}

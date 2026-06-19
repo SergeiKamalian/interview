@@ -1,11 +1,16 @@
-import { Card } from '@shared/ui';
+import { Badge, Card } from '@shared/ui';
+import type { VariantProps } from 'class-variance-authority';
 
-const LABELS: Record<string, { label: string; className: string }> = {
-  strong_invite: { label: 'Strong Hire', className: 'bg-green-100 text-green-800' },
-  invite: { label: 'Hire', className: 'bg-emerald-100 text-emerald-800' },
-  maybe: { label: 'Hold', className: 'bg-amber-100 text-amber-800' },
-  reject: { label: 'No Hire', className: 'bg-orange-100 text-orange-800' },
-  strong_reject: { label: 'No Hire', className: 'bg-red-100 text-red-800' },
+import { badgeVariants } from '@shared/ui/badge';
+
+type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>['variant']>;
+
+const LABELS: Record<string, { label: string; variant: BadgeVariant }> = {
+  strong_invite: { label: 'Strong Hire', variant: 'success' },
+  invite: { label: 'Hire', variant: 'success' },
+  maybe: { label: 'Hold', variant: 'warning' },
+  reject: { label: 'No Hire', variant: 'orange' },
+  strong_reject: { label: 'No Hire', variant: 'destructive' },
 };
 
 type RecommendationCardProps = {
@@ -39,20 +44,15 @@ export function RecommendationCard({
 
   const badge = LABELS[hireRecommendation] ?? {
     label: hireRecommendation,
-    className: 'bg-slate-100 text-slate-700',
+    variant: 'muted' as BadgeVariant,
   };
 
   return (
     <Card header="Recommendation">
       <div className="space-y-3">
-        <span
-          className={[
-            'inline-flex rounded-full px-3 py-1 text-sm font-semibold',
-            badge.className,
-          ].join(' ')}
-        >
+        <Badge variant={badge.variant} className="h-auto px-3 py-1 text-sm font-semibold">
           {badge.label}
-        </span>
+        </Badge>
         {needsManualReview && (
           <p className="text-sm font-medium text-amber-700">
             ⚠ Требуется manual review

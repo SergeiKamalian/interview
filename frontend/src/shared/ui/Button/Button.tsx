@@ -1,25 +1,30 @@
 import type { ButtonHTMLAttributes } from 'react';
-import { Spinner } from '../Spinner/Spinner';
+import { Loader2 } from 'lucide-react';
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost';
-type ButtonSize = 'sm' | 'md' | 'lg';
+import { Button as ShadcnButton } from '../button';
+
+type LegacyVariant = 'primary' | 'secondary' | 'ghost';
+type LegacySize = 'sm' | 'md' | 'lg';
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: ButtonVariant;
-  size?: ButtonSize;
+  variant?: LegacyVariant;
+  size?: LegacySize;
   loading?: boolean;
 };
 
-const variantClasses: Record<ButtonVariant, string> = {
-  primary: 'bg-brand-primary text-white hover:bg-blue-700',
-  secondary: 'bg-slate-200 text-slate-900 hover:bg-slate-300',
-  ghost: 'bg-transparent text-slate-700 hover:bg-slate-100',
+const variantMap: Record<
+  LegacyVariant,
+  'default' | 'secondary' | 'ghost'
+> = {
+  primary: 'default',
+  secondary: 'secondary',
+  ghost: 'ghost',
 };
 
-const sizeClasses: Record<ButtonSize, string> = {
-  sm: 'px-3 py-1.5 text-sm',
-  md: 'px-4 py-2 text-sm',
-  lg: 'px-5 py-2.5 text-base',
+const sizeMap: Record<LegacySize, 'sm' | 'default' | 'lg'> = {
+  sm: 'sm',
+  md: 'default',
+  lg: 'lg',
 };
 
 export function Button({
@@ -27,26 +32,21 @@ export function Button({
   size = 'md',
   loading = false,
   disabled,
-  className = '',
+  className,
   children,
   ...props
 }: ButtonProps) {
   return (
-    <button
+    <ShadcnButton
       type="button"
+      variant={variantMap[variant]}
+      size={sizeMap[size]}
       disabled={disabled ?? loading}
-      className={[
-        'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors',
-        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary',
-        'disabled:cursor-not-allowed disabled:opacity-60',
-        variantClasses[variant],
-        sizeClasses[size],
-        className,
-      ].join(' ')}
+      className={className}
       {...props}
     >
-      {loading && <Spinner size="sm" label="Loading" />}
+      {loading && <Loader2 className="size-4 animate-spin" aria-hidden />}
       {children}
-    </button>
+    </ShadcnButton>
   );
 }

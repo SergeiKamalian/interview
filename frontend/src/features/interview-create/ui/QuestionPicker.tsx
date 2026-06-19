@@ -1,5 +1,5 @@
 import type { QuestionListItem } from '@entities/question/model/types';
-import { Button } from '@shared/ui';
+import { Button, Checkbox, ScrollArea } from '@shared/ui';
 
 type QuestionPickerProps = {
   items: QuestionListItem[];
@@ -34,24 +34,25 @@ export function QuestionPicker({
         <h3 className="mb-2 text-sm font-medium text-slate-800">
           Доступные вопросы
         </h3>
-        <ul className="max-h-96 space-y-2 overflow-y-auto rounded-lg border border-slate-200 p-3">
-          {items.map((item) => (
-            <li key={item.id} className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={selectedIds.includes(item.id)}
-                onChange={() => onToggle(item.id)}
-                className="mt-1"
-              />
-              <div>
-                <p className="text-slate-900">{truncate(item.questionText)}</p>
-                <p className="text-xs text-slate-500">
-                  {item.topic.name} · {item.level} · {item.difficulty}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <ScrollArea className="max-h-96 rounded-lg border border-border p-3">
+          <ul className="space-y-2">
+            {items.map((item) => (
+              <li key={item.id} className="flex items-start gap-2 text-sm">
+                <Checkbox
+                  checked={selectedIds.includes(item.id)}
+                  onCheckedChange={() => onToggle(item.id)}
+                  className="mt-0.5"
+                />
+                <div>
+                  <p className="text-slate-900">{truncate(item.questionText)}</p>
+                  <p className="text-xs text-slate-500">
+                    {item.topic.name} · {item.level} · {item.difficulty}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </ScrollArea>
       </section>
 
       <section>
@@ -71,7 +72,7 @@ export function QuestionPicker({
               return (
                 <li
                   key={id}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm"
                 >
                   <span className="text-slate-800">
                     {index + 1}. {truncate(item.questionText, 48)}

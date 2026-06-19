@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useCompanyCandidatesQuery } from '@entities/candidate/api/candidatesApi';
 import { useDebouncedValue } from '@shared/lib/useDebouncedValue';
 import { formatScore, formatUnixDate } from '@shared/lib/format';
-import { Alert, Button, Card, Input, Spinner } from '@shared/ui';
+import { Alert, Badge, Button, Card, CheckboxField, Input, SelectField, Spinner } from '@shared/ui';
 
 export function CandidatesPage() {
   const [search, setSearch] = useState('');
@@ -43,25 +43,22 @@ export function CandidatesPage() {
             }}
             placeholder="Поиск по имени или email"
           />
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              checked={shortlistedOnly}
-              onChange={(event) => {
-                setShortlistedOnly(event.target.checked);
-                setPage(1);
-              }}
-            />
-            Только shortlist
-          </label>
-          <select
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+          <CheckboxField
+            label="Только shortlist"
+            checked={shortlistedOnly}
+            onCheckedChange={(checked) => {
+              setShortlistedOnly(checked);
+              setPage(1);
+            }}
+          />
+          <SelectField
             value={sort}
-            onChange={(event) => setSort(event.target.value)}
-          >
-            <option value="avg_score">Сортировка: avg score</option>
-            <option value="last_interview_date">Сортировка: last interview</option>
-          </select>
+            onValueChange={setSort}
+            options={[
+              { value: 'avg_score', label: 'Сортировка: avg score' },
+              { value: 'last_interview_date', label: 'Сортировка: last interview' },
+            ]}
+          />
           <Button variant="secondary" onClick={() => void refetch()}>
             Обновить
           </Button>
@@ -122,16 +119,13 @@ export function CandidatesPage() {
                         {formatUnixDate(item.lastInterviewDate)}
                       </td>
                       <td className="px-4 py-3">
-                        <span
-                          className={[
-                            'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-                            item.shortlistStatus === 'shortlisted'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-slate-100 text-slate-600',
-                          ].join(' ')}
+                        <Badge
+                          variant={
+                            item.shortlistStatus === 'shortlisted' ? 'success' : 'muted'
+                          }
                         >
                           {item.shortlistStatus}
-                        </span>
+                        </Badge>
                       </td>
                       <td className="px-4 py-3">
                         <Link

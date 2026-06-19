@@ -7,7 +7,7 @@ import {
 } from '@features/interview-create/api/interviewCreateApi';
 import { QuestionPicker } from '@features/interview-create/ui/QuestionPicker';
 import { useQuestionSelection } from '@features/interview-create/model/useQuestionSelection';
-import { Alert, Button, Card, Input } from '@shared/ui';
+import { Alert, Button, Card, Input, SelectField, Textarea } from '@shared/ui';
 
 export function CreateInterviewPage() {
   const navigate = useNavigate();
@@ -84,41 +84,32 @@ export function CreateInterviewPage() {
             value={jobRole}
             onChange={(e) => setJobRole(e.target.value)}
           />
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Уровень
-            </label>
-            <select
-              value={level}
-              onChange={(e) =>
-                setLevel(e.target.value as typeof level)
-              }
-              className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            >
-              <option value="junior">junior</option>
-              <option value="middle">middle</option>
-              <option value="senior">senior</option>
-              <option value="lead">lead</option>
-            </select>
-          </div>
+          <SelectField
+            label="Уровень"
+            value={level}
+            onValueChange={(value) => setLevel(value as typeof level)}
+            options={[
+              { value: 'junior', label: 'junior' },
+              { value: 'middle', label: 'middle' },
+              { value: 'senior', label: 'senior' },
+              { value: 'lead', label: 'lead' },
+            ]}
+          />
           <Input
             label="Имя интервьюера (TTS)"
             value={interviewerName}
             onChange={(e) => setInterviewerName(e.target.value)}
             placeholder="AI-интервьюер"
           />
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Текст приветствия
-            </label>
-            <textarea
+          <div className="md:col-span-2 space-y-1.5">
+            <Textarea
+              label="Текст приветствия"
               value={welcomeMessageTemplate}
               onChange={(e) => setWelcomeMessageTemplate(e.target.value)}
               placeholder="Привет, {{candidateName}}! Я {{interviewerName}}. Сегодня у нас интервью на позицию «{{jobRole}}». Готов начать?"
               rows={4}
-              className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
             />
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="text-xs text-muted-foreground">
               Плейсхолдеры: {'{{candidateName}}'}, {'{{interviewerName}}'},{' '}
               {'{{jobRole}}'}, {'{{title}}'}, {'{{questionCount}}'}
             </p>

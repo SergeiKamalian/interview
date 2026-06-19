@@ -4,7 +4,7 @@ import { useCompanyInterviewsQuery } from '@entities/interview/api/interviewsApi
 import type { AttemptStatus } from '@shared/api/graphql/generated/graphql';
 import { useDebouncedValue } from '@shared/lib/useDebouncedValue';
 import { formatScore, formatUnixDate } from '@shared/lib/format';
-import { Alert, Button, Card, Input, Spinner } from '@shared/ui';
+import { Alert, Button, Card, Input, SelectField, Spinner } from '@shared/ui';
 
 export function InterviewsPage() {
   const [search, setSearch] = useState('');
@@ -49,28 +49,29 @@ export function InterviewsPage() {
             }}
             placeholder="Поиск: кандидат, email, роль…"
           />
-          <select
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+          <SelectField
             value={status}
-            onChange={(event) => {
-              setStatus(event.target.value as AttemptStatus | '');
+            onValueChange={(value) => {
+              setStatus(value as AttemptStatus | '');
               setPage(1);
             }}
-          >
-            <option value="">Все статусы</option>
-            <option value="pending">pending</option>
-            <option value="in_progress">in_progress</option>
-            <option value="completed">completed</option>
-            <option value="abandoned">abandoned</option>
-          </select>
-          <select
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            placeholder="Все статусы"
+            options={[
+              { value: '', label: 'Все статусы' },
+              { value: 'pending', label: 'pending' },
+              { value: 'in_progress', label: 'in_progress' },
+              { value: 'completed', label: 'completed' },
+              { value: 'abandoned', label: 'abandoned' },
+            ]}
+          />
+          <SelectField
             value={sort}
-            onChange={(event) => setSort(event.target.value)}
-          >
-            <option value="created_at">Сортировка: дата</option>
-            <option value="overall_score">Сортировка: score</option>
-          </select>
+            onValueChange={setSort}
+            options={[
+              { value: 'created_at', label: 'Сортировка: дата' },
+              { value: 'overall_score', label: 'Сортировка: score' },
+            ]}
+          />
           <Button variant="secondary" onClick={() => void refetch()}>
             Обновить
           </Button>

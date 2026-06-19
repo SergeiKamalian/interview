@@ -1,5 +1,9 @@
 import type { InputHTMLAttributes } from 'react';
 
+import { Label } from '../label';
+import { Input as ShadcnInput } from '../input';
+import { cn } from '@shared/lib/utils';
+
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   label?: string;
   error?: string;
@@ -9,23 +13,19 @@ export function Input({ label, error, id, className = '', ...props }: InputProps
   const inputId = id ?? props.name;
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       {label && (
-        <label htmlFor={inputId} className="block text-sm font-medium text-slate-700">
+        <Label htmlFor={inputId} className="text-sm font-medium">
           {label}
-        </label>
+        </Label>
       )}
-      <input
+      <ShadcnInput
         id={inputId}
-        className={[
-          'block w-full rounded-lg border px-3 py-2 text-sm shadow-sm',
-          'focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-blue-200',
-          error ? 'border-red-500' : 'border-slate-300',
-          className,
-        ].join(' ')}
+        aria-invalid={error ? true : undefined}
+        className={cn(className)}
         {...props}
       />
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useQuestionByIdQuery } from '@features/question-bank/api/questionBankApi';
 import type { QuestionListItem } from '@entities/question/model/types';
 import { QuestionExamples } from '@entities/question/ui/QuestionExamples';
-import { Alert, Button, Spinner } from '@shared/ui';
+import { Alert, Badge, Button, Spinner } from '@shared/ui';
 
 type QuestionBankTableProps = {
   items: QuestionListItem[];
@@ -55,16 +55,9 @@ export function QuestionBankTable({
                   {item.topic.interviewWeight ?? '—'}
                 </td>
                 <td className="px-4 py-3">
-                  <span
-                    className={[
-                      'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-                      item.isActive
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-slate-100 text-slate-600',
-                    ].join(' ')}
-                  >
+                  <Badge variant={item.isActive ? 'success' : 'muted'}>
                     {item.isActive ? 'active' : 'archived'}
-                  </span>
+                  </Badge>
                 </td>
                 <td className="px-4 py-3">
                   <Button

@@ -1,4 +1,9 @@
-import { Card } from '@shared/ui';
+import { Badge, Card } from '@shared/ui';
+import type { VariantProps } from 'class-variance-authority';
+
+import { badgeVariants } from '@shared/ui/badge';
+
+type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>['variant']>;
 
 type OverallScoreCardProps = {
   score?: number | null;
@@ -7,11 +12,11 @@ type OverallScoreCardProps = {
   interim?: boolean;
 };
 
-function scoreZone(score: number): string {
-  if (score >= 80) return 'text-green-700 bg-green-50 border-green-200';
-  if (score >= 60) return 'text-blue-700 bg-blue-50 border-blue-200';
-  if (score >= 40) return 'text-amber-700 bg-amber-50 border-amber-200';
-  return 'text-red-700 bg-red-50 border-red-200';
+function scoreVariant(score: number): BadgeVariant {
+  if (score >= 80) return 'success';
+  if (score >= 60) return 'info';
+  if (score >= 40) return 'warning';
+  return 'destructive';
 }
 
 export function OverallScoreCard({
@@ -40,16 +45,16 @@ export function OverallScoreCard({
 
   return (
     <Card header={interim ? 'Overall score (промежуточно)' : 'Overall score'}>
-      <div
-        className={[
-          'inline-flex items-baseline gap-2 rounded-lg border px-4 py-3',
-          scoreZone(normalized),
-        ].join(' ')}
+      <Badge
+        variant={scoreVariant(normalized)}
+        className="h-auto gap-2 rounded-lg border px-4 py-3 text-3xl font-semibold"
       >
-        <span className="text-3xl font-semibold">{normalized.toFixed(0)}</span>
-        <span className="text-sm">/ 100</span>
-        <span className="text-sm text-slate-500">({score.toFixed(1)} / 10)</span>
-      </div>
+        <span>{normalized.toFixed(0)}</span>
+        <span className="text-sm font-normal">/ 100</span>
+        <span className="text-sm font-normal text-muted-foreground">
+          ({score.toFixed(1)} / 10)
+        </span>
+      </Badge>
       <p className="mt-3 text-xs text-slate-500">
         {interim
           ? 'Промежуточный score по уже оценённым checkpoints. Финальная оценка появится после завершения интервью.'
