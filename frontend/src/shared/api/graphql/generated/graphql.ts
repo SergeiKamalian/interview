@@ -44,6 +44,26 @@ export type CompanyCandidatesFilterInput = {
   topicCode?: string | null | undefined;
 };
 
+export type CompanyInterviewSummariesFilterInput = {
+  hasAttemptsOnly?: boolean | null | undefined;
+  interviewLanguage?: string | null | undefined;
+  level?: QuestionLevel | null | undefined;
+  page?: number;
+  pageSize?: number;
+  search?: string | null | undefined;
+  sort?: string;
+  sortDirection?: string;
+  status?: InterviewStatus | null | undefined;
+};
+
+export type CompanyInterviewTemplatesFilterInput = {
+  includeArchived?: boolean | null | undefined;
+  level?: QuestionLevel | null | undefined;
+  page?: number;
+  pageSize?: number;
+  search?: string | null | undefined;
+};
+
 export type CompanyInterviewsFilterInput = {
   dateFrom?: string | null | undefined;
   dateTo?: string | null | undefined;
@@ -68,6 +88,25 @@ export type CreateInterviewInput = {
   title: string;
   welcomeMessageTemplate?: string | null | undefined;
 };
+
+export type CreateInterviewTemplateInput = {
+  interviewLanguage?: string | null | undefined;
+  interviewerName?: string | null | undefined;
+  isVideoEnabled?: boolean | null | undefined;
+  jobDescription?: string | null | undefined;
+  jobRole: string;
+  level: QuestionLevel;
+  professionId?: string | number | null | undefined;
+  questionIds: Array<string | number>;
+  title: string;
+  welcomeMessageTemplate?: string | null | undefined;
+};
+
+export type DashboardAttentionKind =
+  | 'abandoned'
+  | 'in_progress'
+  | 'needs_review'
+  | 'strong_candidate';
 
 export type FinalEvaluationCategory =
   | 'average'
@@ -102,6 +141,10 @@ export type InterviewStrengthCategory =
   | 'medium'
   | 'strong'
   | 'weak';
+
+export type InterviewTemplateStatus =
+  | 'active'
+  | 'archived';
 
 export type LoginInput = {
   email: string;
@@ -217,6 +260,25 @@ export type CompanyCandidatesQueryVariables = Exact<{
 
 export type CompanyCandidatesQuery = { companyCandidates: { total: number, page: number, pageSize: number, items: Array<{ candidateId: string, fullName: string, email: string, interviewsCount: number, avgScore: number | null, lastInterviewDate: number | null, shortlistStatus: string }> } };
 
+export type CompanyDashboardOverviewQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type CompanyDashboardOverviewQuery = { companyDashboardOverview: { interviewsTotal: number, shortlistTotal: number, metrics: { candidatesTotal: number, completedTotal: number, inProgressTotal: number, shortlistedTotal: number, abandonedTotal: number, needsReviewTotal: number, strongInviteTotal: number, completionRate: number | null, interviewsTotal: number, activeInterviewsTotal: number }, interviews: Array<{ interviewId: string, title: string, jobRole: string, status: InterviewStatus, level: QuestionLevel, interviewLanguage: string, questionCount: number, publicUrl: string, createdAt: number, attemptsTotal: number, attemptsCompleted: number, attemptsInProgress: number, attemptsAbandoned: number, attemptsPending: number, completionRate: number | null, shortlistedCount: number, strongInviteCount: number, needsManualReviewCount: number, avgScore: number | null, lastActivityAt: number | null }>, attentionItems: Array<{ kind: DashboardAttentionKind, attemptId: string, interviewId: string, interviewTitle: string, jobRole: string, candidateId: string, candidateName: string, overallScore: number | null, hireRecommendation: HireRecommendation | null, occurredAt: number }>, shortlistPreview: Array<{ candidateId: string, fullName: string, email: string, interviewsCount: number, avgScore: number | null, lastInterviewDate: number | null }>, weakTopics: Array<{ topicName: string, avgScore: number, passRate: number, sampleCount: number }> } };
+
+export type CompanyInterviewSummariesQueryVariables = Exact<{
+  filters?: CompanyInterviewSummariesFilterInput | null | undefined;
+}>;
+
+
+export type CompanyInterviewSummariesQuery = { companyInterviewSummaries: { total: number, page: number, pageSize: number, items: Array<{ interviewId: string, title: string, jobRole: string, status: InterviewStatus, level: QuestionLevel, interviewLanguage: string, questionCount: number, publicUrl: string, createdAt: number, attemptsTotal: number, attemptsCompleted: number, attemptsInProgress: number, attemptsAbandoned: number, attemptsPending: number, completionRate: number | null, shortlistedCount: number, strongInviteCount: number, needsManualReviewCount: number, avgScore: number | null, lastActivityAt: number | null }>, facets: { total: number, active: number, draft: number, archived: number, withAttempts: number } } };
+
+export type CompanyInterviewTemplatesQueryVariables = Exact<{
+  filters?: CompanyInterviewTemplatesFilterInput | null | undefined;
+}>;
+
+
+export type CompanyInterviewTemplatesQuery = { companyInterviewTemplates: { total: number, page: number, pageSize: number, items: Array<{ id: string, title: string, jobRole: string, level: QuestionLevel, interviewLanguage: string, questionCount: number, jobDescription: string | null, professionId: string | null, isVideoEnabled: boolean, interviewerName: string | null, welcomeMessageTemplate: string | null, status: InterviewTemplateStatus, createdAt: number, updatedAt: number, questions: Array<{ questionId: string, sortOrder: number }> }> } };
+
 export type CompanyInterviewsQueryVariables = Exact<{
   filters?: CompanyInterviewsFilterInput | null | undefined;
 }>;
@@ -231,6 +293,28 @@ export type CompleteInterviewAttemptMutationVariables = Exact<{
 
 
 export type CompleteInterviewAttemptMutation = { completeInterviewAttempt: { attemptId: string, status: AttemptStatus, totalQuestions: number, answeredQuestions: number, messages: Array<{ id: string, role: MessageRole, content: string }> } };
+
+export type CreateInterviewFromTemplateMutationVariables = Exact<{
+  templateId: string | number;
+}>;
+
+
+export type CreateInterviewFromTemplateMutation = { createInterviewFromTemplate: { id: string, title: string, jobRole: string, level: QuestionLevel, status: InterviewStatus, publicToken: string, publicUrl: string, questionCount: number, interviewerName: string | null, welcomeMessageTemplate: string | null } };
+
+export type CreateInterviewTemplateFromInterviewMutationVariables = Exact<{
+  interviewId: string | number;
+  title?: string | null | undefined;
+}>;
+
+
+export type CreateInterviewTemplateFromInterviewMutation = { createInterviewTemplateFromInterview: { id: string, title: string, jobRole: string, level: QuestionLevel, interviewLanguage: string, questionCount: number, jobDescription: string | null, professionId: string | null, isVideoEnabled: boolean, interviewerName: string | null, welcomeMessageTemplate: string | null, status: InterviewTemplateStatus, createdAt: number, updatedAt: number, questions: Array<{ questionId: string, sortOrder: number }> } };
+
+export type CreateInterviewTemplateMutationVariables = Exact<{
+  input: CreateInterviewTemplateInput;
+}>;
+
+
+export type CreateInterviewTemplateMutation = { createInterviewTemplate: { id: string, title: string, jobRole: string, level: QuestionLevel, interviewLanguage: string, questionCount: number, jobDescription: string | null, professionId: string | null, isVideoEnabled: boolean, interviewerName: string | null, welcomeMessageTemplate: string | null, status: InterviewTemplateStatus, createdAt: number, updatedAt: number, questions: Array<{ questionId: string, sortOrder: number }> } };
 
 export type CreateInterviewMutationVariables = Exact<{
   input: CreateInterviewInput;
@@ -593,6 +677,141 @@ export const CompanyCandidatesDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<CompanyCandidatesQuery, CompanyCandidatesQueryVariables>;
+export const CompanyDashboardOverviewDocument = new TypedDocumentString(`
+    query CompanyDashboardOverview {
+  companyDashboardOverview {
+    metrics {
+      candidatesTotal
+      completedTotal
+      inProgressTotal
+      shortlistedTotal
+      abandonedTotal
+      needsReviewTotal
+      strongInviteTotal
+      completionRate
+      interviewsTotal
+      activeInterviewsTotal
+    }
+    interviewsTotal
+    interviews {
+      interviewId
+      title
+      jobRole
+      status
+      level
+      interviewLanguage
+      questionCount
+      publicUrl
+      createdAt
+      attemptsTotal
+      attemptsCompleted
+      attemptsInProgress
+      attemptsAbandoned
+      attemptsPending
+      completionRate
+      shortlistedCount
+      strongInviteCount
+      needsManualReviewCount
+      avgScore
+      lastActivityAt
+    }
+    attentionItems {
+      kind
+      attemptId
+      interviewId
+      interviewTitle
+      jobRole
+      candidateId
+      candidateName
+      overallScore
+      hireRecommendation
+      occurredAt
+    }
+    shortlistTotal
+    shortlistPreview {
+      candidateId
+      fullName
+      email
+      interviewsCount
+      avgScore
+      lastInterviewDate
+    }
+    weakTopics {
+      topicName
+      avgScore
+      passRate
+      sampleCount
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<CompanyDashboardOverviewQuery, CompanyDashboardOverviewQueryVariables>;
+export const CompanyInterviewSummariesDocument = new TypedDocumentString(`
+    query CompanyInterviewSummaries($filters: CompanyInterviewSummariesFilterInput) {
+  companyInterviewSummaries(filters: $filters) {
+    items {
+      interviewId
+      title
+      jobRole
+      status
+      level
+      interviewLanguage
+      questionCount
+      publicUrl
+      createdAt
+      attemptsTotal
+      attemptsCompleted
+      attemptsInProgress
+      attemptsAbandoned
+      attemptsPending
+      completionRate
+      shortlistedCount
+      strongInviteCount
+      needsManualReviewCount
+      avgScore
+      lastActivityAt
+    }
+    total
+    page
+    pageSize
+    facets {
+      total
+      active
+      draft
+      archived
+      withAttempts
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<CompanyInterviewSummariesQuery, CompanyInterviewSummariesQueryVariables>;
+export const CompanyInterviewTemplatesDocument = new TypedDocumentString(`
+    query CompanyInterviewTemplates($filters: CompanyInterviewTemplatesFilterInput) {
+  companyInterviewTemplates(filters: $filters) {
+    items {
+      id
+      title
+      jobRole
+      level
+      interviewLanguage
+      questionCount
+      jobDescription
+      professionId
+      isVideoEnabled
+      interviewerName
+      welcomeMessageTemplate
+      status
+      createdAt
+      updatedAt
+      questions {
+        questionId
+        sortOrder
+      }
+    }
+    total
+    page
+    pageSize
+  }
+}
+    `) as unknown as TypedDocumentString<CompanyInterviewTemplatesQuery, CompanyInterviewTemplatesQueryVariables>;
 export const CompanyInterviewsDocument = new TypedDocumentString(`
     query CompanyInterviews($filters: CompanyInterviewsFilterInput) {
   companyInterviews(filters: $filters) {
@@ -629,6 +848,70 @@ export const CompleteInterviewAttemptDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<CompleteInterviewAttemptMutation, CompleteInterviewAttemptMutationVariables>;
+export const CreateInterviewFromTemplateDocument = new TypedDocumentString(`
+    mutation CreateInterviewFromTemplate($templateId: ID!) {
+  createInterviewFromTemplate(templateId: $templateId) {
+    id
+    title
+    jobRole
+    level
+    status
+    publicToken
+    publicUrl
+    questionCount
+    interviewerName
+    welcomeMessageTemplate
+  }
+}
+    `) as unknown as TypedDocumentString<CreateInterviewFromTemplateMutation, CreateInterviewFromTemplateMutationVariables>;
+export const CreateInterviewTemplateFromInterviewDocument = new TypedDocumentString(`
+    mutation CreateInterviewTemplateFromInterview($interviewId: ID!, $title: String) {
+  createInterviewTemplateFromInterview(interviewId: $interviewId, title: $title) {
+    id
+    title
+    jobRole
+    level
+    interviewLanguage
+    questionCount
+    jobDescription
+    professionId
+    isVideoEnabled
+    interviewerName
+    welcomeMessageTemplate
+    status
+    createdAt
+    updatedAt
+    questions {
+      questionId
+      sortOrder
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<CreateInterviewTemplateFromInterviewMutation, CreateInterviewTemplateFromInterviewMutationVariables>;
+export const CreateInterviewTemplateDocument = new TypedDocumentString(`
+    mutation CreateInterviewTemplate($input: CreateInterviewTemplateInput!) {
+  createInterviewTemplate(input: $input) {
+    id
+    title
+    jobRole
+    level
+    interviewLanguage
+    questionCount
+    jobDescription
+    professionId
+    isVideoEnabled
+    interviewerName
+    welcomeMessageTemplate
+    status
+    createdAt
+    updatedAt
+    questions {
+      questionId
+      sortOrder
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<CreateInterviewTemplateMutation, CreateInterviewTemplateMutationVariables>;
 export const CreateInterviewDocument = new TypedDocumentString(`
     mutation CreateInterview($input: CreateInterviewInput!) {
   createInterview(input: $input) {

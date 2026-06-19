@@ -18,5 +18,6 @@ import { CandidatesDashboardService } from './services/candidates-dashboard.serv
     CandidatesDashboardResolver,
     CandidateReportResolver,
   ],
+  exports: [CandidatesDashboardService],
 })
 export class CandidatesModule {}

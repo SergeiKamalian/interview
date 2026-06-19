@@ -20,19 +20,19 @@
 Active block:
 
 ```txt
-14-✅-evaluation-accuracy-analytics
+15-🟡-interview-templates
 ```
 
 Block status:
 
 ```txt
-✅ done (wave 4 complete)
+🟡 in progress
 ```
 
 Block title:
 
 ```txt
-Evaluation accuracy & HR analytics
+Interview templates
 ```
 
 ---
@@ -42,31 +42,31 @@ Evaluation accuracy & HR analytics
 Active subtask ID:
 
 ```txt
-(none)
+TASK-15.6 — Add save interview as template
 ```
 
 File:
 
 ```txt
-(none)
+docs/tasks/list/15-🟡-interview-templates/subtasks/006-⬜-add-save-interview-as-template.md
 ```
 
 Last completed subtask:
 
 ```txt
-TASK-14.37 — Fix follow-up Cyrillic mojibake (ENC-01)
+TASK-15.5 — Add create interview template modal
 ```
 
 Next recommended subtask:
 
 ```txt
-(none — block 14 complete)
+TASK-15.6 — Add save interview as template
 ```
 
 Last updated:
 
 ```txt
-2026-06-18 (14.37 done, ENC-01 fixed)
+2026-06-19 (15.5 done, create interview modal added)
 ```
 
 ---
@@ -116,6 +116,17 @@ Last updated:
 - [x] TASK-14.35 — Policy target refusal branch
 - [x] TASK-14.36 — Golden attempt #91 regression
 - [x] TASK-14.37 — Fix follow-up Cyrillic mojibake (ENC-01)
+
+---
+
+## Current block (15)
+
+- [x] TASK-15.1 — Document interview templates design
+- [x] TASK-15.2 — Add SQL schema for interview templates
+- [x] TASK-15.3 — Add backend GraphQL API templates
+- [x] TASK-15.4 — Add frontend GraphQL/RTK Query layer
+- [x] TASK-15.5 — Add create interview template modal
+- [ ] TASK-15.6 — Add save interview as template
 
 ---
 

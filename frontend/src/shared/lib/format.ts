@@ -20,6 +20,16 @@ export function formatScore(score?: number | null): string {
   return score.toFixed(1);
 }
 
+export function formatCompletionRate(rate?: number | null): string {
+  if (rate == null) {
+    return '—';
+  }
+
+  return `${rate.toLocaleString('ru-RU', {
+    maximumFractionDigits: 1,
+  })}%`;
+}
+
 export function formatUsd(value: number): string {
   return value.toFixed(4);
 }

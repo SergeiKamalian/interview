@@ -24,6 +24,12 @@ const DashboardOverviewPage = lazy(() =>
   })),
 );
 
+const AttemptsPage = lazy(() =>
+  import('@pages/dashboard/attempts/AttemptsPage').then((module) => ({
+    default: module.AttemptsPage,
+  })),
+);
+
 const InterviewsPage = lazy(() =>
   import('@pages/dashboard/interviews/InterviewsPage').then((module) => ({
     default: module.InterviewsPage,
@@ -83,6 +89,7 @@ export const router = createBrowserRouter([
         element: <DashboardLayout />,
         children: [
           { path: '/dashboard', element: <DashboardOverviewPage /> },
+          { path: '/dashboard/attempts', element: <AttemptsPage /> },
           { path: '/dashboard/interviews', element: <InterviewsPage /> },
           { path: '/dashboard/interviews/:interviewId', element: <InterviewDetailsPage /> },
           { path: '/dashboard/candidates', element: <CandidatesPage /> },

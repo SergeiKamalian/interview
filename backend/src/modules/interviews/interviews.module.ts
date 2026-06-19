@@ -26,6 +26,7 @@ import { InterviewsDashboardService } from './services/interviews-dashboard.serv
   ],
   exports: [
     InterviewsDashboardRepository,
+    InterviewsDashboardService,
     InterviewDetailsRepository,
     InterviewTranscriptRepository,
   ],

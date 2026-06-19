@@ -17,5 +17,6 @@ import { TopicSkillQuestionService } from './services/topic-skill-question.servi
     TopicSkillQuestionResolver,
     AiCostResolver,
   ],
+  exports: [TopicSkillQuestionService],
 })
 export class AnalyticsModule {}

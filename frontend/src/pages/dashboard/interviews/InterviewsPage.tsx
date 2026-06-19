@@ -1,90 +1,120 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useCompanyInterviewsQuery } from '@entities/interview/api/interviewsApi';
-import type { AttemptStatus } from '@shared/api/graphql/generated/graphql';
+
+import { useCompanyInterviewSummariesQuery } from '@entities/interview/api/interviewsApi';
+import {
+  applyMockInterviewSummariesFilters,
+  computeMockInterviewSummariesFacets,
+  DEFAULT_INTERVIEW_SUMMARIES_FILTERS,
+  hasActiveInterviewListFilters,
+  toInterviewSummariesQueryFilters,
+} from '@entities/interview/lib/interviewSummariesFilters';
+import { env } from '@shared/config/env';
 import { useDebouncedValue } from '@shared/lib/useDebouncedValue';
-import { formatScore, formatUnixDate } from '@shared/lib/format';
-import { Alert, Button, Card, Input, SelectField, Spinner } from '@shared/ui';
+import { getDashboardMockInterviewSummaries } from '@shared/mocks/dashboard-overview.mock';
+import { Alert, Card, Spinner } from '@shared/ui';
+import { Button } from '@shared/ui/button';
+import { InterviewSummariesFiltersBar } from '@widgets/dashboard/InterviewSummariesFiltersBar';
+import {
+  InterviewSummariesActiveFilterTags,
+  InterviewSummariesQuickFilters,
+  InterviewSummariesSummaryStrip,
+} from '@widgets/dashboard/InterviewSummariesPageChrome';
+import { InterviewSummariesTable } from '@widgets/dashboard/InterviewSummariesTable';
+import { CreateInterviewStartButton } from '@widgets/dashboard/CreateInterviewStartButton';
 
 export function InterviewsPage() {
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<AttemptStatus | ''>('');
-  const [page, setPage] = useState(1);
-  const [sort, setSort] = useState('created_at');
-  const debouncedSearch = useDebouncedValue(search, 300);
+  const [filters, setFilters] = useState(DEFAULT_INTERVIEW_SUMMARIES_FILTERS);
+  const debouncedSearch = useDebouncedValue(filters.search ?? '', 300);
+  const useMock = env.dashboardMock;
 
-  const { data, isLoading, isError, error, refetch } = useCompanyInterviewsQuery({
-    search: debouncedSearch.trim() || undefined,
-    status: status || undefined,
-    page,
-    pageSize: 20,
-    sort,
-    sortDirection: 'desc',
+  const queryFilters = toInterviewSummariesQueryFilters({
+    ...filters,
+    search: debouncedSearch,
   });
 
-  const items = data?.items ?? [];
-  const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
+  const { data, isLoading, isError, error, refetch } = useCompanyInterviewSummariesQuery(
+    queryFilters,
+    { skip: useMock },
+  );
+
+  const allMockItems = getDashboardMockInterviewSummaries();
+  const mockFilteredItems = applyMockInterviewSummariesFilters(allMockItems, {
+    ...filters,
+    search: debouncedSearch,
+  });
+  const mockPageSize = filters.pageSize ?? 20;
+  const mockPage = filters.page ?? 1;
+  const mockSliceStart = (mockPage - 1) * mockPageSize;
+
+  const items = useMock
+    ? mockFilteredItems.slice(mockSliceStart, mockSliceStart + mockPageSize)
+    : (data?.items ?? []);
+  const filteredTotal = useMock ? mockFilteredItems.length : (data?.total ?? 0);
+  const facets = useMock
+    ? computeMockInterviewSummariesFacets(allMockItems)
+    : (data?.facets ?? {
+        total: 0,
+        active: 0,
+        draft: 0,
+        archived: 0,
+        withAttempts: 0,
+      });
+  const pageSize = useMock ? mockPageSize : (data?.pageSize ?? mockPageSize);
+  const page = useMock ? mockPage : (data?.page ?? 1);
+  const totalPages = Math.max(1, Math.ceil(filteredTotal / pageSize));
+  const loading = useMock ? false : isLoading;
+  const hasFilters = hasActiveInterviewListFilters({
+    ...filters,
+    search: debouncedSearch,
+  });
+  const isEmptyCompany = facets.total === 0;
+  const isFilteredEmpty = !loading && !isError && items.length === 0;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-slate-900">Interviews</h2>
-          <p className="text-sm text-slate-500">
-            Список попыток интервью с фильтрами и пагинацией.
+          <h2 className="text-xl font-semibold text-foreground">Интервью</h2>
+          <p className="text-sm text-muted-foreground">
+            Каталог скринингов компании — поиск, фильтры и управление списком.
           </p>
         </div>
-        <Link to="/dashboard/interviews/create">
-          <Button variant="primary">Create Interview</Button>
-        </Link>
+        <CreateInterviewStartButton />
       </div>
 
+      {!loading && !isError && !isEmptyCompany && (
+        <div className="space-y-3">
+          <InterviewSummariesSummaryStrip
+            facets={facets}
+            filteredTotal={filteredTotal}
+            filters={{ ...filters, search: debouncedSearch }}
+          />
+          <InterviewSummariesQuickFilters
+            facets={facets}
+            filters={filters}
+            onChange={setFilters}
+          />
+        </div>
+      )}
+
       <Card>
-        <div className="mb-4 grid gap-3 md:grid-cols-4">
-          <Input
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setPage(1);
-            }}
-            placeholder="Поиск: кандидат, email, роль…"
+        <div className="mb-4 space-y-3">
+          <InterviewSummariesFiltersBar
+            filters={filters}
+            onChange={setFilters}
+            onRefresh={() => void refetch()}
           />
-          <SelectField
-            value={status}
-            onValueChange={(value) => {
-              setStatus(value as AttemptStatus | '');
-              setPage(1);
-            }}
-            placeholder="Все статусы"
-            options={[
-              { value: '', label: 'Все статусы' },
-              { value: 'pending', label: 'pending' },
-              { value: 'in_progress', label: 'in_progress' },
-              { value: 'completed', label: 'completed' },
-              { value: 'abandoned', label: 'abandoned' },
-            ]}
-          />
-          <SelectField
-            value={sort}
-            onValueChange={setSort}
-            options={[
-              { value: 'created_at', label: 'Сортировка: дата' },
-              { value: 'overall_score', label: 'Сортировка: score' },
-            ]}
-          />
-          <Button variant="secondary" onClick={() => void refetch()}>
-            Обновить
-          </Button>
+          <InterviewSummariesActiveFilterTags filters={filters} onChange={setFilters} />
         </div>
 
-        {isLoading && (
-          <div className="flex items-center gap-2 text-sm text-slate-600">
+        {loading && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Spinner />
             Загрузка интервью…
           </div>
         )}
 
-        {isError && (
+        {!useMock && isError && (
           <Alert variant="error" title="Не удалось загрузить интервью">
             {'message' in (error as object)
               ? String((error as { message: string }).message)
@@ -92,67 +122,59 @@ export function InterviewsPage() {
           </Alert>
         )}
 
-        {!isLoading && !isError && items.length === 0 && (
+        {isFilteredEmpty && isEmptyCompany && (
           <Alert variant="info" title="Интервью пока нет">
-            Создайте первое интервью или дождитесь попыток кандидатов.
+            <p className="mb-3">
+              Создайте первое интервью и отправьте ссылку кандидатам на прохождение
+              AI-скрининга.
+            </p>
+            <CreateInterviewStartButton size="sm" />
           </Alert>
         )}
 
-        {!isLoading && !isError && items.length > 0 && (
+        {isFilteredEmpty && !isEmptyCompany && hasFilters && (
+          <Alert variant="info" title="По этим фильтрам ничего не найдено">
+            <p className="mb-3">Попробуйте изменить условия или сбросить фильтры.</p>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() =>
+                setFilters({
+                  ...DEFAULT_INTERVIEW_SUMMARIES_FILTERS,
+                  pageSize: filters.pageSize,
+                })
+              }
+            >
+              Сбросить фильтры
+            </Button>
+          </Alert>
+        )}
+
+        {isFilteredEmpty && !isEmptyCompany && !hasFilters && (
+          <Alert variant="info" title="Список пуст">
+            Интервью в компании есть, но текущая страница не содержит записей.
+          </Alert>
+        )}
+
+        {!loading && !isError && items.length > 0 && (
           <>
-            <div className="overflow-x-auto rounded-xl border border-slate-200">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50 text-left text-slate-600">
-                  <tr>
-                    <th className="px-4 py-3 font-medium">Role</th>
-                    <th className="px-4 py-3 font-medium">Candidate</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium">Started</th>
-                    <th className="px-4 py-3 font-medium">Completed</th>
-                    <th className="px-4 py-3 font-medium">Score</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 bg-white">
-                  {items.map((item) => (
-                    <tr key={item.attemptId} className="hover:bg-slate-50">
-                      <td className="px-4 py-3">
-                        <Link
-                          to={`/dashboard/interviews/${item.interviewId}?attemptId=${item.attemptId}`}
-                          className="font-medium text-brand-primary hover:underline"
-                        >
-                          {item.jobRole}
-                        </Link>
-                        <p className="text-xs text-slate-500">{item.interviewTitle}</p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-slate-900">{item.candidateName}</p>
-                        <p className="text-xs text-slate-500">{item.candidateEmail}</p>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{item.status}</td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {formatUnixDate(item.startedAt)}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {formatUnixDate(item.completedAt)}
-                      </td>
-                      <td className="px-4 py-3 font-medium text-slate-900">
-                        {formatScore(item.overallScore)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
+            <InterviewSummariesTable items={items} containerQuery="@container/main" />
+            <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
               <span>
-                Страница {data?.page ?? 1} из {totalPages} · всего {data?.total ?? 0}
+                Страница {page} из {totalPages}
+                {hasFilters ? ` · найдено ${filteredTotal}` : ` · всего ${facets.total}`}
               </span>
               <div className="flex gap-2">
                 <Button
                   variant="ghost"
                   size="sm"
                   disabled={page <= 1}
-                  onClick={() => setPage((value) => Math.max(1, value - 1))}
+                  onClick={() =>
+                    setFilters((current) => ({
+                      ...current,
+                      page: Math.max(1, (current.page ?? 1) - 1),
+                    }))
+                  }
                 >
                   Назад
                 </Button>
@@ -160,7 +182,12 @@ export function InterviewsPage() {
                   variant="ghost"
                   size="sm"
                   disabled={page >= totalPages}
-                  onClick={() => setPage((value) => value + 1)}
+                  onClick={() =>
+                    setFilters((current) => ({
+                      ...current,
+                      page: (current.page ?? 1) + 1,
+                    }))
+                  }
                 >
                   Вперёд
                 </Button>

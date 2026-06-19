@@ -9,9 +9,11 @@ import { AiProviderModule } from './modules/ai-provider/ai-provider.module';
 import { UsageLoggingModule } from './modules/usage-logging/usage-logging.module';
 import { InterviewsModule } from './modules/interviews/interviews.module';
 import { CandidatesModule } from './modules/candidates/candidates.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ShortlistModule } from './modules/shortlist/shortlist.module';
 import { InterviewCoreModule } from './modules/interview-core/interview-core.module';
+import { InterviewTemplatesModule } from './modules/interview-templates/interview-templates.module';
 import { InterviewRealtimeModule } from './modules/interview-realtime/interview-realtime.module';
 import { MediaModule } from './modules/media/media.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
@@ -37,11 +39,13 @@ import { AppService } from './app.service';
     MediaModule,
     UploadsModule,
     InterviewCoreModule,
+    InterviewTemplatesModule,
     AiEvaluationModule,
     UsageLoggingModule,
     InterviewsModule,
     CandidatesModule,
     AnalyticsModule,
+    DashboardModule,
     ShortlistModule,
     AppGraphQLModule,
   ],

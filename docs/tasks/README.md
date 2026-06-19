@@ -47,7 +47,8 @@ docs/tasks/
     11-⬜-video/
     12-⬜-ats-integrations/
     13-⬜-deployment/
-    14-⬜-evaluation-accuracy-analytics/
+    14-✅-evaluation-accuracy-analytics/
+    15-🟡-interview-templates/
 ```
 
 ---
@@ -70,6 +71,7 @@ docs/tasks/
 12 — ats-integrations
 13 — deployment
 14 — evaluation-accuracy-analytics (scoring honesty, HR analytics, golden set)
+15 — interview-templates (reusable interview blueprints)
 ```
 
 Важно: design docs в `docs/database/` и SQL migrations — source of truth для feature-блоков 04+.
@@ -236,17 +238,17 @@ Cursor НЕ должен выполнять весь блок сразу.
 ## Текущий активный блок
 
 ```txt
-10-🟡-voice (🟡 in progress)
+15-🟡-interview-templates (🟡 in progress)
 ```
 
 Активный subtask:
 
 ```txt
-docs/tasks/list/10-🟡-voice/subtasks/001-🟡-add-microphone-permission.md
+docs/tasks/list/15-🟡-interview-templates/subtasks/006-⬜-add-save-interview-as-template.md
 ```
 
 Следующая рекомендуемая подзадача:
 
 ```txt
-TASK-10.1 — Добавить microphone permission
+TASK-15.6 — Добавить save as template
 ```

@@ -36,7 +36,7 @@ export function AnalyticsByTopicSkillQuestionPage() {
     <div className="space-y-4">
       {data.lowSampleWarning && (
         <Alert variant="info" title="Мало данных для выводов">
-          Завершённых попыток: {data.totalCompletedAttempts}. Минимальный порог — 5.
+          Завершённых интервью: {data.totalCompletedAttempts}. Минимальный порог — 5.
         </Alert>
       )}
 

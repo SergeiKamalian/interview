@@ -30,6 +30,8 @@ export function SelectField({
   placeholder,
   className,
 }: SelectFieldProps) {
+  const selectedLabel = options.find((option) => option.value === value)?.label;
+
   return (
     <div className={cn('space-y-1.5', className)}>
       {label && <Label className="text-sm font-medium">{label}</Label>}
@@ -38,7 +40,9 @@ export function SelectField({
         onValueChange={(nextValue) => onValueChange(nextValue ?? '')}
       >
         <SelectTrigger className="w-full">
-          <SelectValue placeholder={placeholder} />
+          <SelectValue placeholder={placeholder}>
+            {selectedLabel}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {options.map((option) => (

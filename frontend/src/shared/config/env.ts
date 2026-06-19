@@ -3,6 +3,7 @@ type Env = {
   readonly apiUrl: string;
   readonly appName: string;
   readonly interviewAudioEnabled: boolean;
+  readonly dashboardMock: boolean;
 };
 
 function readEnv(): Env {
@@ -11,6 +12,7 @@ function readEnv(): Env {
   const appName = import.meta.env.VITE_APP_NAME ?? 'AI Interviewer';
   const interviewAudioEnabled =
     import.meta.env.VITE_INTERVIEW_AUDIO_ENABLED !== 'false';
+  const dashboardMock = import.meta.env.VITE_DASHBOARD_MOCK === 'true';
 
   if (import.meta.env.DEV && !graphqlUrl) {
     throw new Error('Missing VITE_GRAPHQL_URL in development environment');
@@ -21,6 +23,7 @@ function readEnv(): Env {
     apiUrl,
     appName,
     interviewAudioEnabled,
+    dashboardMock,
   };
 }
 

@@ -268,7 +268,7 @@ export function InterviewDetailsPage() {
               </Link>
             </div>
           ) : (
-            <p className="text-sm text-slate-500">Попыток пока нет.</p>
+            <p className="text-sm text-slate-500">Кандидатов пока нет.</p>
           )}
         </Card>
       </div>

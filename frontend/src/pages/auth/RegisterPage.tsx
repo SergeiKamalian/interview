@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useRegisterMutation } from '@features/auth/api/authApi';
 import { setCredentials } from '@features/auth/model/authSlice';
 import { useAppDispatch } from '@app/store/hooks';
 import { tokenStorage } from '@shared/lib/token-storage';
-import { Alert, Button, Input } from '@shared/ui';
+import { SignupForm } from '@shared/ui/signup-form';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -15,11 +15,13 @@ export function RegisterPage() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [fieldErrors, setFieldErrors] = useState<{
     email?: string;
     password?: string;
+    confirmPassword?: string;
     fullName?: string;
     companyName?: string;
   }>({});
@@ -38,6 +40,12 @@ export function RegisterPage() {
       nextErrors.password = 'Password is required';
     } else if (password.length < 8) {
       nextErrors.password = 'Password must be at least 8 characters';
+    }
+
+    if (!confirmPassword) {
+      nextErrors.confirmPassword = 'Please confirm your password';
+    } else if (password !== confirmPassword) {
+      nextErrors.confirmPassword = 'Passwords do not match';
     }
 
     if (!fullName.trim()) {
@@ -86,67 +94,21 @@ export function RegisterPage() {
   };
 
   return (
-    <form className="space-y-4" onSubmit={handleSubmit} noValidate>
-      <div>
-        <h2 className="text-xl font-semibold text-slate-900">Create account</h2>
-        <p className="text-sm text-slate-600">
-          Register your company and start screening candidates.
-        </p>
-      </div>
-
-      {formError && <Alert variant="error">{formError}</Alert>}
-
-      <Input
-        label="Full name"
-        name="fullName"
-        autoComplete="name"
-        placeholder="Jane Recruiter"
-        value={fullName}
-        onChange={(event) => setFullName(event.target.value)}
-        error={fieldErrors.fullName}
-      />
-
-      <Input
-        label="Company name"
-        name="companyName"
-        autoComplete="organization"
-        placeholder="Acme Corp"
-        value={companyName}
-        onChange={(event) => setCompanyName(event.target.value)}
-        error={fieldErrors.companyName}
-      />
-
-      <Input
-        label="Email"
-        name="email"
-        type="email"
-        autoComplete="email"
-        placeholder="you@company.com"
-        value={email}
-        onChange={(event) => setEmail(event.target.value)}
-        error={fieldErrors.email}
-      />
-
-      <Input
-        label="Password"
-        name="password"
-        type="password"
-        autoComplete="new-password"
-        value={password}
-        onChange={(event) => setPassword(event.target.value)}
-        error={fieldErrors.password}
-      />
-
-      <Button className="w-full" type="submit" disabled={isLoading}>
-        {isLoading ? 'Creating account…' : 'Create account'}
-      </Button>
-
-      <p className="text-center text-sm text-slate-500">
-        Already have an account?{' '}
-        <Link to="/login" className="text-brand-primary hover:underline">
-          Sign in
-        </Link>
-      </p>
-    </form>
+    <SignupForm
+      fullName={fullName}
+      companyName={companyName}
+      email={email}
+      password={password}
+      confirmPassword={confirmPassword}
+      fieldErrors={fieldErrors}
+      formError={formError}
+      isLoading={isLoading}
+      onFullNameChange={setFullName}
+      onCompanyNameChange={setCompanyName}
+      onEmailChange={setEmail}
+      onPasswordChange={setPassword}
+      onConfirmPasswordChange={setConfirmPassword}
+      onSubmit={(event) => void handleSubmit(event)}
+    />
   );
 }

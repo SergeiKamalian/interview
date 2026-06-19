@@ -33,3 +33,4 @@ export { Tabs, TabsContent, TabsList, TabsTrigger } from './tabs';
 export { Separator } from './separator';
 export { ScrollArea, ScrollBar } from './scroll-area';
 export { Label } from './label';
+export { ThemeToggle } from './ThemeToggle/ThemeToggle';

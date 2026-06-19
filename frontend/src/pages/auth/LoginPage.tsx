@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useLoginMutation } from '@features/auth/api/authApi';
 import { setCredentials } from '@features/auth/model/authSlice';
 import { useAppDispatch } from '@app/store/hooks';
 import { tokenStorage } from '@shared/lib/token-storage';
-import { Alert, Button, Input } from '@shared/ui';
+import { LoginForm } from '@shared/ui/login-form';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -72,47 +72,15 @@ export function LoginPage() {
   };
 
   return (
-    <form className="space-y-4" onSubmit={handleSubmit} noValidate>
-      <div>
-        <h2 className="text-xl font-semibold text-slate-900">Sign in</h2>
-        <p className="text-sm text-slate-600">
-          Access your company dashboard.
-        </p>
-      </div>
-
-      {formError && <Alert variant="error">{formError}</Alert>}
-
-      <Input
-        label="Email"
-        name="email"
-        type="email"
-        autoComplete="email"
-        placeholder="you@company.com"
-        value={email}
-        onChange={(event) => setEmail(event.target.value)}
-        error={fieldErrors.email}
-      />
-
-      <Input
-        label="Password"
-        name="password"
-        type="password"
-        autoComplete="current-password"
-        value={password}
-        onChange={(event) => setPassword(event.target.value)}
-        error={fieldErrors.password}
-      />
-
-      <Button className="w-full" type="submit" disabled={isLoading}>
-        {isLoading ? 'Signing in…' : 'Sign in'}
-      </Button>
-
-      <p className="text-center text-sm text-slate-500">
-        No account?{' '}
-        <Link to="/register" className="text-brand-primary hover:underline">
-          Create one
-        </Link>
-      </p>
-    </form>
+    <LoginForm
+      email={email}
+      password={password}
+      fieldErrors={fieldErrors}
+      formError={formError}
+      isLoading={isLoading}
+      onEmailChange={setEmail}
+      onPasswordChange={setPassword}
+      onSubmit={(event) => void handleSubmit(event)}
+    />
   );
 }

@@ -42,6 +42,21 @@ export const GraphqlOperations = {
     document: "query CompanyCandidates($filters: CompanyCandidatesFilterInput) { companyCandidates(filters: $filters) { items { candidateId fullName email interviewsCount avgScore lastInterviewDate shortlistStatus } total page pageSize } }",
     sha256Hash: '94458040d97fcc4f4b704a9b5f22dc8645c637d34db726ccd1c8e79beeb659eb',
   },
+  CompanyDashboardOverview: {
+    operationName: 'CompanyDashboardOverview',
+    document: "query CompanyDashboardOverview { companyDashboardOverview { metrics { candidatesTotal completedTotal inProgressTotal shortlistedTotal abandonedTotal needsReviewTotal strongInviteTotal completionRate interviewsTotal activeInterviewsTotal } interviewsTotal interviews { interviewId title jobRole status level interviewLanguage questionCount publicUrl createdAt attemptsTotal attemptsCompleted attemptsInProgress attemptsAbandoned attemptsPending completionRate shortlistedCount strongInviteCount needsManualReviewCount avgScore lastActivityAt } attentionItems { kind attemptId interviewId interviewTitle jobRole candidateId candidateName overallScore hireRecommendation occurredAt } shortlistTotal shortlistPreview { candidateId fullName email interviewsCount avgScore lastInterviewDate } weakTopics { topicName avgScore passRate sampleCount } } }",
+    sha256Hash: '83240fc3c3321cc46cc88529a11c887a8d261762c02167e22b499bbbefff4627',
+  },
+  CompanyInterviewSummaries: {
+    operationName: 'CompanyInterviewSummaries',
+    document: "query CompanyInterviewSummaries($filters: CompanyInterviewSummariesFilterInput) { companyInterviewSummaries(filters: $filters) { items { interviewId title jobRole status level interviewLanguage questionCount publicUrl createdAt attemptsTotal attemptsCompleted attemptsInProgress attemptsAbandoned attemptsPending completionRate shortlistedCount strongInviteCount needsManualReviewCount avgScore lastActivityAt } total page pageSize facets { total active draft archived withAttempts } } }",
+    sha256Hash: 'edcb91f142667887b2ecdc4619ed68a898a546790b3d55b7db4c2f0ec61de238',
+  },
+  CompanyInterviewTemplates: {
+    operationName: 'CompanyInterviewTemplates',
+    document: "query CompanyInterviewTemplates($filters: CompanyInterviewTemplatesFilterInput) { companyInterviewTemplates(filters: $filters) { items { id title jobRole level interviewLanguage questionCount jobDescription professionId isVideoEnabled interviewerName welcomeMessageTemplate status createdAt updatedAt questions { questionId sortOrder } } total page pageSize } }",
+    sha256Hash: '33b08b8c54cd07ac58971f16ae0d775301ca58a33151a8915cc90dc680dd50f6',
+  },
   CompanyInterviews: {
     operationName: 'CompanyInterviews',
     document: "query CompanyInterviews($filters: CompanyInterviewsFilterInput) { companyInterviews(filters: $filters) { items { attemptId interviewId interviewTitle jobRole candidateName candidateEmail status startedAt completedAt overallScore } total page pageSize } }",
@@ -51,6 +66,21 @@ export const GraphqlOperations = {
     operationName: 'CompleteInterviewAttempt',
     document: "mutation CompleteInterviewAttempt($publicToken: String!, $attemptId: ID!) { completeInterviewAttempt(publicToken: $publicToken, attemptId: $attemptId) { attemptId status totalQuestions answeredQuestions messages { id role content } } }",
     sha256Hash: '1776b590581c7d0575427d84d1aaaa5c135f6bc892972591b5a1e7acfed00b74',
+  },
+  CreateInterviewFromTemplate: {
+    operationName: 'CreateInterviewFromTemplate',
+    document: "mutation CreateInterviewFromTemplate($templateId: ID!) { createInterviewFromTemplate(templateId: $templateId) { id title jobRole level status publicToken publicUrl questionCount interviewerName welcomeMessageTemplate } }",
+    sha256Hash: 'bb82d675d84001016d8fba5faebe8d68f04efec5313af375a59cd8ab628d22fb',
+  },
+  CreateInterviewTemplateFromInterview: {
+    operationName: 'CreateInterviewTemplateFromInterview',
+    document: "mutation CreateInterviewTemplateFromInterview($interviewId: ID!, $title: String) { createInterviewTemplateFromInterview(interviewId: $interviewId, title: $title) { id title jobRole level interviewLanguage questionCount jobDescription professionId isVideoEnabled interviewerName welcomeMessageTemplate status createdAt updatedAt questions { questionId sortOrder } } }",
+    sha256Hash: '039bedbbe0f937875570bee0d1daa4853365b4bb64f0407b87c0ea1bc6a14b0b',
+  },
+  CreateInterviewTemplate: {
+    operationName: 'CreateInterviewTemplate',
+    document: "mutation CreateInterviewTemplate($input: CreateInterviewTemplateInput!) { createInterviewTemplate(input: $input) { id title jobRole level interviewLanguage questionCount jobDescription professionId isVideoEnabled interviewerName welcomeMessageTemplate status createdAt updatedAt questions { questionId sortOrder } } }",
+    sha256Hash: '381b3de27eb35a5562f5511da0e4f38b30a89bbdc0c6abaa34336547f11f77b4',
   },
   CreateInterview: {
     operationName: 'CreateInterview',
