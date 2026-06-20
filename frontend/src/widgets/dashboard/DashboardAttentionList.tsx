@@ -68,7 +68,7 @@ export function DashboardAttentionList({
           items.map((item) => (
             <Link
               key={item.attemptId}
-              to={`/dashboard/interviews/${item.interviewId}?attemptId=${item.attemptId}`}
+              to={`/dashboard/interviews/${item.interviewId}/attempts/${item.attemptId}/review`}
               className="flex items-start justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50"
             >
               <div className="min-w-0 space-y-1">

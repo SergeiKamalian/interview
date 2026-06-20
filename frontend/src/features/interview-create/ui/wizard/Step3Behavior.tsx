@@ -136,7 +136,7 @@ export function Step3Behavior({ data, update }: WizardStepProps) {
       />
       <PresetGroup
         label="Строгость оценки"
-        description="Влияет на пороги закрытия checkpoint, не на max score."
+        description="Влияет на пороги закрытия checkpoint, не на веса вопросов."
         options={STRICTNESS_OPTIONS}
         value={data.scoringStrictness}
         onChange={(value) => update({ scoringStrictness: value })}

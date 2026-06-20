@@ -119,7 +119,7 @@ export function AttemptsPage() {
                     <tr key={item.attemptId} className="hover:bg-muted/30">
                       <td className="px-4 py-3">
                         <Link
-                          to={`/dashboard/interviews/${item.interviewId}?attemptId=${item.attemptId}`}
+                          to={`/dashboard/interviews/${item.interviewId}/attempts/${item.attemptId}/review`}
                           className="font-medium text-primary hover:underline"
                         >
                           {item.jobRole}

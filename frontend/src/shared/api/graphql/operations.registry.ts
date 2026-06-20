@@ -27,6 +27,21 @@ export const GraphqlOperations = {
     document: "mutation ArchiveInterview($id: ID!) { archiveInterview(id: $id) { id status publicUrl } }",
     sha256Hash: '8a07c6cf003bf6fae30396828feac82d425890c88f69d9b2ad296b79b3526fcf',
   },
+  AttemptReviewDecisionHistory: {
+    operationName: 'AttemptReviewDecisionHistory',
+    document: "query AttemptReviewDecisionHistory( $attemptId: ID! $filters: AttemptReviewDecisionHistoryFilterInput ) { attemptReviewDecisionHistory(attemptId: $attemptId, filters: $filters) { items { eventId source action previousValue newValue reason actorEmail actorName occurredAt } total page pageSize } }",
+    sha256Hash: '1e7dde7239ee79fc026f75ed5862a69f651f86cad5c11a7f18e0ef31e9169ff2',
+  },
+  AttemptReviewNotes: {
+    operationName: 'AttemptReviewNotes',
+    document: "query AttemptReviewNotes($attemptId: ID!) { attemptReviewNotes(attemptId: $attemptId) { id attemptId body authorId authorName createdAt updatedAt } }",
+    sha256Hash: '865e4b8d6e97c83c33de3550ae95eecca3c484b8d3eddba1f008d73663ef314c',
+  },
+  AttemptShareLink: {
+    operationName: 'AttemptShareLink',
+    document: "query AttemptShareLink($attemptId: ID!) { attemptShareLink(attemptId: $attemptId) { attemptId token sharePath expiresAt } }",
+    sha256Hash: 'e990143086f6913134ed3ee889bb0c8a4d25ad7360fa97887c0925296f6edcdb',
+  },
   BeginInterviewAttempt: {
     operationName: 'BeginInterviewAttempt',
     document: "mutation BeginInterviewAttempt($input: BeginInterviewAttemptInput!) { beginInterviewAttempt(input: $input) { attemptId status isWelcomePending welcomeMessage totalQuestions answeredQuestions currentQuestionText currentQuestionId messages { id role content sequenceOrder messageKind } } }",
@@ -67,10 +82,30 @@ export const GraphqlOperations = {
     document: "query CompanyInterviews($filters: CompanyInterviewsFilterInput) { companyInterviews(filters: $filters) { items { attemptId interviewId interviewTitle jobRole candidateName candidateEmail status startedAt completedAt overallScore } total page pageSize } }",
     sha256Hash: 'acd78f7d9f08e5defd9b44b023f12874b001086d70b32ec324cd292d48b48e12',
   },
+  CompanyReviewQueue: {
+    operationName: 'CompanyReviewQueue',
+    document: "query CompanyReviewQueue($filters: CompanyReviewQueueFilterInput) { companyReviewQueue(filters: $filters) { items { attemptId candidateId candidateName candidateEmail interviewId interviewTitle jobRole completedAt evaluationStatus totalScore hireRecommendation achievedLevel achievedLevelMethod needsManualReview shortlistStatus } total page pageSize } }",
+    sha256Hash: '99abf4d3a906e3002c42c40a8c33ba8f8b26544a45520c1774a746a26bc1f84a',
+  },
+  CompareInterviewCandidates: {
+    operationName: 'CompareInterviewCandidates',
+    document: "mutation CompareInterviewCandidates($input: CompareInterviewCandidatesInput!) { compareInterviewCandidates(input: $input) { recommendedAttemptId recommendationTitle recommendationSummary decisionRationale ranking { attemptId rank headline tradeOff } useCases { title recommendedAttemptId rationale } candidateNotes { attemptId candidateName bestFor strengths risks followUpQuestions } caveats } }",
+    sha256Hash: '160e55570fd65228c15fb19abeec5ef73d3de9680996dc732c3e79700751021d',
+  },
   CompleteInterviewAttempt: {
     operationName: 'CompleteInterviewAttempt',
     document: "mutation CompleteInterviewAttempt($publicToken: String!, $attemptId: ID!) { completeInterviewAttempt(publicToken: $publicToken, attemptId: $attemptId) { attemptId status totalQuestions answeredQuestions messages { id role content } } }",
     sha256Hash: '1776b590581c7d0575427d84d1aaaa5c135f6bc892972591b5a1e7acfed00b74',
+  },
+  CreateAttemptReviewNote: {
+    operationName: 'CreateAttemptReviewNote',
+    document: "mutation CreateAttemptReviewNote($input: CreateAttemptReviewNoteInput!) { createAttemptReviewNote(input: $input) { id attemptId body authorId authorName createdAt updatedAt } }",
+    sha256Hash: 'c724a0ca419f8645e55488d1b8ba2d95faefbb16be877255174fafd197c6df78',
+  },
+  CreateAttemptShareLink: {
+    operationName: 'CreateAttemptShareLink',
+    document: "mutation CreateAttemptShareLink($input: CreateAttemptShareLinkInput!) { createAttemptShareLink(input: $input) { attemptId token sharePath expiresAt } }",
+    sha256Hash: '48e263dfdedec5da1c5fc51e0708b6e07906c66f1f3ca718c248827165449a9d',
   },
   CreateInterviewFromTemplate: {
     operationName: 'CreateInterviewFromTemplate',
@@ -112,6 +147,11 @@ export const GraphqlOperations = {
     document: "query Hello { hello }",
     sha256Hash: '3f710a83decac3d21ddeae7bd265d8c5a48749226d23327b5dfd7031f406a987',
   },
+  InterviewAttemptsPage: {
+    operationName: 'InterviewAttemptsPage',
+    document: "query InterviewAttemptsPage( $interviewId: ID! $filters: InterviewAttemptsFilterInput ) { interviewAttemptsPage(interviewId: $interviewId, filters: $filters) { total page pageSize items { attemptId candidateId candidateName candidateEmail status completedAt overallScore hireRecommendation evaluationStatus achievedLevel achievedLevelMethod needsManualReview shortlistStatus reviewStatus aiAssessmentVerdict companyDecision reviewedAt hasTeamNotes } } }",
+    sha256Hash: 'ea3d134abcc4e510722557b9275fe193974f89d8effd6fe71af210def4d060d9',
+  },
   Interview: {
     operationName: 'Interview',
     document: "query Interview($id: ID!) { interview(id: $id) { id title jobRole status publicUrl questionCount } }",
@@ -119,8 +159,8 @@ export const GraphqlOperations = {
   },
   InterviewDetails: {
     operationName: 'InterviewDetails',
-    document: "query InterviewDetails($interviewId: ID!) { interviewDetails(interviewId: $interviewId) { id title jobRole status questionCount publicUrl createdAt evaluationStatus primaryFinalEvaluation { id totalScore finalScore totalWeight averageScore strengthCategory category hireRecommendation summary strengths weaknesses risks needsManualReview categoryBreakdown { categoryKey categoryLabel scoreNormalized weight contribution } topicEvaluations { topic score weight weightedScore strengthCategory } } attempts { attemptId candidateId candidateName candidateEmail status startedAt completedAt overallScore hireRecommendation evaluationStatus } } }",
-    sha256Hash: '93243e0e3d26a43f9fd25da1de04870e34cf5624c09be9ce575a1c61ae04e79a',
+    document: "query InterviewDetails($interviewId: ID!) { interviewDetails(interviewId: $interviewId) { id title jobRole professionName level status questionCount publicUrl createdAt evaluationStatus skills questions { id sortOrder questionText level difficulty topicName } primaryFinalEvaluation { id totalScore finalScore totalWeight averageScore strengthCategory category hireRecommendation summary strengths weaknesses risks needsManualReview categoryBreakdown { categoryKey categoryLabel scoreNormalized weight contribution } topicEvaluations { topic score weight weightedScore strengthCategory } } attempts { attemptId candidateId candidateName candidateEmail status startedAt completedAt overallScore hireRecommendation evaluationStatus achievedLevel achievedLevelMethod needsManualReview shortlistStatus reviewStatus aiAssessmentVerdict companyDecision reviewedAt hasTeamNotes } } }",
+    sha256Hash: 'b4bc8493d3119fded6edb26aabd09caa6a89122af4ca7fc3f76e2f83cf79fe95',
   },
   InterviewSession: {
     operationName: 'InterviewSession',
@@ -146,6 +186,11 @@ export const GraphqlOperations = {
     operationName: 'ManagedInterview',
     document: "query ManagedInterview($id: ID!) { interview(id: $id) { id title jobRole level interviewLanguage questionCount status publicToken publicUrl isVideoEnabled interviewerName welcomeMessageTemplate aiTone probingDepth scoringStrictness expiresAt maxCompletions allowRetake timeLimitMinutes passingScore requirePhone requireLinkedin requireGithub } }",
     sha256Hash: 'cc8a649c35c1f24acc33d057eec238b56859bcfee5138fbb48ef5cbb08fada23',
+  },
+  MarkAttemptReviewStarted: {
+    operationName: 'MarkAttemptReviewStarted',
+    document: "mutation MarkAttemptReviewStarted($attemptId: ID!) { markAttemptReviewStarted(attemptId: $attemptId) { attemptId reviewStatus aiAssessmentVerdict companyDecision reviewedAt } }",
+    sha256Hash: '7c8e3f289419b7cbd9a8714e224dc425af458bd0827442ed377337e9168bca69',
   },
   MatchingCandidatesForLevel: {
     operationName: 'MatchingCandidatesForLevel',
@@ -179,18 +224,18 @@ export const GraphqlOperations = {
   },
   QuestionBankList: {
     operationName: 'QuestionBankList',
-    document: "query QuestionBankList($filters: QuestionBankFilterInput) { questionBank(filters: $filters) { total items { id questionText level difficulty maxScore isActive topic { id code name interviewWeight skill { id code name } } profession { id code name } } } }",
-    sha256Hash: '777fa04e2b0d6f4cbe0e6d2916328a7e7aefc6b69ddf1d252ed3f3196795a7fd',
+    document: "query QuestionBankList($filters: QuestionBankFilterInput) { questionBank(filters: $filters) { total items { id questionText level difficulty isActive topic { id code name interviewWeight skill { id code name } } profession { id code name } } } }",
+    sha256Hash: '9445f438a051d1d060bb2b59855e4360643fe01b92b725a1a96d003f7deaf20f',
   },
   QuestionBank: {
     operationName: 'QuestionBank',
-    document: "query QuestionBank($filters: QuestionBankFilterInput) { questionBank(filters: $filters) { total items { id questionText level difficulty maxScore isActive topic { id code name interviewWeight skill { id code name } } profession { id code name } skills { id code name } checkpoints { id checkpointKey title expected score sortOrder } answerExamples { id exampleType exampleText sortOrder } } } }",
-    sha256Hash: 'ba2584cc0ffe8d47aad93c27c7bf7dfaae562e1f605a47dc6df171da1a241428',
+    document: "query QuestionBank($filters: QuestionBankFilterInput) { questionBank(filters: $filters) { total items { id questionText level difficulty isActive topic { id code name interviewWeight skill { id code name } } profession { id code name } skills { id code name } checkpoints { id checkpointKey title expected score sortOrder } answerExamples { id exampleType exampleText sortOrder } } } }",
+    sha256Hash: '36be24907580d5f02b5eeba46b40f015efda81dccf86f2853b3a9fb2807675ff',
   },
   Question: {
     operationName: 'Question',
-    document: "query Question($id: ID!) { question(id: $id) { id questionText level difficulty maxScore isActive shortAnswer idealAnswer topic { id code name interviewWeight } profession { id code name } checkpoints { id checkpointKey title expected score sortOrder } answerExamples { id exampleType exampleText sortOrder } } }",
-    sha256Hash: 'ed4a698a5b73241e881c7749af32ffd214c44872851832241deb67844fca8f2f',
+    document: "query Question($id: ID!) { question(id: $id) { id questionText level difficulty isActive shortAnswer idealAnswer topic { id code name interviewWeight } profession { id code name } checkpoints { id checkpointKey title expected score sortOrder } answerExamples { id exampleType exampleText sortOrder } } }",
+    sha256Hash: '2e836e6b0fe930c4adedecc0d4df24f044aa611fe820ed9093995ae684dfab00',
   },
   RefreshTokens: {
     operationName: 'RefreshTokens',
@@ -211,6 +256,21 @@ export const GraphqlOperations = {
     operationName: 'ResumeInterview',
     document: "mutation ResumeInterview($id: ID!) { resumeInterview(id: $id) { id status publicUrl } }",
     sha256Hash: 'f34aa727711a825eec4e41de202d13915c5ac789f9e417f16bcbbbb074b6c79f',
+  },
+  RevokeAttemptShareLink: {
+    operationName: 'RevokeAttemptShareLink',
+    document: "mutation RevokeAttemptShareLink($attemptId: ID!) { revokeAttemptShareLink(attemptId: $attemptId) }",
+    sha256Hash: '50f6703770300f5b1274856cbb3915ce95034ddcf5f18ee7be88cf13f777b994',
+  },
+  SetAttemptAiVerdict: {
+    operationName: 'SetAttemptAiVerdict',
+    document: "mutation SetAttemptAiVerdict($input: SetAttemptAiVerdictInput!) { setAttemptAiVerdict(input: $input) { attemptId reviewStatus aiAssessmentVerdict companyDecision reviewedAt } }",
+    sha256Hash: 'eee9a4905b2af1c4515d574c113f4366b636cda5bbb6ef49c549a05371320fd0',
+  },
+  SetAttemptCompanyDecision: {
+    operationName: 'SetAttemptCompanyDecision',
+    document: "mutation SetAttemptCompanyDecision($input: SetAttemptCompanyDecisionInput!) { setAttemptCompanyDecision(input: $input) { attemptId reviewStatus aiAssessmentVerdict companyDecision reviewedAt } }",
+    sha256Hash: '36a2690fc8e20dae2da47ff49a2583f6e2dd37ef69d26b539421c88499b27533',
   },
   Skills: {
     operationName: 'Skills',
@@ -246,6 +306,11 @@ export const GraphqlOperations = {
     operationName: 'Topics',
     document: "query Topics($skillId: String, $professionId: String) { topics(skillId: $skillId, professionId: $professionId) { id code name interviewWeight skill { id code name } } }",
     sha256Hash: 'a78c2e047042507f75586d4941996475caccad3655195013f2a02043f903bb4c',
+  },
+  UpdateAttemptReviewNote: {
+    operationName: 'UpdateAttemptReviewNote',
+    document: "mutation UpdateAttemptReviewNote($input: UpdateAttemptReviewNoteInput!) { updateAttemptReviewNote(input: $input) { id attemptId body authorId authorName createdAt updatedAt } }",
+    sha256Hash: '3538883d1ec053970e31246767c806082c664f6d0a926acbbe4fa2edb730ffed',
   }
 } as const satisfies Record<string, GraphqlOperationDef>;
 

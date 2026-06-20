@@ -15,7 +15,7 @@ export function CategoryBreakdownChart({ items }: CategoryBreakdownChartProps) {
   if (items.length === 0) {
     return (
       <Card header="Category breakdown">
-        <p className="text-sm text-slate-500">Нет данных для разбивки.</p>
+        <p className="text-sm text-muted-foreground">Нет данных для разбивки.</p>
       </Card>
     );
   }
@@ -26,15 +26,15 @@ export function CategoryBreakdownChart({ items }: CategoryBreakdownChartProps) {
         {items.map((item) => (
           <div key={item.categoryKey}>
             <div className="mb-1 flex justify-between text-sm">
-              <span className="font-medium text-slate-800">
+              <span className="font-medium text-foreground">
                 {item.categoryLabel}
               </span>
-              <span className="text-slate-600 whitespace-nowrap">
+              <span className="whitespace-nowrap text-muted-foreground">
                 {item.scoreNormalized.toFixed(0)}% · +
                 {item.contribution.toFixed(1)}
               </span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-2 overflow-hidden rounded-full bg-muted">
               <div
                 className="h-full rounded-full bg-brand-primary"
                 style={{ width: `${Math.min(item.scoreNormalized, 100)}%` }}

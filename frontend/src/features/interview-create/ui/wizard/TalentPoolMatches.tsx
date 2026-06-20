@@ -135,39 +135,34 @@ export function TalentPoolMatches({
     );
   }
 
-  // Loading / refetching — keep a disabled placeholder so the section doesn't jump.
-  if (isLoading || isFetching) {
-    return (
-      <Button variant="outline" size="sm" disabled className="gap-2">
-        <Spinner />
-        Поиск кандидатов из архива…
-      </Button>
-    );
-  }
-
   const count = candidates.length;
-
-  // Empty state: unobtrusive muted hint instead of a button.
-  if (count === 0) {
-    return (
-      <p className="flex items-center gap-2 text-xs text-muted-foreground">
-        <UsersIcon className="size-3.5" />
-        Подходящих кандидатов из архива пока нет.
-      </p>
-    );
-  }
+  const isSearching = isLoading || isFetching;
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="sm"
-        className="gap-2"
-        onClick={() => setOpen(true)}
-      >
-        <UsersIcon className="size-4 text-primary" />
-        Есть {candidatesPhrase(count)} из архива
-      </Button>
+      <div className="flex min-h-9 items-center">
+        {isSearching ? (
+          <Button variant="outline" size="sm" disabled className="gap-2">
+            <Spinner />
+            Поиск кандидатов из архива…
+          </Button>
+        ) : count === 0 ? (
+          <p className="flex items-center gap-2 text-xs text-muted-foreground">
+            <UsersIcon className="size-3.5 shrink-0" />
+            Подходящих кандидатов из архива пока нет.
+          </p>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => setOpen(true)}
+          >
+            <UsersIcon className="size-4 text-primary" />
+            Есть {candidatesPhrase(count)} из архива
+          </Button>
+        )}
+      </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl">

@@ -17,6 +17,7 @@ import { Spinner } from '@shared/ui';
 const PAGE_TITLES: Record<string, string> = {
   dashboard: 'Дашборд',
   interviews: 'Интервью',
+  review: 'Очередь проверки',
   attempts: 'Кандидаты',
   candidates: 'Кандидаты',
   analytics: 'Аналитика',
@@ -31,6 +32,16 @@ function resolvePageTitle(pathname: string) {
 
   if (segments[1] === 'candidates' && segments[2] && segments[3] === 'report') {
     return 'Отчёт кандидата';
+  }
+
+  if (
+    segments[1] === 'interviews' &&
+    segments[2] &&
+    segments[3] === 'attempts' &&
+    segments[4] &&
+    segments[5] === 'review'
+  ) {
+    return 'Проверка кандидата';
   }
 
   if (segments[1] === 'interviews' && segments[2] && segments[2] !== 'create') {

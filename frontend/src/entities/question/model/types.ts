@@ -33,7 +33,6 @@ export type QuestionListItem = {
   questionText: string;
   level: QuestionLevel;
   difficulty: QuestionDifficulty;
-  maxScore: number;
   isActive: boolean;
   topic: QuestionLookup;
   profession: QuestionLookup;
@@ -47,7 +46,6 @@ export type QuestionDetail = {
   questionText: string;
   level: QuestionLevel;
   difficulty: QuestionDifficulty;
-  maxScore: number;
   isActive: boolean;
   shortAnswer: string;
   idealAnswer: string;

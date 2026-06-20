@@ -19,7 +19,7 @@ export const shortlistApi = baseApi.injectEndpoints({
       }),
       transformResponse: (response: AddCandidateToShortlistMutation) =>
         response.addCandidateToShortlist,
-      invalidatesTags: ['Candidate'],
+      invalidatesTags: ['Candidate', 'Interview'],
     }),
     removeFromShortlist: builder.mutation<
       RemoveCandidateFromShortlistMutation['removeCandidateFromShortlist'],
@@ -31,7 +31,7 @@ export const shortlistApi = baseApi.injectEndpoints({
       }),
       transformResponse: (response: RemoveCandidateFromShortlistMutation) =>
         response.removeCandidateFromShortlist,
-      invalidatesTags: ['Candidate'],
+      invalidatesTags: ['Candidate', 'Interview'],
     }),
   }),
 });

@@ -118,6 +118,8 @@ pending → in_progress → completed
 
 **Indexes:** `(company_id, status)`, `(interview_id, status)`, `(company_id, is_shortlisted)`
 
+**Company review state:** see [`attempt-review.md`](attempt-review.md) — `interview_attempt_reviews` per completed attempt.
+
 ---
 
 ## `interview_messages`

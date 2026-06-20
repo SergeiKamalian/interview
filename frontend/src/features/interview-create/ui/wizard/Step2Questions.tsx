@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -13,6 +13,7 @@ import {
   getQuestionPrimarySkill,
   groupQuestionsByPrimarySkill,
 } from '@entities/question/lib/groupQuestionsBySkill';
+import { sortQuestionsByTargetLevel } from '@entities/question/lib/sortQuestionsByTargetLevel';
 import {
   difficultyBadgeVariant,
   difficultyLabel,
@@ -34,13 +35,8 @@ import {
   Spinner,
   ScrollArea,
 } from '@shared/ui';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@shared/ui/tooltip';
 import { cn } from '@shared/lib/utils';
+import type { QuestionLevel } from '@shared/api/graphql/generated/graphql';
 import type { QuestionListItem } from '@entities/question/model/types';
 import type { WizardStepProps } from './types';
 
@@ -76,22 +72,11 @@ function QuestionMeta({ question }: { question: QuestionListItem }) {
       <Badge variant={difficultyBadgeVariant(question.difficulty)}>
         {difficultyLabel(question.difficulty)}
       </Badge>
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Badge variant="outline" className="font-mono">
-                max {question.maxScore}
-                {weight != null ? ` · вес ${weight}` : ''}
-              </Badge>
-            }
-          />
-          <TooltipContent>
-            maxScore — максимум за вопрос; вес — interviewWeight темы (влияет на
-            итоговую оценку).
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      {weight != null && (
+        <Badge variant="outline" className="font-mono">
+          вес {weight}
+        </Badge>
+      )}
     </span>
   );
 }
@@ -157,33 +142,21 @@ export function Step2Questions({ data, update }: WizardStepProps) {
     });
   }, [pool, search, level, difficulty, topicId]);
 
-  // Group by skill, then float skill groups selected on step 1 to the top.
+  // Group by skill, float selected stacks to the top, sort questions by wizard level.
   const groups = useMemo(() => {
-    const grouped = groupQuestionsByPrimarySkill(filtered);
+    const grouped = groupQuestionsByPrimarySkill(filtered).map((group) => ({
+      ...group,
+      items: sortQuestionsByTargetLevel(group.items, data.level as QuestionLevel),
+    }));
     return [...grouped].sort((left, right) => {
       const leftSel = isSelectedSkillGroup(left.skill.id) ? 0 : 1;
       const rightSel = isSelectedSkillGroup(right.skill.id) ? 0 : 1;
       return leftSel - rightSel;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtered, selectedSkillIds]);
+  }, [filtered, selectedSkillIds, data.level]);
 
-  // Seed accordion open-state once data loads: selected skill groups open first.
   const [openSkills, setOpenSkills] = useState<string[]>([]);
-  const seededRef = useRef(false);
-  useEffect(() => {
-    if (seededRef.current || groups.length === 0) {
-      return;
-    }
-    const selectedOpen = groups
-      .filter((group) => isSelectedSkillGroup(group.skill.id))
-      .map((group) => group.skill.code);
-    setOpenSkills(
-      selectedOpen.length > 0 ? selectedOpen : [groups[0].skill.code],
-    );
-    seededRef.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groups]);
 
   const toggle = (id: string) => {
     const next = data.questionIds.includes(id)
@@ -229,8 +202,8 @@ export function Step2Questions({ data, update }: WizardStepProps) {
             Соберите набор вопросов
           </p>
           <p className="text-xs text-muted-foreground">
-            Вопросы сгруппированы по стеку. Стеки, выбранные на шаге «Вакансия»,
-            идут первыми и раскрыты. Или дайте AI подобрать набор из банка.
+            Вопросы сгруппированы по стеку. Стеки с шага «Вакансия» идут первыми,
+            внутри — от выбранного уровня. Или дайте AI подобрать набор из банка.
           </p>
         </div>
         <Button

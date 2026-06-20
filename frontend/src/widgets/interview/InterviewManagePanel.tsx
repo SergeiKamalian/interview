@@ -407,7 +407,7 @@ export function InterviewManagePanel({
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <p className="mb-1 text-xs font-medium text-muted-foreground">
-              AI-настройки
+              ИИ-настройки
             </p>
             <dl className="text-sm">
               <MetaRow label="Тон" value={TONE_LABELS[interview.aiTone]} />

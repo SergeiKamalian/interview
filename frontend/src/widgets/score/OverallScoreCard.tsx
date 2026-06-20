@@ -28,7 +28,7 @@ export function OverallScoreCard({
   if (loading) {
     return (
       <Card header="Overall score">
-        <div className="h-16 animate-pulse rounded-lg bg-slate-100" />
+        <div className="h-16 animate-pulse rounded-lg bg-muted" />
       </Card>
     );
   }
@@ -36,7 +36,7 @@ export function OverallScoreCard({
   if (score == null) {
     return (
       <Card header="Overall score">
-        <p className="text-sm text-slate-500">Оценка ещё не готова.</p>
+        <p className="text-sm text-muted-foreground">Оценка ещё не готова.</p>
       </Card>
     );
   }
@@ -55,7 +55,7 @@ export function OverallScoreCard({
           ({score.toFixed(1)} / 10)
         </span>
       </Badge>
-      <p className="mt-3 text-xs text-slate-500">
+      <p className="mt-3 text-xs text-muted-foreground">
         {interim
           ? 'Промежуточный score по уже оценённым checkpoints. Финальная оценка появится после завершения интервью.'
           : 'Score показан по 100-балльной шкале и рассчитан по structured checkpoints из question bank, не по свободному тексту AI.'}

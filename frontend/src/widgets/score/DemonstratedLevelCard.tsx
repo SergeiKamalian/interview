@@ -43,10 +43,10 @@ export function DemonstratedLevelCard({
     <Card header="Demonstrated level">
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-slate-500">Target</span>
+          <span className="text-muted-foreground">Target</span>
           <Badge variant="muted">{levelLabel(targetLevel)}</Badge>
-          <span className="text-slate-400">·</span>
-          <span className="text-slate-500">Demonstrated</span>
+          <span className="text-muted-foreground">·</span>
+          <span className="text-muted-foreground">Demonstrated</span>
           <Badge variant={achievedLevel ? 'success' : 'warning'}>
             {levelLabel(achievedLevel)}
           </Badge>
@@ -56,7 +56,7 @@ export function DemonstratedLevelCard({
         </div>
 
         {isEstimate && (
-          <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
             {achievedLevelNote ??
               'Точный уровень не подтверждён. Добавьте вопросы нижнего уровня для калибровки.'}
           </p>
@@ -67,7 +67,7 @@ export function DemonstratedLevelCard({
             {levelBreakdown.map((item) => (
               <div key={item.level}>
                 <div className="mb-1 flex justify-between text-sm">
-                  <span className="font-medium text-slate-800">
+                  <span className="font-medium text-foreground">
                     {levelLabel(item.level)}
                     {item.passed ? (
                       <Badge variant="success" className="ml-2">
@@ -79,12 +79,12 @@ export function DemonstratedLevelCard({
                       </Badge>
                     )}
                   </span>
-                  <span className="text-slate-600">
+                  <span className="text-muted-foreground">
                     {item.earned.toFixed(1)} / {item.maxScore.toFixed(1)} ·{' '}
                     {Math.round(item.ratio * 100)}%
                   </span>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-2 overflow-hidden rounded-full bg-muted">
                   <div
                     className={
                       item.passed
@@ -100,7 +100,7 @@ export function DemonstratedLevelCard({
             ))}
           </div>
         ) : (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-muted-foreground">
             Разбивка по уровням пока недоступна.
           </p>
         )}

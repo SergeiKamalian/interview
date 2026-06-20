@@ -30,7 +30,6 @@ export function QuestionBankTable({
               <th className="px-4 py-3 font-medium">Тема</th>
               <th className="px-4 py-3 font-medium">Уровень</th>
               <th className="px-4 py-3 font-medium">Сложность</th>
-              <th className="px-4 py-3 font-medium">Score</th>
               <th className="px-4 py-3 font-medium">Weight</th>
               <th className="px-4 py-3 font-medium">Статус</th>
               <th className="px-4 py-3 font-medium">Действия</th>
@@ -50,7 +49,6 @@ export function QuestionBankTable({
                 <td className="px-4 py-3 text-slate-600">{item.topic.name}</td>
                 <td className="px-4 py-3 text-slate-600">{item.level}</td>
                 <td className="px-4 py-3 text-slate-600">{item.difficulty}</td>
-                <td className="px-4 py-3 text-slate-600">{item.maxScore}</td>
                 <td className="px-4 py-3 text-slate-600">
                   {item.topic.interviewWeight ?? '—'}
                 </td>
@@ -111,8 +109,8 @@ export function QuestionBankDetails({ questionId }: QuestionBankDetailsProps) {
         {selected.questionText}
       </h3>
       <p className="mt-1 text-sm text-slate-500">
-        {selected.profession.name} · {selected.topic.name} · weight{' '}
-        {selected.topic.interviewWeight ?? '—'} · max score {selected.maxScore}
+        {selected.profession.name} · {selected.topic.name} · вес{' '}
+        {selected.topic.interviewWeight ?? '—'}
       </p>
 
       <div className="mt-4">

@@ -11,6 +11,7 @@ import { InterviewsModule } from './modules/interviews/interviews.module';
 import { CandidatesModule } from './modules/candidates/candidates.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { AttemptReviewModule } from './modules/attempt-review/attempt-review.module';
 import { ShortlistModule } from './modules/shortlist/shortlist.module';
 import { InterviewCoreModule } from './modules/interview-core/interview-core.module';
 import { InterviewTemplatesModule } from './modules/interview-templates/interview-templates.module';
@@ -47,6 +48,7 @@ import { AppService } from './app.service';
     AnalyticsModule,
     DashboardModule,
     ShortlistModule,
+    AttemptReviewModule,
     AppGraphQLModule,
   ],
   controllers: [AppController],

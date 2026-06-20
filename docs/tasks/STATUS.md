@@ -20,22 +20,22 @@
 Active block:
 
 ```txt
-15-🟡-interview-templates (возобновлён на TASK-15.6)
+19-✅-post-interview-company-flow
 ```
 
 Block status:
 
 ```txt
-🟡 in progress (15.1–15.5 ✅; осталось TASK-15.6 — save interview as template)
+✅ done (Wave 1 + Wave 2: TASK-19.1–19.18 complete)
 ```
 
 Block title:
 
 ```txt
-Interview templates
+Post-interview company flow
 ```
 
-Note: БЛОК `18` ЗАКРЫТ ЦЕЛИКОМ (18.1–18.10 ✅: achieved level + talent pool по стеку + backfill + UX кнопка-счётчик/модалка), папка → `18-✅-achieved-level-talent-pool`. Активный блок возвращён к `15-🟡-interview-templates`, subtask TASK-15.6 (save as template). `16-✅`/`17-✅`/`18-✅` закрыты.
+Note: Блок **19 закрыт целиком**. Следующий активный блок → см. roadmap (`15-🟡` на TASK-15.6).
 
 ---
 
@@ -44,16 +44,52 @@ Note: БЛОК `18` ЗАКРЫТ ЦЕЛИКОМ (18.1–18.10 ✅: achieved leve
 Active subtask ID:
 
 ```txt
-TASK-15.6 — Add save interview as template
+(none — block 19 complete)
 ```
 
 File:
 
 ```txt
-docs/tasks/list/15-🟡-interview-templates/subtasks/006-⬜-add-save-interview-as-template.md
+(none)
 ```
 
 Last completed subtask:
+
+```txt
+TASK-19.18 — Decision audit history: GraphQL attemptReviewDecisionHistory (UNION review + shortlist events); DecisionAuditTimeline на AttemptReviewPage. Wave 2 полностью закрыта после TASK-19.12/19.13 (verdict UI + quick actions). Verify: backend build+test (10 passed), frontend graphql:sync (61 ops)+build OK.
+```
+
+Archived — previous last completed:
+
+```txt
+TASK-19.16 — Shareable candidate review link: migration `026_interview_attempt_share_tokens.sql`; GraphQL `attemptShareLink` / `createAttemptShareLink` / `revokeAttemptShareLink`; REST `GET /api/public/attempt-share/:token` (summary-only); UI `AttemptShareDialog` на AttemptReviewPage + public `/share/:token`. Verify: backend build+test (10 passed), migrate OK, frontend graphql:sync+build OK, curl invalid token → 404 Share link not found.
+```
+
+Archived — previous last completed:
+
+```txt
+TASK-19.17 — Candidate context panel: widget CandidateContextPanel на AttemptReviewPage (reuse useCandidateReportQuery) — контакты, LinkedIn/GitHub, talent pool/achieved level, другие завершённые интервью компании, ссылка на полный отчёт; read-only. Verify: eslint exit0, vite build exit0; pnpm run build падает на graphql:sync из-за ops других subtasks (не 19.17).
+```
+
+Archived — previous last completed:
+
+```txt
+TASK-19.11 — Interview candidates table upgrade: GraphQL interviewAttemptsPage с server-side pagination/filters; таблица «Все кandidатов» с колонками review/level/manual review/shortlist, checkbox selection, фильтр непросмотренных, убран Report. Verify: backend+frontend build OK, graphql sync 51 ops, smoke interviewAttemptsPage(32).
+```
+
+Archived — previous last completed:
+
+```txt
+TASK-19.8 — Interview details modal context: расширена модалка `Детали интервью` на `/dashboard/interviews/:id`, чтобы company user видел стек и вопросы. Backend `interviewDetails` теперь отдаёт `professionName`, `level`, `skills`, `questions { id sortOrder questionText level difficulty topicName maxScore }`; repository подтягивает skills через `interview_questions.source_question_id -> question_skills -> skills`. Frontend operation/codegen обновлены; modal стала scrollable `max-w-4xl` с секциями `Основное`, `Стек`, `Вопросы интервью`, показывает профессию, уровень, ссылку, skills badges и все вопросы с темой/сложностью/баллами. Verify: backend eslint exit0, frontend eslint exit0, backend build exit0, frontend build exit0 (только стандартный Vite chunk warning), GraphQL smoke `interviewDetails(32)` вернул `Frontend Developer`, 6 skills и 10 questions; browser smoke `/dashboard/interviews/32` на временном Vite :4662 + backend :3000 в dark mode открыл modal с новыми секциями. Важно: TASK-19.5 report export / handoff prep не закрывался и остаётся active todo.
+```
+
+Archived — previous last completed:
+
+```txt
+TASK-19.1 — Company review queue: добавлен company-side review queue после прохождения интервью. Backend: новый GraphQL query companyReviewQueue(filters) в candidates module, tenant-scope через @CurrentUser().companyId, берёт completed non-preview attempts из interview_attempts + candidates + interviews + final_evaluations + candidate_shortlist; поля candidate/interview/completedAt/evaluationStatus/score/hireRecommendation/achievedLevel/achievedLevelMethod/needsManualReview/shortlistStatus; фильтры search/evaluationStatus/shortlistedOnly/manualReviewOnly, pagination/sort. Frontend: GraphQL operation + RTK Query useCompanyReviewQueueQuery, route /dashboard/review, sidebar link Review queue, таблица на shadcn Table, фильтры и ссылки Report/Details. Verify: backend build exit0; jest company-review-queue.service.spec 3 passed; frontend graphql:sync exit0 (registry 49 ops); frontend build exit0 (только Vite chunk warning); targeted eslint backend/frontend exit0 после Prettier --fix; GraphQL smoke company1 total=2 attempts 105/102; UI smoke /dashboard/review через Vite proxy показал 2 строки: Алексей Петров 8.5 strong_invite middle none, Sergey Frontend 5.5 maybe junior shortlisted.
+```
+
+Archived — previous last completed:
 
 ```txt
 TASK-18.10 — UI: talent pool в визарде через компактную кнопку-счётчик + модалку (shadcn Dialog). Переписал TalentPoolMatches: тот же useMatchingCandidatesForLevelQuery (backend/GraphQL не тронуты, count = длина массива), но вместо всегда-инлайн Card теперь кнопка «Есть {N} подходящ{ий|их} кандидат{|а|ов} из архива» (русские склонения, иконка users) → клик открывает Dialog (DialogContent + ScrollArea) со списком; строка кандидата вынесена в CandidateRow и сохраняет ВСЕ поля (имя, achievedLevel badge, «приблизительно» при estimate, professionName, matchedSkills, email, «Из интервью «…» · дата», ссылка «Открыть отчёт» → /dashboard/candidates/<id>/report). Empty-state: нет профессии → null; loading → disabled-кнопка outline со спиннером; count===0 → muted-хинт «Подходящих кандидатов из архива пока нет.»; error → Alert. Реактивно на смену level/profession/skills. Step1Vacancy не менялся. Verify: eslint TalentPoolMatches.tsx exit0, pnpm -C frontend build (tsc+vite) exit0; backend пересобран и поднят на :3000 (старый dist был без полей 18.8 → 400; после rebuild ок), фронт dev :5200 (vite-proxy /graphql→:3000), company1 HS256-токен в localStorage; вживую: Frontend+Middle → «Есть 1 подходящий кандидат» (singular), Frontend+Junior → «Есть 2 подходящих кандидата» → модалка с 2 кандидатами (Алексей Петров middle + Sergey Frontend junior, все поля, href report=103), Frontend+Senior → кнопка пропала + muted-хинт. Скриншоты кнопки/модалки/empty сняты. БЛОК 18 ЗАКРЫТ ЦЕЛИКОМ, папка → 18-✅-achieved-level-talent-pool. Активный блок → 15-🟡-interview-templates, subtask TASK-15.6.
@@ -80,7 +116,7 @@ TASK-18.6 — Backend: talent pool query. Новый GraphQL query matchingCandi
 Next recommended subtask:
 
 ```txt
-TASK-15.6 — Add save interview as template (блок 15 возобновлён; блоки 16/17/18 закрыты)
+TASK-19.12 — AI assessment verdict UI
 ```
 
 Optional / deferred:

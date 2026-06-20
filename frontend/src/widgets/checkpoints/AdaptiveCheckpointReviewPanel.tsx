@@ -59,6 +59,14 @@ const STATUS_VARIANTS: Record<string, BadgeVariant> = {
   unseen: 'muted',
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  covered: 'закрыт',
+  partial: 'частично',
+  missed: 'не закрыт',
+  unclear: 'неясно',
+  unseen: 'не затронут',
+};
+
 const DEPTH_VARIANTS: Record<string, BadgeVariant> = {
   Упомянул: 'muted',
   Слышал: 'yellow',
@@ -118,24 +126,24 @@ function formatAiEvaluationConfidence(confidence: number): string {
 
   switch (level) {
     case 'high':
-      return `Уверенность AI в оценке: ${percent}% (высокая)`;
+      return `Уверенность ИИ в оценке: ${percent}% (высокая)`;
     case 'medium':
-      return `Уверенность AI в оценке: ${percent}% (средняя)`;
+      return `Уверенность ИИ в оценке: ${percent}% (средняя)`;
     case 'low':
-      return `Уверенность AI в оценке: ${percent}% (низкая)`;
+      return `Уверенность ИИ в оценке: ${percent}% (низкая)`;
     default:
-      return `Уверенность AI в оценке: ${percent}%`;
+      return `Уверенность ИИ в оценке: ${percent}%`;
   }
 }
 
 function AxisBar({ label, value, tone }: { label: string; value: number; tone: string }) {
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between text-xs text-slate-600">
+      <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
         <span>{label}</span>
         <span>{value}%</span>
       </div>
-      <div className="h-2 rounded-full bg-slate-100">
+      <div className="h-2 rounded-full bg-muted">
         <div className={`h-2 rounded-full ${tone}`} style={{ width: `${value}%` }} />
       </div>
     </div>
@@ -148,17 +156,17 @@ function CheckpointEvaluationCard({ checkpoint }: { checkpoint: CheckpointItem }
   const aiConfidenceLevel = resolveAiConfidenceLevel(checkpoint.confidence);
 
   return (
-    <div className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
+    <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
       <button
         type="button"
         className="w-full text-left"
         onClick={() => setExpanded((value) => !value)}
       >
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <span className="font-medium text-slate-800">{checkpoint.checkpointTitle}</span>
+          <span className="font-medium text-foreground">{checkpoint.checkpointTitle}</span>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={STATUS_VARIANTS[checkpoint.status] ?? 'muted'}>
-              {checkpoint.status}
+              {STATUS_LABELS[checkpoint.status] ?? checkpoint.status}
             </Badge>
             <Badge variant={DEPTH_VARIANTS[depthLabel] ?? 'muted'}>{depthLabel}</Badge>
           </div>
@@ -177,7 +185,7 @@ function CheckpointEvaluationCard({ checkpoint }: { checkpoint: CheckpointItem }
           />
         </div>
 
-        <p className="text-xs text-slate-600">
+        <p className="text-xs text-muted-foreground">
           Балл: {checkpoint.scoreAwarded}/{checkpoint.maxScore}
           {aiConfidenceLevel !== null &&
             checkpoint.confidence !== null &&
@@ -185,7 +193,7 @@ function CheckpointEvaluationCard({ checkpoint }: { checkpoint: CheckpointItem }
             <Badge
               variant={aiConfidenceVariant(aiConfidenceLevel)}
               className="ml-2"
-              title="Насколько AI уверен в выставленном статусе и балле — не уровень знаний кандидата."
+              title="Насколько ИИ уверен в выставленном статусе и балле — не уровень знаний кандидата."
             >
               {formatAiEvaluationConfidence(checkpoint.confidence)}
             </Badge>
@@ -197,10 +205,10 @@ function CheckpointEvaluationCard({ checkpoint }: { checkpoint: CheckpointItem }
       </button>
 
       {expanded && (
-        <div className="mt-2 space-y-2 border-t border-slate-200 pt-2 text-xs text-slate-600">
+        <div className="mt-2 space-y-2 border-t border-border pt-2 text-xs text-muted-foreground">
           {checkpoint.rationale && <p>{checkpoint.rationale}</p>}
           {checkpoint.evidenceSummary && (
-            <p className="italic text-slate-500">“{checkpoint.evidenceSummary}”</p>
+            <p className="italic text-muted-foreground">“{checkpoint.evidenceSummary}”</p>
           )}
         </div>
       )}
@@ -214,8 +222,8 @@ export function AdaptiveCheckpointReviewPanel({
   if (review.questionGroups.length === 0) {
     return (
       <Card header="Оценка по критериям">
-        <p className="text-sm text-slate-500">
-          Per-checkpoint отчёт появится после ответов кандидата.
+        <p className="text-sm text-muted-foreground">
+          Отчёт по критериям появится после ответов кандидата.
         </p>
       </Card>
     );
@@ -229,13 +237,13 @@ export function AdaptiveCheckpointReviewPanel({
             {review.redFlags.map((flag) => (
               <li
                 key={`${flag.checkpointKey}-${flag.summary}`}
-                className="rounded-md border border-red-100 bg-red-50 px-3 py-2"
+                className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2"
               >
-                <p className="font-medium text-red-900">
+                <p className="font-medium text-foreground">
                   {flag.checkpointTitle}: {flag.summary}
                 </p>
                 {flag.candidateQuote && (
-                  <p className="mt-1 text-xs italic text-red-700">
+                  <p className="mt-1 text-xs italic text-muted-foreground">
                     “{flag.candidateQuote}”
                   </p>
                 )}
@@ -247,22 +255,22 @@ export function AdaptiveCheckpointReviewPanel({
 
       <Card header="Оценка по критериям">
         {review.needsManualReview && (
-          <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            Рекомендуется ручная проверка: у части checkpoints низкая уверенность AI в
+          <p className="mb-3 rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-foreground">
+            Рекомендуется ручная проверка: у части критериев низкая уверенность ИИ в
             оценке.
           </p>
         )}
 
-        <div className="mb-4 space-y-1 text-xs text-slate-500">
+        <div className="mb-4 space-y-1 text-xs text-muted-foreground">
           <p>
-            <span className="font-medium text-slate-600">Глубина ответа:</span> Упомянул ·
+            <span className="font-medium text-foreground">Глубина ответа:</span> Упомянул ·
             Слышал · Знает поверхностно · Понимает · Знает · Ошибается уверенно · Не
             затронул
           </p>
           <p>
-            <span className="font-medium text-slate-600">Уверенность AI</span> — насколько
-            модель уверена в своей оценке checkpoint (статус и балл), а не насколько
-            хорошо кандидат знает тему. Высокая уверенность при missed означает «AI
+            <span className="font-medium text-foreground">Уверенность ИИ</span> — насколько
+            модель уверена в своей оценке критерия (статус и балл), а не насколько
+            хорошо кандидат знает тему. Высокая уверенность при незакрытом критерии означает «ИИ
             уверен, что критерий не выполнен».
           </p>
         </div>
@@ -271,12 +279,12 @@ export function AdaptiveCheckpointReviewPanel({
           {review.questionGroups.map((group) => (
             <section
               key={group.interviewQuestionId}
-              className="rounded-lg border border-slate-200 p-3"
+              className="rounded-lg border border-border bg-card p-3"
             >
               <div className="mb-3 flex items-start justify-between gap-2">
-                <h4 className="text-sm font-medium text-slate-900">{group.questionText}</h4>
+                <h4 className="text-sm font-medium text-foreground">{group.questionText}</h4>
                 {group.needsManualReview && (
-                  <Badge variant="warning">manual review</Badge>
+                  <Badge variant="warning">ручная проверка</Badge>
                 )}
               </div>
 

@@ -81,3 +81,42 @@ export type CompanyInterviewSummariesFilters = {
   sort?: string;
   sortDirection?: string;
 };
+
+export type InterviewAttemptsPageFilters = {
+  search?: string;
+  hireRecommendation?: string;
+  unreviewedOnly?: boolean;
+  disagreeOnly?: boolean;
+  page?: number;
+  pageSize?: number;
+  sort?: string;
+  sortDirection?: string;
+};
+
+export type InterviewAttemptsPageItem = {
+  attemptId: string;
+  candidateId: string;
+  candidateName: string;
+  candidateEmail: string;
+  status: string;
+  completedAt?: number | null;
+  overallScore?: number | null;
+  hireRecommendation?: string | null;
+  evaluationStatus: string;
+  achievedLevel?: string | null;
+  achievedLevelMethod?: string | null;
+  needsManualReview: boolean;
+  shortlistStatus: string;
+  reviewStatus: string;
+  aiAssessmentVerdict: string;
+  companyDecision: string;
+  reviewedAt?: number | null;
+  hasTeamNotes?: boolean;
+};
+
+export type InterviewAttemptsPageResult = {
+  items: InterviewAttemptsPageItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+};

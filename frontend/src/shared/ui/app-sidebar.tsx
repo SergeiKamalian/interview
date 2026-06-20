@@ -7,6 +7,7 @@ import {
   GalleryVerticalEnd,
   LayoutDashboardIcon,
   ListIcon,
+  ListChecksIcon,
   UsersIcon,
 } from 'lucide-react';
 
@@ -37,6 +38,11 @@ const navMain = [
     url: '/dashboard/interviews',
     end: true,
     icon: <ListIcon />,
+  },
+  {
+    title: 'Review queue',
+    url: '/dashboard/review',
+    icon: <ListChecksIcon />,
   },
   {
     title: 'Кандидаты',

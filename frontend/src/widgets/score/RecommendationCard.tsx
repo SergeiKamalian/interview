@@ -29,7 +29,7 @@ export function RecommendationCard({
   if (loading) {
     return (
       <Card header="Recommendation">
-        <div className="h-20 animate-pulse rounded-lg bg-slate-100" />
+        <div className="h-20 animate-pulse rounded-lg bg-muted" />
       </Card>
     );
   }
@@ -37,7 +37,9 @@ export function RecommendationCard({
   if (!hireRecommendation) {
     return (
       <Card header="Recommendation">
-        <p className="text-sm text-slate-500">Рекомендация появится после AI-оценки.</p>
+        <p className="text-sm text-muted-foreground">
+          Рекомендация появится после AI-оценки.
+        </p>
       </Card>
     );
   }
@@ -54,12 +56,12 @@ export function RecommendationCard({
           {badge.label}
         </Badge>
         {needsManualReview && (
-          <p className="text-sm font-medium text-amber-700">
+          <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
             ⚠ Требуется manual review
           </p>
         )}
-        {summary && <p className="text-sm text-slate-700">{summary}</p>}
-        <p className="text-xs text-slate-500">
+        {summary && <p className="text-sm text-foreground">{summary}</p>}
+        <p className="text-xs text-muted-foreground">
           Recommendation основана на checkpoint coverage, а не на свободной
           интерпретации ответа.
         </p>

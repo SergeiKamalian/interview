@@ -12,6 +12,7 @@ import { CreateInterviewPage } from '@pages/dashboard/CreateInterviewPage';
 import { PublicInterviewStartPage } from '@pages/public/PublicInterviewStartPage';
 import { PublicInterviewSessionPage } from '@pages/public/PublicInterviewSessionPage';
 import { PublicInterviewCompletePage } from '@pages/public/PublicInterviewCompletePage';
+import { SharedAttemptReviewPage } from '@pages/public/SharedAttemptReviewPage';
 import { NotFoundPage } from '@pages/not-found/NotFoundPage';
 import {
   GuestRoute,
@@ -42,6 +43,12 @@ const CandidatesPage = lazy(() =>
   })),
 );
 
+const ReviewQueuePage = lazy(() =>
+  import('@pages/dashboard/review/ReviewQueuePage').then((module) => ({
+    default: module.ReviewQueuePage,
+  })),
+);
+
 const AnalyticsPage = lazy(() =>
   import('@pages/dashboard/analytics/AnalyticsPage').then((module) => ({
     default: module.AnalyticsPage,
@@ -51,6 +58,12 @@ const AnalyticsPage = lazy(() =>
 const InterviewDetailsPage = lazy(() =>
   import('@pages/dashboard/interviews/InterviewDetailsPage').then((module) => ({
     default: module.InterviewDetailsPage,
+  })),
+);
+
+const AttemptReviewPage = lazy(() =>
+  import('@pages/dashboard/interviews/AttemptReviewPage').then((module) => ({
+    default: module.AttemptReviewPage,
   })),
 );
 
@@ -68,6 +81,7 @@ export const router = createBrowserRouter([
       { path: '/i/:token', element: <PublicInterviewStartPage /> },
       { path: '/i/:token/session', element: <PublicInterviewSessionPage /> },
       { path: '/i/:token/complete', element: <PublicInterviewCompletePage /> },
+      { path: '/share/:token', element: <SharedAttemptReviewPage /> },
     ],
   },
   {
@@ -92,6 +106,11 @@ export const router = createBrowserRouter([
           { path: '/dashboard/attempts', element: <AttemptsPage /> },
           { path: '/dashboard/interviews', element: <InterviewsPage /> },
           { path: '/dashboard/interviews/:interviewId', element: <InterviewDetailsPage /> },
+          {
+            path: '/dashboard/interviews/:interviewId/attempts/:attemptId/review',
+            element: <AttemptReviewPage />,
+          },
+          { path: '/dashboard/review', element: <ReviewQueuePage /> },
           { path: '/dashboard/candidates', element: <CandidatesPage /> },
           { path: '/dashboard/candidates/:candidateId/report', element: <CandidateReportPage /> },
           { path: '/dashboard/analytics', element: <AnalyticsPage /> },

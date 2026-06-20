@@ -1,4 +1,7 @@
-export function formatUnixDate(timestamp?: number | null): string {
+export function formatUnixDate(
+  timestamp?: number | null,
+  options?: Intl.DateTimeFormatOptions,
+): string {
   if (!timestamp) {
     return '—';
   }
@@ -9,6 +12,7 @@ export function formatUnixDate(timestamp?: number | null): string {
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    ...options,
   });
 }
 

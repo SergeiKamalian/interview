@@ -5,6 +5,10 @@ import type {
   CompanyInterviewSummariesQueryVariables,
   CompanyInterviewsQuery,
   CompanyInterviewsQueryVariables,
+  CompareInterviewCandidatesMutation,
+  CompareInterviewCandidatesMutationVariables,
+  InterviewAttemptsPageQuery,
+  InterviewAttemptsPageQueryVariables,
   InterviewDetailsQuery,
   InterviewDetailsQueryVariables,
 } from '@shared/api/graphql/generated/graphql';
@@ -13,6 +17,8 @@ import type {
   CompanyInterviewSummariesResult,
   CompanyInterviewsFilters,
   CompanyInterviewsResult,
+  InterviewAttemptsPageFilters,
+  InterviewAttemptsPageResult,
 } from '../model/interview.types';
 
 export const interviewsApi = baseApi.injectEndpoints({
@@ -59,11 +65,41 @@ export const interviewsApi = baseApi.injectEndpoints({
         { type: 'Interview', id: interviewId },
       ],
     }),
+    compareInterviewCandidates: builder.mutation<
+      CompareInterviewCandidatesMutation['compareInterviewCandidates'],
+      CompareInterviewCandidatesMutationVariables['input']
+    >({
+      query: (input) => ({
+        ...GraphqlOperations.CompareInterviewCandidates,
+        variables: { input } satisfies CompareInterviewCandidatesMutationVariables,
+      }),
+      transformResponse: (response: CompareInterviewCandidatesMutation) =>
+        response.compareInterviewCandidates,
+    }),
+    interviewAttemptsPage: builder.query<
+      InterviewAttemptsPageResult,
+      { interviewId: string; filters?: InterviewAttemptsPageFilters }
+    >({
+      query: ({ interviewId, filters }) => ({
+        ...GraphqlOperations.InterviewAttemptsPage,
+        variables: {
+          interviewId,
+          filters,
+        } satisfies InterviewAttemptsPageQueryVariables,
+      }),
+      transformResponse: (response: InterviewAttemptsPageQuery) =>
+        response.interviewAttemptsPage,
+      providesTags: (_result, _error, { interviewId }) => [
+        { type: 'Interview', id: `${interviewId}-attempts-page` },
+      ],
+    }),
   }),
 });
 
 export const {
+  useCompareInterviewCandidatesMutation,
   useCompanyInterviewSummariesQuery,
   useCompanyInterviewsQuery,
+  useInterviewAttemptsPageQuery,
   useInterviewDetailsQuery,
 } = interviewsApi;

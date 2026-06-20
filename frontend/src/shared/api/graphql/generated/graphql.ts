@@ -8,6 +8,15 @@ export type AchievedLevelMethod =
   | 'estimate'
   | 'evidence';
 
+export type AiAssessmentVerdict =
+  | 'agree'
+  | 'disagree'
+  | 'pending';
+
+export type AiAssessmentVerdictInput =
+  | 'agree'
+  | 'disagree';
+
 export type AiCostFilterInput = {
   dateFrom?: string | null | undefined;
   dateTo?: string | null | undefined;
@@ -24,6 +33,16 @@ export type AnswerExampleType =
   | 'bad'
   | 'good';
 
+export type AttemptReviewDecisionHistoryFilterInput = {
+  page?: number;
+  pageSize?: number;
+};
+
+export type AttemptReviewStatus =
+  | 'in_review'
+  | 'pending'
+  | 'reviewed';
+
 export type AttemptStatus =
   | 'abandoned'
   | 'completed'
@@ -39,6 +58,19 @@ export type CheckpointMatchStatus =
   | 'met'
   | 'not_met'
   | 'partially_met';
+
+export type CompanyAttemptDecision =
+  | 'hold'
+  | 'invite_live'
+  | 'pending'
+  | 'reject'
+  | 'shortlist';
+
+export type CompanyAttemptDecisionInput =
+  | 'hold'
+  | 'invite_live'
+  | 'reject'
+  | 'shortlist';
 
 export type CompanyCandidatesFilterInput = {
   maxScore?: number | null | undefined;
@@ -82,6 +114,33 @@ export type CompanyInterviewsFilterInput = {
   sort?: string;
   sortDirection?: string;
   status?: AttemptStatus | null | undefined;
+};
+
+export type CompanyReviewQueueFilterInput = {
+  evaluationStatus?: string | null | undefined;
+  manualReviewOnly?: boolean | null | undefined;
+  page?: number;
+  pageSize?: number;
+  search?: string | null | undefined;
+  shortlistedOnly?: boolean | null | undefined;
+  sort?: string;
+  sortDirection?: string;
+  unreviewedOnly?: boolean | null | undefined;
+};
+
+export type CompareInterviewCandidatesInput = {
+  attemptIds: Array<string | number>;
+  interviewId: string | number;
+};
+
+export type CreateAttemptReviewNoteInput = {
+  attemptId: string;
+  body: string;
+};
+
+export type CreateAttemptShareLinkInput = {
+  attemptId: string;
+  expiresInDays?: number | null | undefined;
 };
 
 export type CreateInterviewInput = {
@@ -138,6 +197,10 @@ export type DashboardAttentionKind =
   | 'needs_review'
   | 'strong_candidate';
 
+export type DecisionAuditEventSource =
+  | 'attempt_review'
+  | 'shortlist';
+
 export type DraftInterviewFromJobDescriptionInput = {
   count?: number | null | undefined;
   jobDescription: string;
@@ -157,6 +220,17 @@ export type HireRecommendation =
   | 'reject'
   | 'strong_invite'
   | 'strong_reject';
+
+export type InterviewAttemptsFilterInput = {
+  disagreeOnly?: boolean | null | undefined;
+  hireRecommendation?: string | null | undefined;
+  page?: number;
+  pageSize?: number;
+  search?: string | null | undefined;
+  sort?: string;
+  sortDirection?: string;
+  unreviewedOnly?: boolean | null | undefined;
+};
 
 export type InterviewMessageKind =
   | 'follow_up_answer'
@@ -231,6 +305,18 @@ export type ScoringStrictness =
   | 'lenient'
   | 'strict';
 
+export type SetAttemptAiVerdictInput = {
+  attemptId: string;
+  reason?: string | null | undefined;
+  verdict: AiAssessmentVerdictInput;
+};
+
+export type SetAttemptCompanyDecisionInput = {
+  attemptId: string;
+  decision: CompanyAttemptDecisionInput;
+  reason?: string | null | undefined;
+};
+
 export type ShortlistStatus =
   | 'removed'
   | 'shortlisted';
@@ -265,6 +351,11 @@ export type TopicSkillQuestionFilterInput = {
   level?: QuestionLevel | null | undefined;
 };
 
+export type UpdateAttemptReviewNoteInput = {
+  body: string;
+  noteId: string;
+};
+
 export type AdaptiveCheckpointReviewByAttemptQueryVariables = Exact<{
   attemptId: string | number;
 }>;
@@ -293,6 +384,28 @@ export type ArchiveInterviewMutationVariables = Exact<{
 
 
 export type ArchiveInterviewMutation = { archiveInterview: { id: string, status: InterviewStatus, publicUrl: string } };
+
+export type AttemptReviewDecisionHistoryQueryVariables = Exact<{
+  attemptId: string | number;
+  filters?: AttemptReviewDecisionHistoryFilterInput | null | undefined;
+}>;
+
+
+export type AttemptReviewDecisionHistoryQuery = { attemptReviewDecisionHistory: { total: number, page: number, pageSize: number, items: Array<{ eventId: string, source: DecisionAuditEventSource, action: string, previousValue: string | null, newValue: string | null, reason: string | null, actorEmail: string | null, actorName: string | null, occurredAt: number }> } };
+
+export type AttemptReviewNotesQueryVariables = Exact<{
+  attemptId: string | number;
+}>;
+
+
+export type AttemptReviewNotesQuery = { attemptReviewNotes: Array<{ id: string, attemptId: string, body: string, authorId: string, authorName: string, createdAt: number, updatedAt: number }> };
+
+export type AttemptShareLinkQueryVariables = Exact<{
+  attemptId: string | number;
+}>;
+
+
+export type AttemptShareLinkQuery = { attemptShareLink: { attemptId: string, token: string, sharePath: string, expiresAt: number | null } | null };
 
 export type BeginInterviewAttemptMutationVariables = Exact<{
   input: BeginInterviewAttemptInput;
@@ -348,6 +461,20 @@ export type CompanyInterviewsQueryVariables = Exact<{
 
 export type CompanyInterviewsQuery = { companyInterviews: { total: number, page: number, pageSize: number, items: Array<{ attemptId: string, interviewId: string, interviewTitle: string, jobRole: string, candidateName: string, candidateEmail: string, status: AttemptStatus, startedAt: number | null, completedAt: number | null, overallScore: number | null }> } };
 
+export type CompanyReviewQueueQueryVariables = Exact<{
+  filters?: CompanyReviewQueueFilterInput | null | undefined;
+}>;
+
+
+export type CompanyReviewQueueQuery = { companyReviewQueue: { total: number, page: number, pageSize: number, items: Array<{ attemptId: string, candidateId: string, candidateName: string, candidateEmail: string, interviewId: string, interviewTitle: string, jobRole: string, completedAt: number | null, evaluationStatus: string, totalScore: number | null, hireRecommendation: HireRecommendation | null, achievedLevel: QuestionLevel | null, achievedLevelMethod: AchievedLevelMethod | null, needsManualReview: boolean, shortlistStatus: string }> } };
+
+export type CompareInterviewCandidatesMutationVariables = Exact<{
+  input: CompareInterviewCandidatesInput;
+}>;
+
+
+export type CompareInterviewCandidatesMutation = { compareInterviewCandidates: { recommendedAttemptId: string | null, recommendationTitle: string, recommendationSummary: string, decisionRationale: Array<string>, caveats: Array<string>, ranking: Array<{ attemptId: string, rank: number, headline: string, tradeOff: string }>, useCases: Array<{ title: string, recommendedAttemptId: string | null, rationale: string }>, candidateNotes: Array<{ attemptId: string, candidateName: string, bestFor: string, strengths: Array<string>, risks: Array<string>, followUpQuestions: Array<string> }> } };
+
 export type CompleteInterviewAttemptMutationVariables = Exact<{
   publicToken: string;
   attemptId: string | number;
@@ -355,6 +482,20 @@ export type CompleteInterviewAttemptMutationVariables = Exact<{
 
 
 export type CompleteInterviewAttemptMutation = { completeInterviewAttempt: { attemptId: string, status: AttemptStatus, totalQuestions: number, answeredQuestions: number, messages: Array<{ id: string, role: MessageRole, content: string }> } };
+
+export type CreateAttemptReviewNoteMutationVariables = Exact<{
+  input: CreateAttemptReviewNoteInput;
+}>;
+
+
+export type CreateAttemptReviewNoteMutation = { createAttemptReviewNote: { id: string, attemptId: string, body: string, authorId: string, authorName: string, createdAt: number, updatedAt: number } };
+
+export type CreateAttemptShareLinkMutationVariables = Exact<{
+  input: CreateAttemptShareLinkInput;
+}>;
+
+
+export type CreateAttemptShareLinkMutation = { createAttemptShareLink: { attemptId: string, token: string, sharePath: string, expiresAt: number | null } };
 
 export type CreateInterviewFromTemplateMutationVariables = Exact<{
   templateId: string | number;
@@ -411,6 +552,14 @@ export type HelloQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type HelloQuery = { hello: string };
 
+export type InterviewAttemptsPageQueryVariables = Exact<{
+  interviewId: string | number;
+  filters?: InterviewAttemptsFilterInput | null | undefined;
+}>;
+
+
+export type InterviewAttemptsPageQuery = { interviewAttemptsPage: { total: number, page: number, pageSize: number, items: Array<{ attemptId: string, candidateId: string, candidateName: string, candidateEmail: string, status: AttemptStatus, completedAt: number | null, overallScore: number | null, hireRecommendation: HireRecommendation | null, evaluationStatus: string, achievedLevel: QuestionLevel | null, achievedLevelMethod: AchievedLevelMethod | null, needsManualReview: boolean, shortlistStatus: string, reviewStatus: AttemptReviewStatus, aiAssessmentVerdict: AiAssessmentVerdict, companyDecision: CompanyAttemptDecision, reviewedAt: number | null, hasTeamNotes: boolean }> } };
+
 export type InterviewQueryVariables = Exact<{
   id: string | number;
 }>;
@@ -423,7 +572,7 @@ export type InterviewDetailsQueryVariables = Exact<{
 }>;
 
 
-export type InterviewDetailsQuery = { interviewDetails: { id: string, title: string, jobRole: string, status: InterviewStatus, questionCount: number, publicUrl: string, createdAt: number, evaluationStatus: string, primaryFinalEvaluation: { id: string, totalScore: number, finalScore: number, totalWeight: number, averageScore: number | null, strengthCategory: InterviewStrengthCategory, category: FinalEvaluationCategory, hireRecommendation: HireRecommendation, summary: string, strengths: Array<string>, weaknesses: Array<string>, risks: Array<string>, needsManualReview: boolean, categoryBreakdown: Array<{ categoryKey: string, categoryLabel: string, scoreNormalized: number, weight: number, contribution: number }>, topicEvaluations: Array<{ topic: string, score: number, weight: number, weightedScore: number, strengthCategory: InterviewStrengthCategory }> } | null, attempts: Array<{ attemptId: string, candidateId: string, candidateName: string, candidateEmail: string, status: AttemptStatus, startedAt: number | null, completedAt: number | null, overallScore: number | null, hireRecommendation: HireRecommendation | null, evaluationStatus: string }> } };
+export type InterviewDetailsQuery = { interviewDetails: { id: string, title: string, jobRole: string, professionName: string | null, level: string, status: InterviewStatus, questionCount: number, publicUrl: string, createdAt: number, evaluationStatus: string, skills: Array<string>, questions: Array<{ id: string, sortOrder: number, questionText: string, level: string, difficulty: string, topicName: string | null }>, primaryFinalEvaluation: { id: string, totalScore: number, finalScore: number, totalWeight: number, averageScore: number | null, strengthCategory: InterviewStrengthCategory, category: FinalEvaluationCategory, hireRecommendation: HireRecommendation, summary: string, strengths: Array<string>, weaknesses: Array<string>, risks: Array<string>, needsManualReview: boolean, categoryBreakdown: Array<{ categoryKey: string, categoryLabel: string, scoreNormalized: number, weight: number, contribution: number }>, topicEvaluations: Array<{ topic: string, score: number, weight: number, weightedScore: number, strengthCategory: InterviewStrengthCategory }> } | null, attempts: Array<{ attemptId: string, candidateId: string, candidateName: string, candidateEmail: string, status: AttemptStatus, startedAt: number | null, completedAt: number | null, overallScore: number | null, hireRecommendation: HireRecommendation | null, evaluationStatus: string, achievedLevel: QuestionLevel | null, achievedLevelMethod: AchievedLevelMethod | null, needsManualReview: boolean, shortlistStatus: string, reviewStatus: AttemptReviewStatus, aiAssessmentVerdict: AiAssessmentVerdict, companyDecision: CompanyAttemptDecision, reviewedAt: number | null, hasTeamNotes: boolean }> } };
 
 export type InterviewSessionQueryVariables = Exact<{
   publicToken: string;
@@ -458,6 +607,13 @@ export type ManagedInterviewQueryVariables = Exact<{
 
 
 export type ManagedInterviewQuery = { interview: { id: string, title: string, jobRole: string, level: QuestionLevel, interviewLanguage: string, questionCount: number, status: InterviewStatus, publicToken: string, publicUrl: string, isVideoEnabled: boolean, interviewerName: string | null, welcomeMessageTemplate: string | null, aiTone: AiTone, probingDepth: ProbingDepth, scoringStrictness: ScoringStrictness, expiresAt: string | null, maxCompletions: number | null, allowRetake: boolean, timeLimitMinutes: number | null, passingScore: number | null, requirePhone: boolean, requireLinkedin: boolean, requireGithub: boolean } };
+
+export type MarkAttemptReviewStartedMutationVariables = Exact<{
+  attemptId: string | number;
+}>;
+
+
+export type MarkAttemptReviewStartedMutation = { markAttemptReviewStarted: { attemptId: string, reviewStatus: AttemptReviewStatus, aiAssessmentVerdict: AiAssessmentVerdict, companyDecision: CompanyAttemptDecision, reviewedAt: number | null } };
 
 export type MatchingCandidatesForLevelQueryVariables = Exact<{
   level: QuestionLevel;
@@ -504,21 +660,21 @@ export type QuestionBankListQueryVariables = Exact<{
 }>;
 
 
-export type QuestionBankListQuery = { questionBank: { total: number, items: Array<{ id: string, questionText: string, level: QuestionLevel, difficulty: QuestionDifficulty, maxScore: number, isActive: boolean, topic: { id: string, code: string, name: string, interviewWeight: number, skill: { id: string, code: string, name: string } | null }, profession: { id: string, code: string, name: string } }> } };
+export type QuestionBankListQuery = { questionBank: { total: number, items: Array<{ id: string, questionText: string, level: QuestionLevel, difficulty: QuestionDifficulty, isActive: boolean, topic: { id: string, code: string, name: string, interviewWeight: number, skill: { id: string, code: string, name: string } | null }, profession: { id: string, code: string, name: string } }> } };
 
 export type QuestionBankQueryVariables = Exact<{
   filters?: QuestionBankFilterInput | null | undefined;
 }>;
 
 
-export type QuestionBankQuery = { questionBank: { total: number, items: Array<{ id: string, questionText: string, level: QuestionLevel, difficulty: QuestionDifficulty, maxScore: number, isActive: boolean, topic: { id: string, code: string, name: string, interviewWeight: number, skill: { id: string, code: string, name: string } | null }, profession: { id: string, code: string, name: string }, skills: Array<{ id: string, code: string, name: string }>, checkpoints: Array<{ id: string, checkpointKey: string, title: string, expected: string, score: number, sortOrder: number }>, answerExamples: Array<{ id: string, exampleType: AnswerExampleType, exampleText: string, sortOrder: number }> }> } };
+export type QuestionBankQuery = { questionBank: { total: number, items: Array<{ id: string, questionText: string, level: QuestionLevel, difficulty: QuestionDifficulty, isActive: boolean, topic: { id: string, code: string, name: string, interviewWeight: number, skill: { id: string, code: string, name: string } | null }, profession: { id: string, code: string, name: string }, skills: Array<{ id: string, code: string, name: string }>, checkpoints: Array<{ id: string, checkpointKey: string, title: string, expected: string, score: number, sortOrder: number }>, answerExamples: Array<{ id: string, exampleType: AnswerExampleType, exampleText: string, sortOrder: number }> }> } };
 
 export type QuestionQueryVariables = Exact<{
   id: string | number;
 }>;
 
 
-export type QuestionQuery = { question: { id: string, questionText: string, level: QuestionLevel, difficulty: QuestionDifficulty, maxScore: number, isActive: boolean, shortAnswer: string, idealAnswer: string, topic: { id: string, code: string, name: string, interviewWeight: number }, profession: { id: string, code: string, name: string }, checkpoints: Array<{ id: string, checkpointKey: string, title: string, expected: string, score: number, sortOrder: number }>, answerExamples: Array<{ id: string, exampleType: AnswerExampleType, exampleText: string, sortOrder: number }> } };
+export type QuestionQuery = { question: { id: string, questionText: string, level: QuestionLevel, difficulty: QuestionDifficulty, isActive: boolean, shortAnswer: string, idealAnswer: string, topic: { id: string, code: string, name: string, interviewWeight: number }, profession: { id: string, code: string, name: string }, checkpoints: Array<{ id: string, checkpointKey: string, title: string, expected: string, score: number, sortOrder: number }>, answerExamples: Array<{ id: string, exampleType: AnswerExampleType, exampleText: string, sortOrder: number }> } };
 
 export type RefreshTokensMutationVariables = Exact<{ [key: string]: never; }>;
 
@@ -546,6 +702,27 @@ export type ResumeInterviewMutationVariables = Exact<{
 
 
 export type ResumeInterviewMutation = { resumeInterview: { id: string, status: InterviewStatus, publicUrl: string } };
+
+export type RevokeAttemptShareLinkMutationVariables = Exact<{
+  attemptId: string | number;
+}>;
+
+
+export type RevokeAttemptShareLinkMutation = { revokeAttemptShareLink: boolean };
+
+export type SetAttemptAiVerdictMutationVariables = Exact<{
+  input: SetAttemptAiVerdictInput;
+}>;
+
+
+export type SetAttemptAiVerdictMutation = { setAttemptAiVerdict: { attemptId: string, reviewStatus: AttemptReviewStatus, aiAssessmentVerdict: AiAssessmentVerdict, companyDecision: CompanyAttemptDecision, reviewedAt: number | null } };
+
+export type SetAttemptCompanyDecisionMutationVariables = Exact<{
+  input: SetAttemptCompanyDecisionInput;
+}>;
+
+
+export type SetAttemptCompanyDecisionMutation = { setAttemptCompanyDecision: { attemptId: string, reviewStatus: AttemptReviewStatus, aiAssessmentVerdict: AiAssessmentVerdict, companyDecision: CompanyAttemptDecision, reviewedAt: number | null } };
 
 export type SkillsQueryVariables = Exact<{
   professionId?: string | null | undefined;
@@ -596,6 +773,13 @@ export type TopicsQueryVariables = Exact<{
 
 
 export type TopicsQuery = { topics: Array<{ id: string, code: string, name: string, interviewWeight: number, skill: { id: string, code: string, name: string } | null }> };
+
+export type UpdateAttemptReviewNoteMutationVariables = Exact<{
+  input: UpdateAttemptReviewNoteInput;
+}>;
+
+
+export type UpdateAttemptReviewNoteMutation = { updateAttemptReviewNote: { id: string, attemptId: string, body: string, authorId: string, authorName: string, createdAt: number, updatedAt: number } };
 
 export class TypedDocumentString<TResult, TVariables>
   extends String
@@ -705,6 +889,49 @@ export const ArchiveInterviewDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ArchiveInterviewMutation, ArchiveInterviewMutationVariables>;
+export const AttemptReviewDecisionHistoryDocument = new TypedDocumentString(`
+    query AttemptReviewDecisionHistory($attemptId: ID!, $filters: AttemptReviewDecisionHistoryFilterInput) {
+  attemptReviewDecisionHistory(attemptId: $attemptId, filters: $filters) {
+    items {
+      eventId
+      source
+      action
+      previousValue
+      newValue
+      reason
+      actorEmail
+      actorName
+      occurredAt
+    }
+    total
+    page
+    pageSize
+  }
+}
+    `) as unknown as TypedDocumentString<AttemptReviewDecisionHistoryQuery, AttemptReviewDecisionHistoryQueryVariables>;
+export const AttemptReviewNotesDocument = new TypedDocumentString(`
+    query AttemptReviewNotes($attemptId: ID!) {
+  attemptReviewNotes(attemptId: $attemptId) {
+    id
+    attemptId
+    body
+    authorId
+    authorName
+    createdAt
+    updatedAt
+  }
+}
+    `) as unknown as TypedDocumentString<AttemptReviewNotesQuery, AttemptReviewNotesQueryVariables>;
+export const AttemptShareLinkDocument = new TypedDocumentString(`
+    query AttemptShareLink($attemptId: ID!) {
+  attemptShareLink(attemptId: $attemptId) {
+    attemptId
+    token
+    sharePath
+    expiresAt
+  }
+}
+    `) as unknown as TypedDocumentString<AttemptShareLinkQuery, AttemptShareLinkQueryVariables>;
 export const BeginInterviewAttemptDocument = new TypedDocumentString(`
     mutation BeginInterviewAttempt($input: BeginInterviewAttemptInput!) {
   beginInterviewAttempt(input: $input) {
@@ -996,6 +1223,62 @@ export const CompanyInterviewsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<CompanyInterviewsQuery, CompanyInterviewsQueryVariables>;
+export const CompanyReviewQueueDocument = new TypedDocumentString(`
+    query CompanyReviewQueue($filters: CompanyReviewQueueFilterInput) {
+  companyReviewQueue(filters: $filters) {
+    items {
+      attemptId
+      candidateId
+      candidateName
+      candidateEmail
+      interviewId
+      interviewTitle
+      jobRole
+      completedAt
+      evaluationStatus
+      totalScore
+      hireRecommendation
+      achievedLevel
+      achievedLevelMethod
+      needsManualReview
+      shortlistStatus
+    }
+    total
+    page
+    pageSize
+  }
+}
+    `) as unknown as TypedDocumentString<CompanyReviewQueueQuery, CompanyReviewQueueQueryVariables>;
+export const CompareInterviewCandidatesDocument = new TypedDocumentString(`
+    mutation CompareInterviewCandidates($input: CompareInterviewCandidatesInput!) {
+  compareInterviewCandidates(input: $input) {
+    recommendedAttemptId
+    recommendationTitle
+    recommendationSummary
+    decisionRationale
+    ranking {
+      attemptId
+      rank
+      headline
+      tradeOff
+    }
+    useCases {
+      title
+      recommendedAttemptId
+      rationale
+    }
+    candidateNotes {
+      attemptId
+      candidateName
+      bestFor
+      strengths
+      risks
+      followUpQuestions
+    }
+    caveats
+  }
+}
+    `) as unknown as TypedDocumentString<CompareInterviewCandidatesMutation, CompareInterviewCandidatesMutationVariables>;
 export const CompleteInterviewAttemptDocument = new TypedDocumentString(`
     mutation CompleteInterviewAttempt($publicToken: String!, $attemptId: ID!) {
   completeInterviewAttempt(publicToken: $publicToken, attemptId: $attemptId) {
@@ -1011,6 +1294,29 @@ export const CompleteInterviewAttemptDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<CompleteInterviewAttemptMutation, CompleteInterviewAttemptMutationVariables>;
+export const CreateAttemptReviewNoteDocument = new TypedDocumentString(`
+    mutation CreateAttemptReviewNote($input: CreateAttemptReviewNoteInput!) {
+  createAttemptReviewNote(input: $input) {
+    id
+    attemptId
+    body
+    authorId
+    authorName
+    createdAt
+    updatedAt
+  }
+}
+    `) as unknown as TypedDocumentString<CreateAttemptReviewNoteMutation, CreateAttemptReviewNoteMutationVariables>;
+export const CreateAttemptShareLinkDocument = new TypedDocumentString(`
+    mutation CreateAttemptShareLink($input: CreateAttemptShareLinkInput!) {
+  createAttemptShareLink(input: $input) {
+    attemptId
+    token
+    sharePath
+    expiresAt
+  }
+}
+    `) as unknown as TypedDocumentString<CreateAttemptShareLinkMutation, CreateAttemptShareLinkMutationVariables>;
 export const CreateInterviewFromTemplateDocument = new TypedDocumentString(`
     mutation CreateInterviewFromTemplate($templateId: ID!) {
   createInterviewFromTemplate(templateId: $templateId) {
@@ -1197,6 +1503,35 @@ export const HelloDocument = new TypedDocumentString(`
   hello
 }
     `) as unknown as TypedDocumentString<HelloQuery, HelloQueryVariables>;
+export const InterviewAttemptsPageDocument = new TypedDocumentString(`
+    query InterviewAttemptsPage($interviewId: ID!, $filters: InterviewAttemptsFilterInput) {
+  interviewAttemptsPage(interviewId: $interviewId, filters: $filters) {
+    total
+    page
+    pageSize
+    items {
+      attemptId
+      candidateId
+      candidateName
+      candidateEmail
+      status
+      completedAt
+      overallScore
+      hireRecommendation
+      evaluationStatus
+      achievedLevel
+      achievedLevelMethod
+      needsManualReview
+      shortlistStatus
+      reviewStatus
+      aiAssessmentVerdict
+      companyDecision
+      reviewedAt
+      hasTeamNotes
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<InterviewAttemptsPageQuery, InterviewAttemptsPageQueryVariables>;
 export const InterviewDocument = new TypedDocumentString(`
     query Interview($id: ID!) {
   interview(id: $id) {
@@ -1215,11 +1550,22 @@ export const InterviewDetailsDocument = new TypedDocumentString(`
     id
     title
     jobRole
+    professionName
+    level
     status
     questionCount
     publicUrl
     createdAt
     evaluationStatus
+    skills
+    questions {
+      id
+      sortOrder
+      questionText
+      level
+      difficulty
+      topicName
+    }
     primaryFinalEvaluation {
       id
       totalScore
@@ -1260,6 +1606,15 @@ export const InterviewDetailsDocument = new TypedDocumentString(`
       overallScore
       hireRecommendation
       evaluationStatus
+      achievedLevel
+      achievedLevelMethod
+      needsManualReview
+      shortlistStatus
+      reviewStatus
+      aiAssessmentVerdict
+      companyDecision
+      reviewedAt
+      hasTeamNotes
     }
   }
 }
@@ -1359,6 +1714,17 @@ export const ManagedInterviewDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ManagedInterviewQuery, ManagedInterviewQueryVariables>;
+export const MarkAttemptReviewStartedDocument = new TypedDocumentString(`
+    mutation MarkAttemptReviewStarted($attemptId: ID!) {
+  markAttemptReviewStarted(attemptId: $attemptId) {
+    attemptId
+    reviewStatus
+    aiAssessmentVerdict
+    companyDecision
+    reviewedAt
+  }
+}
+    `) as unknown as TypedDocumentString<MarkAttemptReviewStartedMutation, MarkAttemptReviewStartedMutationVariables>;
 export const MatchingCandidatesForLevelDocument = new TypedDocumentString(`
     query MatchingCandidatesForLevel($level: QuestionLevel!, $professionId: ID!, $skillIds: [ID!]) {
   matchingCandidatesForLevel(
@@ -1446,7 +1812,6 @@ export const QuestionBankListDocument = new TypedDocumentString(`
       questionText
       level
       difficulty
-      maxScore
       isActive
       topic {
         id
@@ -1477,7 +1842,6 @@ export const QuestionBankDocument = new TypedDocumentString(`
       questionText
       level
       difficulty
-      maxScore
       isActive
       topic {
         id
@@ -1525,7 +1889,6 @@ export const QuestionDocument = new TypedDocumentString(`
     questionText
     level
     difficulty
-    maxScore
     isActive
     shortAnswer
     idealAnswer
@@ -1603,6 +1966,33 @@ export const ResumeInterviewDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ResumeInterviewMutation, ResumeInterviewMutationVariables>;
+export const RevokeAttemptShareLinkDocument = new TypedDocumentString(`
+    mutation RevokeAttemptShareLink($attemptId: ID!) {
+  revokeAttemptShareLink(attemptId: $attemptId)
+}
+    `) as unknown as TypedDocumentString<RevokeAttemptShareLinkMutation, RevokeAttemptShareLinkMutationVariables>;
+export const SetAttemptAiVerdictDocument = new TypedDocumentString(`
+    mutation SetAttemptAiVerdict($input: SetAttemptAiVerdictInput!) {
+  setAttemptAiVerdict(input: $input) {
+    attemptId
+    reviewStatus
+    aiAssessmentVerdict
+    companyDecision
+    reviewedAt
+  }
+}
+    `) as unknown as TypedDocumentString<SetAttemptAiVerdictMutation, SetAttemptAiVerdictMutationVariables>;
+export const SetAttemptCompanyDecisionDocument = new TypedDocumentString(`
+    mutation SetAttemptCompanyDecision($input: SetAttemptCompanyDecisionInput!) {
+  setAttemptCompanyDecision(input: $input) {
+    attemptId
+    reviewStatus
+    aiAssessmentVerdict
+    companyDecision
+    reviewedAt
+  }
+}
+    `) as unknown as TypedDocumentString<SetAttemptCompanyDecisionMutation, SetAttemptCompanyDecisionMutationVariables>;
 export const SkillsDocument = new TypedDocumentString(`
     query Skills($professionId: String) {
   skills(professionId: $professionId) {
@@ -1699,3 +2089,16 @@ export const TopicsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<TopicsQuery, TopicsQueryVariables>;
+export const UpdateAttemptReviewNoteDocument = new TypedDocumentString(`
+    mutation UpdateAttemptReviewNote($input: UpdateAttemptReviewNoteInput!) {
+  updateAttemptReviewNote(input: $input) {
+    id
+    attemptId
+    body
+    authorId
+    authorName
+    createdAt
+    updatedAt
+  }
+}
+    `) as unknown as TypedDocumentString<UpdateAttemptReviewNoteMutation, UpdateAttemptReviewNoteMutationVariables>;

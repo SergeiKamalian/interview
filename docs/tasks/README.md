@@ -50,6 +50,9 @@ docs/tasks/
     14-✅-evaluation-accuracy-analytics/
     15-🟡-interview-templates/
     16-✅-interview-creation-flow/
+    17-✅-interview-evaluation-quality/
+    18-✅-achieved-level-talent-pool/
+    19-✅-post-interview-company-flow/
 ```
 
 ---
@@ -73,6 +76,7 @@ docs/tasks/
 13 — deployment
 14 — evaluation-accuracy-analytics (scoring honesty, HR analytics, golden set)
 15 — interview-templates (reusable interview blueprints)
+19 — post-interview-company-flow (company review queue после прохождения интервью)
 ```
 
 Важно: design docs в `docs/database/` и SQL migrations — source of truth для feature-блоков 04+.
@@ -239,17 +243,11 @@ Cursor НЕ должен выполнять весь блок сразу.
 ## Текущий активный блок
 
 ```txt
-15-🟡-interview-templates (🟡 in progress)
+19-✅-post-interview-company-flow (✅ done — Wave 1 + Wave 2 complete)
 ```
 
-Активный subtask:
+Следующий рекомендуемый блок:
 
 ```txt
-docs/tasks/list/15-🟡-interview-templates/subtasks/006-⬜-add-save-interview-as-template.md
-```
-
-Следующая рекомендуемая подзадача:
-
-```txt
-TASK-15.6 — Добавить save as template
+15-🟡-interview-templates (TASK-15.6)
 ```

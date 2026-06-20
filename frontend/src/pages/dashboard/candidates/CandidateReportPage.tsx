@@ -146,7 +146,7 @@ export function CandidateReportPage() {
                 <tr key={item.attemptId} className="border-t border-slate-100">
                   <td className="py-2 pr-4">
                     <Link
-                      to={`/dashboard/interviews/${item.interviewId}?attemptId=${item.attemptId}`}
+                      to={`/dashboard/interviews/${item.interviewId}/attempts/${item.attemptId}/review`}
                       className="text-brand-primary hover:underline"
                     >
                       {item.interviewTitle}
