@@ -4,6 +4,10 @@ import type { InterviewQuestionEntity } from '../../interview-core/entities/inte
 import type { InterviewMessageEntity } from '../../interview-core/entities/interview-message.entity';
 import { InterviewCoreRepository } from '../../interview-core/interview-core.repository';
 import { InterviewMessageKindEnum } from '../../interview-core/types/interview.type';
+import {
+  DEFAULT_AI_TONE,
+  type AiTone,
+} from '../../interview-core/types/interview-config.enum';
 import { InterviewRealtimeService } from '../../interview-realtime/interview-realtime.service';
 import { InterviewAiMessageStreamService } from '../../interview-realtime/interview-ai-message-stream.service';
 import { FollowUpRepository } from '../repositories/follow-up.repository';
@@ -88,6 +92,11 @@ export class AdaptiveInterviewSubmitService {
     }
   }
 
+  private async resolveAiTone(interviewId: number): Promise<AiTone> {
+    const interview = await this.repository.findById(interviewId);
+    return interview?.aiTone ?? DEFAULT_AI_TONE;
+  }
+
   async initializeQuestionAiState(input: {
     companyId: number;
     attemptId: number;
@@ -138,6 +147,7 @@ export class AdaptiveInterviewSubmitService {
         isFirstQuestion: input.answeredMainQuestions === 0,
         previousQuestionCount: input.answeredMainQuestions,
         seed: input.attemptId + input.question.id,
+        aiTone: await this.resolveAiTone(input.question.interviewId),
       },
     );
 
@@ -746,6 +756,7 @@ export class AdaptiveInterviewSubmitService {
         questionText: input.currentQuestion.questionText,
         referenceAnswer: input.currentQuestion.shortAnswer,
         seed: attemptId + input.currentQuestion.id,
+        aiTone: await this.resolveAiTone(input.currentQuestion.interviewId),
       });
 
     const streamedMainQuestion = this.aiMessageStreamService.isEnabled()

@@ -1,5 +1,13 @@
 import { Field, InputType, Int } from '@nestjs/graphql';
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 import {
   QuestionDifficultyEnum,
   QuestionLevelEnum,
@@ -29,6 +37,13 @@ export class QuestionBankFilterInput {
   @IsOptional()
   @IsString()
   topicId?: string;
+
+  @Field(() => [String], { nullable: true })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsString({ each: true })
+  skillIds?: string[];
 
   @Field(() => QuestionLevelEnum, { nullable: true })
   @IsOptional()

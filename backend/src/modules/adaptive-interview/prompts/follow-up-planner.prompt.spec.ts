@@ -24,7 +24,9 @@ describe('follow-up-planner.prompt v2', () => {
     expect(systemPrompt).toContain('MANDATORY');
     expect(systemPrompt).toContain('first person «я»');
     expect(systemPrompt).toContain('NEVER use third person');
-    expect(systemPrompt).toContain('NEVER start every follow-up with «Понял, спасибо»');
+    expect(systemPrompt).toContain(
+      'NEVER start every follow-up with «Понял, спасибо»',
+    );
     expect(systemPrompt).toContain('NEVER use robotic templates');
   });
 
@@ -41,6 +43,32 @@ describe('follow-up-planner.prompt v2', () => {
     const streamingPrompt = buildFollowUpPlannerStreamingSystemPrompt();
 
     expect(streamingPrompt).toContain('plain text only');
+  });
+
+  it('applies ai_tone preset to the persona (strict stricter, friendly warmer)', () => {
+    const friendly = buildFollowUpPlannerSystemPrompt('friendly');
+    const neutral = buildFollowUpPlannerSystemPrompt('neutral');
+    const strict = buildFollowUpPlannerSystemPrompt('strict');
+
+    expect(friendly).toContain('Interviewer tone: FRIENDLY');
+    expect(friendly).toContain('warm and encouraging');
+    expect(neutral).toContain('Interviewer tone: NEUTRAL');
+    expect(strict).toContain('Interviewer tone: STRICT');
+    expect(strict).toContain('demanding');
+
+    // Tone changes phrasing, never scoring — invariant must be stated in every variant.
+    for (const prompt of [friendly, neutral, strict]) {
+      expect(prompt).toContain('NEVER changes scoring');
+      expect(prompt).toContain('human technical interviewer');
+    }
+
+    expect(strict).not.toEqual(friendly);
+  });
+
+  it('defaults to neutral tone when ai_tone is omitted', () => {
+    expect(buildFollowUpPlannerSystemPrompt()).toContain(
+      'Interviewer tone: NEUTRAL',
+    );
   });
 
   it('passes classifier turn_kind into clarification redirect block', () => {

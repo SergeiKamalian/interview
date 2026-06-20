@@ -1,5 +1,8 @@
 import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview-context.types';
-import { getAdaptiveInterviewContextLimits } from '../config/adaptive-interview-context.config';
+import {
+  applyProbingDepthToLimits,
+  getAdaptiveInterviewContextLimits,
+} from '../config/adaptive-interview-context.config';
 import {
   collectCheckpointEvidenceText,
   collectFullCandidateText,
@@ -210,7 +213,10 @@ export function formatInterviewPolicyTurnBlock(
 function resolveBudgetConfigFromContext(
   context: AdaptiveInterviewContextPacket,
 ): FollowUpBudgetConfig {
-  const limits = getAdaptiveInterviewContextLimits();
+  const limits = applyProbingDepthToLimits(
+    getAdaptiveInterviewContextLimits(),
+    context.probingDepth,
+  );
 
   return {
     maxFollowUpsPerQuestion:

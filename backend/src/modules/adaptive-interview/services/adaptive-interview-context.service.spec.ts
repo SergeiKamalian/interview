@@ -9,6 +9,7 @@ describe('AdaptiveInterviewContextService', () => {
     Pick<
       InterviewCoreRepository,
       | 'findInterviewQuestionById'
+      | 'findById'
       | 'listMessages'
       | 'findCheckpointsByInterviewQuestionId'
       | 'findAnswerExamplesByInterviewQuestionId'
@@ -22,6 +23,7 @@ describe('AdaptiveInterviewContextService', () => {
   beforeEach(async () => {
     interviewRepository = {
       findInterviewQuestionById: jest.fn(),
+      findById: jest.fn().mockResolvedValue(null),
       listMessages: jest.fn(),
       findCheckpointsByInterviewQuestionId: jest.fn(),
       findAnswerExamplesByInterviewQuestionId: jest.fn().mockResolvedValue([]),
@@ -63,6 +65,37 @@ describe('AdaptiveInterviewContextService', () => {
       difficulty: 'intermediate',
       topicName: 'React',
       createdAt: new Date(),
+    });
+
+    interviewRepository.findById.mockResolvedValue({
+      id: 1,
+      companyId: 7,
+      createdByUserId: 3,
+      title: 'Frontend',
+      jobRole: 'Frontend',
+      professionId: null,
+      level: 'middle',
+      interviewLanguage: 'ru',
+      questionCount: 5,
+      jobDescription: null,
+      publicToken: 'token',
+      status: 'active',
+      isVideoEnabled: false,
+      interviewerName: null,
+      welcomeMessageTemplate: null,
+      aiTone: 'strict',
+      probingDepth: 'deep',
+      scoringStrictness: 'lenient',
+      expiresAt: null,
+      maxCompletions: null,
+      allowRetake: false,
+      timeLimitMinutes: 30,
+      passingScore: null,
+      requirePhone: false,
+      requireLinkedin: false,
+      requireGithub: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
 
     interviewRepository.listMessages.mockResolvedValue([
@@ -139,10 +172,69 @@ describe('AdaptiveInterviewContextService', () => {
     expect(packet.interviewQuestionId).toBe(10);
     expect(packet.latestCandidateAnswer).toBe('It runs side effects.');
     expect(packet.localTurns).toHaveLength(2);
-    expect(packet.localTurns.some((turn) => turn.content.includes('Other'))).toBe(
-      false,
-    );
+    expect(
+      packet.localTurns.some((turn) => turn.content.includes('Other')),
+    ).toBe(false);
     expect(packet.checkpointStates).toHaveLength(1);
     expect(packet.checkpoints).toHaveLength(1);
+    expect(packet.aiTone).toBe('strict');
+    expect(packet.probingDepth).toBe('deep');
+    expect(packet.scoringStrictness).toBe('lenient');
+    expect(packet.timeLimitMinutes).toBe(30);
+  });
+
+  it('falls back to defaults when interview row is missing', async () => {
+    interviewRepository.findById.mockResolvedValue(null);
+
+    interviewRepository.findInterviewQuestionById.mockResolvedValue({
+      id: 10,
+      interviewId: 1,
+      sourceQuestionId: null,
+      sortOrder: 0,
+      questionText: 'What is useEffect?',
+      shortAnswer: 'Hook for side effects.',
+      idealAnswer: 'Long ideal answer',
+      maxScore: 5,
+      level: 'middle',
+      difficulty: 'intermediate',
+      topicName: 'React',
+      createdAt: new Date(),
+    });
+
+    interviewRepository.listMessages.mockResolvedValue([
+      {
+        id: 1,
+        companyId: 7,
+        interviewAttemptId: 5,
+        interviewQuestionId: 10,
+        role: 'candidate',
+        content: 'It runs side effects.',
+        sequenceOrder: 1,
+        createdAt: new Date(),
+      },
+    ]);
+
+    interviewRepository.findCheckpointsByInterviewQuestionId.mockResolvedValue([
+      {
+        id: 100,
+        interviewQuestionId: 10,
+        checkpointKey: 'side_effects',
+        title: 'Side effects',
+        expected: 'Mentions side effects',
+        evaluationHints: null,
+        score: 1,
+        sortOrder: 0,
+        createdAt: new Date(),
+      },
+    ]);
+
+    checkpointStateRepository.findByAttemptAndQuestion.mockResolvedValue([]);
+
+    const packet = await service.buildContextPacket(5, 10);
+
+    expect(packet.aiTone).toBe('neutral');
+    expect(packet.probingDepth).toBe('balanced');
+    expect(packet.scoringStrictness).toBe('balanced');
+    expect(packet.timeLimitMinutes).toBeNull();
   });
 });

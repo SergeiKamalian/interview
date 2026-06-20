@@ -108,7 +108,9 @@ export class AiProviderService {
   ): Promise<ChatCompletionResult> {
     const config = this.aiProviderConfig.getConfig();
     const client = this.aiProviderConfig.getClientConfig();
-    const model = options?.model ?? config.modelEvaluation;
+    const model =
+      options?.model ??
+      this.aiProviderConfig.resolveModel(options?.debug?.operationType);
 
     const body: ChatCompletionCreateParamsNonStreaming = {
       model,
@@ -216,7 +218,9 @@ export class AiProviderService {
   ): Promise<ResponseCompletionResult> {
     const config = this.aiProviderConfig.getConfig();
     const client = this.aiProviderConfig.getClientConfig();
-    const model = options?.model ?? config.modelEvaluation;
+    const model =
+      options?.model ??
+      this.aiProviderConfig.resolveModel(options?.debug?.operationType);
 
     const body: ResponseCreateParamsNonStreaming = {
       model,
@@ -317,7 +321,9 @@ export class AiProviderService {
   ): Promise<ResponseCompletionResult> {
     const config = this.aiProviderConfig.getConfig();
     const client = this.aiProviderConfig.getClientConfig();
-    const model = options.model ?? config.modelEvaluation;
+    const model =
+      options.model ??
+      this.aiProviderConfig.resolveModel(options.debug?.operationType);
     const body: ResponseCreateParamsNonStreaming = {
       model,
       input: this.toResponseInput(options.messages),
@@ -423,7 +429,9 @@ export class AiProviderService {
   ): Promise<ChatCompletionResult> {
     const config = this.aiProviderConfig.getConfig();
     const client = this.aiProviderConfig.getClientConfig();
-    const model = options.model ?? config.modelEvaluation;
+    const model =
+      options.model ??
+      this.aiProviderConfig.resolveModel(options.debug?.operationType);
 
     const body: ChatCompletionCreateParamsStreaming = {
       model,
@@ -525,7 +533,9 @@ export class AiProviderService {
   ): Promise<ResponseCompletionResult> {
     const config = this.aiProviderConfig.getConfig();
     const client = this.aiProviderConfig.getClientConfig();
-    const model = options.model ?? config.modelEvaluation;
+    const model =
+      options.model ??
+      this.aiProviderConfig.resolveModel(options.debug?.operationType);
 
     const body: ResponseCreateParamsStreaming = {
       model,

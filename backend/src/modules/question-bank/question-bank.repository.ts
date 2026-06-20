@@ -86,6 +86,30 @@ interface CountRow extends RowDataPacket {
   total: number;
 }
 
+interface SuggestionCandidateRow extends RowDataPacket {
+  id: number;
+  question_text: string;
+  level: QuestionLevel;
+  difficulty: QuestionDifficulty;
+  max_score: string;
+  topic_id: number;
+  topic_name: string;
+  interview_weight: string;
+  skill_codes: string | null;
+}
+
+export type SuggestionCandidateEntity = {
+  id: number;
+  questionText: string;
+  level: QuestionLevel;
+  difficulty: QuestionDifficulty;
+  maxScore: number;
+  topicId: number;
+  topicName: string;
+  interviewWeight: number;
+  skillCodes: string[];
+};
+
 type QueryFn = <T extends RowDataPacket[] | ResultSetHeader>(
   sql: string,
   params?: DbQueryParam[],
@@ -220,6 +244,175 @@ export class QuestionBankRepository {
 
     const row = rows[0];
     return row ? this.mapTopicWithSkill(row) : null;
+  }
+
+  /**
+   * Lightweight candidate descriptors for AI question selection (TASK-16.4).
+   * Only returns questions visible to the company (global or company-owned),
+   * filtered by profession (required) and optional level / skillIds (OR).
+   */
+  async findSuggestionCandidates(
+    companyId: number,
+    params: {
+      professionId: number;
+      level?: QuestionLevel;
+      skillIds?: number[];
+      limit: number;
+    },
+  ): Promise<SuggestionCandidateEntity[]> {
+    const clauses = [
+      '(q.company_id IS NULL OR q.company_id = ?)',
+      'q.deleted_at IS NULL',
+      'q.is_active = 1',
+      'q.profession_id = ?',
+    ];
+    const queryParams: DbQueryParam[] = [companyId, params.professionId];
+
+    if (params.level) {
+      clauses.push('q.level = ?');
+      queryParams.push(params.level);
+    }
+
+    const skillIds = (params.skillIds ?? []).filter(
+      (id) => Number.isInteger(id) && id > 0,
+    );
+    if (skillIds.length > 0) {
+      const placeholders = skillIds.map(() => '?').join(', ');
+      clauses.push(
+        `EXISTS (
+           SELECT 1 FROM question_skills qs
+           WHERE qs.question_id = q.id
+             AND qs.skill_id IN (${placeholders})
+         )`,
+      );
+      queryParams.push(...skillIds);
+    }
+
+    const limit = Math.min(Math.max(params.limit, 1), 500);
+
+    const rows = await this.database.query<SuggestionCandidateRow[]>(
+      `SELECT q.id, q.question_text, q.level, q.difficulty, q.max_score,
+              t.id AS topic_id, t.name AS topic_name, t.interview_weight,
+              GROUP_CONCAT(DISTINCT s.code ORDER BY s.code SEPARATOR ',') AS skill_codes
+       FROM questions q
+       JOIN topics t ON t.id = q.topic_id
+       LEFT JOIN question_skills qs ON qs.question_id = q.id
+       LEFT JOIN skills s ON s.id = qs.skill_id
+       WHERE ${clauses.map((clause) => `(${clause})`).join(' AND ')}
+       GROUP BY q.id, q.question_text, q.level, q.difficulty, q.max_score,
+                t.id, t.name, t.interview_weight
+       ORDER BY t.interview_weight DESC, q.id ASC
+       LIMIT ${limit}`,
+      queryParams,
+    );
+
+    return rows.map((row) => ({
+      id: Number(row.id),
+      questionText: row.question_text,
+      level: row.level,
+      difficulty: row.difficulty,
+      maxScore: Number(row.max_score),
+      topicId: Number(row.topic_id),
+      topicName: row.topic_name,
+      interviewWeight: Number(row.interview_weight),
+      skillCodes: row.skill_codes ? row.skill_codes.split(',') : [],
+    }));
+  }
+
+  async findProfessions(): Promise<ProfessionEntity[]> {
+    const rows = await this.database.query<LookupRow[]>(
+      `SELECT id, code, name, is_active, created_at, updated_at
+       FROM professions
+       WHERE is_active = 1
+       ORDER BY name ASC`,
+    );
+
+    return rows.map((row) => this.mapProfession(row));
+  }
+
+  /**
+   * Skills relevant to a profession are derived from data: distinct skills of
+   * questions visible to the company (global or company-owned). No separate
+   * `profession_skills` table. Without a profession filter, all active skills
+   * are returned as a global lookup.
+   */
+  async findSkillsByProfession(
+    companyId: number,
+    professionId?: number,
+  ): Promise<SkillEntity[]> {
+    if (professionId === undefined) {
+      const rows = await this.database.query<LookupRow[]>(
+        `SELECT id, code, name, is_active, created_at, updated_at
+         FROM skills
+         WHERE is_active = 1
+         ORDER BY name ASC`,
+      );
+
+      return rows.map((row) => this.mapSkill(row));
+    }
+
+    const rows = await this.database.query<LookupRow[]>(
+      `SELECT DISTINCT s.id, s.code, s.name, s.is_active, s.created_at, s.updated_at
+       FROM skills s
+       JOIN question_skills qs ON qs.skill_id = s.id
+       JOIN questions q ON q.id = qs.question_id
+       WHERE s.is_active = 1
+         AND q.profession_id = ?
+         AND (q.company_id IS NULL OR q.company_id = ?)
+         AND q.deleted_at IS NULL
+         AND q.is_active = 1
+       ORDER BY s.name ASC`,
+      [professionId, companyId],
+    );
+
+    return rows.map((row) => this.mapSkill(row));
+  }
+
+  /**
+   * Topics filtered by skill (`topics.skill_id`) and/or by profession (topics
+   * that have at least one visible question for that profession).
+   */
+  async findTopics(
+    companyId: number,
+    skillId?: number,
+    professionId?: number,
+  ): Promise<TopicEntity[]> {
+    const clauses = ['t.is_active = 1'];
+    const params: DbQueryParam[] = [];
+
+    if (skillId !== undefined) {
+      clauses.push('t.skill_id = ?');
+      params.push(skillId);
+    }
+
+    if (professionId !== undefined) {
+      clauses.push(
+        `EXISTS (
+           SELECT 1 FROM questions q
+           WHERE q.topic_id = t.id
+             AND q.profession_id = ?
+             AND (q.company_id IS NULL OR q.company_id = ?)
+             AND q.deleted_at IS NULL
+             AND q.is_active = 1
+         )`,
+      );
+      params.push(professionId, companyId);
+    }
+
+    const rows = await this.database.query<TopicWithSkillRow[]>(
+      `SELECT t.id, t.skill_id, t.code, t.name, t.interview_weight, t.is_active,
+              t.created_at, t.updated_at,
+              s.id AS skill_lookup_id, s.code AS skill_code, s.name AS skill_name,
+              s.is_active AS skill_is_active, s.created_at AS skill_created_at,
+              s.updated_at AS skill_updated_at
+       FROM topics t
+       LEFT JOIN skills s ON s.id = t.skill_id
+       WHERE ${clauses.join(' AND ')}
+       ORDER BY t.name ASC`,
+      params,
+    );
+
+    return rows.map((row) => this.mapTopicWithSkill(row));
   }
 
   async findSkillsByIds(ids: number[]): Promise<SkillEntity[]> {
@@ -473,6 +666,24 @@ export class QuestionBankRepository {
       params.push(Number(filters.topicId));
     }
 
+    if (filters.skillIds && filters.skillIds.length > 0) {
+      const skillIds = filters.skillIds
+        .map((id) => Number(id))
+        .filter((id) => Number.isInteger(id) && id > 0);
+
+      if (skillIds.length > 0) {
+        const placeholders = skillIds.map(() => '?').join(', ');
+        clauses.push(
+          `EXISTS (
+             SELECT 1 FROM question_skills qs
+             WHERE qs.question_id = q.id
+               AND qs.skill_id IN (${placeholders})
+           )`,
+        );
+        params.push(...skillIds);
+      }
+    }
+
     if (filters.level) {
       clauses.push('q.level = ?');
       params.push(filters.level);
@@ -540,7 +751,11 @@ export class QuestionBankRepository {
   private mapTopicWithSkill(row: TopicWithSkillRow): TopicEntity {
     const topic = this.mapTopic(row);
 
-    if (row.skill_lookup_id === null || row.skill_code === null || row.skill_name === null) {
+    if (
+      row.skill_lookup_id === null ||
+      row.skill_code === null ||
+      row.skill_name === null
+    ) {
       return { ...topic, skill: null };
     }
 

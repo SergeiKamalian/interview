@@ -43,6 +43,26 @@ erDiagram
 | `interviewer_name` | Optional AI interviewer display name for welcome TTS |
 | `welcome_message_template` | Optional welcome text with `{{candidateName}}`, `{{interviewerName}}`, `{{jobRole}}`, `{{title}}`, `{{questionCount}}` |
 
+### Interview creation config (migration `020_interview_config_fields.sql`)
+
+Added by block `16-interview-creation-flow` (design: `docs/interview-creation/README.md` §5). AI-behavior knobs влияют на разговор и follow-up-бюджет, но **не** меняют `max_score` / checkpoints / критерии (инвариант банка). Лимиты энфорсятся на входе кандидата (block 16, позже).
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `ai_tone` | `ENUM('friendly','neutral','strict')` DEFAULT `neutral` | Тон AI-интервьюера |
+| `probing_depth` | `ENUM('shallow','balanced','deep')` DEFAULT `balanced` | Глубина копания (follow-up бюджет) |
+| `scoring_strictness` | `ENUM('lenient','balanced','strict')` DEFAULT `balanced` | Строгость оценки (пороги закрытия checkpoint, не max score) |
+| `expires_at` | `DATETIME NULL` | Дедлайн прохождения; **interview-only**, в шаблон не зеркалится |
+| `max_completions` | `INT UNSIGNED NULL` | Кап завершённых прохождений |
+| `allow_retake` | `TINYINT(1)` DEFAULT `0` | Разрешить пересдачу на один email |
+| `time_limit_minutes` | `INT UNSIGNED NULL` | Лимит времени на всё интервью |
+| `passing_score` | `DECIMAL(4,2) NULL` | Проходной порог (шкала 0–10) |
+| `require_phone` | `TINYINT(1)` DEFAULT `0` | Обязательное поле кандидата |
+| `require_linkedin` | `TINYINT(1)` DEFAULT `0` | Обязательное поле кандидата |
+| `require_github` | `TINYINT(1)` DEFAULT `0` | Обязательное поле кандидата |
+
+**Required-поля кандидата:** выбраны отдельные булевы колонки (`require_phone` / `require_linkedin` / `require_github`), а не JSON `candidate_required_fields` — для индексации/энфорса/типизации GraphQL и единообразия с остальными first-class колонками. `email` всегда обязателен (не настраивается).
+
 **Public token policy:** crypto-random UUID v4, generated in application, never sequential IDs in URLs.
 
 **Indexes:** `(company_id, created_at)`, `(company_id, status)`, UNIQUE `public_token`

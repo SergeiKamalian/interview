@@ -2,6 +2,11 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
+enum AchievedLevelMethod {
+  estimate
+  evidence
+}
+
 type AdaptiveCheckpointReviewType {
   attemptId: String!
   needsManualReview: Boolean!
@@ -59,6 +64,12 @@ type AiCostKpiType {
   costPerInterview: Float!
   totalCostUsd: Float!
   totalRequests: Int!
+}
+
+enum AiTone {
+  friendly
+  neutral
+  strict
 }
 
 type AiUsageCostSummaryType {
@@ -321,28 +332,49 @@ type CompanyType {
 }
 
 input CreateInterviewInput {
+  aiTone: AiTone
+  allowRetake: Boolean
+  expiresAt: String
   interviewLanguage: String = "ru"
   interviewerName: String
   isVideoEnabled: Boolean
   jobDescription: String
   jobRole: String!
   level: QuestionLevel!
+  maxCompletions: Int
+  passingScore: Float
+  probingDepth: ProbingDepth
   professionId: String
   questionCount: Int
   questionIds: [String!]!
+  requireGithub: Boolean
+  requireLinkedin: Boolean
+  requirePhone: Boolean
+  scoringStrictness: ScoringStrictness
+  timeLimitMinutes: Int
   title: String!
   welcomeMessageTemplate: String
 }
 
 input CreateInterviewTemplateInput {
+  aiTone: AiTone
+  allowRetake: Boolean
   interviewLanguage: String = "ru"
   interviewerName: String
   isVideoEnabled: Boolean
   jobDescription: String
   jobRole: String!
   level: QuestionLevel!
+  maxCompletions: Int
+  passingScore: Float
+  probingDepth: ProbingDepth
   professionId: ID
   questionIds: [ID!]!
+  requireGithub: Boolean
+  requireLinkedin: Boolean
+  requirePhone: Boolean
+  scoringStrictness: ScoringStrictness
+  timeLimitMinutes: Int
   title: String!
   welcomeMessageTemplate: String
 }
@@ -410,6 +442,12 @@ type DashboardWeakTopicType {
   topicName: String!
 }
 
+input DraftInterviewFromJobDescriptionInput {
+  count: Int = 10
+  jobDescription: String!
+  language: String
+}
+
 type ElevenLabsCostAnalyticsType {
   byOperation: [ElevenLabsCostByOperationType!]!
   kpi: ElevenLabsCostKpiType!
@@ -448,6 +486,9 @@ enum FinalEvaluationCategory {
 }
 
 type FinalEvaluationType {
+  achievedLevel: QuestionLevel
+  achievedLevelMethod: AchievedLevelMethod
+  achievedLevelNote: String
   averageScore: Float
   category: FinalEvaluationCategory!
   categoryBreakdown: [CategoryBreakdownType!]!
@@ -456,11 +497,13 @@ type FinalEvaluationType {
   hireRecommendation: HireRecommendation!
   id: String!
   interviewAttemptId: String!
+  levelBreakdown: [LevelBreakdownType!]!
   needsManualReview: Boolean!
   risks: [String!]!
   strengthCategory: InterviewStrengthCategory!
   strengths: [String!]!
   summary: String!
+  targetLevel: QuestionLevel
   topicEvaluations: [TopicSessionEvaluationType!]!
   totalScore: Float!
   totalWeight: Float!
@@ -546,6 +589,7 @@ enum InterviewStatus {
   active
   archived
   draft
+  paused
 }
 
 enum InterviewStrengthCategory {
@@ -565,6 +609,8 @@ enum InterviewTemplateStatus {
 }
 
 type InterviewTemplateType {
+  aiTone: AiTone!
+  allowRetake: Boolean!
   createdAt: Int!
   id: String!
   interviewLanguage: String!
@@ -573,10 +619,18 @@ type InterviewTemplateType {
   jobDescription: String
   jobRole: String!
   level: QuestionLevel!
+  maxCompletions: Int
+  passingScore: Float
+  probingDepth: ProbingDepth!
   professionId: String
   questionCount: Int!
   questions: [InterviewTemplateQuestionType!]!
+  requireGithub: Boolean!
+  requireLinkedin: Boolean!
+  requirePhone: Boolean!
+  scoringStrictness: ScoringStrictness!
   status: InterviewTemplateStatus!
+  timeLimitMinutes: Int
   title: String!
   updatedAt: Int!
   welcomeMessageTemplate: String
@@ -588,6 +642,9 @@ type InterviewTranscriptType {
 }
 
 type InterviewType {
+  aiTone: AiTone!
+  allowRetake: Boolean!
+  expiresAt: String
   id: String!
   interviewLanguage: String!
   interviewerName: String
@@ -595,12 +652,39 @@ type InterviewType {
   jobDescription: String
   jobRole: String!
   level: QuestionLevel!
+  maxCompletions: Int
+  passingScore: Float
+  probingDepth: ProbingDepth!
   publicToken: String!
   publicUrl: String!
   questionCount: Int!
+  requireGithub: Boolean!
+  requireLinkedin: Boolean!
+  requirePhone: Boolean!
+  scoringStrictness: ScoringStrictness!
   status: InterviewStatus!
+  timeLimitMinutes: Int
   title: String!
   welcomeMessageTemplate: String
+}
+
+type JobDescriptionDraftPayload {
+  generatedByAi: Boolean!
+  jobRole: String
+  level: QuestionLevel
+  professionId: String
+  questionIds: [String!]!
+  questions: [QuestionType!]!
+  skillIds: [String!]!
+  title: String
+}
+
+type LevelBreakdownType {
+  earned: Float!
+  level: QuestionLevel!
+  maxScore: Float!
+  passed: Boolean!
+  ratio: Float!
 }
 
 input LoginInput {
@@ -625,6 +709,7 @@ enum MessageRole {
 type Mutation {
   addCandidateRecruiterNote(candidateId: ID!, reason: String!): ShortlistActionPayloadType!
   addCandidateToShortlist(candidateId: ID!, reason: String): ShortlistActionPayloadType!
+  archiveInterview(id: ID!): InterviewType!
   archiveQuestion(id: ID!): QuestionType!
   beginInterviewAttempt(input: BeginInterviewAttemptInput!): InterviewSessionType!
   completeInterviewAttempt(attemptId: ID!, publicToken: String!): InterviewSessionType!
@@ -633,16 +718,27 @@ type Mutation {
   createInterviewTemplate(input: CreateInterviewTemplateInput!): InterviewTemplateType!
   createInterviewTemplateFromInterview(interviewId: ID!, title: String): InterviewTemplateType!
   createQuestion(input: CreateQuestionInput!): QuestionType!
+  draftInterviewFromJobDescription(input: DraftInterviewFromJobDescriptionInput!): JobDescriptionDraftPayload!
   evaluateInterviewAttempt(attemptId: ID!): EvaluateInterviewAttemptPayload!
   login(input: LoginInput!): AuthPayload!
   logout: LogoutPayload!
+  pauseInterview(id: ID!): InterviewType!
   publishInterview(id: ID!): InterviewType!
   refreshTokens: RefreshPayload!
   register(input: RegisterInput!): AuthPayload!
   removeCandidateFromShortlist(candidateId: ID!, reason: String): ShortlistActionPayloadType!
+  resumeInterview(id: ID!): InterviewType!
+  startInterviewPreview(interviewId: ID!): StartInterviewPreviewPayload!
   startPublicInterview(input: StartPublicInterviewInput!): StartPublicInterviewPayload!
   submitInterviewAnswer(input: SubmitInterviewAnswerInput!): SubmitInterviewAnswerPayload!
+  suggestInterviewQuestions(input: SuggestInterviewQuestionsInput!): SuggestedInterviewQuestionsPayload!
   updateQuestion(input: UpdateQuestionInput!): QuestionType!
+}
+
+enum ProbingDepth {
+  balanced
+  deep
+  shallow
 }
 
 type ProfessionType {
@@ -675,13 +771,17 @@ type Query {
   interviewDetails(interviewId: ID!): InterviewDetailsType!
   interviewSession(attemptId: ID!, publicToken: String!): InterviewSessionType!
   interviewTranscript(attemptId: ID!): InterviewTranscriptType!
+  matchingCandidatesForLevel(level: QuestionLevel!, professionId: ID!, skillIds: [ID!]): [TalentPoolCandidateType!]!
   me: MePayload!
+  professions: [ProfessionType!]!
   publicInterview(publicToken: String!): PublicInterviewType!
   question(id: ID!): QuestionType!
   questionBank(filters: QuestionBankFilterInput): QuestionBankListPayload!
   questionEvaluationsByAttempt(attemptId: ID!): [QuestionEvaluationType!]!
   questionEvaluationsByInterview(interviewId: ID!): [QuestionEvaluationType!]!
+  skills(professionId: String): [SkillType!]!
   topicSkillQuestionAnalytics(filters: TopicSkillQuestionFilterInput): TopicSkillQuestionAnalyticsType!
+  topics(professionId: String, skillId: String): [TopicType!]!
 }
 
 type QuestionAnalyticsItemType {
@@ -706,6 +806,7 @@ input QuestionBankFilterInput {
   offset: Int = 0
   professionId: String
   search: String
+  skillIds: [String!]
   topicId: String
 }
 
@@ -786,6 +887,12 @@ input RegisterInput {
   password: String!
 }
 
+enum ScoringStrictness {
+  balanced
+  lenient
+  strict
+}
+
 type ShortlistActionPayloadType {
   candidateId: String!
   reason: String
@@ -808,6 +915,12 @@ type SkillType {
   code: String!
   id: String!
   name: String!
+}
+
+type StartInterviewPreviewPayload {
+  attemptId: String!
+  publicToken: String!
+  totalQuestions: Int!
 }
 
 input StartPublicInterviewInput {
@@ -844,6 +957,36 @@ type SubmitInterviewAnswerPayload {
   status: AttemptStatus!
   totalMainQuestions: Int!
   totalQuestions: Int!
+}
+
+input SuggestInterviewQuestionsInput {
+  count: Int = 10
+  level: QuestionLevel
+  professionId: String!
+  skillIds: [String!]
+}
+
+type SuggestedInterviewQuestionsPayload {
+  candidateCount: Int!
+  count: Int!
+  generatedByAi: Boolean!
+  questionIds: [String!]!
+  questions: [QuestionType!]!
+}
+
+type TalentPoolCandidateType {
+  achievedLevel: QuestionLevel!
+  achievedLevelMethod: AchievedLevelMethod
+  candidateId: String!
+  completedAt: Int
+  email: String!
+  fullName: String!
+  matchedSkillCount: Int!
+  matchedSkills: [String!]!
+  professionId: String!
+  professionName: String!
+  sourceInterviewId: String!
+  sourceInterviewTitle: String!
 }
 
 type TopicAnalyticsItemType {

@@ -193,7 +193,10 @@ export class PerTurnCheckpointEvaluatorService {
       : ([
           {
             role: 'system',
-            content: buildEvaluateConversationSystemPrompt(combinedTurn),
+            content: buildEvaluateConversationSystemPrompt(
+              combinedTurn,
+              context.scoringStrictness,
+            ),
           },
           {
             role: 'user',
@@ -268,7 +271,10 @@ export class PerTurnCheckpointEvaluatorService {
       interviewQuestionId,
     );
     const promptVersion = ADAPTIVE_AI_CONVERSATION_EVALUATE_PROMPT_VERSION;
-    const systemPrompt = buildEvaluateConversationSystemPrompt(combinedTurn);
+    const systemPrompt = buildEvaluateConversationSystemPrompt(
+      combinedTurn,
+      context.scoringStrictness,
+    );
     const turnUserPrompt = buildEvaluateConversationTurnUserPrompt(
       context,
       combinedTurn,
@@ -348,7 +354,9 @@ export class PerTurnCheckpointEvaluatorService {
       candidateDispositionFromClassifier?: CandidateAnswerDisposition | null;
     },
   ): Promise<PerTurnCheckpointEvaluatorRunResult> {
-    const systemPrompt = buildPerTurnCheckpointEvaluationSystemPrompt();
+    const systemPrompt = buildPerTurnCheckpointEvaluationSystemPrompt(
+      context.scoringStrictness,
+    );
     const userPrompt = buildPerTurnCheckpointEvaluationUserPrompt(context);
 
     logAdaptiveAiDebug(this.logger, 'evaluate_turn.context', {
@@ -533,13 +541,12 @@ export class PerTurnCheckpointEvaluatorService {
             input.candidateDispositionFromClassifier,
         });
 
-      const evaluationWithDisposition =
-        input.candidateDispositionFromClassifier
-          ? {
-              ...flooredEvaluation,
-              candidateDisposition: input.candidateDispositionFromClassifier,
-            }
-          : flooredEvaluation;
+      const evaluationWithDisposition = input.candidateDispositionFromClassifier
+        ? {
+            ...flooredEvaluation,
+            candidateDisposition: input.candidateDispositionFromClassifier,
+          }
+        : flooredEvaluation;
 
       if (adjustments.length > 0) {
         this.logger.log(
@@ -657,7 +664,10 @@ export class PerTurnCheckpointEvaluatorService {
         [
           {
             role: 'system',
-            content: buildEvaluateConversationSystemPrompt(combinedTurn),
+            content: buildEvaluateConversationSystemPrompt(
+              combinedTurn,
+              context.scoringStrictness,
+            ),
           },
           {
             role: 'user',

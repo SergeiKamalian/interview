@@ -21,18 +21,24 @@ import type { CandidateTurnKind } from '../types/candidate-turn-classifier.types
 import { isScopeClarificationTurn } from './candidate-clarification.util';
 import {
   collectCheckpointEvidenceText,
-  collectFullCandidateText,
   collectLatestCandidateText,
   stripNeutralMetaphors,
 } from './checkpoint-evidence-text.util';
-import { extractMatchedFalseClaimQuote } from './false-claim-quote.util';
-import { parseCoverageFromRationale } from './checkpoint-depth.util';
+import { extractMatchedFalseClaimQuoteStrict } from './false-claim-quote.util';
+import {
+  parseCoverageFromRationale,
+  parseDepthFromRationale,
+} from './checkpoint-depth.util';
 import { mergeCheckpointEvaluation } from './merge-checkpoint-evaluation.util';
 import { alignRationaleDepthWithScore } from './rationale-depth-alignment.util';
 import {
   getContradictionScoreCap,
   getPositiveEvidenceScoreFloor,
 } from './hint-driven-evidence.util';
+import {
+  getScoringStrictnessScoreMultiplier,
+  scaleGuardScore,
+} from './scoring-strictness.util';
 import {
   applyTransitiveCheckpointFloors,
   applyTransitiveFloorToGuardedResult,
@@ -69,7 +75,9 @@ export function applyCheckpointScoreFloors(
     evaluationMode?: EvaluationMode;
     evidenceSource?: EvaluationEvidenceSource;
     candidateTurnKind?: CandidateTurnKind | null;
-    candidateDispositionFromClassifier?: PerTurnCheckpointEvaluationAiResponse['candidateDisposition'] | null;
+    candidateDispositionFromClassifier?:
+      | PerTurnCheckpointEvaluationAiResponse['candidateDisposition']
+      | null;
   } = {},
 ): ApplyCheckpointScoreFloorsResult {
   const expectedCheckpointKey =
@@ -81,26 +89,15 @@ export function applyCheckpointScoreFloors(
   const evaluationMode = options.evaluationMode ?? 'full';
   const metaTurnTargetKey =
     context.targetCheckpointKey ?? expectedCheckpointKey ?? null;
-  const fullCandidateText = collectFullCandidateText(context);
   const latestCandidateText = collectLatestCandidateText(context);
   const badExamples = context.badAnswerExamples ?? [];
   const promptVersion = getPerTurnCheckpointEvaluationPromptVersion();
+  // Per-interview scoring strictness (TASK-16.10): scales guard caps/floors only.
+  // balanced (default / undefined) → 1 → byte-identical to prior behavior.
+  const strictnessMultiplier = getScoringStrictnessScoreMultiplier(
+    context.scoringStrictness,
+  );
   const adjustments: CheckpointGuardAdjustment[] = [];
-
-  type GuardDraft = {
-    original: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number];
-    checkpoint: AdaptiveCheckpointDefinition;
-    priorState?: AdaptiveInterviewContextPacket['checkpointStates'][number];
-    effectiveMaxScore: number;
-    guardedWithQuote: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number];
-    isTargetedFollowUp: boolean;
-    latestTurnText: string;
-    checkpointEvidenceText: string;
-    aiSnapshot: {
-      status: PerTurnCheckpointEvaluationStatus;
-      scoreAwarded: number;
-    };
-  };
 
   const processed = evaluation.checkpointResults.map((result) => {
     const checkpoint = context.checkpoints.find(
@@ -165,6 +162,7 @@ export function applyCheckpointScoreFloors(
               context.maxScore,
               isTargetedFollowUp,
               options.candidateTurnKind,
+              strictnessMultiplier,
             ),
             {
               checkpoint,
@@ -173,6 +171,7 @@ export function applyCheckpointScoreFloors(
               latestTurnText,
               questionMaxScore: context.maxScore,
             },
+            strictnessMultiplier,
           ),
           effectiveMaxScore,
         )
@@ -183,10 +182,17 @@ export function applyCheckpointScoreFloors(
                 applyExplicitRefusalCap(
                   applyBadExampleOverlapCap(
                     applySemanticContradictionCap(
-                      applyRationaleContradictionCap(result, effectiveMaxScore),
+                      applyRationaleContradictionCap(
+                        result,
+                        effectiveMaxScore,
+                        strictnessMultiplier,
+                        evaluationText,
+                        checkpoint,
+                      ),
                       evaluationText,
                       checkpoint,
                       effectiveMaxScore,
+                      strictnessMultiplier,
                     ),
                     evaluationText,
                     checkpointEvidenceText,
@@ -198,6 +204,7 @@ export function applyCheckpointScoreFloors(
                     checkpoint.evaluationHints?.neutralMetaphors,
                     effectiveMaxScore,
                     checkpoint,
+                    strictnessMultiplier,
                   ),
                   latestTurnText,
                   checkpoint,
@@ -205,6 +212,7 @@ export function applyCheckpointScoreFloors(
                   context.maxScore,
                   isTargetedFollowUp,
                   options.candidateTurnKind,
+                  strictnessMultiplier,
                 ),
                 latestTurnText,
                 floorFullText,
@@ -212,6 +220,7 @@ export function applyCheckpointScoreFloors(
                 effectiveMaxScore,
                 isTargetedFollowUp,
                 options.candidateTurnKind,
+                strictnessMultiplier,
               ),
               {
                 checkpoint,
@@ -220,8 +229,10 @@ export function applyCheckpointScoreFloors(
                 latestTurnText,
                 questionMaxScore: context.maxScore,
               },
+              strictnessMultiplier,
             ),
             effectiveMaxScore,
+            strictnessMultiplier,
           ),
           effectiveMaxScore,
         );
@@ -289,8 +300,9 @@ export function applyCheckpointScoreFloors(
   });
 
   const transitiveEntries: TransitiveGuardedCheckpoint[] = processed
-    .filter((item): item is Extract<typeof item, { kind: 'draft' }> =>
-      item.kind === 'draft',
+    .filter(
+      (item): item is Extract<typeof item, { kind: 'draft' }> =>
+        item.kind === 'draft',
     )
     .map((item) => ({
       checkpointKey: item.guardedWithQuote.checkpointKey,
@@ -345,7 +357,8 @@ export function applyCheckpointScoreFloors(
 
     const merged = mergeCheckpointEvaluation({
       currentScoreAwarded: item.priorState?.scoreAwarded ?? 0,
-      currentStatus: (item.priorState?.status ?? 'unseen') as CheckpointStateStatus,
+      currentStatus: (item.priorState?.status ??
+        'unseen') as CheckpointStateStatus,
       currentEvidenceSummary: null,
       currentRationale: null,
       incomingScoreAwarded: guardedWithQuote.scoreAwarded,
@@ -375,6 +388,7 @@ export function applyCheckpointScoreFloors(
         latestTurnText: item.latestTurnText,
         questionMaxScore: context.maxScore,
         guardedResult: guardedWithQuote,
+        strictnessMultiplier,
       }),
     });
 
@@ -432,19 +446,25 @@ export function applyCheckpointScoreFloors(
               rationale: merged.rationale ?? item.original.rationale,
             },
             item.effectiveMaxScore,
+            strictnessMultiplier,
           );
 
-    return {
-      ...item.original,
-      scoreAwarded: realigned.scoreAwarded,
-      status: realigned.status,
-      evidenceSummary: merged.evidenceSummary,
-      rationale: alignRationaleDepthWithScore(
-        normalizeRationaleDepth(realigned.rationale ?? item.original.rationale),
-        realigned.scoreAwarded,
-        item.effectiveMaxScore,
-      ),
-    };
+    return upgradeStrongPartialToCovered(
+      {
+        ...item.original,
+        scoreAwarded: realigned.scoreAwarded,
+        status: realigned.status,
+        evidenceSummary: merged.evidenceSummary,
+        rationale: alignRationaleDepthWithScore(
+          normalizeRationaleDepth(
+            realigned.rationale ?? item.original.rationale,
+          ),
+          realigned.scoreAwarded,
+          item.effectiveMaxScore,
+        ),
+      },
+      item.effectiveMaxScore,
+    );
   });
 
   return {
@@ -453,6 +473,70 @@ export function applyCheckpointScoreFloors(
       checkpointResults,
     },
     adjustments,
+  };
+}
+
+/**
+ * TASK-17.4: make `covered` reachable for strong answers. The guard chain
+ * (enforceStatusScoreAlignment) downgrades `covered`→`partial` whenever the
+ * awarded score is below the full max, so a confident, near-complete answer
+ * (e.g. 0.85·max, confidence 0.9) would otherwise be stuck at `partial` forever
+ * and surface as "0/N covered" in the final report. We upgrade a high-confidence
+ * partial back to `covered` once it clears a strong threshold — WITHOUT touching
+ * the score or the question bank criteria. A partial whose rationale flags a real
+ * contradiction / false claim is never upgraded.
+ */
+export const COVERED_UPGRADE_SCORE_RATIO = 0.8;
+export const COVERED_UPGRADE_MIN_CONFIDENCE = 0.7;
+
+export function upgradeStrongPartialToCovered(
+  result: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
+  maxScore: number,
+): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
+  if (result.status !== 'partial' || maxScore <= 0) {
+    return result;
+  }
+
+  const ratio = result.scoreAwarded / maxScore;
+  const confidence = result.confidence ?? 0;
+  if (
+    ratio < COVERED_UPGRADE_SCORE_RATIO ||
+    confidence < COVERED_UPGRADE_MIN_CONFIDENCE
+  ) {
+    return result;
+  }
+
+  const rationale = result.rationale ?? '';
+
+  // Never upgrade an answer the guards capped for a contradiction / false claim.
+  if (
+    hasFalseClaimInRationale(rationale) ||
+    /semantic guard capped/i.test(rationale) ||
+    /depth\s*=\s*false_claim/i.test(rationale)
+  ) {
+    return result;
+  }
+
+  // A high score produced by the shallow-accept floor means a deliberately
+  // shallow (basic-tier) answer was accepted without probing — that is NOT a
+  // fully-covered answer and must stay `partial`.
+  if (/shallow accept floor/i.test(rationale)) {
+    return result;
+  }
+
+  // `covered` requires genuine depth AND breadth, not just an inflated score:
+  // the evaluator must have judged the checkpoint as understood/known with high
+  // coverage. This keeps shallow/partial-knowledge answers at `partial`.
+  const depth = parseDepthFromRationale(rationale);
+  const coverage = parseCoverageFromRationale(rationale);
+  const strongDepth = depth === 'understands' || depth === 'knows';
+  if (!strongDepth || coverage !== 'high') {
+    return result;
+  }
+
+  return {
+    ...result,
+    status: 'covered',
   };
 }
 
@@ -503,7 +587,9 @@ function applyScopeClarificationScoreFreeze(input: {
   result: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number];
   checkpointKey: string;
   targetCheckpointKey?: string | null;
-  candidateDisposition: PerTurnCheckpointEvaluationAiResponse['candidateDisposition'] | null;
+  candidateDisposition:
+    | PerTurnCheckpointEvaluationAiResponse['candidateDisposition']
+    | null;
   priorScoreAwarded: number;
   isTargetedFollowUp: boolean;
 }): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
@@ -612,7 +698,12 @@ function attachFalseClaimEvidence(
     return result;
   }
 
-  const quote = extractMatchedFalseClaimQuote(
+  // TASK-17.5: only overwrite evidence_summary with a quote that LITERALLY
+  // contains a configured false claim. Without a real match we keep the model's
+  // own evidence_summary instead of falling back to the answer's first sentence
+  // (which produced irrelevant "evidence" like the opening definition of a
+  // correct answer).
+  const quote = extractMatchedFalseClaimQuoteStrict(
     checkpointEvidenceText,
     checkpoint.evaluationHints?.falseClaims,
   );
@@ -634,6 +725,7 @@ function applyExplicitRefusalCap(
   questionMaxScore?: number,
   isTargetedFollowUp = false,
   candidateTurnKind?: CandidateTurnKind | null,
+  strictnessMultiplier = 1,
 ): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
   if (
     !isTargetedRefusalForPolicy({
@@ -669,7 +761,11 @@ function applyExplicitRefusalCap(
       tier,
       probeStatus: 'probed',
     });
-    const floor = getShallowAcceptFloorScore(maxScore, fraction);
+    const floor = scaleGuardScore(
+      getShallowAcceptFloorScore(maxScore, fraction),
+      maxScore,
+      strictnessMultiplier,
+    );
     const scoreAwarded = Math.max(floor, Math.min(result.scoreAwarded, floor));
 
     return {
@@ -724,6 +820,9 @@ function stripTrailingDepth(rationale: string | null | undefined): string {
 function applyRationaleContradictionCap(
   result: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
   maxScore: number,
+  strictnessMultiplier = 1,
+  candidateText = '',
+  checkpoint?: AdaptiveCheckpointDefinition,
 ): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
   if (result.scoreAwarded < maxScore || result.status !== 'covered') {
     return result;
@@ -731,6 +830,17 @@ function applyRationaleContradictionCap(
 
   const rationale = (result.rationale ?? '').toLowerCase();
   if (rationaleIndicatesOmissionNotContradiction(rationale)) {
+    return result;
+  }
+
+  // TASK-17.2: never cap an answer the rationale itself calls sound. The model
+  // sometimes self-contradicts (writes accuracy=wrong while also stating
+  // «суть сохранена и не противоречит» / «описан корректно»); that is not a
+  // real material error and must not zero a correct answer.
+  if (
+    rationaleIndicatesSoundEvidence(result.rationale) ||
+    rationaleAffirmsAnswerIsCorrect(rationale)
+  ) {
     return result;
   }
 
@@ -757,8 +867,23 @@ function applyRationaleContradictionCap(
     return result;
   }
 
+  // TASK-17.2: the rationale-based contradiction cap must be backed by a real,
+  // cited contradicting phrase from the question bank's false claims — not the
+  // raw model accuracy=wrong/false_claim flag alone. Without a matched quote we
+  // trust the covered score (the semantic contradiction cap already handles
+  // hint-matched contradictions separately).
+  if (!hasCitedFalseClaim(candidateText, checkpoint)) {
+    return result;
+  }
+
   const accuracyWrong = /accuracy\s*=\s*wrong/i.test(rationale);
-  const cap = accuracyWrong ? 0 : partialScoreForMax(maxScore);
+  const cap = accuracyWrong
+    ? 0
+    : scaleGuardScore(
+        partialScoreForMax(maxScore),
+        maxScore,
+        strictnessMultiplier,
+      );
   return {
     ...result,
     scoreAwarded: cap,
@@ -775,6 +900,7 @@ function applyBadExampleOverlapCap(
   neutralMetaphors: string[] | undefined,
   maxScore: number,
   checkpoint: AdaptiveCheckpointDefinition,
+  strictnessMultiplier = 1,
 ): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
   if (result.scoreAwarded <= 0) {
     return result;
@@ -800,7 +926,11 @@ function applyBadExampleOverlapCap(
     return result;
   }
 
-  const cap = partialScoreForMax(maxScore);
+  const cap = scaleGuardScore(
+    partialScoreForMax(maxScore),
+    maxScore,
+    strictnessMultiplier,
+  );
   return {
     ...result,
     scoreAwarded: Math.min(result.scoreAwarded, cap),
@@ -812,6 +942,7 @@ function applyBadExampleOverlapCap(
 function applyRationaleScoreAlignment(
   result: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number],
   maxScore: number,
+  strictnessMultiplier = 1,
 ): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
   const rationale = result.rationale ?? '';
   if (result.scoreAwarded <= 0) {
@@ -869,6 +1000,10 @@ function applyRationaleScoreAlignment(
     minScore = partialScoreForMax(maxScore);
   }
 
+  if (minScore !== null) {
+    minScore = scaleGuardScore(minScore, maxScore, strictnessMultiplier);
+  }
+
   if (minScore === null || result.scoreAwarded >= minScore) {
     return result;
   }
@@ -892,6 +1027,7 @@ function applyShallowAcceptFloor(
     latestTurnText: string;
     questionMaxScore: number;
   },
+  strictnessMultiplier = 1,
 ): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
   const state = {
     status: result.status as CheckpointStateStatus,
@@ -955,7 +1091,11 @@ function applyShallowAcceptFloor(
     tier,
     probeStatus,
   });
-  const floor = getShallowAcceptFloorScore(state.maxScore, fraction);
+  const floor = scaleGuardScore(
+    getShallowAcceptFloorScore(state.maxScore, fraction),
+    state.maxScore,
+    strictnessMultiplier,
+  );
 
   if (result.scoreAwarded >= floor) {
     if (probeStatus === 'open' && !isProbePendingRationale(result.rationale)) {
@@ -999,6 +1139,7 @@ function resolveProvisionalScoreFloor(input: {
   latestTurnText: string;
   questionMaxScore: number;
   guardedResult: PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number];
+  strictnessMultiplier?: number;
 }): number | undefined {
   const maxScore = input.priorState?.maxScore ?? input.checkpoint.score;
   const state = {
@@ -1038,7 +1179,11 @@ function resolveProvisionalScoreFloor(input: {
     probeStatus,
   });
 
-  return getShallowAcceptFloorScore(maxScore, fraction);
+  return scaleGuardScore(
+    getShallowAcceptFloorScore(maxScore, fraction),
+    maxScore,
+    input.strictnessMultiplier ?? 1,
+  );
 }
 
 function applyPositiveEvidenceFloor(
@@ -1049,6 +1194,7 @@ function applyPositiveEvidenceFloor(
   maxScore: number,
   isTargetedFollowUp = false,
   candidateTurnKind?: CandidateTurnKind | null,
+  strictnessMultiplier = 1,
 ): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
   if (
     isTargetedRefusalForPolicy({
@@ -1068,12 +1214,16 @@ function applyPositiveEvidenceFloor(
     return result;
   }
 
-  const floor = getPositiveEvidenceScoreFloor(
+  const rawFloor = getPositiveEvidenceScoreFloor(
     checkpoint.evaluationHints,
     isTargetedFollowUp ? latestCandidateText : '',
     fullCandidateText,
     maxScore,
   );
+  const floor =
+    rawFloor === null
+      ? null
+      : scaleGuardScore(rawFloor, maxScore, strictnessMultiplier);
   if (
     floor === null ||
     matchesCheckpointFalseClaims(
@@ -1157,8 +1307,13 @@ function applySemanticContradictionCap(
   candidateText: string,
   checkpoint: AdaptiveCheckpointDefinition,
   maxScore: number,
+  strictnessMultiplier = 1,
 ): PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number] {
-  const cap = getContradictionScoreCap(checkpoint, candidateText, maxScore);
+  const rawCap = getContradictionScoreCap(checkpoint, candidateText, maxScore);
+  const cap =
+    rawCap === null
+      ? null
+      : scaleGuardScore(rawCap, maxScore, strictnessMultiplier);
   if (cap === null || result.scoreAwarded <= cap) {
     return result;
   }
@@ -1183,6 +1338,41 @@ function rationaleIndicatesOmissionNotContradiction(
     /не\s+адресован/i,
     /не\s+упомянут.{0,40}текущ/i,
   ].some((pattern) => pattern.test(rationale));
+}
+
+/**
+ * TASK-17.2: detects rationales where the model affirms the answer is
+ * substantively correct / not contradictory even though it also emitted a
+ * accuracy=wrong / false_claim flag. Patterns are deliberately narrow so a
+ * genuine half-right/half-wrong rationale (e.g. «суть верна, но X не
+ * соответствует») is NOT treated as an affirmation.
+ */
+function rationaleAffirmsAnswerIsCorrect(rationale: string): boolean {
+  return [
+    /не\s+противоречит/,
+    /без\s+ложных\s+утвержд/,
+    /без\s+материальн\w*\s+ошиб/,
+    /суть\s+[\wа-яё]+\s+сохранен/,
+    /механизм[\wа-яё ]*описан\s+корректно/,
+    /описан[аоы]?\s+корректно\s+без/,
+  ].some((pattern) => pattern.test(rationale));
+}
+
+/**
+ * TASK-17.2: a contradiction cap may only be applied when the candidate's
+ * evidence actually contains a phrase that matches the checkpoint's configured
+ * false claims (question bank source of truth) — not on the model's raw flag.
+ */
+function hasCitedFalseClaim(
+  candidateText: string,
+  checkpoint?: AdaptiveCheckpointDefinition,
+): boolean {
+  const falseClaims = checkpoint?.evaluationHints?.falseClaims ?? [];
+  if (falseClaims.length === 0 || !candidateText.trim()) {
+    return false;
+  }
+
+  return matchesCheckpointFalseClaims(candidateText, falseClaims);
 }
 
 function resolveIncomingAllowsScoreDecrease(

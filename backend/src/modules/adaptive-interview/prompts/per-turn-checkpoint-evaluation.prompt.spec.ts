@@ -10,7 +10,7 @@ describe('per-turn checkpoint evaluation prompt', () => {
   it('requires cumulative scoring and probe-or-accept rules in system prompt', () => {
     const prompt = buildPerTurnCheckpointEvaluationSystemPrompt();
 
-    expect(PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION).toBe('2.9.0');
+    expect(PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION).toBe('2.10.0');
     expect(prompt).toContain('cumulative evidence');
     expect(prompt).toContain('Probe-or-accept');
     expect(prompt).toContain('probe=pending');
@@ -44,13 +44,16 @@ describe('per-turn checkpoint evaluation prompt', () => {
           scoreAwarded: 0.25,
           maxScore: 2.5,
           followUpCount: 0,
-          rationale:
-            'depth=partial_knowledge coverage=medium accuracy=partial',
+          rationale: 'depth=partial_knowledge coverage=medium accuracy=partial',
         },
       ],
       evidenceSnippets: [],
       localTurns: [],
-      followUpLimits: { maxPerQuestion: 3, maxPerCheckpoint: 1, usedForQuestion: 0 },
+      followUpLimits: {
+        maxPerQuestion: 3,
+        maxPerCheckpoint: 1,
+        usedForQuestion: 0,
+      },
     } satisfies AdaptiveInterviewContextPacket);
 
     expect(userPrompt).toContain('Interview policy (this turn)');
@@ -84,7 +87,11 @@ describe('per-turn checkpoint evaluation prompt', () => {
       checkpointStates: [],
       evidenceSnippets: [],
       localTurns: [],
-      followUpLimits: { maxPerQuestion: 3, maxPerCheckpoint: 1, usedForQuestion: 1 },
+      followUpLimits: {
+        maxPerQuestion: 3,
+        maxPerCheckpoint: 1,
+        usedForQuestion: 1,
+      },
     } satisfies AdaptiveInterviewContextPacket);
 
     expect(userPrompt).toContain('Follow-up target checkpoint');
@@ -113,8 +120,7 @@ describe('per-turn checkpoint evaluation prompt', () => {
       localTurns: [
         {
           role: 'ai',
-          content:
-            'Как работает scheduler, MessageChannel и postMessage?',
+          content: 'Как работает scheduler, MessageChannel и postMessage?',
         },
         {
           role: 'candidate',

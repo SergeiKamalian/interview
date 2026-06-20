@@ -1,5 +1,6 @@
 import type { CompanyInterviewSummariesFilters } from "@entities/interview/model/interview.types";
 import { DEFAULT_INTERVIEW_SUMMARIES_FILTERS } from "@entities/interview/lib/interviewSummariesFilters";
+import { INTERVIEW_LANGUAGE_SELECT_OPTIONS } from "@entities/interview/lib/interviewLanguage";
 import { Button, CheckboxField, Input, SelectField } from "@shared/ui";
 
 type InterviewSummariesFiltersBarProps = {
@@ -105,8 +106,7 @@ export function InterviewSummariesFiltersBar({
           placeholder="Все языки"
           options={[
             { value: "", label: "Все языки" },
-            { value: "ru", label: "Русский" },
-            { value: "en", label: "English" },
+            ...INTERVIEW_LANGUAGE_SELECT_OPTIONS,
           ]}
         />
       </div>

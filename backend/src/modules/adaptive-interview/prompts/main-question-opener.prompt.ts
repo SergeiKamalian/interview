@@ -1,7 +1,14 @@
-import { INTERVIEWER_FIRST_PERSON_VOICE_RULES } from './interviewer-voice.prompt';
+import {
+  buildInterviewerToneBlock,
+  INTERVIEWER_FIRST_PERSON_VOICE_RULES,
+} from './interviewer-voice.prompt';
+import {
+  DEFAULT_AI_TONE,
+  type AiTone,
+} from '../../interview-core/types/interview-config.enum';
 
 export const MAIN_QUESTION_OPENER_PROMPT_KEY = 'main_question_opener';
-export const MAIN_QUESTION_OPENER_PROMPT_VERSION = '1.1.0';
+export const MAIN_QUESTION_OPENER_PROMPT_VERSION = '1.2.0';
 
 export type MainQuestionOpenerPromptInput = {
   questionText: string;
@@ -10,9 +17,13 @@ export type MainQuestionOpenerPromptInput = {
   previousQuestionCount: number;
 };
 
-export function buildMainQuestionOpenerSystemPrompt(): string {
+export function buildMainQuestionOpenerSystemPrompt(
+  aiTone: AiTone = DEFAULT_AI_TONE,
+): string {
   return [
     'You write the opening line of a live technical interview — a SHORT readiness check before the candidate explains the topic.',
+    '',
+    buildInterviewerToneBlock(aiTone),
     '',
     INTERVIEWER_FIRST_PERSON_VOICE_RULES,
     '',
@@ -63,7 +74,11 @@ export function buildMainQuestionOpenerUserPrompt(
 
   const reference = input.referenceAnswer?.trim();
   if (reference) {
-    lines.push('', 'Reference answer (context only — never reveal):', reference);
+    lines.push(
+      '',
+      'Reference answer (context only — never reveal):',
+      reference,
+    );
   }
 
   lines.push('', 'Write the topic opener message now.');

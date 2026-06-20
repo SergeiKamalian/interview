@@ -1,4 +1,14 @@
 import { Field, Float, ObjectType, registerEnumType } from '@nestjs/graphql';
+import { QuestionLevelEnum } from '../../question-bank/types/question.type';
+
+export enum AchievedLevelMethodEnum {
+  evidence = 'evidence',
+  estimate = 'estimate',
+}
+
+registerEnumType(AchievedLevelMethodEnum, {
+  name: 'AchievedLevelMethod',
+});
 
 export enum InterviewStrengthCategoryEnum {
   weak = 'weak',
@@ -71,6 +81,24 @@ export class CategoryBreakdownType {
 }
 
 @ObjectType()
+export class LevelBreakdownType {
+  @Field(() => QuestionLevelEnum)
+  level!: QuestionLevelEnum;
+
+  @Field(() => Float)
+  earned!: number;
+
+  @Field(() => Float)
+  maxScore!: number;
+
+  @Field(() => Float)
+  ratio!: number;
+
+  @Field()
+  passed!: boolean;
+}
+
+@ObjectType()
 export class FinalEvaluationType {
   @Field()
   id!: string;
@@ -98,6 +126,25 @@ export class FinalEvaluationType {
 
   @Field(() => HireRecommendationEnum)
   hireRecommendation!: HireRecommendationEnum;
+
+  /** Demonstrated level — separate axis from hireRecommendation (TASK-18). */
+  @Field(() => QuestionLevelEnum, { nullable: true })
+  achievedLevel?: QuestionLevelEnum | null;
+
+  @Field(() => AchievedLevelMethodEnum, { nullable: true })
+  achievedLevelMethod?: AchievedLevelMethodEnum | null;
+
+  /** Human-facing note (e.g. calibration hint when method === 'estimate'). */
+  @Field(() => String, { nullable: true })
+  achievedLevelNote?: string | null;
+
+  /** Interview target level (interviews.level), null when unknown. */
+  @Field(() => QuestionLevelEnum, { nullable: true })
+  targetLevel?: QuestionLevelEnum | null;
+
+  /** Per-level score aggregation, ordered junior→lead, only present levels. */
+  @Field(() => [LevelBreakdownType])
+  levelBreakdown!: LevelBreakdownType[];
 
   @Field()
   summary!: string;

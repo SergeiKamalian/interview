@@ -1,3 +1,4 @@
+import type { ScoringStrictness } from '../../interview-core/types/interview-config.enum';
 import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview-context.types';
 import {
   buildInterviewPolicyTurnBlock,
@@ -24,8 +25,9 @@ const COMBINED_FOLLOW_UP_SCHEMA = `Optional field when combined mode is on:
 
 export function buildEvaluateConversationSystemPrompt(
   combinedTurn: boolean,
+  scoringStrictness?: ScoringStrictness,
 ): string {
-  const base = buildPerTurnCheckpointEvaluationSystemPrompt();
+  const base = buildPerTurnCheckpointEvaluationSystemPrompt(scoringStrictness);
 
   return [
     base,
@@ -36,6 +38,7 @@ export function buildEvaluateConversationSystemPrompt(
     '- Later user messages may include an Interview policy block — follow it for this turn.',
     '- Use conversation history plus the latest turn; scores are cumulative and must never decrease except on false claim / decline.',
     '- Cumulative does not mean lenient: do not increase scores for keyword mentions that are false or semantically wrong.',
+    '- accuracy=wrong / depth=false_claim only when you can cite a SPECIFIC incorrect statement; «correct but incomplete» is accuracy=partial, never accuracy=wrong (see base rules).',
     combinedTurn
       ? [
           COMBINED_FOLLOW_UP_SCHEMA,

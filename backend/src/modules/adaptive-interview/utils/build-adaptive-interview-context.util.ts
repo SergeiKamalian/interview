@@ -16,7 +16,9 @@ export function buildAdaptiveInterviewContextPacket(
   input: BuildAdaptiveInterviewContextInput,
 ): AdaptiveInterviewContextPacket {
   const questionMessages = input.questionMessages
-    .filter((message) => message.interviewQuestionId === input.interviewQuestionId)
+    .filter(
+      (message) => message.interviewQuestionId === input.interviewQuestionId,
+    )
     .sort((left, right) => left.sequenceOrder - right.sequenceOrder);
 
   const candidateMessages = questionMessages.filter(
@@ -40,7 +42,9 @@ export function buildAdaptiveInterviewContextPacket(
       followUpCount: state.followUpCount,
       rationale: state.rationale ?? null,
     }))
-    .sort((left, right) => left.checkpointKey.localeCompare(right.checkpointKey));
+    .sort((left, right) =>
+      left.checkpointKey.localeCompare(right.checkpointKey),
+    );
 
   const evidenceSnippets = input.checkpointStates
     .filter((state) => state.evidenceSummary?.trim())
@@ -48,12 +52,15 @@ export function buildAdaptiveInterviewContextPacket(
       checkpointKey: state.checkpointKey,
       summary: boundText(state.evidenceSummary!, input.limits.maxTextLength),
     }))
-    .sort((left, right) => left.checkpointKey.localeCompare(right.checkpointKey));
+    .sort((left, right) =>
+      left.checkpointKey.localeCompare(right.checkpointKey),
+    );
 
   const localTurns = buildLocalTurns(
     questionMessages,
     input.limits.localTurnLimit,
     input.limits.maxTextLength,
+    input.limits.maxCandidateAnswerLength,
   );
 
   const usedForQuestion = checkpointStates.reduce(
@@ -66,6 +73,10 @@ export function buildAdaptiveInterviewContextPacket(
     interviewId: input.interviewId,
     attemptId: input.attemptId,
     companyId: input.companyId,
+    aiTone: input.aiTone,
+    probingDepth: input.probingDepth,
+    scoringStrictness: input.scoringStrictness,
+    timeLimitMinutes: input.timeLimitMinutes,
     questionText: boundText(input.questionText, input.limits.maxTextLength),
     referenceAnswer,
     maxScore: input.maxScore,
@@ -78,7 +89,10 @@ export function buildAdaptiveInterviewContextPacket(
       .slice(0, 3)
       .map((example) => boundText(example, input.limits.maxTextLength)),
     latestCandidateAnswer: latestCandidateMessage
-      ? boundText(latestCandidateMessage.content, input.limits.maxTextLength)
+      ? boundText(
+          latestCandidateMessage.content,
+          input.limits.maxCandidateAnswerLength,
+        )
       : '',
     latestCandidateMessageId: latestCandidateMessage?.id ?? null,
     latestAnswerMessageKind:
@@ -118,13 +132,19 @@ function buildLocalTurns(
   questionMessages: BuildAdaptiveInterviewContextInput['questionMessages'],
   localTurnLimit: number,
   maxTextLength: number,
+  maxCandidateAnswerLength: number,
 ): AdaptiveInterviewContextPacket['localTurns'] {
   const maxMessages = localTurnLimit * 2;
 
   return questionMessages.slice(-maxMessages).map((message) => ({
     sequenceOrder: message.sequenceOrder,
     role: message.role,
-    content: boundText(message.content, maxTextLength),
+    // TASK-17.5: never truncate the candidate's own words below the full-answer
+    // bound — only interviewer turns use the compact maxTextLength.
+    content: boundText(
+      message.content,
+      message.role === 'candidate' ? maxCandidateAnswerLength : maxTextLength,
+    ),
     messageKind:
       message.messageKind === 'follow_up_answer'
         ? 'follow_up_answer'

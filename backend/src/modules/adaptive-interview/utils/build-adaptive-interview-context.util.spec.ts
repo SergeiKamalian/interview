@@ -8,6 +8,7 @@ const limits = {
   maxFollowUpsPerQuestion: 3,
   maxFollowUpsPerCheckpoint: 1,
   maxTextLength: 500,
+  maxCandidateAnswerLength: 8000,
   maxReferenceAnswerLength: 600,
 };
 
@@ -79,9 +80,9 @@ describe('buildAdaptiveInterviewContextPacket', () => {
     });
 
     expect(packet.localTurns).toHaveLength(2);
-    expect(packet.localTurns.every((turn) => turn.content !== 'Question 2')).toBe(
-      true,
-    );
+    expect(
+      packet.localTurns.every((turn) => turn.content !== 'Question 2'),
+    ).toBe(true);
     expect(packet.latestCandidateAnswer).toBe('Answer for question 1');
     expect(packet.latestCandidateMessageId).toBe(2);
   });
@@ -134,15 +135,20 @@ describe('buildAdaptiveInterviewContextPacket', () => {
     expect(packet.referenceAnswer).toBe('Hook for side effects.');
   });
 
-  it('bounds long candidate answers and keeps only latest local turns', () => {
-    const longAnswer = 'a'.repeat(700);
-    const messages = Array.from({ length: 8 }, (_, index) => ({
-      id: index + 1,
-      role: (index % 2 === 0 ? 'ai' : 'candidate') as 'ai' | 'candidate',
-      content: `turn-${index}`,
-      sequenceOrder: index + 1,
-      interviewQuestionId: 10,
-    }));
+  it('keeps the full candidate answer (no maxTextLength truncation) and only latest turns', () => {
+    // TASK-17.5: a real answer well above maxTextLength (500) must reach the
+    // evaluator in full — only interviewer turns use the compact bound.
+    const longAnswer = 'a'.repeat(2500);
+    const messages = Array.from({ length: 8 }, (_, index) => {
+      const role: 'ai' | 'candidate' = index % 2 === 0 ? 'ai' : 'candidate';
+      return {
+        id: index + 1,
+        role,
+        content: `turn-${index}`,
+        sequenceOrder: index + 1,
+        interviewQuestionId: 10,
+      };
+    });
 
     messages[7] = {
       id: 8,
@@ -157,10 +163,32 @@ describe('buildAdaptiveInterviewContextPacket', () => {
       questionMessages: messages,
     });
 
-    expect(packet.latestCandidateAnswer.length).toBeLessThanOrEqual(500);
-    expect(packet.latestCandidateAnswer.endsWith('…')).toBe(true);
+    expect(packet.latestCandidateAnswer).toBe(longAnswer);
+    expect(packet.latestCandidateAnswer.endsWith('…')).toBe(false);
+    const latestTurn = packet.localTurns[packet.localTurns.length - 1];
+    expect(latestTurn?.content).toBe(longAnswer);
     expect(packet.localTurns).toHaveLength(6);
     expect(packet.localTurns[0]?.sequenceOrder).toBe(3);
+  });
+
+  it('still bounds a candidate answer that exceeds the candidate bound', () => {
+    const hugeAnswer = 'a'.repeat(120);
+    const packet = buildAdaptiveInterviewContextPacket({
+      ...baseInput,
+      limits: { ...limits, maxCandidateAnswerLength: 50 },
+      questionMessages: [
+        {
+          id: 1,
+          role: 'candidate',
+          content: hugeAnswer,
+          sequenceOrder: 1,
+          interviewQuestionId: 10,
+        },
+      ],
+    });
+
+    expect(packet.latestCandidateAnswer.length).toBeLessThanOrEqual(50);
+    expect(packet.latestCandidateAnswer.endsWith('…')).toBe(true);
   });
 });
 

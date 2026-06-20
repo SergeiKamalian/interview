@@ -1,4 +1,4 @@
-import { Card } from '@shared/ui';
+import { Card } from "@shared/ui";
 
 type BreakdownItem = {
   categoryKey: string;
@@ -26,9 +26,12 @@ export function CategoryBreakdownChart({ items }: CategoryBreakdownChartProps) {
         {items.map((item) => (
           <div key={item.categoryKey}>
             <div className="mb-1 flex justify-between text-sm">
-              <span className="font-medium text-slate-800">{item.categoryLabel}</span>
-              <span className="text-slate-600">
-                {item.scoreNormalized.toFixed(0)}% · +{item.contribution.toFixed(1)}
+              <span className="font-medium text-slate-800">
+                {item.categoryLabel}
+              </span>
+              <span className="text-slate-600 whitespace-nowrap">
+                {item.scoreNormalized.toFixed(0)}% · +
+                {item.contribution.toFixed(1)}
               </span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-slate-100">

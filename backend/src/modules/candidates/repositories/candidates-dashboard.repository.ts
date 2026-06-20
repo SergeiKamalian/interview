@@ -58,7 +58,8 @@ export class CandidatesDashboardRepository {
       filters.sort === 'last_interview_date'
         ? 'stats.last_interview_date'
         : 'stats.avg_score';
-    const sortDirection = filters.sortDirection?.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+    const sortDirection =
+      filters.sortDirection?.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
     const fromClause = `
       FROM candidates c
@@ -69,7 +70,7 @@ export class CandidatesDashboardRepository {
                MAX(ia.completed_at) AS last_interview_date
         FROM interview_attempts ia
         LEFT JOIN final_evaluations fe ON fe.interview_attempt_id = ia.id
-        WHERE ia.company_id = ?
+        WHERE ia.company_id = ? AND ia.is_preview = 0
         GROUP BY ia.candidate_id
       ) stats ON stats.candidate_id = c.id
       LEFT JOIN candidate_shortlist cs ON cs.candidate_id = c.id AND cs.company_id = c.company_id

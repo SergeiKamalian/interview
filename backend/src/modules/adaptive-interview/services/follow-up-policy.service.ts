@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { getAdaptiveInterviewContextLimits } from '../config/adaptive-interview-context.config';
+import {
+  applyProbingDepthToLimits,
+  getAdaptiveInterviewContextLimits,
+} from '../config/adaptive-interview-context.config';
 import { getFollowUpEvidenceWeightConfig } from '../config/follow-up-evidence-weight.config';
 import type { CandidateAnswerDisposition } from '../types/candidate-answer-disposition.type';
 import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview-context.types';
@@ -25,7 +28,10 @@ export class FollowUpPolicyService {
     candidateTurnKind?: FollowUpPolicyInput['candidateTurnKind'],
     evaluationMode?: EvaluationMode,
   ): FollowUpPolicyDecision {
-    const limits = getAdaptiveInterviewContextLimits();
+    const limits = applyProbingDepthToLimits(
+      getAdaptiveInterviewContextLimits(),
+      context.probingDepth,
+    );
 
     const weightConfig = getFollowUpEvidenceWeightConfig();
 

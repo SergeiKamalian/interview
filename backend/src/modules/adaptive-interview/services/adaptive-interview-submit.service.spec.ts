@@ -69,6 +69,7 @@ describe('AdaptiveInterviewSubmitService', () => {
     candidateId: 2,
     status: 'in_progress' as const,
     isShortlisted: false,
+    isPreview: false,
     startedAt: new Date(),
     completedAt: null,
     createdAt: new Date(),
@@ -110,6 +111,7 @@ describe('AdaptiveInterviewSubmitService', () => {
     repository = {
       countMainAnswerMessages: jest.fn().mockResolvedValue(0),
       findAwaitingTopicOpener: jest.fn().mockResolvedValue(null),
+      findById: jest.fn().mockResolvedValue(null),
       getNextSequenceOrder: jest
         .fn()
         .mockResolvedValueOnce(2)

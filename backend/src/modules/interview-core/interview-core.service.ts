@@ -11,6 +11,12 @@ import { mapInterviewToGraphql } from './interview-core.mapper';
 import { InterviewCoreRepository } from './interview-core.repository';
 import { PublicTokenService } from './public-token.service';
 import type { InterviewType } from './types/interview.type';
+import type { InterviewStatus } from './types/interview-status.enum';
+import {
+  DEFAULT_AI_TONE,
+  DEFAULT_PROBING_DEPTH,
+  DEFAULT_SCORING_STRICTNESS,
+} from './types/interview-config.enum';
 
 @Injectable()
 export class InterviewCoreService {
@@ -85,6 +91,18 @@ export class InterviewCoreService {
           isVideoEnabled: input.isVideoEnabled ?? false,
           interviewerName: input.interviewerName?.trim() ?? null,
           welcomeMessageTemplate: input.welcomeMessageTemplate?.trim() ?? null,
+          aiTone: input.aiTone ?? DEFAULT_AI_TONE,
+          probingDepth: input.probingDepth ?? DEFAULT_PROBING_DEPTH,
+          scoringStrictness:
+            input.scoringStrictness ?? DEFAULT_SCORING_STRICTNESS,
+          expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+          maxCompletions: input.maxCompletions ?? null,
+          allowRetake: input.allowRetake ?? false,
+          timeLimitMinutes: input.timeLimitMinutes ?? null,
+          passingScore: input.passingScore ?? null,
+          requirePhone: input.requirePhone ?? false,
+          requireLinkedin: input.requireLinkedin ?? false,
+          requireGithub: input.requireGithub ?? false,
           questions: loadedQuestions,
           topicNames,
           topicWeights,
@@ -111,6 +129,82 @@ export class InterviewCoreService {
     }
 
     return mapInterviewToGraphql(interview);
+  }
+
+  async pauseInterview(
+    companyId: number,
+    interviewIdRaw: string,
+  ): Promise<InterviewType> {
+    return this.transitionStatus(companyId, interviewIdRaw, {
+      from: ['active'],
+      to: 'paused',
+      code: 'INTERVIEW_NOT_PAUSABLE',
+      message: 'Only active interviews can be paused',
+    });
+  }
+
+  async resumeInterview(
+    companyId: number,
+    interviewIdRaw: string,
+  ): Promise<InterviewType> {
+    return this.transitionStatus(companyId, interviewIdRaw, {
+      from: ['paused'],
+      to: 'active',
+      code: 'INTERVIEW_NOT_RESUMABLE',
+      message: 'Only paused interviews can be resumed',
+    });
+  }
+
+  async archiveInterview(
+    companyId: number,
+    interviewIdRaw: string,
+  ): Promise<InterviewType> {
+    return this.transitionStatus(companyId, interviewIdRaw, {
+      from: ['draft', 'active', 'paused'],
+      to: 'archived',
+      code: 'INTERVIEW_ALREADY_ARCHIVED',
+      message: 'Interview is already archived',
+    });
+  }
+
+  private async transitionStatus(
+    companyId: number,
+    interviewIdRaw: string,
+    transition: {
+      from: InterviewStatus[];
+      to: InterviewStatus;
+      code: string;
+      message: string;
+    },
+  ): Promise<InterviewType> {
+    const interviewId = Number(interviewIdRaw);
+    const current = await this.repository.findByIdForCompany(
+      companyId,
+      interviewId,
+    );
+
+    if (!current) {
+      throw new NotFoundException('Interview not found');
+    }
+
+    if (!transition.from.includes(current.status)) {
+      throw new BadRequestException({
+        message: transition.message,
+        code: transition.code,
+      });
+    }
+
+    const updated = await this.repository.updateStatus(
+      companyId,
+      interviewId,
+      transition.to,
+    );
+
+    if (!updated) {
+      throw new NotFoundException('Interview not found');
+    }
+
+    return mapInterviewToGraphql(updated);
   }
 
   async getInterview(

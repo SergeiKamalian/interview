@@ -2,7 +2,6 @@ import { textContainsPhrase } from './text-evidence-overlap.util';
 
 export function extractFalseClaimQuote(
   text: string | null | undefined,
-  _checkpointKey?: string,
 ): string | null {
   if (!text?.trim()) {
     return null;
@@ -43,6 +42,40 @@ export function extractMatchedFalseClaimQuote(
     sentences.find((sentence) => textContainsPhrase(sentence, matchedClaim)) ??
     sentences.find((sentence) => sentence.length >= 24) ??
     text;
+
+  return sentenceWithClaim.length > 160
+    ? `${sentenceWithClaim.slice(0, 160)}…`
+    : sentenceWithClaim;
+}
+
+/**
+ * TASK-17.5: like {@link extractMatchedFalseClaimQuote} but WITHOUT the
+ * first-sentence fallback. Returns the candidate sentence that literally
+ * contains a configured false claim, or `null` when none matches. Use this when
+ * the quote must be real evidence (e.g. overwriting evidence_summary), so a
+ * correct answer is never "quoted" with an irrelevant first sentence.
+ */
+export function extractMatchedFalseClaimQuoteStrict(
+  text: string | null | undefined,
+  falseClaims: string[] | undefined,
+): string | null {
+  if (!text?.trim() || !falseClaims?.length) {
+    return null;
+  }
+
+  const matchedClaim = falseClaims.find((claim) =>
+    textContainsPhrase(text, claim),
+  );
+  if (!matchedClaim) {
+    return null;
+  }
+
+  const sentenceWithClaim =
+    text
+      .split(/(?<=[.!?])\s+/)
+      .map((sentence) => sentence.trim())
+      .filter(Boolean)
+      .find((sentence) => textContainsPhrase(sentence, matchedClaim)) ?? text;
 
   return sentenceWithClaim.length > 160
     ? `${sentenceWithClaim.slice(0, 160)}…`

@@ -1,10 +1,19 @@
 import type { CheckpointEvaluationHints } from './checkpoint-evaluation-hints.type';
+import type {
+  AiTone,
+  ProbingDepth,
+  ScoringStrictness,
+} from '../../interview-core/types/interview-config.enum';
 
 export type AdaptiveLocalTurn = {
   sequenceOrder: number;
   role: 'ai' | 'candidate';
   content: string;
-  messageKind?: 'main_answer' | 'follow_up_answer' | 'topic_opener_answer' | null;
+  messageKind?:
+    | 'main_answer'
+    | 'follow_up_answer'
+    | 'topic_opener_answer'
+    | null;
   targetCheckpointKey?: string | null;
 };
 
@@ -46,6 +55,10 @@ export type AdaptiveInterviewContextPacket = {
   interviewId: number;
   attemptId: number;
   companyId: number;
+  aiTone: AiTone;
+  probingDepth: ProbingDepth;
+  scoringStrictness: ScoringStrictness;
+  timeLimitMinutes: number | null;
   questionText: string;
   referenceAnswer: string;
   maxScore: number;
@@ -53,7 +66,11 @@ export type AdaptiveInterviewContextPacket = {
   badAnswerExamples: string[];
   latestCandidateAnswer: string;
   latestCandidateMessageId: number | null;
-  latestAnswerMessageKind?: 'main_answer' | 'follow_up_answer' | 'topic_opener_answer' | null;
+  latestAnswerMessageKind?:
+    | 'main_answer'
+    | 'follow_up_answer'
+    | 'topic_opener_answer'
+    | null;
   targetCheckpointKey?: string | null;
   checkpointStates: AdaptiveCheckpointStateSnapshot[];
   evidenceSnippets: AdaptiveEvidenceSnippet[];
@@ -66,6 +83,10 @@ export type BuildAdaptiveInterviewContextInput = {
   interviewId: number;
   attemptId: number;
   companyId: number;
+  aiTone: AiTone;
+  probingDepth: ProbingDepth;
+  scoringStrictness: ScoringStrictness;
+  timeLimitMinutes: number | null;
   questionText: string;
   shortAnswer: string;
   idealAnswer: string;
@@ -95,6 +116,7 @@ export type BuildAdaptiveInterviewContextInput = {
     maxFollowUpsPerQuestion: number;
     maxFollowUpsPerCheckpoint: number;
     maxTextLength: number;
+    maxCandidateAnswerLength: number;
     maxReferenceAnswerLength: number;
   };
 };

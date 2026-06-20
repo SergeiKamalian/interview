@@ -75,7 +75,7 @@ export class DashboardOverviewRepository {
        FROM (
          SELECT COUNT(DISTINCT ia.candidate_id) AS candidates_total
          FROM interview_attempts ia
-         WHERE ia.company_id = ?
+         WHERE ia.company_id = ? AND ia.is_preview = 0
        ) candidate_stats
        CROSS JOIN (
          SELECT
@@ -95,7 +95,7 @@ export class DashboardOverviewRepository {
            END AS completion_rate
          FROM interview_attempts ia
          LEFT JOIN final_evaluations fe ON fe.interview_attempt_id = ia.id
-         WHERE ia.company_id = ?
+         WHERE ia.company_id = ? AND ia.is_preview = 0
        ) attempt_stats
        CROSS JOIN (
          SELECT COUNT(*) AS shortlisted_total
@@ -157,6 +157,7 @@ export class DashboardOverviewRepository {
        INNER JOIN candidates c ON c.id = ia.candidate_id
        LEFT JOIN final_evaluations fe ON fe.interview_attempt_id = ia.id
        WHERE ia.company_id = ?
+         AND ia.is_preview = 0
          AND (
            (ia.status = 'completed' AND (
              fe.needs_manual_review = 1

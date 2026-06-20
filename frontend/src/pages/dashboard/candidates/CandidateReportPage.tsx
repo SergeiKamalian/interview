@@ -4,6 +4,7 @@ import { ShortlistToggleButton } from '@features/shortlist/ui/ShortlistToggleBut
 import { OverallScoreCard } from '@widgets/score/OverallScoreCard';
 import { CategoryBreakdownChart } from '@widgets/score/CategoryBreakdownChart';
 import { RecommendationCard } from '@widgets/score/RecommendationCard';
+import { DemonstratedLevelCard } from '@widgets/score/DemonstratedLevelCard';
 import { formatScore, formatUnixDate } from '@shared/lib/format';
 import { Alert, Card, Spinner } from '@shared/ui';
 
@@ -84,6 +85,16 @@ export function CandidateReportPage() {
         />
         <CategoryBreakdownChart items={evaluation?.categoryBreakdown ?? []} />
       </div>
+
+      {evaluation && (
+        <DemonstratedLevelCard
+          targetLevel={evaluation.targetLevel}
+          achievedLevel={evaluation.achievedLevel}
+          achievedLevelMethod={evaluation.achievedLevelMethod}
+          achievedLevelNote={evaluation.achievedLevelNote}
+          levelBreakdown={evaluation.levelBreakdown}
+        />
+      )}
 
       <Card header="Recommendations">
         {evaluation ? (

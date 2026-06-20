@@ -1,3 +1,5 @@
+import type { ProbingDepth } from '../../interview-core/types/interview-config.enum';
+
 export const ADAPTIVE_INTERVIEW_CONTEXT_DEFAULTS = {
   localTurnLimit: 10,
   /** 4 allows one depth probe on heavy checkpoint + residual/narrowing without early exhaustion */
@@ -7,6 +9,14 @@ export const ADAPTIVE_INTERVIEW_CONTEXT_DEFAULTS = {
   heavyCheckpointWeightRatio: 0.2,
   minPriorityToProbe: 0.15,
   maxTextLength: 500,
+  /**
+   * TASK-17.5: candidate answers must reach the evaluator in full. The generic
+   * maxTextLength (500) is fine for interviewer turns / question text, but it
+   * silently truncated 2000–3000 char answers with «…», which the evaluator then
+   * read as «ответ обрывается» and under-scored. Candidate answer content uses
+   * this much larger bound instead.
+   */
+  maxCandidateAnswerLength: 8000,
   maxReferenceAnswerLength: 600,
   /** 0.85 = stop follow-ups when question score is sufficient */
   questionScoreSufficientRatio: 0.85,
@@ -21,6 +31,7 @@ export type AdaptiveInterviewContextLimits = {
   heavyCheckpointWeightRatio: number;
   minPriorityToProbe: number;
   maxTextLength: number;
+  maxCandidateAnswerLength: number;
   maxReferenceAnswerLength: number;
   questionScoreSufficientRatio: number;
   lowWeightCheckpointRatio: number;
@@ -36,7 +47,10 @@ export function isFollowUpLlmEnabled(): boolean {
 
 /** Last-resort regex intent when CandidateTurnClassifier AI is unavailable. Default off. */
 export function isClassifierRegexEmergencyFallbackEnabled(): boolean {
-  return readBooleanFlag(process.env.CLASSIFIER_REGEX_EMERGENCY_FALLBACK, false);
+  return readBooleanFlag(
+    process.env.CLASSIFIER_REGEX_EMERGENCY_FALLBACK,
+    false,
+  );
 }
 
 /** Legacy Chat Completions fallback: keeps Redis messages and sends full chat history. */
@@ -108,6 +122,10 @@ export function getAdaptiveInterviewContextLimits(): AdaptiveInterviewContextLim
       ADAPTIVE_INTERVIEW_CONTEXT_DEFAULTS.minPriorityToProbe,
     ),
     maxTextLength: ADAPTIVE_INTERVIEW_CONTEXT_DEFAULTS.maxTextLength,
+    maxCandidateAnswerLength: readPositiveInt(
+      process.env.ADAPTIVE_MAX_CANDIDATE_ANSWER_LENGTH,
+      ADAPTIVE_INTERVIEW_CONTEXT_DEFAULTS.maxCandidateAnswerLength,
+    ),
     maxReferenceAnswerLength:
       ADAPTIVE_INTERVIEW_CONTEXT_DEFAULTS.maxReferenceAnswerLength,
     questionScoreSufficientRatio: readPositiveFloat(
@@ -119,6 +137,67 @@ export function getAdaptiveInterviewContextLimits(): AdaptiveInterviewContextLim
       ADAPTIVE_INTERVIEW_CONTEXT_DEFAULTS.lowWeightCheckpointRatio,
     ),
   };
+}
+
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+/**
+ * Per-interview probing depth (TASK-16.9). Overrides the question-level follow-up
+ * budget / early-stop levers ONLY:
+ *  - shallow: fewer follow-ups, stop sooner, probe only high-priority checkpoints;
+ *  - balanced: defaults (no change);
+ *  - deep: more follow-ups, keep probing longer, also probe lower-priority gaps.
+ *
+ * Bank-level per-checkpoint `probePolicy` (minPriorityToProbe / maxFollowUps) keeps
+ * precedence — it is read directly from hints in the budget allocator and is NOT
+ * touched here. Depth tunes the GLOBAL defaults that apply when the bank is silent.
+ * The invariant holds: max_score / checkpoints / criteria are never changed.
+ */
+export function applyProbingDepthToLimits(
+  limits: AdaptiveInterviewContextLimits,
+  probingDepth: ProbingDepth,
+): AdaptiveInterviewContextLimits {
+  switch (probingDepth) {
+    case 'shallow':
+      return {
+        ...limits,
+        maxFollowUpsPerQuestion: Math.max(
+          1,
+          Math.round(limits.maxFollowUpsPerQuestion / 2),
+        ),
+        maxFollowUpsHeavyCheckpoint: Math.max(
+          0,
+          limits.maxFollowUpsHeavyCheckpoint - 1,
+        ),
+        // Lower sufficiency bar → "good enough" reached sooner → earlier stop.
+        questionScoreSufficientRatio: clamp01(
+          limits.questionScoreSufficientRatio - 0.15,
+        ),
+        // Higher priority bar → only the most important checkpoints get probed.
+        // TASK-17.3: this trims ONLY secondary checkpoints. Must-have ones
+        // (probe-required tiers / heavy weight — see isMustHaveCheckpoint) still
+        // get probed because probeRequired candidates bypass minPriorityToProbe
+        // in the budget allocator, regardless of depth.
+        minPriorityToProbe: clamp01(limits.minPriorityToProbe + 0.15),
+      };
+    case 'deep':
+      return {
+        ...limits,
+        maxFollowUpsPerQuestion: limits.maxFollowUpsPerQuestion + 2,
+        maxFollowUpsHeavyCheckpoint: limits.maxFollowUpsHeavyCheckpoint + 1,
+        // Raise sufficiency bar → keep probing closer to full coverage.
+        questionScoreSufficientRatio: clamp01(
+          limits.questionScoreSufficientRatio + 0.1,
+        ),
+        // Lower priority bar → also drill lower-priority residual gaps.
+        minPriorityToProbe: clamp01(limits.minPriorityToProbe - 0.1),
+      };
+    case 'balanced':
+    default:
+      return limits;
+  }
 }
 
 function readBooleanFlag(

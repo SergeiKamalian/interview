@@ -3,6 +3,7 @@ import type { RowDataPacket } from 'mysql2/promise';
 import { DatabaseService } from '../../../common/database/database.service';
 import type { FinalEvaluationEntity } from '../../ai-evaluation/entities/final-evaluation.entity';
 import { FinalEvaluationRepository } from '../../ai-evaluation/repositories/final-evaluation.repository';
+import type { QuestionLevel } from '../../question-bank/types/question-level.enum';
 
 interface CandidateRow extends RowDataPacket {
   id: number;
@@ -19,6 +20,7 @@ interface HistoryRow extends RowDataPacket {
   interview_id: number;
   interview_title: string;
   job_role: string;
+  interview_level: QuestionLevel;
   status: string;
   completed_at: Date | null;
   total_score: string | null;
@@ -55,13 +57,14 @@ export class CandidateReportRepository {
               ia.interview_id,
               i.title AS interview_title,
               i.job_role,
+              i.level AS interview_level,
               ia.status,
               ia.completed_at,
               fe.total_score
        FROM interview_attempts ia
        INNER JOIN interviews i ON i.id = ia.interview_id
        LEFT JOIN final_evaluations fe ON fe.interview_attempt_id = ia.id
-       WHERE ia.candidate_id = ? AND ia.company_id = ?
+       WHERE ia.candidate_id = ? AND ia.company_id = ? AND ia.is_preview = 0
        ORDER BY ia.created_at DESC`,
       [candidateId, companyId],
     );
@@ -77,10 +80,11 @@ export class CandidateReportRepository {
     const latestCompleted = history.find((item) => item.status === 'completed');
     let latestFinalEvaluation: FinalEvaluationEntity | null = null;
     if (latestCompleted) {
-      latestFinalEvaluation = await this.finalEvaluationRepository.findByAttemptId(
-        companyId,
-        latestCompleted.attempt_id,
-      );
+      latestFinalEvaluation =
+        await this.finalEvaluationRepository.findByAttemptId(
+          companyId,
+          latestCompleted.attempt_id,
+        );
     }
 
     return {
@@ -88,6 +92,7 @@ export class CandidateReportRepository {
       history,
       shortlist: shortlistRows[0] ?? null,
       latestFinalEvaluation,
+      latestTargetLevel: latestCompleted?.interview_level ?? null,
     };
   }
 }

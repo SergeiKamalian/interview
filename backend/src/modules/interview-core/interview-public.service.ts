@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
@@ -18,7 +19,10 @@ import {
   MediaAssetService,
   VOICE_ANSWER_PLACEHOLDER,
 } from '../media/media-asset.service';
+import type { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { DatabaseService } from '../../common/database/database.service';
+import type { DbQueryParam } from '../../common/database/database.types';
+import type { InterviewEntity } from './entities/interview.entity';
 import type { StartPublicInterviewInput } from './dto/start-public-interview.input';
 import type { BeginInterviewAttemptInput } from './dto/begin-interview-attempt.input';
 import {
@@ -33,9 +37,12 @@ import { resolveWelcomeMessage } from './utils/interview-welcome.util';
 import type {
   InterviewSessionType,
   PublicInterviewType,
+  StartInterviewPreviewPayload,
   StartPublicInterviewPayload,
   SubmitInterviewAnswerPayload,
 } from './types/interview.type';
+
+const PREVIEW_CANDIDATE_NAME = 'Preview candidate';
 
 @Injectable()
 export class InterviewPublicService {
@@ -72,6 +79,52 @@ export class InterviewPublicService {
           `Auto AI evaluation failed for attempt ${attemptId}: ${message}`,
         );
       });
+  }
+
+  private assertInterviewNotExpired(expiresAt: Date | null): void {
+    if (expiresAt && Date.now() > new Date(expiresAt).getTime()) {
+      throw new ForbiddenException({
+        message: 'This interview link has expired',
+        code: 'INTERVIEW_EXPIRED',
+      });
+    }
+  }
+
+  private async assertCanStartNewAttempt(
+    interview: InterviewEntity,
+    email: string,
+    query: <R extends RowDataPacket[] | ResultSetHeader>(
+      sql: string,
+      params?: DbQueryParam[],
+    ) => Promise<R>,
+  ): Promise<void> {
+    if (interview.maxCompletions != null) {
+      const completed = await this.repository.countCompletedAttempts(
+        interview.id,
+        query,
+      );
+      if (completed >= interview.maxCompletions) {
+        throw new ForbiddenException({
+          message: 'This interview is no longer accepting new candidates',
+          code: 'INTERVIEW_FULL',
+        });
+      }
+    }
+
+    if (!interview.allowRetake) {
+      const alreadyCompleted =
+        await this.repository.hasCompletedAttemptForEmail(
+          interview.id,
+          email,
+          query,
+        );
+      if (alreadyCompleted) {
+        throw new ForbiddenException({
+          message: 'You have already completed this interview',
+          code: 'INTERVIEW_RETAKE_NOT_ALLOWED',
+        });
+      }
+    }
   }
 
   async getPublicInterview(publicToken: string): Promise<PublicInterviewType> {
@@ -112,6 +165,8 @@ export class InterviewPublicService {
       });
     }
 
+    this.assertInterviewNotExpired(interview.expiresAt);
+
     const email = input.email.trim().toLowerCase();
     const adaptiveEnabled = this.isAdaptiveEnabled();
 
@@ -135,6 +190,10 @@ export class InterviewPublicService {
       );
 
       if (!attempt) {
+        // New attempt — enforce per-interview access limits. Candidates with an
+        // active (pending/in_progress) attempt are allowed to resume regardless.
+        await this.assertCanStartNewAttempt(interview, email, query);
+
         const welcomeText = resolveWelcomeMessage({
           template: interview.welcomeMessageTemplate,
           interviewerName: interview.interviewerName,
@@ -194,6 +253,104 @@ export class InterviewPublicService {
     }
 
     return buildStartPayload(result);
+  }
+
+  /**
+   * Owner-authenticated "try as a candidate" dry run. Reuses the public session
+   * flow (begin/session/submit via the interview's public token), but:
+   *  - works even on `draft`/`paused` interviews (no status gate here — the public
+   *    session resolvers key off the token + attemptId, not interview status);
+   *  - is flagged `is_preview = 1`, so it never counts toward `max_completions`,
+   *    candidate lists, the funnel or analytics;
+   *  - ignores access limits (expiry / retake / completions) — it's a private dry run.
+   * Interview settings (tone / depth / strictness, questions) apply because the
+   * preview attempt is linked to the real interview row.
+   */
+  async startInterviewPreview(
+    companyId: number,
+    interviewIdRaw: string,
+  ): Promise<StartInterviewPreviewPayload> {
+    const interviewId = Number(interviewIdRaw);
+    const interview = await this.repository.findByIdForCompany(
+      companyId,
+      interviewId,
+    );
+
+    if (!interview) {
+      throw new NotFoundException({
+        message: 'Interview not found',
+        code: 'INTERVIEW_NOT_FOUND',
+      });
+    }
+
+    const questions = await this.repository.listQuestionsForInterview(
+      interview.id,
+    );
+
+    if (questions.length === 0) {
+      throw new BadRequestException({
+        message: 'Interview has no questions',
+        code: 'INTERVIEW_HAS_NO_QUESTIONS',
+      });
+    }
+
+    const previewEmail = `preview+company${companyId}@interview.local`;
+
+    const result = await this.database.withTransaction(async (query) => {
+      const candidate = await this.repository.findOrCreateCandidate(
+        {
+          companyId: interview.companyId,
+          interviewId: interview.id,
+          fullName: PREVIEW_CANDIDATE_NAME,
+          email: previewEmail,
+          phone: null,
+          linkedinUrl: null,
+          githubUrl: null,
+        },
+        query,
+      );
+
+      // Always start a fresh preview attempt — don't resume a stale dry run.
+      const attempt = await this.repository.createAttempt(
+        {
+          companyId: interview.companyId,
+          interviewId: interview.id,
+          candidateId: candidate.id,
+          isPreview: true,
+        },
+        query,
+      );
+
+      const welcomeText = resolveWelcomeMessage({
+        template: interview.welcomeMessageTemplate,
+        interviewerName: interview.interviewerName,
+        candidateName: PREVIEW_CANDIDATE_NAME,
+        jobRole: interview.jobRole,
+        title: interview.title,
+        questionCount: questions.length,
+      });
+
+      await this.repository.appendMessage(
+        {
+          companyId: interview.companyId,
+          attemptId: attempt.id,
+          interviewQuestionId: null,
+          role: 'ai',
+          content: welcomeText,
+          sequenceOrder: 1,
+          messageKind: 'welcome',
+        },
+        query,
+      );
+
+      return { attemptId: attempt.id };
+    });
+
+    return {
+      attemptId: String(result.attemptId),
+      publicToken: interview.publicToken,
+      totalQuestions: questions.length,
+    };
   }
 
   async beginInterviewAttempt(
@@ -288,7 +445,10 @@ export class InterviewPublicService {
     welcomeMessage: string | null;
     isWelcomePending: boolean;
   }> {
-    const attempt = await this.repository.findAttemptById(attemptId, publicToken);
+    const attempt = await this.repository.findAttemptById(
+      attemptId,
+      publicToken,
+    );
     if (!attempt) {
       return { welcomeMessage: null, isWelcomePending: false };
     }
@@ -431,6 +591,7 @@ export class InterviewPublicService {
         questions,
         trimmedAnswer: effectiveAnswer,
         mediaAssetId,
+        isPreview: attempt.isPreview,
       });
     }
 
@@ -447,7 +608,7 @@ export class InterviewPublicService {
         mediaAssetId,
       });
 
-    if (adaptiveResult.status === 'completed') {
+    if (adaptiveResult.status === 'completed' && !attempt.isPreview) {
       this.scheduleEvaluation(attempt.companyId, attemptId);
     }
 
@@ -474,6 +635,7 @@ export class InterviewPublicService {
     >;
     trimmedAnswer: string;
     mediaAssetId: number | null;
+    isPreview: boolean;
   }): Promise<SubmitInterviewAnswerPayload> {
     const answeredBefore = await this.repository.countCandidateMessages(
       input.attemptId,
@@ -559,7 +721,7 @@ export class InterviewPublicService {
       };
     });
 
-    if (result.status === 'completed') {
+    if (result.status === 'completed' && !input.isPreview) {
       this.scheduleEvaluation(input.attempt.companyId, input.attemptId);
     }
 
@@ -604,7 +766,9 @@ export class InterviewPublicService {
 
     if (attempt.status === 'in_progress') {
       await this.repository.completeAttempt(attemptId);
-      this.scheduleEvaluation(attempt.companyId, attemptId);
+      if (!attempt.isPreview) {
+        this.scheduleEvaluation(attempt.companyId, attemptId);
+      }
     }
 
     return this.getSession(publicToken, attemptIdRaw);

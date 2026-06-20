@@ -8,9 +8,17 @@ import { CandidateReportRepository } from '../repositories/candidate-report.repo
 export class CandidateReportService {
   constructor(private readonly repository: CandidateReportRepository) {}
 
-  async getReport(companyId: number, candidateId: number): Promise<CandidateReportType> {
-    const { candidate, history, shortlist, latestFinalEvaluation } =
-      await this.repository.getReport(companyId, candidateId);
+  async getReport(
+    companyId: number,
+    candidateId: number,
+  ): Promise<CandidateReportType> {
+    const {
+      candidate,
+      history,
+      shortlist,
+      latestFinalEvaluation,
+      latestTargetLevel,
+    } = await this.repository.getReport(companyId, candidateId);
 
     return {
       candidateId: String(candidate.id),
@@ -33,7 +41,11 @@ export class CandidateReportService {
         totalScore: item.total_score != null ? Number(item.total_score) : null,
       })),
       latestFinalEvaluation: latestFinalEvaluation
-        ? mapFinalEvaluationToGraphql(latestFinalEvaluation)
+        ? mapFinalEvaluationToGraphql(
+            latestFinalEvaluation,
+            latestFinalEvaluation.rawResponse?.deterministicScore,
+            latestTargetLevel,
+          )
         : null,
     };
   }

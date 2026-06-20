@@ -22,6 +22,11 @@ export const GraphqlOperations = {
     document: "query AiCostAnalytics($filters: AiCostFilterInput) { aiCostAnalytics(filters: $filters) { kpi { totalCostUsd costPerInterview costPerCandidate totalRequests } byModel { model promptTokens completionTokens totalCostUsd } topExpensiveInterviews { interviewAttemptId interviewTitle totalCostUsd latencyMs } elevenLabs { kpi { totalCostUsd totalCharacters totalRequests } byOperation { operationType characterCount totalCostUsd } } } }",
     sha256Hash: '974d996d3ab9c10f6b6eeac46c5a6a84114d35df066f715d37375c03b0f1a0de',
   },
+  ArchiveInterview: {
+    operationName: 'ArchiveInterview',
+    document: "mutation ArchiveInterview($id: ID!) { archiveInterview(id: $id) { id status publicUrl } }",
+    sha256Hash: '8a07c6cf003bf6fae30396828feac82d425890c88f69d9b2ad296b79b3526fcf',
+  },
   BeginInterviewAttempt: {
     operationName: 'BeginInterviewAttempt',
     document: "mutation BeginInterviewAttempt($input: BeginInterviewAttemptInput!) { beginInterviewAttempt(input: $input) { attemptId status isWelcomePending welcomeMessage totalQuestions answeredQuestions currentQuestionText currentQuestionId messages { id role content sequenceOrder messageKind } } }",
@@ -29,8 +34,8 @@ export const GraphqlOperations = {
   },
   CandidateReport: {
     operationName: 'CandidateReport',
-    document: "query CandidateReport($candidateId: ID!) { candidateReport(candidateId: $candidateId) { candidateId fullName email phone linkedinUrl githubUrl shortlistStatus shortlistReason latestFinalEvaluation { id totalScore finalScore totalWeight averageScore strengthCategory category hireRecommendation summary detailedSummary strengths weaknesses risks needsManualReview categoryBreakdown { categoryKey categoryLabel scoreNormalized weight contribution } topicEvaluations { topic score weight weightedScore strengthCategory } } interviewHistory { attemptId interviewId interviewTitle jobRole status completedAt totalScore } } }",
-    sha256Hash: 'e98130646ad36a3d9f1c5aa98c0c2fe845855d1b9317fc031657d37d0ddaa39c',
+    document: "query CandidateReport($candidateId: ID!) { candidateReport(candidateId: $candidateId) { candidateId fullName email phone linkedinUrl githubUrl shortlistStatus shortlistReason latestFinalEvaluation { id totalScore finalScore totalWeight averageScore strengthCategory category hireRecommendation achievedLevel achievedLevelMethod achievedLevelNote targetLevel levelBreakdown { level earned maxScore ratio passed } summary detailedSummary strengths weaknesses risks needsManualReview categoryBreakdown { categoryKey categoryLabel scoreNormalized weight contribution } topicEvaluations { topic score weight weightedScore strengthCategory } } interviewHistory { attemptId interviewId interviewTitle jobRole status completedAt totalScore } } }",
+    sha256Hash: 'a4e17b7b58c7b9ef7b192b839b9738ec2af0ae189b19b85089b0b7ec968f9c4c',
   },
   CheckpointResultsByAttempt: {
     operationName: 'CheckpointResultsByAttempt',
@@ -54,8 +59,8 @@ export const GraphqlOperations = {
   },
   CompanyInterviewTemplates: {
     operationName: 'CompanyInterviewTemplates',
-    document: "query CompanyInterviewTemplates($filters: CompanyInterviewTemplatesFilterInput) { companyInterviewTemplates(filters: $filters) { items { id title jobRole level interviewLanguage questionCount jobDescription professionId isVideoEnabled interviewerName welcomeMessageTemplate status createdAt updatedAt questions { questionId sortOrder } } total page pageSize } }",
-    sha256Hash: '33b08b8c54cd07ac58971f16ae0d775301ca58a33151a8915cc90dc680dd50f6',
+    document: "query CompanyInterviewTemplates($filters: CompanyInterviewTemplatesFilterInput) { companyInterviewTemplates(filters: $filters) { items { id title jobRole level interviewLanguage questionCount jobDescription professionId isVideoEnabled interviewerName welcomeMessageTemplate aiTone probingDepth scoringStrictness maxCompletions allowRetake timeLimitMinutes passingScore requirePhone requireLinkedin requireGithub status createdAt updatedAt questions { questionId sortOrder } } total page pageSize } }",
+    sha256Hash: 'fa4f5355eac928b0b8b9b3e067f01b20853d148726dd74d1e762bd5696a8c067',
   },
   CompanyInterviews: {
     operationName: 'CompanyInterviews',
@@ -74,18 +79,23 @@ export const GraphqlOperations = {
   },
   CreateInterviewTemplateFromInterview: {
     operationName: 'CreateInterviewTemplateFromInterview',
-    document: "mutation CreateInterviewTemplateFromInterview($interviewId: ID!, $title: String) { createInterviewTemplateFromInterview(interviewId: $interviewId, title: $title) { id title jobRole level interviewLanguage questionCount jobDescription professionId isVideoEnabled interviewerName welcomeMessageTemplate status createdAt updatedAt questions { questionId sortOrder } } }",
-    sha256Hash: '039bedbbe0f937875570bee0d1daa4853365b4bb64f0407b87c0ea1bc6a14b0b',
+    document: "mutation CreateInterviewTemplateFromInterview($interviewId: ID!, $title: String) { createInterviewTemplateFromInterview(interviewId: $interviewId, title: $title) { id title jobRole level interviewLanguage questionCount jobDescription professionId isVideoEnabled interviewerName welcomeMessageTemplate aiTone probingDepth scoringStrictness maxCompletions allowRetake timeLimitMinutes passingScore requirePhone requireLinkedin requireGithub status createdAt updatedAt questions { questionId sortOrder } } }",
+    sha256Hash: '4f1354da2c393b16cbc5f7a2b65d19abd214b4ca53fc21e22a5242e0f4d50710',
   },
   CreateInterviewTemplate: {
     operationName: 'CreateInterviewTemplate',
-    document: "mutation CreateInterviewTemplate($input: CreateInterviewTemplateInput!) { createInterviewTemplate(input: $input) { id title jobRole level interviewLanguage questionCount jobDescription professionId isVideoEnabled interviewerName welcomeMessageTemplate status createdAt updatedAt questions { questionId sortOrder } } }",
-    sha256Hash: '381b3de27eb35a5562f5511da0e4f38b30a89bbdc0c6abaa34336547f11f77b4',
+    document: "mutation CreateInterviewTemplate($input: CreateInterviewTemplateInput!) { createInterviewTemplate(input: $input) { id title jobRole level interviewLanguage questionCount jobDescription professionId isVideoEnabled interviewerName welcomeMessageTemplate aiTone probingDepth scoringStrictness maxCompletions allowRetake timeLimitMinutes passingScore requirePhone requireLinkedin requireGithub status createdAt updatedAt questions { questionId sortOrder } } }",
+    sha256Hash: '2fc5307df4f69a28c42688c9f18df660d4a3e85c3909d9226897340c02fa4fb6',
   },
   CreateInterview: {
     operationName: 'CreateInterview',
     document: "mutation CreateInterview($input: CreateInterviewInput!) { createInterview(input: $input) { id title jobRole level status publicToken publicUrl questionCount interviewerName welcomeMessageTemplate } }",
     sha256Hash: 'b6b1596454218a45eabacfe27ada9cb66ad2df7b15459e9483f14d45da2c29d0',
+  },
+  DraftInterviewFromJobDescription: {
+    operationName: 'DraftInterviewFromJobDescription',
+    document: "mutation DraftInterviewFromJobDescription($input: DraftInterviewFromJobDescriptionInput!) { draftInterviewFromJobDescription(input: $input) { title jobRole professionId level skillIds questionIds generatedByAi } }",
+    sha256Hash: 'd04405994b13b69f8460ab24c501b11d6b48d6133e7b32d41f809f529abc3142',
   },
   EvaluateInterviewAttempt: {
     operationName: 'EvaluateInterviewAttempt',
@@ -132,10 +142,30 @@ export const GraphqlOperations = {
     document: "mutation Logout { logout { success } }",
     sha256Hash: 'e95849698f87003740d4746be7f1e4f193cc8bd09afd72059b22a2f460f30674',
   },
+  ManagedInterview: {
+    operationName: 'ManagedInterview',
+    document: "query ManagedInterview($id: ID!) { interview(id: $id) { id title jobRole level interviewLanguage questionCount status publicToken publicUrl isVideoEnabled interviewerName welcomeMessageTemplate aiTone probingDepth scoringStrictness expiresAt maxCompletions allowRetake timeLimitMinutes passingScore requirePhone requireLinkedin requireGithub } }",
+    sha256Hash: 'cc8a649c35c1f24acc33d057eec238b56859bcfee5138fbb48ef5cbb08fada23',
+  },
+  MatchingCandidatesForLevel: {
+    operationName: 'MatchingCandidatesForLevel',
+    document: "query MatchingCandidatesForLevel( $level: QuestionLevel! $professionId: ID! $skillIds: [ID!] ) { matchingCandidatesForLevel( level: $level professionId: $professionId skillIds: $skillIds ) { candidateId fullName email achievedLevel achievedLevelMethod sourceInterviewId sourceInterviewTitle professionId professionName matchedSkills matchedSkillCount completedAt } }",
+    sha256Hash: '05a1131a6a90469d2ad04d87aac0f45b0bcfe264d4183844335381bdefa26039',
+  },
   Me: {
     operationName: 'Me',
     document: "query Me { me { user { id email fullName isActive } company { id name slug isActive } } }",
     sha256Hash: '5f9c2503b6ca4fe21e1c16798409bceb2edfa861d45775b9cc7ada9c8275661f',
+  },
+  PauseInterview: {
+    operationName: 'PauseInterview',
+    document: "mutation PauseInterview($id: ID!) { pauseInterview(id: $id) { id status publicUrl } }",
+    sha256Hash: 'cf8d9ea444df49b4db177569bba7297772b876306198e50599fb3a6dd7d0ed30',
+  },
+  Professions: {
+    operationName: 'Professions',
+    document: "query Professions { professions { id code name } }",
+    sha256Hash: '369d6ae5ecbf7f85509afba84b0be90ffd1a551e3013b5d3a429e620de299ae5',
   },
   PublicInterview: {
     operationName: 'PublicInterview',
@@ -177,6 +207,21 @@ export const GraphqlOperations = {
     document: "mutation RemoveCandidateFromShortlist($candidateId: ID!, $reason: String) { removeCandidateFromShortlist(candidateId: $candidateId, reason: $reason) { candidateId status reason } }",
     sha256Hash: 'eea0840468dc86c5c2b7077fce042f4746bd0187d09973782c889c57d871aa03',
   },
+  ResumeInterview: {
+    operationName: 'ResumeInterview',
+    document: "mutation ResumeInterview($id: ID!) { resumeInterview(id: $id) { id status publicUrl } }",
+    sha256Hash: 'f34aa727711a825eec4e41de202d13915c5ac789f9e417f16bcbbbb074b6c79f',
+  },
+  Skills: {
+    operationName: 'Skills',
+    document: "query Skills($professionId: String) { skills(professionId: $professionId) { id code name } }",
+    sha256Hash: '148ef1051043f9005da10edfbbfc985b02e4ca8dfcd44b96516683e2138c4ff5',
+  },
+  StartInterviewPreview: {
+    operationName: 'StartInterviewPreview',
+    document: "mutation StartInterviewPreview($interviewId: ID!) { startInterviewPreview(interviewId: $interviewId) { attemptId publicToken totalQuestions } }",
+    sha256Hash: '47035fcb423791da694c0d133421f3345e121c5dc403b62c221d689f5f436ec6',
+  },
   StartPublicInterview: {
     operationName: 'StartPublicInterview',
     document: "mutation StartPublicInterview($input: StartPublicInterviewInput!) { startPublicInterview(input: $input) { attemptId currentQuestionText totalQuestions } }",
@@ -187,10 +232,20 @@ export const GraphqlOperations = {
     document: "mutation SubmitInterviewAnswer($input: SubmitInterviewAnswerInput!) { submitInterviewAnswer(input: $input) { status nextQuestionText pendingMessageText answeredQuestions totalQuestions answeredMainQuestions totalMainQuestions messageKind currentInterviewQuestionId isFollowUp currentQuestionFollowUpCount } }",
     sha256Hash: 'b936b668f3732ef1f268034d8e43866bbc1946f0fb16661a2262fabe0f2336ee',
   },
+  SuggestInterviewQuestions: {
+    operationName: 'SuggestInterviewQuestions',
+    document: "mutation SuggestInterviewQuestions($input: SuggestInterviewQuestionsInput!) { suggestInterviewQuestions(input: $input) { count candidateCount generatedByAi questionIds } }",
+    sha256Hash: '548e97bfb30507f661119cd0bfcb368f2ab97e0d5a0d41b37bcd6aa0fbecb372',
+  },
   TopicSkillQuestionAnalytics: {
     operationName: 'TopicSkillQuestionAnalytics',
     document: "query TopicSkillQuestionAnalytics($filters: TopicSkillQuestionFilterInput) { topicSkillQuestionAnalytics(filters: $filters) { totalCompletedAttempts lowSampleWarning topics { topicName avgScore passRate sampleCount } skills { skillName avgScore passRate sampleCount } questions { questionId questionText avgScore passRate sampleCount } } }",
     sha256Hash: 'd8d55accebfe184107870db37acbac5f49a6e2f398eb354ae6d694ed370c2df6',
+  },
+  Topics: {
+    operationName: 'Topics',
+    document: "query Topics($skillId: String, $professionId: String) { topics(skillId: $skillId, professionId: $professionId) { id code name interviewWeight skill { id code name } } }",
+    sha256Hash: 'a78c2e047042507f75586d4941996475caccad3655195013f2a02043f903bb4c',
   }
 } as const satisfies Record<string, GraphqlOperationDef>;
 

@@ -4,13 +4,20 @@ import type { FinalEvaluationEntity } from './entities/final-evaluation.entity';
 import type { QuestionEvaluationEntity } from './entities/question-evaluation.entity';
 import type { CheckpointResultType } from './graphql/checkpoint-result.type';
 import {
+  AchievedLevelMethodEnum,
   FinalEvaluationCategoryEnum,
   HireRecommendationEnum,
   InterviewStrengthCategoryEnum,
   type CategoryBreakdownType,
   type FinalEvaluationType,
+  type LevelBreakdownType,
   type TopicSessionEvaluationType,
 } from './graphql/final-evaluation.type';
+import {
+  QUESTION_LEVELS,
+  type QuestionLevel,
+} from '../question-bank/types/question-level.enum';
+import { QuestionLevelEnum } from '../question-bank/types/question.type';
 
 export function mapQuestionEvaluationToGraphql(
   entity: QuestionEvaluationEntity,
@@ -46,10 +53,12 @@ export function mapCheckpointResultToGraphql(
 export function mapFinalEvaluationToGraphql(
   entity: FinalEvaluationEntity,
   deterministicScore?: unknown,
+  targetLevel?: QuestionLevel | null,
 ): FinalEvaluationType {
   const breakdown = extractBreakdown(deterministicScore);
   const topicEvaluations = extractTopicEvaluations(deterministicScore);
   const scoreMeta = extractScoreMeta(deterministicScore, entity.totalScore);
+  const achievedLevelMeta = extractAchievedLevelMeta(entity.rawResponse);
 
   return {
     id: String(entity.id),
@@ -61,6 +70,11 @@ export function mapFinalEvaluationToGraphql(
     strengthCategory: scoreMeta.strengthCategory,
     category: entity.category as FinalEvaluationCategoryEnum,
     hireRecommendation: entity.hireRecommendation as HireRecommendationEnum,
+    achievedLevel: toQuestionLevelEnum(entity.achievedLevel),
+    achievedLevelMethod: toAchievedLevelMethodEnum(entity.achievedLevelMethod),
+    achievedLevelNote: achievedLevelMeta.note,
+    targetLevel: toQuestionLevelEnum(targetLevel ?? null),
+    levelBreakdown: achievedLevelMeta.levelBreakdown,
     summary: entity.summary,
     detailedSummary: entity.detailedSummary,
     strengths: entity.strengths,
@@ -69,6 +83,94 @@ export function mapFinalEvaluationToGraphql(
     needsManualReview: entity.needsManualReview,
     categoryBreakdown: breakdown,
     topicEvaluations,
+  };
+}
+
+function toQuestionLevelEnum(
+  value: string | null | undefined,
+): QuestionLevelEnum | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  return (QUESTION_LEVELS as readonly string[]).includes(value)
+    ? (value as QuestionLevelEnum)
+    : null;
+}
+
+function toAchievedLevelMethodEnum(
+  value: string | null | undefined,
+): AchievedLevelMethodEnum | null {
+  if (value === AchievedLevelMethodEnum.evidence) {
+    return AchievedLevelMethodEnum.evidence;
+  }
+  if (value === AchievedLevelMethodEnum.estimate) {
+    return AchievedLevelMethodEnum.estimate;
+  }
+  return null;
+}
+
+/**
+ * `levelBreakdown` + `note` are persisted by FinalEvaluationService into
+ * `raw_response.achievedLevelResult` (the full computeAchievedLevel result).
+ * Older rows without it degrade to an empty breakdown / null note.
+ */
+function extractAchievedLevelMeta(rawResponse: unknown): {
+  levelBreakdown: LevelBreakdownType[];
+  note: string | null;
+} {
+  if (!rawResponse || typeof rawResponse !== 'object') {
+    return { levelBreakdown: [], note: null };
+  }
+
+  const result = (rawResponse as { achievedLevelResult?: unknown })
+    .achievedLevelResult;
+  if (!result || typeof result !== 'object') {
+    return { levelBreakdown: [], note: null };
+  }
+
+  const { perLevel, note } = result as {
+    perLevel?: unknown;
+    note?: unknown;
+  };
+
+  const levelBreakdown = Array.isArray(perLevel)
+    ? perLevel
+        .map((item) => mapLevelBreakdown(item))
+        .filter((item): item is LevelBreakdownType => item !== null)
+    : [];
+
+  return {
+    levelBreakdown,
+    note: typeof note === 'string' ? note : null,
+  };
+}
+
+function mapLevelBreakdown(item: unknown): LevelBreakdownType | null {
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+
+  const candidate = item as {
+    level?: unknown;
+    earned?: unknown;
+    maxScore?: unknown;
+    ratio?: unknown;
+    passed?: unknown;
+  };
+
+  const level = toQuestionLevelEnum(
+    typeof candidate.level === 'string' ? candidate.level : null,
+  );
+  if (level === null) {
+    return null;
+  }
+
+  return {
+    level,
+    earned: Number(candidate.earned ?? 0),
+    maxScore: Number(candidate.maxScore ?? 0),
+    ratio: Number(candidate.ratio ?? 0),
+    passed: candidate.passed === true,
   };
 }
 

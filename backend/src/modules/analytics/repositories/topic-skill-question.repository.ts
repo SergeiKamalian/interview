@@ -36,8 +36,15 @@ const MIN_SAMPLE_SIZE = 5;
 export class TopicSkillQuestionRepository {
   constructor(private readonly database: DatabaseService) {}
 
-  async getAnalytics(companyId: number, filters: TopicSkillQuestionFilterInput) {
-    const conditions = ['ia.company_id = ?', "ia.status = 'completed'"];
+  async getAnalytics(
+    companyId: number,
+    filters: TopicSkillQuestionFilterInput,
+  ) {
+    const conditions = [
+      'ia.company_id = ?',
+      "ia.status = 'completed'",
+      'ia.is_preview = 0',
+    ];
     const params: DbQueryParam[] = [companyId];
 
     if (filters.dateFrom) {

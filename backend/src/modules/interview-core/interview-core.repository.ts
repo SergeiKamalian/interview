@@ -16,6 +16,11 @@ import type {
   MessageRole,
 } from './entities/interview-message.entity';
 import type { MessageKind } from './types/message-kind.type';
+import type {
+  AiTone,
+  ProbingDepth,
+  ScoringStrictness,
+} from './types/interview-config.enum';
 import type { InterviewAnswerExampleEntity } from './entities/interview-answer-example.entity';
 import type { InterviewQuestionCheckpointEntity } from './entities/interview-question-checkpoint.entity';
 import type { InterviewQuestionEntity } from './entities/interview-question.entity';
@@ -38,6 +43,17 @@ interface InterviewRow extends RowDataPacket {
   is_video_enabled: number;
   interviewer_name: string | null;
   welcome_message_template: string | null;
+  ai_tone: AiTone;
+  probing_depth: ProbingDepth;
+  scoring_strictness: ScoringStrictness;
+  expires_at: Date | null;
+  max_completions: number | null;
+  allow_retake: number;
+  time_limit_minutes: number | null;
+  passing_score: string | null;
+  require_phone: number;
+  require_linkedin: number;
+  require_github: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -78,6 +94,7 @@ interface AttemptRow extends RowDataPacket {
   candidate_id: number;
   status: AttemptStatus;
   is_shortlisted: number;
+  is_preview: number;
   started_at: Date | null;
   completed_at: Date | null;
   created_at: Date;
@@ -147,6 +164,17 @@ export type CreateInterviewData = {
   isVideoEnabled: boolean;
   interviewerName?: string | null;
   welcomeMessageTemplate?: string | null;
+  aiTone: AiTone;
+  probingDepth: ProbingDepth;
+  scoringStrictness: ScoringStrictness;
+  expiresAt: Date | null;
+  maxCompletions: number | null;
+  allowRetake: boolean;
+  timeLimitMinutes: number | null;
+  passingScore: number | null;
+  requirePhone: boolean;
+  requireLinkedin: boolean;
+  requireGithub: boolean;
   questions: QuestionWithDetailsEntity[];
   topicNames: Map<number, string>;
   topicWeights: Map<number, number>;
@@ -164,8 +192,11 @@ export class InterviewCoreRepository {
       `INSERT INTO interviews (
          company_id, created_by_user_id, title, job_role, profession_id,
          level, interview_language, question_count, job_description,
-         public_token, status, is_video_enabled, interviewer_name, welcome_message_template
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)`,
+         public_token, status, is_video_enabled, interviewer_name, welcome_message_template,
+         ai_tone, probing_depth, scoring_strictness, expires_at, max_completions,
+         allow_retake, time_limit_minutes, passing_score,
+         require_phone, require_linkedin, require_github
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         data.companyId,
         data.createdByUserId,
@@ -180,6 +211,17 @@ export class InterviewCoreRepository {
         data.isVideoEnabled ? 1 : 0,
         data.interviewerName ?? null,
         data.welcomeMessageTemplate ?? null,
+        data.aiTone,
+        data.probingDepth,
+        data.scoringStrictness,
+        data.expiresAt,
+        data.maxCompletions,
+        data.allowRetake ? 1 : 0,
+        data.timeLimitMinutes,
+        data.passingScore,
+        data.requirePhone ? 1 : 0,
+        data.requireLinkedin ? 1 : 0,
+        data.requireGithub ? 1 : 0,
       ],
     );
 
@@ -251,7 +293,10 @@ export class InterviewCoreRepository {
       `SELECT id, company_id, created_by_user_id, title, job_role, profession_id,
               level, interview_language, question_count, job_description,
               public_token, status, is_video_enabled, interviewer_name,
-              welcome_message_template, created_at, updated_at
+              welcome_message_template, ai_tone, probing_depth, scoring_strictness,
+              expires_at, max_completions, allow_retake, time_limit_minutes,
+              passing_score, require_phone, require_linkedin, require_github,
+              created_at, updated_at
        FROM interviews
        WHERE id = ? AND company_id = ?
        LIMIT 1`,
@@ -277,6 +322,19 @@ export class InterviewCoreRepository {
     return this.findByIdForCompany(companyId, interviewId);
   }
 
+  async updateStatus(
+    companyId: number,
+    interviewId: number,
+    status: InterviewStatus,
+  ): Promise<InterviewEntity | null> {
+    await this.database.query<ResultSetHeader>(
+      `UPDATE interviews SET status = ? WHERE id = ? AND company_id = ?`,
+      [status, interviewId, companyId],
+    );
+
+    return this.findByIdForCompany(companyId, interviewId);
+  }
+
   async findByIdForCompany(
     companyId: number,
     interviewId: number,
@@ -285,11 +343,33 @@ export class InterviewCoreRepository {
       `SELECT id, company_id, created_by_user_id, title, job_role, profession_id,
               level, interview_language, question_count, job_description,
               public_token, status, is_video_enabled, interviewer_name,
-              welcome_message_template, created_at, updated_at
+              welcome_message_template, ai_tone, probing_depth, scoring_strictness,
+              expires_at, max_completions, allow_retake, time_limit_minutes,
+              passing_score, require_phone, require_linkedin, require_github,
+              created_at, updated_at
        FROM interviews
        WHERE id = ? AND company_id = ?
        LIMIT 1`,
       [interviewId, companyId],
+    );
+
+    const row = rows[0];
+    return row ? this.mapInterview(row) : null;
+  }
+
+  async findById(interviewId: number): Promise<InterviewEntity | null> {
+    const rows = await this.database.query<InterviewRow[]>(
+      `SELECT id, company_id, created_by_user_id, title, job_role, profession_id,
+              level, interview_language, question_count, job_description,
+              public_token, status, is_video_enabled, interviewer_name,
+              welcome_message_template, ai_tone, probing_depth, scoring_strictness,
+              expires_at, max_completions, allow_retake, time_limit_minutes,
+              passing_score, require_phone, require_linkedin, require_github,
+              created_at, updated_at
+       FROM interviews
+       WHERE id = ?
+       LIMIT 1`,
+      [interviewId],
     );
 
     const row = rows[0];
@@ -304,7 +384,10 @@ export class InterviewCoreRepository {
       `SELECT id, company_id, created_by_user_id, title, job_role, profession_id,
               level, interview_language, question_count, job_description,
               public_token, status, is_video_enabled, interviewer_name,
-              welcome_message_template, created_at, updated_at
+              welcome_message_template, ai_tone, probing_depth, scoring_strictness,
+              expires_at, max_completions, allow_retake, time_limit_minutes,
+              passing_score, require_phone, require_linkedin, require_github,
+              created_at, updated_at
        FROM interviews
        WHERE public_token = ? AND status = ?
        LIMIT 1`,
@@ -454,7 +537,7 @@ export class InterviewCoreRepository {
   ): Promise<InterviewAttemptEntity | null> {
     const rows = await this.database.query<AttemptRow[]>(
       `SELECT id, company_id, interview_id, candidate_id, status, is_shortlisted,
-              started_at, completed_at, created_at, updated_at
+              is_preview, started_at, completed_at, created_at, updated_at
        FROM interview_attempts
        WHERE interview_id = ? AND candidate_id = ? AND status IN ('pending', 'in_progress')
        LIMIT 1`,
@@ -465,24 +548,60 @@ export class InterviewCoreRepository {
     return row ? this.mapAttempt(row) : null;
   }
 
+  async countCompletedAttempts(
+    interviewId: number,
+    query: QueryFn = (sql, params) => this.database.query(sql, params),
+  ): Promise<number> {
+    const rows = await query<CountRow[]>(
+      `SELECT COUNT(*) AS total
+       FROM interview_attempts
+       WHERE interview_id = ? AND status = 'completed' AND is_preview = 0`,
+      [interviewId],
+    );
+
+    return Number(rows[0]?.total ?? 0);
+  }
+
+  async hasCompletedAttemptForEmail(
+    interviewId: number,
+    email: string,
+    query: QueryFn = (sql, params) => this.database.query(sql, params),
+  ): Promise<boolean> {
+    const rows = await query<CountRow[]>(
+      `SELECT COUNT(*) AS total
+       FROM interview_attempts a
+       INNER JOIN candidates c ON c.id = a.candidate_id
+       WHERE a.interview_id = ? AND c.email = ? AND a.status = 'completed' AND a.is_preview = 0`,
+      [interviewId, email],
+    );
+
+    return Number(rows[0]?.total ?? 0) > 0;
+  }
+
   async createAttempt(
     input: {
       companyId: number;
       interviewId: number;
       candidateId: number;
+      isPreview?: boolean;
     },
     query: QueryFn = (sql, params) => this.database.query(sql, params),
   ): Promise<InterviewAttemptEntity> {
     const result = await query<ResultSetHeader>(
       `INSERT INTO interview_attempts (
-         company_id, interview_id, candidate_id, status, started_at
-       ) VALUES (?, ?, ?, 'pending', NULL)`,
-      [input.companyId, input.interviewId, input.candidateId],
+         company_id, interview_id, candidate_id, status, is_preview, started_at
+       ) VALUES (?, ?, ?, 'pending', ?, NULL)`,
+      [
+        input.companyId,
+        input.interviewId,
+        input.candidateId,
+        input.isPreview ? 1 : 0,
+      ],
     );
 
     const rows = await query<AttemptRow[]>(
       `SELECT id, company_id, interview_id, candidate_id, status, is_shortlisted,
-              started_at, completed_at, created_at, updated_at
+              is_preview, started_at, completed_at, created_at, updated_at
        FROM interview_attempts WHERE id = ? LIMIT 1`,
       [Number(result.insertId)],
     );
@@ -512,7 +631,7 @@ export class InterviewCoreRepository {
 
     const rows = await query<AttemptRow[]>(
       `SELECT id, company_id, interview_id, candidate_id, status, is_shortlisted,
-              started_at, completed_at, created_at, updated_at
+              is_preview, started_at, completed_at, created_at, updated_at
        FROM interview_attempts WHERE id = ? LIMIT 1`,
       [attemptId],
     );
@@ -546,7 +665,10 @@ export class InterviewCoreRepository {
       `SELECT i.id, i.company_id, i.created_by_user_id, i.title, i.job_role, i.profession_id,
               i.level, i.interview_language, i.question_count, i.job_description,
               i.public_token, i.status, i.is_video_enabled, i.interviewer_name,
-              i.welcome_message_template, i.created_at, i.updated_at
+              i.welcome_message_template, i.ai_tone, i.probing_depth, i.scoring_strictness,
+              i.expires_at, i.max_completions, i.allow_retake, i.time_limit_minutes,
+              i.passing_score, i.require_phone, i.require_linkedin, i.require_github,
+              i.created_at, i.updated_at
        FROM interviews i
        INNER JOIN interview_attempts a ON a.interview_id = i.id
        WHERE a.id = ? AND i.public_token = ?
@@ -564,7 +686,7 @@ export class InterviewCoreRepository {
   ): Promise<InterviewAttemptEntity | null> {
     const rows = await this.database.query<AttemptRow[]>(
       `SELECT id, company_id, interview_id, candidate_id, status, is_shortlisted,
-              started_at, completed_at, created_at, updated_at
+              is_preview, started_at, completed_at, created_at, updated_at
        FROM interview_attempts
        WHERE id = ? AND company_id = ?
        LIMIT 1`,
@@ -581,7 +703,7 @@ export class InterviewCoreRepository {
   ): Promise<InterviewAttemptEntity | null> {
     const rows = await this.database.query<AttemptRow[]>(
       `SELECT a.id, a.company_id, a.interview_id, a.candidate_id, a.status,
-              a.is_shortlisted, a.started_at, a.completed_at, a.created_at, a.updated_at
+              a.is_shortlisted, a.is_preview, a.started_at, a.completed_at, a.created_at, a.updated_at
        FROM interview_attempts a
        JOIN interviews i ON i.id = a.interview_id
        WHERE a.id = ? AND i.public_token = ?
@@ -781,6 +903,20 @@ export class InterviewCoreRepository {
       isVideoEnabled: row.is_video_enabled === 1,
       interviewerName: row.interviewer_name,
       welcomeMessageTemplate: row.welcome_message_template,
+      aiTone: row.ai_tone,
+      probingDepth: row.probing_depth,
+      scoringStrictness: row.scoring_strictness,
+      expiresAt: row.expires_at,
+      maxCompletions:
+        row.max_completions != null ? Number(row.max_completions) : null,
+      allowRetake: row.allow_retake === 1,
+      timeLimitMinutes:
+        row.time_limit_minutes != null ? Number(row.time_limit_minutes) : null,
+      passingScore:
+        row.passing_score != null ? Number(row.passing_score) : null,
+      requirePhone: row.require_phone === 1,
+      requireLinkedin: row.require_linkedin === 1,
+      requireGithub: row.require_github === 1,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -859,6 +995,7 @@ export class InterviewCoreRepository {
       candidateId: row.candidate_id,
       status: row.status,
       isShortlisted: row.is_shortlisted === 1,
+      isPreview: row.is_preview === 1,
       startedAt: row.started_at,
       completedAt: row.completed_at,
       createdAt: row.created_at,

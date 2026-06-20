@@ -14,6 +14,11 @@ import {
   type SubmitInterviewAnswerPayload,
 } from './types/interview.type';
 import { QuestionLevelEnum } from '../question-bank/types/question.type';
+import {
+  AiToneEnum,
+  ProbingDepthEnum,
+  ScoringStrictnessEnum,
+} from './types/interview-config.enum';
 
 const DEFAULT_PUBLIC_BASE = '/i';
 
@@ -35,6 +40,17 @@ export function mapInterviewToGraphql(
     isVideoEnabled: interview.isVideoEnabled,
     interviewerName: interview.interviewerName,
     welcomeMessageTemplate: interview.welcomeMessageTemplate,
+    aiTone: interview.aiTone as AiToneEnum,
+    probingDepth: interview.probingDepth as ProbingDepthEnum,
+    scoringStrictness: interview.scoringStrictness as ScoringStrictnessEnum,
+    expiresAt: interview.expiresAt ? interview.expiresAt.toISOString() : null,
+    maxCompletions: interview.maxCompletions,
+    allowRetake: interview.allowRetake,
+    timeLimitMinutes: interview.timeLimitMinutes,
+    passingScore: interview.passingScore,
+    requirePhone: interview.requirePhone,
+    requireLinkedin: interview.requireLinkedin,
+    requireGithub: interview.requireGithub,
   };
 }
 

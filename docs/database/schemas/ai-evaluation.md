@@ -2,7 +2,7 @@
 
 AI сравнивает ответ с checkpoint snapshot, возвращает structured JSON + normalized rows.
 
-**Migration:** `007_create_ai_evaluation.sql` · **Feature block:** `07-⬜-ai-evaluation`
+**Migration:** `007_create_ai_evaluation.sql` (+ `023_final_evaluation_achieved_level.sql`) · **Feature block:** `07-⬜-ai-evaluation`
 
 ---
 
@@ -37,7 +37,7 @@ erDiagram
 
 ## `question_evaluations`
 
-One evaluation per candidate message (UNIQUE on `interview_message_id`).
+One evaluation per candidate **main answer** message (UNIQUE on `interview_message_id`).
 
 | Column | Notes |
 |--------|-------|
@@ -45,6 +45,13 @@ One evaluation per candidate message (UNIQUE on `interview_message_id`).
 | `raw_response` | JSON — full AI payload |
 | `short_summary`, `review` | Parsed text |
 | `needs_manual_review` | Guardrail flag |
+
+**Status: ACTIVE (not deprecated).** Это канонический per-question store, который читают `final_evaluations` (через `findByAttemptId`) и GraphQL-резолверы (`questionEvaluations`). Заполняется при запуске полной AI-оценки завершённой попытки (`AiEvaluationService.evaluateInterviewAttempt`):
+
+- **Adaptive flow (основной):** `AdaptiveEvidenceEvaluationService.syncQuestionEvaluationsFromEvidence` синхронизирует одну строку на main-answer из `interview_question_summaries` — `score`/`max_score`/`short_summary` ЗЕРКАЛЯТ агрегат evidence (`buildQuestionSummaryFromCheckpointStates`). Поэтому исправления формата покрытия (TASK-17.3/17.4) автоматически попадают в `short_summary` новых попыток.
+- **Legacy/non-adaptive flow:** прямой `upsertByInterviewMessage` из `AiEvaluationService`.
+
+> Таблица не пустая и не «мёртвый путь»: строки появляются только для **завершённых и оценённых** попыток (по одной на вопрос). Незавершённые/preview-попытки имеют только `interview_checkpoint_states`, но не `question_evaluations`.
 
 ---
 
@@ -70,9 +77,13 @@ One per attempt (UNIQUE `interview_attempt_id`).
 | `total_score` | DECIMAL(5,2), scale 0–10 |
 | `category` | weak \| basic \| average \| good \| strong |
 | `hire_recommendation` | strong_reject … strong_invite |
+| `achieved_level` | ENUM junior \| middle \| senior \| lead, NULL. «Demonstrated level» — высший уровень вопросов, реально подтверждённый кандидатом, **независимо** от целевого уровня интервью (block 18). NULL, если уровень не подтверждён. |
+| `achieved_level_method` | ENUM evidence \| estimate, NULL. `evidence` — уровень напрямую проверен вопросами; `estimate` — грубая оценка (нижний уровень не покрыт). |
 | `summary`, `detailed_summary` | TEXT |
 | `strengths`, `weaknesses`, `risks` | JSON arrays |
 | `raw_response` | JSON audit |
+
+Index `idx_final_evaluations_company_achieved (company_id, achieved_level)` поддерживает talent pool (подбор прошлых кандидатов с `achievedLevel >= target` в рамках компании). Колонки добавлены миграцией `023_final_evaluation_achieved_level.sql`.
 
 ---
 
@@ -112,7 +123,8 @@ Maps to:
 
 ## DDL reference
 
-`backend/migrations/007_create_ai_evaluation.sql`
+- `backend/migrations/007_create_ai_evaluation.sql`
+- `backend/migrations/023_final_evaluation_achieved_level.sql` — `achieved_level` + `achieved_level_method` на `final_evaluations` (block 18)
 
 ---
 

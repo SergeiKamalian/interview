@@ -1,5 +1,10 @@
-import { Field, Int, ObjectType, registerEnumType } from '@nestjs/graphql';
+import { Field, Float, Int, ObjectType, registerEnumType } from '@nestjs/graphql';
 import { QuestionLevelEnum } from '../../question-bank/types/question.type';
+import {
+  AiToneEnum,
+  ProbingDepthEnum,
+  ScoringStrictnessEnum,
+} from '../../interview-core/types/interview-config.enum';
 
 export enum InterviewTemplateStatusEnum {
   active = 'active',
@@ -53,6 +58,36 @@ export class InterviewTemplateType {
 
   @Field(() => String, { nullable: true })
   welcomeMessageTemplate?: string | null;
+
+  @Field(() => AiToneEnum)
+  aiTone!: AiToneEnum;
+
+  @Field(() => ProbingDepthEnum)
+  probingDepth!: ProbingDepthEnum;
+
+  @Field(() => ScoringStrictnessEnum)
+  scoringStrictness!: ScoringStrictnessEnum;
+
+  @Field(() => Int, { nullable: true })
+  maxCompletions?: number | null;
+
+  @Field()
+  allowRetake!: boolean;
+
+  @Field(() => Int, { nullable: true })
+  timeLimitMinutes?: number | null;
+
+  @Field(() => Float, { nullable: true })
+  passingScore?: number | null;
+
+  @Field()
+  requirePhone!: boolean;
+
+  @Field()
+  requireLinkedin!: boolean;
+
+  @Field()
+  requireGithub!: boolean;
 
   @Field(() => InterviewTemplateStatusEnum)
   status!: InterviewTemplateStatusEnum;

@@ -2,13 +2,19 @@ import type { CandidateTurnKind } from '../types/candidate-turn-classifier.types
 import { sanitizeCheckpointExpectedForCandidateSpeech } from '../utils/checkpoint-expected-speech.util';
 import type { FollowUpAnswerTone } from '../utils/follow-up-acknowledgment.util';
 import {
+  buildInterviewerPersonaOpener,
+  buildInterviewerToneBlock,
   INTERVIEWER_ACKNOWLEDGMENT_VARIETY_RULES,
   INTERVIEWER_FIRST_PERSON_VOICE_RULES,
   INTERVIEWER_FOLLOW_UP_REMINDER,
 } from './interviewer-voice.prompt';
+import {
+  DEFAULT_AI_TONE,
+  type AiTone,
+} from '../../interview-core/types/interview-config.enum';
 
 export const FOLLOW_UP_PLANNER_PROMPT_KEY = 'follow_up_planner';
-export const FOLLOW_UP_PLANNER_PROMPT_VERSION = '2.10.0';
+export const FOLLOW_UP_PLANNER_PROMPT_VERSION = '2.11.0';
 
 const RESPONSE_JSON_SCHEMA = `{
   "follow_up_question": "interviewer «я» → candidate «вы»: varied short opener (not «Понял, спасибо» every time) or none, then ONE direct follow-up question in Russian — never quote the candidate's words",
@@ -22,7 +28,12 @@ export type FollowUpPlannerPromptInput = {
   checkpointExpected: string;
   latestCandidateAnswer: string;
   previousFollowUpQuestions: string[];
-  followUpKind?: 'depth_probe' | 'residual_probe' | 'topic_redirect' | 'clarification_redirect' | 'generic';
+  followUpKind?:
+    | 'depth_probe'
+    | 'residual_probe'
+    | 'topic_redirect'
+    | 'clarification_redirect'
+    | 'generic';
   candidateTurnKind?: CandidateTurnKind | null;
   missingMustConcepts?: string[];
   followUpBudgetBlock?: string;
@@ -30,35 +41,39 @@ export type FollowUpPlannerPromptInput = {
   answerTone?: FollowUpAnswerTone;
 };
 
-const INTERVIEWER_PERSONA = [
-  'You are an experienced, friendly human technical interviewer in a live 1:1 conversation.',
-  'Sound natural and respectful — like a real interviewer, not a quiz bot or grading rubric.',
-  '',
-  INTERVIEWER_FIRST_PERSON_VOICE_RULES,
-  '',
-  'Dialogue style:',
-  INTERVIEWER_ACKNOWLEDGMENT_VARIETY_RULES,
-  '- Do NOT repeat, quote, or paraphrase what the candidate just said — no «про … услышал», no «…» with their answer.',
-  '- They already know what they said; move straight to your clarifying question.',
-  '- Keep the full message to 1–2 short sentences (optional acknowledgment + one question).',
-  '',
-  'Critical rules:',
-  '- Ask exactly ONE follow-up question in Russian (unless the main question is clearly in English).',
-  '- Use the candidate answer only to decide WHAT to ask next — never to recap it aloud.',
-  '- The backend selected an internal topic to clarify — use it as guidance only; rephrase in «я»→«вы» form.',
-  '- NEVER quote internal rubric labels (e.g. "Понимает параметр типа", checkpoint keys, scores, or evaluation criteria).',
-  '- NEVER use robotic templates like "Можете подробнее рассказать про «…»" with a rubric title.',
-  '- Do NOT repeat a follow-up that was already asked in this question.',
-  '- Do NOT reveal the ideal answer or grading rubric.',
-  '- Do NOT propose a second depth probe on checkpoints below minPriorityToProbe (see budget block).',
-  '- If the candidate clearly said they do not know or do not understand the topic, respond warmly and ask a simpler question OR rephrase the main idea in plain language — do not drill the same rubric item aggressively.',
-  '',
-  'Answer-tone reactions (match how well they answered — do NOT always say «Вы верно описали общую идею»):',
-  '- good: warm confirmation — «Да, в целом верно», «Хорошо, основную идею схватили», «Да, да — направление правильное»',
-  '- partial: honest but friendly — «Ну, частично верно», «Есть верное, но не всё», «В целом ок, но давайте докопаемся»',
-  '- weak: gentle correction allowed — «Ну, не совсем так» + ONE short sentence how it actually works (plain language, no rubric), then ask them to continue or clarify',
-  '- NEVER reuse the same opener from prior follow-ups in this question — rotate or skip the opener.',
-].join('\n');
+function buildInterviewerPersona(aiTone: AiTone = DEFAULT_AI_TONE): string {
+  return [
+    buildInterviewerPersonaOpener(aiTone),
+    'Sound natural and respectful — like a real interviewer, not a quiz bot or grading rubric.',
+    '',
+    buildInterviewerToneBlock(aiTone),
+    '',
+    INTERVIEWER_FIRST_PERSON_VOICE_RULES,
+    '',
+    'Dialogue style:',
+    INTERVIEWER_ACKNOWLEDGMENT_VARIETY_RULES,
+    '- Do NOT repeat, quote, or paraphrase what the candidate just said — no «про … услышал», no «…» with their answer.',
+    '- They already know what they said; move straight to your clarifying question.',
+    '- Keep the full message to 1–2 short sentences (optional acknowledgment + one question).',
+    '',
+    'Critical rules:',
+    '- Ask exactly ONE follow-up question in Russian (unless the main question is clearly in English).',
+    '- Use the candidate answer only to decide WHAT to ask next — never to recap it aloud.',
+    '- The backend selected an internal topic to clarify — use it as guidance only; rephrase in «я»→«вы» form.',
+    '- NEVER quote internal rubric labels (e.g. "Понимает параметр типа", checkpoint keys, scores, or evaluation criteria).',
+    '- NEVER use robotic templates like "Можете подробнее рассказать про «…»" with a rubric title.',
+    '- Do NOT repeat a follow-up that was already asked in this question.',
+    '- Do NOT reveal the ideal answer or grading rubric.',
+    '- Do NOT propose a second depth probe on checkpoints below minPriorityToProbe (see budget block).',
+    '- If the candidate clearly said they do not know or do not understand the topic, respond warmly and ask a simpler question OR rephrase the main idea in plain language — do not drill the same rubric item aggressively.',
+    '',
+    'Answer-tone reactions (match how well they answered — do NOT always say «Вы верно описали общую идею»):',
+    '- good: warm confirmation — «Да, в целом верно», «Хорошо, основную идею схватили», «Да, да — направление правильное»',
+    '- partial: honest but friendly — «Ну, частично верно», «Есть верное, но не всё», «В целом ок, но давайте докопаемся»',
+    '- weak: gentle correction allowed — «Ну, не совсем так» + ONE short sentence how it actually works (plain language, no rubric), then ask them to continue or clarify',
+    '- NEVER reuse the same opener from prior follow-ups in this question — rotate or skip the opener.',
+  ].join('\n');
+}
 
 function buildAnswerToneBlock(tone: FollowUpAnswerTone | undefined): string {
   if (!tone) {
@@ -138,10 +153,7 @@ function buildSharedUserContext(input: FollowUpPlannerPromptInput): string {
   const probeBlock =
     input.followUpKind === 'depth_probe' &&
     (input.missingMustConcepts?.length ?? 0) > 0
-      ? buildDepthProbeBlock(
-          input.missingMustConcepts!,
-          input.answerTone,
-        )
+      ? buildDepthProbeBlock(input.missingMustConcepts!, input.answerTone)
       : input.followUpKind === 'residual_probe' &&
           (input.missingMustConcepts?.length ?? 0) > 0
         ? [
@@ -190,9 +202,11 @@ function sanitizeTopicHint(checkpointExpected: string): string {
   return sanitizeCheckpointExpectedForCandidateSpeech(checkpointExpected);
 }
 
-export function buildFollowUpPlannerSystemPrompt(): string {
+export function buildFollowUpPlannerSystemPrompt(
+  aiTone: AiTone = DEFAULT_AI_TONE,
+): string {
   return [
-    INTERVIEWER_PERSONA,
+    buildInterviewerPersona(aiTone),
     '',
     'Return valid JSON only, with no markdown fences or extra commentary.',
     '',
@@ -215,9 +229,11 @@ export function buildFollowUpPlannerUserPrompt(
   ].join('\n');
 }
 
-export function buildFollowUpPlannerStreamingSystemPrompt(): string {
+export function buildFollowUpPlannerStreamingSystemPrompt(
+  aiTone: AiTone = DEFAULT_AI_TONE,
+): string {
   return [
-    INTERVIEWER_PERSONA,
+    buildInterviewerPersona(aiTone),
     '',
     'Return plain text only: varied short opener (or none) + one follow-up question in the same message. Never quote the candidate. No JSON, no markdown, no commentary.',
   ].join('\n');

@@ -11,6 +11,10 @@ import {
   MAIN_QUESTION_REVEAL_PROMPT_KEY,
 } from '../prompts/main-question-reveal.prompt';
 import {
+  DEFAULT_AI_TONE,
+  type AiTone,
+} from '../../interview-core/types/interview-config.enum';
+import {
   buildMainQuestionRevealFallback,
   buildTopicOpenerFallback,
 } from '../utils/topic-opener.util';
@@ -29,6 +33,7 @@ export class MainQuestionOpenerService {
     isFirstQuestion: boolean;
     previousQuestionCount: number;
     seed: number;
+    aiTone?: AiTone;
   }): Promise<string> {
     const fallback = buildTopicOpenerFallback({
       questionText: input.questionText,
@@ -39,7 +44,12 @@ export class MainQuestionOpenerService {
     try {
       const completion = await this.aiProviderService.createChatCompletion(
         [
-          { role: 'system', content: buildMainQuestionOpenerSystemPrompt() },
+          {
+            role: 'system',
+            content: buildMainQuestionOpenerSystemPrompt(
+              input.aiTone ?? DEFAULT_AI_TONE,
+            ),
+          },
           {
             role: 'user',
             content: buildMainQuestionOpenerUserPrompt({
@@ -82,6 +92,7 @@ export class MainQuestionOpenerService {
     questionText: string;
     referenceAnswer?: string | null;
     seed: number;
+    aiTone?: AiTone;
   }): Promise<string> {
     const fallback = buildMainQuestionRevealFallback({
       openerAnswer: input.candidateOpenerAnswer,
@@ -91,7 +102,12 @@ export class MainQuestionOpenerService {
     try {
       const completion = await this.aiProviderService.createChatCompletion(
         [
-          { role: 'system', content: buildMainQuestionRevealSystemPrompt() },
+          {
+            role: 'system',
+            content: buildMainQuestionRevealSystemPrompt(
+              input.aiTone ?? DEFAULT_AI_TONE,
+            ),
+          },
           {
             role: 'user',
             content: buildMainQuestionRevealUserPrompt({

@@ -6,6 +6,7 @@ export { Spinner } from './Spinner/Spinner';
 export { Badge, badgeVariants } from './badge';
 export { CheckboxField } from './Checkbox/CheckboxField';
 export { SelectField } from './Select/SelectField';
+export { SearchableSelectField } from './Select/SearchableSelectField';
 export { Textarea } from './Textarea/Textarea';
 
 export { Checkbox } from './checkbox';

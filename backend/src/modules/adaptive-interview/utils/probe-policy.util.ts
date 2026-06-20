@@ -100,6 +100,49 @@ export function resolveComplexityTier(
   return 'mention';
 }
 
+/** TASK-17.3: default weight ratio above which a checkpoint is "must-have". */
+export const MUST_HAVE_CHECKPOINT_WEIGHT_RATIO = 0.2;
+
+/**
+ * TASK-17.3: a "must-have" checkpoint is one the interview must verify regardless
+ * of probing depth — its complexity tier requires a probe
+ * (intermediate/advanced/expert) OR it carries a heavy weight share of the
+ * question. Secondary checkpoints (shallow-accept tiers, low weight) may
+ * legitimately go un-asked at shallow depth.
+ *
+ * This formalizes the split the probe policy already enforces: `probeRequired`
+ * returns true only for PROBE_REQUIRED_TIERS, and the budget allocator lets a
+ * probe-required candidate bypass the (depth-raised) `minPriorityToProbe` floor —
+ * so must-have checkpoints are probed at any depth while shallow only trims
+ * secondary ones. The scorer reuses this to avoid penalizing never-asked
+ * secondary checkpoints. INVARIANT: weights / max_score / criteria are unchanged.
+ */
+export function isMustHaveCheckpoint(input: {
+  checkpointWeight: number;
+  hints: CheckpointEvaluationHints | null | undefined;
+  questionMaxScore: number;
+  heavyCheckpointWeightRatio?: number;
+}): boolean {
+  const tier = resolveComplexityTier(
+    input.hints,
+    input.checkpointWeight,
+    input.questionMaxScore,
+  );
+
+  if (PROBE_REQUIRED_TIERS.has(tier)) {
+    return true;
+  }
+
+  const ratio =
+    input.questionMaxScore > 0
+      ? input.checkpointWeight / input.questionMaxScore
+      : 0;
+  const heavyRatio =
+    input.heavyCheckpointWeightRatio ?? MUST_HAVE_CHECKPOINT_WEIGHT_RATIO;
+
+  return input.checkpointWeight >= 2 || ratio >= heavyRatio;
+}
+
 export function getMissingMustConcepts(
   hints: CheckpointEvaluationHints | null | undefined,
   candidateText: string,

@@ -1,24 +1,24 @@
-import { Link } from 'react-router-dom';
+import { Link } from "react-router-dom";
 import {
   UsersIcon,
   CheckCircle2Icon,
   LoaderIcon,
   StarIcon,
   ListIcon,
-} from 'lucide-react';
+} from "lucide-react";
 
-import type { DashboardOverview } from '@entities/dashboard/api/dashboardApi';
+import type { DashboardOverview } from "@entities/dashboard/api/dashboardApi";
 import {
   Card,
   CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@shared/ui/card';
-import { Skeleton } from '@shared/ui/skeleton';
+} from "@shared/ui/card";
+import { Skeleton } from "@shared/ui/skeleton";
 
 type SectionCardsProps = {
-  metrics?: DashboardOverview['metrics'];
+  metrics?: DashboardOverview["metrics"];
   isLoading?: boolean;
   isError?: boolean;
 };
@@ -44,8 +44,11 @@ function MetricCard({
   isLoading,
   isError,
 }: MetricCardProps) {
-  const displayValue =
-    isError ? '—' : value != null ? value.toLocaleString('ru-RU') : '0';
+  const displayValue = isError
+    ? "—"
+    : value != null
+      ? value.toLocaleString("ru-RU")
+      : "0";
 
   return (
     <Card className="@container/card">
@@ -56,7 +59,7 @@ function MetricCard({
         </CardTitle>
       </CardHeader>
       <CardFooter className="flex-col items-start gap-1.5 text-sm">
-        <div className="line-clamp-1 flex gap-2 font-medium">
+        <div className="line-clamp-1 flex gap-2 font-medium items-center">
           {icon}
           {href && !isLoading ? (
             <Link to={href} className="hover:underline">
@@ -79,46 +82,46 @@ export function SectionCards({
 }: SectionCardsProps) {
   const cards = [
     {
-      title: 'Интервью',
+      title: "Интервью",
       value: metrics?.interviewsTotal ?? null,
       footerTitle:
         metrics?.activeInterviewsTotal != null
-          ? `${metrics.activeInterviewsTotal.toLocaleString('ru-RU')} активны`
-          : 'Активные интервью',
-      footerDescription: 'Всего скринингов в компании',
-      href: '/dashboard/interviews',
+          ? `${metrics.activeInterviewsTotal.toLocaleString("ru-RU")} активны`
+          : "Активные интервью",
+      footerDescription: "Всего скринингов в компании",
+      href: "/dashboard/interviews",
       icon: <ListIcon className="size-4" />,
     },
     {
-      title: 'Кандидаты',
+      title: "Кандидаты",
       value: metrics?.candidatesTotal ?? null,
-      footerTitle: 'Все кандидаты',
-      footerDescription: 'Уникальные кандидаты со скринингами',
-      href: '/dashboard/candidates',
+      footerTitle: "Все кандидаты",
+      footerDescription: "Уникальные кандидаты со скринингами",
+      href: "/dashboard/candidates",
       icon: <UsersIcon className="size-4" />,
     },
     {
-      title: 'Завершённые скрининги',
+      title: "Завершённые скрининги",
       value: metrics?.completedTotal ?? null,
-      footerTitle: 'Завершённые интервью',
-      footerDescription: 'Пройденные AI-интервью',
-      href: '/dashboard/attempts',
+      footerTitle: "Завершённые интервью",
+      footerDescription: "Пройденные AI-интервью",
+      href: "/dashboard/attempts",
       icon: <CheckCircle2Icon className="size-4" />,
     },
     {
-      title: 'В процессе',
+      title: "В процессе",
       value: metrics?.inProgressTotal ?? null,
-      footerTitle: 'Активные сессии',
-      footerDescription: 'Кандидаты проходят интервью сейчас',
-      href: '/dashboard/attempts?status=in_progress',
+      footerTitle: "Активные сессии",
+      footerDescription: "Кандидаты проходят интервью сейчас",
+      href: "/dashboard/attempts?status=in_progress",
       icon: <LoaderIcon className="size-4" />,
     },
     {
-      title: 'Шортлист',
+      title: "Шортлист",
       value: metrics?.shortlistedTotal ?? null,
-      footerTitle: 'Открыть шортлист',
-      footerDescription: 'Отмечены для следующего этапа',
-      href: '/dashboard/candidates?shortlist=1',
+      footerTitle: "Открыть шортлист",
+      footerDescription: "Отмечены для следующего этапа",
+      href: "/dashboard/candidates?shortlist=1",
       icon: <StarIcon className="size-4" />,
     },
   ];

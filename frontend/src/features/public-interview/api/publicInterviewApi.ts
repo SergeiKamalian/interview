@@ -9,6 +9,8 @@ import type {
   InterviewSessionQueryVariables,
   PublicInterviewQuery,
   PublicInterviewQueryVariables,
+  StartInterviewPreviewMutation,
+  StartInterviewPreviewMutationVariables,
   StartPublicInterviewMutation,
   StartPublicInterviewMutationVariables,
   SubmitInterviewAnswerMutation,
@@ -38,6 +40,19 @@ export const publicInterviewApi = baseApi.injectEndpoints({
       }),
       transformResponse: (response: StartPublicInterviewMutation) =>
         response.startPublicInterview,
+    }),
+    startInterviewPreview: builder.mutation<
+      StartInterviewPreviewMutation['startInterviewPreview'],
+      string
+    >({
+      query: (interviewId) => ({
+        ...GraphqlOperations.StartInterviewPreview,
+        variables: {
+          interviewId,
+        } satisfies StartInterviewPreviewMutationVariables,
+      }),
+      transformResponse: (response: StartInterviewPreviewMutation) =>
+        response.startInterviewPreview,
     }),
     interviewSession: builder.query<
       InterviewSessionQuery['interviewSession'],
@@ -89,6 +104,7 @@ export const publicInterviewApi = baseApi.injectEndpoints({
 export const {
   usePublicInterviewQuery,
   useStartPublicInterviewMutation,
+  useStartInterviewPreviewMutation,
   useInterviewSessionQuery,
   useBeginInterviewAttemptMutation,
   useSubmitInterviewAnswerMutation,

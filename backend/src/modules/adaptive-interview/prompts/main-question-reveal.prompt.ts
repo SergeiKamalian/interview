@@ -1,7 +1,14 @@
-import { INTERVIEWER_FIRST_PERSON_VOICE_RULES } from './interviewer-voice.prompt';
+import {
+  buildInterviewerToneBlock,
+  INTERVIEWER_FIRST_PERSON_VOICE_RULES,
+} from './interviewer-voice.prompt';
+import {
+  DEFAULT_AI_TONE,
+  type AiTone,
+} from '../../interview-core/types/interview-config.enum';
 
 export const MAIN_QUESTION_REVEAL_PROMPT_KEY = 'main_question_reveal';
-export const MAIN_QUESTION_REVEAL_PROMPT_VERSION = '1.0.0';
+export const MAIN_QUESTION_REVEAL_PROMPT_VERSION = '1.1.0';
 
 export type MainQuestionRevealPromptInput = {
   topicOpenerText: string;
@@ -11,10 +18,14 @@ export type MainQuestionRevealPromptInput = {
   referenceAnswer?: string | null;
 };
 
-export function buildMainQuestionRevealSystemPrompt(): string {
+export function buildMainQuestionRevealSystemPrompt(
+  aiTone: AiTone = DEFAULT_AI_TONE,
+): string {
   return [
     'You are a live technical interviewer continuing a natural 1:1 conversation.',
     'The candidate just answered your short topic-readiness check. Now invite them to explain — in human, conversational Russian.',
+    '',
+    buildInterviewerToneBlock(aiTone),
     '',
     INTERVIEWER_FIRST_PERSON_VOICE_RULES,
     '',

@@ -4,11 +4,19 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InterviewCoreRepository } from '../../interview-core/interview-core.repository';
-import { getAdaptiveInterviewContextLimits } from '../config/adaptive-interview-context.config';
+import {
+  applyProbingDepthToLimits,
+  getAdaptiveInterviewContextLimits,
+} from '../config/adaptive-interview-context.config';
 import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview-context.types';
 import { buildAdaptiveInterviewContextPacket } from '../utils/build-adaptive-interview-context.util';
 import { attachSnapshotExamplesToCheckpoints } from '../utils/attach-snapshot-examples.util';
 import { CheckpointStateRepository } from '../repositories/checkpoint-state.repository';
+import {
+  DEFAULT_AI_TONE,
+  DEFAULT_PROBING_DEPTH,
+  DEFAULT_SCORING_STRICTNESS,
+} from '../../interview-core/types/interview-config.enum';
 
 @Injectable()
 export class AdaptiveInterviewContextService {
@@ -30,8 +38,13 @@ export class AdaptiveInterviewContextService {
       throw new NotFoundException('Interview question not found');
     }
 
-    const [messages, snapshotCheckpoints, checkpointStates, snapshotExamples] =
-      await Promise.all([
+    const [
+      messages,
+      snapshotCheckpoints,
+      checkpointStates,
+      snapshotExamples,
+      interview,
+    ] = await Promise.all([
       this.interviewRepository.listMessages(attemptId),
       this.interviewRepository.findCheckpointsByInterviewQuestionId(
         interviewQuestionId,
@@ -43,6 +56,7 @@ export class AdaptiveInterviewContextService {
       this.interviewRepository.findAnswerExamplesByInterviewQuestionId(
         interviewQuestionId,
       ),
+      this.interviewRepository.findById(interviewQuestion.interviewId),
     ]);
 
     if (snapshotCheckpoints.length === 0) {
@@ -68,12 +82,10 @@ export class AdaptiveInterviewContextService {
       snapshotExamples,
     );
 
-    const badAnswerExamples = checkpoints.flatMap(
-      (checkpoint) => [
-        ...(checkpoint.badExamples ?? []),
-        ...(checkpoint.questionBadExamples ?? []),
-      ],
-    );
+    const badAnswerExamples = checkpoints.flatMap((checkpoint) => [
+      ...(checkpoint.badExamples ?? []),
+      ...(checkpoint.questionBadExamples ?? []),
+    ]);
 
     if (snapshotExamples.length === 0 && interviewQuestion.sourceQuestionId) {
       const legacyBadExamples =
@@ -89,7 +101,13 @@ export class AdaptiveInterviewContextService {
       interviewQuestionId: interviewQuestion.id,
       interviewId: interviewQuestion.interviewId,
       attemptId,
-      companyId: attemptMessage?.companyId ?? checkpointStates[0]?.companyId ?? 0,
+      companyId:
+        attemptMessage?.companyId ?? checkpointStates[0]?.companyId ?? 0,
+      aiTone: interview?.aiTone ?? DEFAULT_AI_TONE,
+      probingDepth: interview?.probingDepth ?? DEFAULT_PROBING_DEPTH,
+      scoringStrictness:
+        interview?.scoringStrictness ?? DEFAULT_SCORING_STRICTNESS,
+      timeLimitMinutes: interview?.timeLimitMinutes ?? null,
       questionText: interviewQuestion.questionText,
       shortAnswer: interviewQuestion.shortAnswer,
       idealAnswer: interviewQuestion.idealAnswer,
@@ -114,7 +132,10 @@ export class AdaptiveInterviewContextService {
         rationale: state.rationale,
       })),
       badAnswerExamples: uniqueBadExamples,
-      limits: getAdaptiveInterviewContextLimits(),
+      limits: applyProbingDepthToLimits(
+        getAdaptiveInterviewContextLimits(),
+        interview?.probingDepth ?? DEFAULT_PROBING_DEPTH,
+      ),
     });
   }
 }

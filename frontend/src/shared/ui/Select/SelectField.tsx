@@ -11,7 +11,23 @@ import { cn } from '@shared/lib/utils';
 export type SelectOption = {
   value: string;
   label: string;
+  flag?: string;
 };
+
+function SelectOptionLabel({ option }: { option: SelectOption }) {
+  if (!option.flag) {
+    return option.label;
+  }
+
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span aria-hidden className="text-base leading-none">
+        {option.flag}
+      </span>
+      <span>{option.label}</span>
+    </span>
+  );
+}
 
 type SelectFieldProps = {
   label?: string;
@@ -30,7 +46,7 @@ export function SelectField({
   placeholder,
   className,
 }: SelectFieldProps) {
-  const selectedLabel = options.find((option) => option.value === value)?.label;
+  const selectedOption = options.find((option) => option.value === value);
 
   return (
     <div className={cn('space-y-1.5', className)}>
@@ -41,13 +57,15 @@ export function SelectField({
       >
         <SelectTrigger className="w-full">
           <SelectValue placeholder={placeholder}>
-            {selectedLabel}
+            {selectedOption ? (
+              <SelectOptionLabel option={selectedOption} />
+            ) : null}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent side="bottom" align="start" alignItemWithTrigger={false}>
           {options.map((option) => (
             <SelectItem key={option.value || '__empty'} value={option.value}>
-              {option.label}
+              <SelectOptionLabel option={option} />
             </SelectItem>
           ))}
         </SelectContent>

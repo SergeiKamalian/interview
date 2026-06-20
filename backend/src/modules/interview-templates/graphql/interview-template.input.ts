@@ -1,4 +1,4 @@
-import { Field, ID, InputType, Int } from '@nestjs/graphql';
+import { Field, Float, ID, InputType, Int } from '@nestjs/graphql';
 import {
   ArrayMinSize,
   IsArray,
@@ -6,6 +6,7 @@ import {
   IsEnum,
   IsInt,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
   Max,
@@ -13,6 +14,13 @@ import {
   Min,
 } from 'class-validator';
 import { QuestionLevelEnum } from '../../question-bank/types/question.type';
+import {
+  AiToneEnum,
+  PASSING_SCORE_MAX,
+  PASSING_SCORE_MIN,
+  ProbingDepthEnum,
+  ScoringStrictnessEnum,
+} from '../../interview-core/types/interview-config.enum';
 
 @InputType()
 export class CompanyInterviewTemplatesFilterInput {
@@ -95,6 +103,60 @@ export class CreateInterviewTemplateInput {
   @IsString()
   @MaxLength(4000)
   welcomeMessageTemplate?: string;
+
+  @Field(() => AiToneEnum, { nullable: true })
+  @IsOptional()
+  @IsEnum(AiToneEnum)
+  aiTone?: AiToneEnum;
+
+  @Field(() => ProbingDepthEnum, { nullable: true })
+  @IsOptional()
+  @IsEnum(ProbingDepthEnum)
+  probingDepth?: ProbingDepthEnum;
+
+  @Field(() => ScoringStrictnessEnum, { nullable: true })
+  @IsOptional()
+  @IsEnum(ScoringStrictnessEnum)
+  scoringStrictness?: ScoringStrictnessEnum;
+
+  @Field(() => Int, { nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxCompletions?: number;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsBoolean()
+  allowRetake?: boolean;
+
+  @Field(() => Int, { nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  timeLimitMinutes?: number;
+
+  @Field(() => Float, { nullable: true })
+  @IsOptional()
+  @IsNumber()
+  @Min(PASSING_SCORE_MIN)
+  @Max(PASSING_SCORE_MAX)
+  passingScore?: number;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsBoolean()
+  requirePhone?: boolean;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsBoolean()
+  requireLinkedin?: boolean;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsBoolean()
+  requireGithub?: boolean;
 
   @Field(() => [ID])
   @IsArray()

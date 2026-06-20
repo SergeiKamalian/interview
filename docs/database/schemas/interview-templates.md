@@ -51,8 +51,20 @@ Company-scoped reusable blueprint for creating `interviews`.
 | `is_video_enabled` | `TINYINT(1)` | Copied into interview |
 | `interviewer_name` | `VARCHAR(255) NULL` | Optional AI interviewer display name |
 | `welcome_message_template` | `TEXT NULL` | Optional welcome text |
+| `ai_tone` | `ENUM('friendly','neutral','strict')` DEFAULT `neutral` | Тон AI-интервьюера (migration `020`) |
+| `probing_depth` | `ENUM('shallow','balanced','deep')` DEFAULT `balanced` | Глубина копания (migration `020`) |
+| `scoring_strictness` | `ENUM('lenient','balanced','strict')` DEFAULT `balanced` | Строгость оценки (migration `020`) |
+| `max_completions` | `INT UNSIGNED NULL` | Дефолт капа завершённых прохождений (migration `020`) |
+| `allow_retake` | `TINYINT(1)` DEFAULT `0` | Дефолт разрешения пересдачи (migration `020`) |
+| `time_limit_minutes` | `INT UNSIGNED NULL` | Дефолт лимита времени (migration `020`) |
+| `passing_score` | `DECIMAL(4,2) NULL` | Дефолт проходного порога (migration `020`) |
+| `require_phone` | `TINYINT(1)` DEFAULT `0` | Дефолт обязательного поля кандидата (migration `020`) |
+| `require_linkedin` | `TINYINT(1)` DEFAULT `0` | Дефолт обязательного поля кандидата (migration `020`) |
+| `require_github` | `TINYINT(1)` DEFAULT `0` | Дефолт обязательного поля кандидата (migration `020`) |
 | `status` | `ENUM('active', 'archived')` | Soft lifecycle without deleting rows |
 | `created_at`, `updated_at` | `TIMESTAMP` | Standard timestamps |
+
+> Config-поля из migration `020` зеркалят `interviews`, **кроме `expires_at`** — дедлайн всегда per-interview и в шаблон не сохраняется.
 
 ### Indexes
 

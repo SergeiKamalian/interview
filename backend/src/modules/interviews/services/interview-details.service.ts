@@ -10,7 +10,10 @@ import { InterviewDetailsRepository } from '../repositories/interview-details.re
 export class InterviewDetailsService {
   constructor(private readonly repository: InterviewDetailsRepository) {}
 
-  async getDetails(companyId: number, interviewId: number): Promise<InterviewDetailsType> {
+  async getDetails(
+    companyId: number,
+    interviewId: number,
+  ): Promise<InterviewDetailsType> {
     const { interview, attempts, primaryAttempt, primaryFinalEvaluation } =
       await this.repository.getInterviewDetails(companyId, interviewId);
 
@@ -33,7 +36,10 @@ export class InterviewDetailsService {
       hireRecommendation: attempt.hire_recommendation
         ? (attempt.hire_recommendation as HireRecommendationEnum)
         : null,
-      evaluationStatus: this.resolveAttemptEvaluationStatus(attempt.status, attempt.total_score),
+      evaluationStatus: this.resolveAttemptEvaluationStatus(
+        attempt.status,
+        attempt.total_score,
+      ),
     }));
 
     const evaluationStatus = primaryAttempt
@@ -53,7 +59,11 @@ export class InterviewDetailsService {
       createdAt: Math.floor(interview.created_at.getTime() / 1000),
       attempts: mappedAttempts,
       primaryFinalEvaluation: primaryFinalEvaluation
-        ? mapFinalEvaluationToGraphql(primaryFinalEvaluation)
+        ? mapFinalEvaluationToGraphql(
+            primaryFinalEvaluation,
+            primaryFinalEvaluation.rawResponse?.deterministicScore,
+            interview.level,
+          )
         : null,
       evaluationStatus,
     };

@@ -1,10 +1,22 @@
-import { Field, Int, ObjectType, registerEnumType } from '@nestjs/graphql';
+import {
+  Field,
+  Float,
+  Int,
+  ObjectType,
+  registerEnumType,
+} from '@nestjs/graphql';
 import { QuestionLevelEnum } from '../../question-bank/types/question.type';
 import type { InterviewStatus } from './interview-status.enum';
+import {
+  AiToneEnum,
+  ProbingDepthEnum,
+  ScoringStrictnessEnum,
+} from './interview-config.enum';
 
 export enum InterviewStatusEnum {
   draft = 'draft',
   active = 'active',
+  paused = 'paused',
   archived = 'archived',
 }
 
@@ -76,6 +88,39 @@ export class InterviewType {
 
   @Field(() => String, { nullable: true })
   welcomeMessageTemplate?: string | null;
+
+  @Field(() => AiToneEnum)
+  aiTone!: AiToneEnum;
+
+  @Field(() => ProbingDepthEnum)
+  probingDepth!: ProbingDepthEnum;
+
+  @Field(() => ScoringStrictnessEnum)
+  scoringStrictness!: ScoringStrictnessEnum;
+
+  @Field(() => String, { nullable: true })
+  expiresAt?: string | null;
+
+  @Field(() => Int, { nullable: true })
+  maxCompletions?: number | null;
+
+  @Field()
+  allowRetake!: boolean;
+
+  @Field(() => Int, { nullable: true })
+  timeLimitMinutes?: number | null;
+
+  @Field(() => Float, { nullable: true })
+  passingScore?: number | null;
+
+  @Field()
+  requirePhone!: boolean;
+
+  @Field()
+  requireLinkedin!: boolean;
+
+  @Field()
+  requireGithub!: boolean;
 }
 
 @ObjectType()
@@ -160,6 +205,18 @@ export class StartPublicInterviewPayload {
 }
 
 @ObjectType()
+export class StartInterviewPreviewPayload {
+  @Field()
+  attemptId!: string;
+
+  @Field()
+  publicToken!: string;
+
+  @Field(() => Int)
+  totalQuestions!: number;
+}
+
+@ObjectType()
 export class SubmitInterviewAnswerPayload {
   @Field(() => AttemptStatusEnum)
   status!: AttemptStatusEnum;
@@ -198,5 +255,6 @@ export class SubmitInterviewAnswerPayload {
 export const GRAPHQL_INTERVIEW_STATUSES: InterviewStatus[] = [
   'draft',
   'active',
+  'paused',
   'archived',
 ];

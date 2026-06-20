@@ -1,12 +1,46 @@
+import type { ScoringStrictness } from '../../interview-core/types/interview-config.enum';
 import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview-context.types';
 import {
   buildInterviewPolicyTurnBlock,
   formatInterviewPolicyTurnBlock,
 } from '../utils/build-interview-policy-turn-block.util';
 
+/**
+ * Per-interview scoring strictness (TASK-16.10). Returns extra rubric guidance for
+ * the evaluator that nudges WHERE inside the existing bands an answer lands and how
+ * forgiving "covered" is. INVARIANT: this never changes max_score, checkpoints, or
+ * criteria — only the strictness of closing a checkpoint. `balanced` (and undefined)
+ * returns `null` so the prompt is byte-identical to before (golden calibration safe).
+ */
+function buildScoringStrictnessRubricBlock(
+  scoringStrictness: ScoringStrictness | undefined,
+): string | null {
+  switch (scoringStrictness) {
+    case 'strict':
+      return [
+        'Scoring strictness: STRICT (interviewer-configured — affects thresholds ONLY, never max_score/checkpoints/criteria).',
+        '- Demand precision: when an explanation is correct but imprecise or missing core mechanics, prefer the LOW end of the partial band.',
+        '- Reserve covered=max_score for fully correct answers with NO vague or hand-wavy parts.',
+        '- Any material false claim caps the checkpoint strictly at the lower partial/missed range.',
+        '- Do NOT round up borderline answers; if in doubt between two bands, pick the lower one.',
+      ].join('\n');
+    case 'lenient':
+      return [
+        'Scoring strictness: LENIENT (interviewer-configured — affects thresholds ONLY, never max_score/checkpoints/criteria).',
+        '- Give the benefit of the doubt: when the core idea is correct, prefer the HIGH end of the partial band.',
+        '- Minor omissions of optional details should NOT block covered when the core mechanics are right.',
+        '- Still never award credit for false claims, keyword-only mentions, or fundamentally wrong explanations.',
+        '- If in doubt between two bands for a genuinely-correct-core answer, pick the higher one.',
+      ].join('\n');
+    case 'balanced':
+    default:
+      return null;
+  }
+}
+
 export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_KEY =
   'per_turn_checkpoint_evaluation';
-export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION = '2.9.0';
+export const PER_TURN_CHECKPOINT_EVALUATION_PROMPT_VERSION = '2.10.0';
 
 export function getPerTurnCheckpointEvaluationPromptVersion(): string {
   const override = process.env.PER_TURN_EVAL_PROMPT_VERSION?.trim();
@@ -30,7 +64,11 @@ const RESPONSE_JSON_SCHEMA = `{
   ]
 }`;
 
-export function buildPerTurnCheckpointEvaluationSystemPrompt(): string {
+export function buildPerTurnCheckpointEvaluationSystemPrompt(
+  scoringStrictness?: ScoringStrictness,
+): string {
+  const strictnessBlock = buildScoringStrictnessRubricBlock(scoringStrictness);
+
   return [
     'You are a strict technical interview evaluator for a live adaptive interview.',
     'Assess the latest candidate answer together with earlier local turns for the current question.',
@@ -83,10 +121,16 @@ export function buildPerTurnCheckpointEvaluationSystemPrompt(): string {
     '- missed: fundamentally wrong, only keywords, or confident false explanation → score_awarded = 0.',
     '- unclear: candidate did not address this checkpoint at all → score_awarded = 0.',
     '',
+    'Accuracy=wrong / depth=false_claim discipline (MANDATORY — avoid false positives):',
+    '- Use accuracy=wrong / depth=false_claim ONLY when you can point to a SPECIFIC incorrect statement the candidate actually made about THIS checkpoint.',
+    '- A correct-but-incomplete or imprecise answer is accuracy=partial, NEVER accuracy=wrong. Missing optional details is NOT a false claim.',
+    '- NEVER write accuracy=wrong (or depth=false_claim) while your own rationale also says the core/«суть» is correct, sound, «не противоречит», or «описан корректно». That is self-contradictory — choose accuracy=partial or accuracy=full instead.',
+    '- If you cannot quote the wrong phrase, do NOT flag it as wrong; downgrade to partial coverage instead.',
+    '',
     'Half-right / half-wrong answers:',
     '- If an answer is ~50% correct and ~50% false for a checkpoint, status MUST be partial (NOT covered) and score MUST be below max_score.',
     '- Example: names Fiber + reconciliation correctly but says requestIdleCallback drives scheduling → scheduling = partial 0.5, depth=false_claim, not covered 1.',
-    '- NEVER set status=covered with score=max when your rationale mentions incorrect, contradictory, or imprecise parts.',
+    '- NEVER set status=covered with score=max when your rationale mentions a concrete incorrect or contradictory statement (not merely missing details).',
     '',
     '- Confident false statements MUST cap the checkpoint at partial or missed; do not treat false explanations as full knowledge.',
     '- If the latest answer explicitly refuses a sub-topic («не знаю», «давайте дальше», «не скажу»), that checkpoint → missed with depth=heard_of even if mentioned earlier.',
@@ -125,6 +169,7 @@ export function buildPerTurnCheckpointEvaluationSystemPrompt(): string {
     '  - keep prior scores for the targeted checkpoint;',
     '  - targeted checkpoint: do NOT treat as covered/partial improvement from this message alone.',
     '- Return valid JSON only, with no markdown fences or extra commentary.',
+    ...(strictnessBlock ? ['', strictnessBlock] : []),
     '',
     'Required JSON shape:',
     RESPONSE_JSON_SCHEMA,

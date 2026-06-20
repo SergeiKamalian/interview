@@ -1,22 +1,15 @@
 import { baseApi } from '@shared/api/baseApi';
 import { GraphqlOperations } from '@shared/api/graphql/operations.registry';
 import type {
+  CreateInterviewInput as GeneratedCreateInterviewInput,
   CreateInterviewMutation,
   CreateInterviewMutationVariables,
   PublishInterviewMutation,
   PublishInterviewMutationVariables,
 } from '@shared/api/graphql/generated/graphql';
 
-export type CreateInterviewInput = {
-  title: string;
-  jobRole: string;
-  level: 'junior' | 'middle' | 'senior' | 'lead';
-  interviewLanguage?: string;
-  jobDescription?: string;
-  interviewerName?: string;
-  welcomeMessageTemplate?: string;
-  questionIds: string[];
-};
+/** Full create input (all interview config fields), sourced from the schema. */
+export type CreateInterviewInput = GeneratedCreateInterviewInput;
 
 export type CreatedInterview = {
   id: string;
@@ -50,7 +43,10 @@ export const interviewCreateApi = baseApi.injectEndpoints({
       }),
       transformResponse: (response: PublishInterviewMutation) =>
         response.publishInterview,
-      invalidatesTags: ['Interview'],
+      invalidatesTags: (_result, _error, id) => [
+        'Interview',
+        { type: 'Interview', id },
+      ],
     }),
   }),
 });

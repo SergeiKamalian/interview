@@ -1,6 +1,7 @@
 import { RouterProvider } from 'react-router-dom';
 import { AppBootstrap } from '@app/providers/AppBootstrap';
 import { router } from '@app/router';
+import { Toaster } from '@shared/ui/sonner';
 import '@features/auth/api/authApi';
 import '@entities/interview/api/interviewsApi';
 import '@entities/interview/api/interviewTranscriptApi';
@@ -18,6 +19,7 @@ export function App() {
   return (
     <AppBootstrap>
       <RouterProvider router={router} />
+      <Toaster position="top-right" richColors />
     </AppBootstrap>
   );
 }

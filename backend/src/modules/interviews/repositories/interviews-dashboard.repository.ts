@@ -97,7 +97,7 @@ export class InterviewsDashboardRepository {
     const pageSize = Math.min(Math.max(filters.pageSize ?? 20, 1), 100);
     const offset = (page - 1) * pageSize;
 
-    const conditions = ['ia.company_id = ?'];
+    const conditions = ['ia.company_id = ?', 'ia.is_preview = 0'];
     const params: DbQueryParam[] = [companyId];
 
     if (filters.status) {
@@ -128,7 +128,8 @@ export class InterviewsDashboardRepository {
       filters.sort === CompanyInterviewsSortField.OVERALL_SCORE
         ? 'fe.total_score'
         : 'ia.created_at';
-    const sortDirection = filters.sortDirection?.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+    const sortDirection =
+      filters.sortDirection?.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
     const countRows = await this.database.query<CountRow[]>(
       `SELECT COUNT(*) AS total
@@ -246,7 +247,7 @@ export class InterviewsDashboardRepository {
         LEFT JOIN candidate_shortlist cs
           ON cs.candidate_id = ia.candidate_id
          AND cs.company_id = ia.company_id
-        WHERE ia.company_id = ?
+        WHERE ia.company_id = ? AND ia.is_preview = 0
         GROUP BY ia.interview_id
       ) stats ON stats.interview_id = i.id
     `;
@@ -317,7 +318,7 @@ export class InterviewsDashboardRepository {
          SELECT ia.interview_id,
                 COUNT(*) AS attempts_total
          FROM interview_attempts ia
-         WHERE ia.company_id = ?
+         WHERE ia.company_id = ? AND ia.is_preview = 0
          GROUP BY ia.interview_id
        ) stats ON stats.interview_id = i.id
        WHERE i.company_id = ?`,

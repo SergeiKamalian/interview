@@ -4,12 +4,21 @@ type Exact<T extends { [key: string]: unknown }> = { [K in keyof T]: T[K] };
 /** Internal type. DO NOT USE DIRECTLY. */
 export type Incremental<T> = T | { [P in keyof T]?: P extends ' $fragmentName' | '__typename' ? T[P] : never };
 import type { DocumentTypeDecoration } from '@graphql-typed-document-node/core';
+export type AchievedLevelMethod =
+  | 'estimate'
+  | 'evidence';
+
 export type AiCostFilterInput = {
   dateFrom?: string | null | undefined;
   dateTo?: string | null | undefined;
   model?: string | null | undefined;
   provider?: string | null | undefined;
 };
+
+export type AiTone =
+  | 'friendly'
+  | 'neutral'
+  | 'strict';
 
 export type AnswerExampleType =
   | 'bad'
@@ -76,28 +85,49 @@ export type CompanyInterviewsFilterInput = {
 };
 
 export type CreateInterviewInput = {
+  aiTone?: AiTone | null | undefined;
+  allowRetake?: boolean | null | undefined;
+  expiresAt?: string | null | undefined;
   interviewLanguage?: string | null | undefined;
   interviewerName?: string | null | undefined;
   isVideoEnabled?: boolean | null | undefined;
   jobDescription?: string | null | undefined;
   jobRole: string;
   level: QuestionLevel;
+  maxCompletions?: number | null | undefined;
+  passingScore?: number | null | undefined;
+  probingDepth?: ProbingDepth | null | undefined;
   professionId?: string | null | undefined;
   questionCount?: number | null | undefined;
   questionIds: Array<string>;
+  requireGithub?: boolean | null | undefined;
+  requireLinkedin?: boolean | null | undefined;
+  requirePhone?: boolean | null | undefined;
+  scoringStrictness?: ScoringStrictness | null | undefined;
+  timeLimitMinutes?: number | null | undefined;
   title: string;
   welcomeMessageTemplate?: string | null | undefined;
 };
 
 export type CreateInterviewTemplateInput = {
+  aiTone?: AiTone | null | undefined;
+  allowRetake?: boolean | null | undefined;
   interviewLanguage?: string | null | undefined;
   interviewerName?: string | null | undefined;
   isVideoEnabled?: boolean | null | undefined;
   jobDescription?: string | null | undefined;
   jobRole: string;
   level: QuestionLevel;
+  maxCompletions?: number | null | undefined;
+  passingScore?: number | null | undefined;
+  probingDepth?: ProbingDepth | null | undefined;
   professionId?: string | number | null | undefined;
   questionIds: Array<string | number>;
+  requireGithub?: boolean | null | undefined;
+  requireLinkedin?: boolean | null | undefined;
+  requirePhone?: boolean | null | undefined;
+  scoringStrictness?: ScoringStrictness | null | undefined;
+  timeLimitMinutes?: number | null | undefined;
   title: string;
   welcomeMessageTemplate?: string | null | undefined;
 };
@@ -107,6 +137,12 @@ export type DashboardAttentionKind =
   | 'in_progress'
   | 'needs_review'
   | 'strong_candidate';
+
+export type DraftInterviewFromJobDescriptionInput = {
+  count?: number | null | undefined;
+  jobDescription: string;
+  language?: string | null | undefined;
+};
 
 export type FinalEvaluationCategory =
   | 'average'
@@ -135,7 +171,8 @@ export type InterviewMessageKind =
 export type InterviewStatus =
   | 'active'
   | 'archived'
-  | 'draft';
+  | 'draft'
+  | 'paused';
 
 export type InterviewStrengthCategory =
   | 'medium'
@@ -155,6 +192,11 @@ export type MessageRole =
   | 'ai'
   | 'candidate';
 
+export type ProbingDepth =
+  | 'balanced'
+  | 'deep'
+  | 'shallow';
+
 export type QuestionBankFilterInput = {
   difficulty?: QuestionDifficulty | null | undefined;
   level?: QuestionLevel | null | undefined;
@@ -162,6 +204,7 @@ export type QuestionBankFilterInput = {
   offset?: number | null | undefined;
   professionId?: string | null | undefined;
   search?: string | null | undefined;
+  skillIds?: Array<string> | null | undefined;
   topicId?: string | null | undefined;
 };
 
@@ -183,6 +226,11 @@ export type RegisterInput = {
   password: string;
 };
 
+export type ScoringStrictness =
+  | 'balanced'
+  | 'lenient'
+  | 'strict';
+
 export type ShortlistStatus =
   | 'removed'
   | 'shortlisted';
@@ -201,6 +249,13 @@ export type SubmitInterviewAnswerInput = {
   attemptId: string;
   mediaAssetId?: string | null | undefined;
   publicToken: string;
+};
+
+export type SuggestInterviewQuestionsInput = {
+  count?: number | null | undefined;
+  level?: QuestionLevel | null | undefined;
+  professionId: string;
+  skillIds?: Array<string> | null | undefined;
 };
 
 export type TopicSkillQuestionFilterInput = {
@@ -232,6 +287,13 @@ export type AiCostAnalyticsQueryVariables = Exact<{
 
 export type AiCostAnalyticsQuery = { aiCostAnalytics: { kpi: { totalCostUsd: number, costPerInterview: number, costPerCandidate: number, totalRequests: number }, byModel: Array<{ model: string, promptTokens: number, completionTokens: number, totalCostUsd: number }>, topExpensiveInterviews: Array<{ interviewAttemptId: string, interviewTitle: string | null, totalCostUsd: number, latencyMs: number | null }>, elevenLabs: { kpi: { totalCostUsd: number, totalCharacters: number, totalRequests: number }, byOperation: Array<{ operationType: string, characterCount: number, totalCostUsd: number }> } } };
 
+export type ArchiveInterviewMutationVariables = Exact<{
+  id: string | number;
+}>;
+
+
+export type ArchiveInterviewMutation = { archiveInterview: { id: string, status: InterviewStatus, publicUrl: string } };
+
 export type BeginInterviewAttemptMutationVariables = Exact<{
   input: BeginInterviewAttemptInput;
 }>;
@@ -244,7 +306,7 @@ export type CandidateReportQueryVariables = Exact<{
 }>;
 
 
-export type CandidateReportQuery = { candidateReport: { candidateId: string, fullName: string, email: string, phone: string | null, linkedinUrl: string | null, githubUrl: string | null, shortlistStatus: string, shortlistReason: string | null, latestFinalEvaluation: { id: string, totalScore: number, finalScore: number, totalWeight: number, averageScore: number | null, strengthCategory: InterviewStrengthCategory, category: FinalEvaluationCategory, hireRecommendation: HireRecommendation, summary: string, detailedSummary: string | null, strengths: Array<string>, weaknesses: Array<string>, risks: Array<string>, needsManualReview: boolean, categoryBreakdown: Array<{ categoryKey: string, categoryLabel: string, scoreNormalized: number, weight: number, contribution: number }>, topicEvaluations: Array<{ topic: string, score: number, weight: number, weightedScore: number, strengthCategory: InterviewStrengthCategory }> } | null, interviewHistory: Array<{ attemptId: string, interviewId: string, interviewTitle: string, jobRole: string, status: AttemptStatus, completedAt: number | null, totalScore: number | null }> } };
+export type CandidateReportQuery = { candidateReport: { candidateId: string, fullName: string, email: string, phone: string | null, linkedinUrl: string | null, githubUrl: string | null, shortlistStatus: string, shortlistReason: string | null, latestFinalEvaluation: { id: string, totalScore: number, finalScore: number, totalWeight: number, averageScore: number | null, strengthCategory: InterviewStrengthCategory, category: FinalEvaluationCategory, hireRecommendation: HireRecommendation, achievedLevel: QuestionLevel | null, achievedLevelMethod: AchievedLevelMethod | null, achievedLevelNote: string | null, targetLevel: QuestionLevel | null, summary: string, detailedSummary: string | null, strengths: Array<string>, weaknesses: Array<string>, risks: Array<string>, needsManualReview: boolean, levelBreakdown: Array<{ level: QuestionLevel, earned: number, maxScore: number, ratio: number, passed: boolean }>, categoryBreakdown: Array<{ categoryKey: string, categoryLabel: string, scoreNormalized: number, weight: number, contribution: number }>, topicEvaluations: Array<{ topic: string, score: number, weight: number, weightedScore: number, strengthCategory: InterviewStrengthCategory }> } | null, interviewHistory: Array<{ attemptId: string, interviewId: string, interviewTitle: string, jobRole: string, status: AttemptStatus, completedAt: number | null, totalScore: number | null }> } };
 
 export type CheckpointResultsByAttemptQueryVariables = Exact<{
   attemptId: string | number;
@@ -277,7 +339,7 @@ export type CompanyInterviewTemplatesQueryVariables = Exact<{
 }>;
 
 
-export type CompanyInterviewTemplatesQuery = { companyInterviewTemplates: { total: number, page: number, pageSize: number, items: Array<{ id: string, title: string, jobRole: string, level: QuestionLevel, interviewLanguage: string, questionCount: number, jobDescription: string | null, professionId: string | null, isVideoEnabled: boolean, interviewerName: string | null, welcomeMessageTemplate: string | null, status: InterviewTemplateStatus, createdAt: number, updatedAt: number, questions: Array<{ questionId: string, sortOrder: number }> }> } };
+export type CompanyInterviewTemplatesQuery = { companyInterviewTemplates: { total: number, page: number, pageSize: number, items: Array<{ id: string, title: string, jobRole: string, level: QuestionLevel, interviewLanguage: string, questionCount: number, jobDescription: string | null, professionId: string | null, isVideoEnabled: boolean, interviewerName: string | null, welcomeMessageTemplate: string | null, aiTone: AiTone, probingDepth: ProbingDepth, scoringStrictness: ScoringStrictness, maxCompletions: number | null, allowRetake: boolean, timeLimitMinutes: number | null, passingScore: number | null, requirePhone: boolean, requireLinkedin: boolean, requireGithub: boolean, status: InterviewTemplateStatus, createdAt: number, updatedAt: number, questions: Array<{ questionId: string, sortOrder: number }> }> } };
 
 export type CompanyInterviewsQueryVariables = Exact<{
   filters?: CompanyInterviewsFilterInput | null | undefined;
@@ -307,14 +369,14 @@ export type CreateInterviewTemplateFromInterviewMutationVariables = Exact<{
 }>;
 
 
-export type CreateInterviewTemplateFromInterviewMutation = { createInterviewTemplateFromInterview: { id: string, title: string, jobRole: string, level: QuestionLevel, interviewLanguage: string, questionCount: number, jobDescription: string | null, professionId: string | null, isVideoEnabled: boolean, interviewerName: string | null, welcomeMessageTemplate: string | null, status: InterviewTemplateStatus, createdAt: number, updatedAt: number, questions: Array<{ questionId: string, sortOrder: number }> } };
+export type CreateInterviewTemplateFromInterviewMutation = { createInterviewTemplateFromInterview: { id: string, title: string, jobRole: string, level: QuestionLevel, interviewLanguage: string, questionCount: number, jobDescription: string | null, professionId: string | null, isVideoEnabled: boolean, interviewerName: string | null, welcomeMessageTemplate: string | null, aiTone: AiTone, probingDepth: ProbingDepth, scoringStrictness: ScoringStrictness, maxCompletions: number | null, allowRetake: boolean, timeLimitMinutes: number | null, passingScore: number | null, requirePhone: boolean, requireLinkedin: boolean, requireGithub: boolean, status: InterviewTemplateStatus, createdAt: number, updatedAt: number, questions: Array<{ questionId: string, sortOrder: number }> } };
 
 export type CreateInterviewTemplateMutationVariables = Exact<{
   input: CreateInterviewTemplateInput;
 }>;
 
 
-export type CreateInterviewTemplateMutation = { createInterviewTemplate: { id: string, title: string, jobRole: string, level: QuestionLevel, interviewLanguage: string, questionCount: number, jobDescription: string | null, professionId: string | null, isVideoEnabled: boolean, interviewerName: string | null, welcomeMessageTemplate: string | null, status: InterviewTemplateStatus, createdAt: number, updatedAt: number, questions: Array<{ questionId: string, sortOrder: number }> } };
+export type CreateInterviewTemplateMutation = { createInterviewTemplate: { id: string, title: string, jobRole: string, level: QuestionLevel, interviewLanguage: string, questionCount: number, jobDescription: string | null, professionId: string | null, isVideoEnabled: boolean, interviewerName: string | null, welcomeMessageTemplate: string | null, aiTone: AiTone, probingDepth: ProbingDepth, scoringStrictness: ScoringStrictness, maxCompletions: number | null, allowRetake: boolean, timeLimitMinutes: number | null, passingScore: number | null, requirePhone: boolean, requireLinkedin: boolean, requireGithub: boolean, status: InterviewTemplateStatus, createdAt: number, updatedAt: number, questions: Array<{ questionId: string, sortOrder: number }> } };
 
 export type CreateInterviewMutationVariables = Exact<{
   input: CreateInterviewInput;
@@ -322,6 +384,13 @@ export type CreateInterviewMutationVariables = Exact<{
 
 
 export type CreateInterviewMutation = { createInterview: { id: string, title: string, jobRole: string, level: QuestionLevel, status: InterviewStatus, publicToken: string, publicUrl: string, questionCount: number, interviewerName: string | null, welcomeMessageTemplate: string | null } };
+
+export type DraftInterviewFromJobDescriptionMutationVariables = Exact<{
+  input: DraftInterviewFromJobDescriptionInput;
+}>;
+
+
+export type DraftInterviewFromJobDescriptionMutation = { draftInterviewFromJobDescription: { title: string | null, jobRole: string | null, professionId: string | null, level: QuestionLevel | null, skillIds: Array<string>, questionIds: Array<string>, generatedByAi: boolean } };
 
 export type EvaluateInterviewAttemptMutationVariables = Exact<{
   attemptId: string | number;
@@ -383,10 +452,38 @@ export type LogoutMutationVariables = Exact<{ [key: string]: never; }>;
 
 export type LogoutMutation = { logout: { success: boolean } };
 
+export type ManagedInterviewQueryVariables = Exact<{
+  id: string | number;
+}>;
+
+
+export type ManagedInterviewQuery = { interview: { id: string, title: string, jobRole: string, level: QuestionLevel, interviewLanguage: string, questionCount: number, status: InterviewStatus, publicToken: string, publicUrl: string, isVideoEnabled: boolean, interviewerName: string | null, welcomeMessageTemplate: string | null, aiTone: AiTone, probingDepth: ProbingDepth, scoringStrictness: ScoringStrictness, expiresAt: string | null, maxCompletions: number | null, allowRetake: boolean, timeLimitMinutes: number | null, passingScore: number | null, requirePhone: boolean, requireLinkedin: boolean, requireGithub: boolean } };
+
+export type MatchingCandidatesForLevelQueryVariables = Exact<{
+  level: QuestionLevel;
+  professionId: string | number;
+  skillIds?: Array<string | number> | string | number | null | undefined;
+}>;
+
+
+export type MatchingCandidatesForLevelQuery = { matchingCandidatesForLevel: Array<{ candidateId: string, fullName: string, email: string, achievedLevel: QuestionLevel, achievedLevelMethod: AchievedLevelMethod | null, sourceInterviewId: string, sourceInterviewTitle: string, professionId: string, professionName: string, matchedSkills: Array<string>, matchedSkillCount: number, completedAt: number | null }> };
+
 export type MeQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type MeQuery = { me: { user: { id: string, email: string, fullName: string, isActive: boolean }, company: { id: string, name: string, slug: string, isActive: boolean } } };
+
+export type PauseInterviewMutationVariables = Exact<{
+  id: string | number;
+}>;
+
+
+export type PauseInterviewMutation = { pauseInterview: { id: string, status: InterviewStatus, publicUrl: string } };
+
+export type ProfessionsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ProfessionsQuery = { professions: Array<{ id: string, code: string, name: string }> };
 
 export type PublicInterviewQueryVariables = Exact<{
   publicToken: string;
@@ -443,6 +540,27 @@ export type RemoveCandidateFromShortlistMutationVariables = Exact<{
 
 export type RemoveCandidateFromShortlistMutation = { removeCandidateFromShortlist: { candidateId: string, status: ShortlistStatus, reason: string | null } };
 
+export type ResumeInterviewMutationVariables = Exact<{
+  id: string | number;
+}>;
+
+
+export type ResumeInterviewMutation = { resumeInterview: { id: string, status: InterviewStatus, publicUrl: string } };
+
+export type SkillsQueryVariables = Exact<{
+  professionId?: string | null | undefined;
+}>;
+
+
+export type SkillsQuery = { skills: Array<{ id: string, code: string, name: string }> };
+
+export type StartInterviewPreviewMutationVariables = Exact<{
+  interviewId: string | number;
+}>;
+
+
+export type StartInterviewPreviewMutation = { startInterviewPreview: { attemptId: string, publicToken: string, totalQuestions: number } };
+
 export type StartPublicInterviewMutationVariables = Exact<{
   input: StartPublicInterviewInput;
 }>;
@@ -457,12 +575,27 @@ export type SubmitInterviewAnswerMutationVariables = Exact<{
 
 export type SubmitInterviewAnswerMutation = { submitInterviewAnswer: { status: AttemptStatus, nextQuestionText: string | null, pendingMessageText: string | null, answeredQuestions: number, totalQuestions: number, answeredMainQuestions: number, totalMainQuestions: number, messageKind: InterviewMessageKind | null, currentInterviewQuestionId: string | null, isFollowUp: boolean, currentQuestionFollowUpCount: number } };
 
+export type SuggestInterviewQuestionsMutationVariables = Exact<{
+  input: SuggestInterviewQuestionsInput;
+}>;
+
+
+export type SuggestInterviewQuestionsMutation = { suggestInterviewQuestions: { count: number, candidateCount: number, generatedByAi: boolean, questionIds: Array<string> } };
+
 export type TopicSkillQuestionAnalyticsQueryVariables = Exact<{
   filters?: TopicSkillQuestionFilterInput | null | undefined;
 }>;
 
 
 export type TopicSkillQuestionAnalyticsQuery = { topicSkillQuestionAnalytics: { totalCompletedAttempts: number, lowSampleWarning: boolean, topics: Array<{ topicName: string, avgScore: number, passRate: number, sampleCount: number }>, skills: Array<{ skillName: string, avgScore: number, passRate: number, sampleCount: number }>, questions: Array<{ questionId: string, questionText: string, avgScore: number, passRate: number, sampleCount: number }> } };
+
+export type TopicsQueryVariables = Exact<{
+  skillId?: string | null | undefined;
+  professionId?: string | null | undefined;
+}>;
+
+
+export type TopicsQuery = { topics: Array<{ id: string, code: string, name: string, interviewWeight: number, skill: { id: string, code: string, name: string } | null }> };
 
 export class TypedDocumentString<TResult, TVariables>
   extends String
@@ -563,6 +696,15 @@ export const AiCostAnalyticsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<AiCostAnalyticsQuery, AiCostAnalyticsQueryVariables>;
+export const ArchiveInterviewDocument = new TypedDocumentString(`
+    mutation ArchiveInterview($id: ID!) {
+  archiveInterview(id: $id) {
+    id
+    status
+    publicUrl
+  }
+}
+    `) as unknown as TypedDocumentString<ArchiveInterviewMutation, ArchiveInterviewMutationVariables>;
 export const BeginInterviewAttemptDocument = new TypedDocumentString(`
     mutation BeginInterviewAttempt($input: BeginInterviewAttemptInput!) {
   beginInterviewAttempt(input: $input) {
@@ -604,6 +746,17 @@ export const CandidateReportDocument = new TypedDocumentString(`
       strengthCategory
       category
       hireRecommendation
+      achievedLevel
+      achievedLevelMethod
+      achievedLevelNote
+      targetLevel
+      levelBreakdown {
+        level
+        earned
+        maxScore
+        ratio
+        passed
+      }
       summary
       detailedSummary
       strengths
@@ -798,6 +951,16 @@ export const CompanyInterviewTemplatesDocument = new TypedDocumentString(`
       isVideoEnabled
       interviewerName
       welcomeMessageTemplate
+      aiTone
+      probingDepth
+      scoringStrictness
+      maxCompletions
+      allowRetake
+      timeLimitMinutes
+      passingScore
+      requirePhone
+      requireLinkedin
+      requireGithub
       status
       createdAt
       updatedAt
@@ -878,6 +1041,16 @@ export const CreateInterviewTemplateFromInterviewDocument = new TypedDocumentStr
     isVideoEnabled
     interviewerName
     welcomeMessageTemplate
+    aiTone
+    probingDepth
+    scoringStrictness
+    maxCompletions
+    allowRetake
+    timeLimitMinutes
+    passingScore
+    requirePhone
+    requireLinkedin
+    requireGithub
     status
     createdAt
     updatedAt
@@ -902,6 +1075,16 @@ export const CreateInterviewTemplateDocument = new TypedDocumentString(`
     isVideoEnabled
     interviewerName
     welcomeMessageTemplate
+    aiTone
+    probingDepth
+    scoringStrictness
+    maxCompletions
+    allowRetake
+    timeLimitMinutes
+    passingScore
+    requirePhone
+    requireLinkedin
+    requireGithub
     status
     createdAt
     updatedAt
@@ -928,6 +1111,19 @@ export const CreateInterviewDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<CreateInterviewMutation, CreateInterviewMutationVariables>;
+export const DraftInterviewFromJobDescriptionDocument = new TypedDocumentString(`
+    mutation DraftInterviewFromJobDescription($input: DraftInterviewFromJobDescriptionInput!) {
+  draftInterviewFromJobDescription(input: $input) {
+    title
+    jobRole
+    professionId
+    level
+    skillIds
+    questionIds
+    generatedByAi
+  }
+}
+    `) as unknown as TypedDocumentString<DraftInterviewFromJobDescriptionMutation, DraftInterviewFromJobDescriptionMutationVariables>;
 export const EvaluateInterviewAttemptDocument = new TypedDocumentString(`
     mutation EvaluateInterviewAttempt($attemptId: ID!) {
   evaluateInterviewAttempt(attemptId: $attemptId) {
@@ -1134,6 +1330,57 @@ export const LogoutDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<LogoutMutation, LogoutMutationVariables>;
+export const ManagedInterviewDocument = new TypedDocumentString(`
+    query ManagedInterview($id: ID!) {
+  interview(id: $id) {
+    id
+    title
+    jobRole
+    level
+    interviewLanguage
+    questionCount
+    status
+    publicToken
+    publicUrl
+    isVideoEnabled
+    interviewerName
+    welcomeMessageTemplate
+    aiTone
+    probingDepth
+    scoringStrictness
+    expiresAt
+    maxCompletions
+    allowRetake
+    timeLimitMinutes
+    passingScore
+    requirePhone
+    requireLinkedin
+    requireGithub
+  }
+}
+    `) as unknown as TypedDocumentString<ManagedInterviewQuery, ManagedInterviewQueryVariables>;
+export const MatchingCandidatesForLevelDocument = new TypedDocumentString(`
+    query MatchingCandidatesForLevel($level: QuestionLevel!, $professionId: ID!, $skillIds: [ID!]) {
+  matchingCandidatesForLevel(
+    level: $level
+    professionId: $professionId
+    skillIds: $skillIds
+  ) {
+    candidateId
+    fullName
+    email
+    achievedLevel
+    achievedLevelMethod
+    sourceInterviewId
+    sourceInterviewTitle
+    professionId
+    professionName
+    matchedSkills
+    matchedSkillCount
+    completedAt
+  }
+}
+    `) as unknown as TypedDocumentString<MatchingCandidatesForLevelQuery, MatchingCandidatesForLevelQueryVariables>;
 export const MeDocument = new TypedDocumentString(`
     query Me {
   me {
@@ -1152,6 +1399,24 @@ export const MeDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<MeQuery, MeQueryVariables>;
+export const PauseInterviewDocument = new TypedDocumentString(`
+    mutation PauseInterview($id: ID!) {
+  pauseInterview(id: $id) {
+    id
+    status
+    publicUrl
+  }
+}
+    `) as unknown as TypedDocumentString<PauseInterviewMutation, PauseInterviewMutationVariables>;
+export const ProfessionsDocument = new TypedDocumentString(`
+    query Professions {
+  professions {
+    id
+    code
+    name
+  }
+}
+    `) as unknown as TypedDocumentString<ProfessionsQuery, ProfessionsQueryVariables>;
 export const PublicInterviewDocument = new TypedDocumentString(`
     query PublicInterview($publicToken: String!) {
   publicInterview(publicToken: $publicToken) {
@@ -1329,6 +1594,33 @@ export const RemoveCandidateFromShortlistDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<RemoveCandidateFromShortlistMutation, RemoveCandidateFromShortlistMutationVariables>;
+export const ResumeInterviewDocument = new TypedDocumentString(`
+    mutation ResumeInterview($id: ID!) {
+  resumeInterview(id: $id) {
+    id
+    status
+    publicUrl
+  }
+}
+    `) as unknown as TypedDocumentString<ResumeInterviewMutation, ResumeInterviewMutationVariables>;
+export const SkillsDocument = new TypedDocumentString(`
+    query Skills($professionId: String) {
+  skills(professionId: $professionId) {
+    id
+    code
+    name
+  }
+}
+    `) as unknown as TypedDocumentString<SkillsQuery, SkillsQueryVariables>;
+export const StartInterviewPreviewDocument = new TypedDocumentString(`
+    mutation StartInterviewPreview($interviewId: ID!) {
+  startInterviewPreview(interviewId: $interviewId) {
+    attemptId
+    publicToken
+    totalQuestions
+  }
+}
+    `) as unknown as TypedDocumentString<StartInterviewPreviewMutation, StartInterviewPreviewMutationVariables>;
 export const StartPublicInterviewDocument = new TypedDocumentString(`
     mutation StartPublicInterview($input: StartPublicInterviewInput!) {
   startPublicInterview(input: $input) {
@@ -1355,6 +1647,16 @@ export const SubmitInterviewAnswerDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SubmitInterviewAnswerMutation, SubmitInterviewAnswerMutationVariables>;
+export const SuggestInterviewQuestionsDocument = new TypedDocumentString(`
+    mutation SuggestInterviewQuestions($input: SuggestInterviewQuestionsInput!) {
+  suggestInterviewQuestions(input: $input) {
+    count
+    candidateCount
+    generatedByAi
+    questionIds
+  }
+}
+    `) as unknown as TypedDocumentString<SuggestInterviewQuestionsMutation, SuggestInterviewQuestionsMutationVariables>;
 export const TopicSkillQuestionAnalyticsDocument = new TypedDocumentString(`
     query TopicSkillQuestionAnalytics($filters: TopicSkillQuestionFilterInput) {
   topicSkillQuestionAnalytics(filters: $filters) {
@@ -1382,3 +1684,18 @@ export const TopicSkillQuestionAnalyticsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<TopicSkillQuestionAnalyticsQuery, TopicSkillQuestionAnalyticsQueryVariables>;
+export const TopicsDocument = new TypedDocumentString(`
+    query Topics($skillId: String, $professionId: String) {
+  topics(skillId: $skillId, professionId: $professionId) {
+    id
+    code
+    name
+    interviewWeight
+    skill {
+      id
+      code
+      name
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<TopicsQuery, TopicsQueryVariables>;

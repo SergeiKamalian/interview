@@ -7,6 +7,7 @@ import type { EvaluationEvidenceSource } from '../types/evaluation-evidence-sour
 import type { PerTurnCheckpointEvaluationAiResponse } from '../types/per-turn-evaluation.types';
 import { applyCheckpointScoreFloors } from '../utils/apply-checkpoint-score-floors.util';
 import { fiberCheckpoint } from '../utils/fiber-evaluation-hints.fixture';
+import type { CheckpointEvaluationHints } from '../types/checkpoint-evaluation-hints.type';
 import type { GoldenCalibrationCase } from './types';
 
 const FIBER_CHECKPOINTS = [
@@ -42,7 +43,9 @@ function loadGoldenCases(): GoldenCalibrationCase[] {
 function buildFiberContext(
   caseData: GoldenCalibrationCase,
 ): AdaptiveInterviewContextPacket {
-  const candidateTurns = caseData.turns.filter((turn) => turn.role === 'candidate');
+  const candidateTurns = caseData.turns.filter(
+    (turn) => turn.role === 'candidate',
+  );
   const useLatestTurnOnly =
     caseData.id === 'react-fiber-attempt42-paraphrase' ||
     caseData.id === 'react-fiber-scheduling-after-probe-decline' ||
@@ -165,6 +168,84 @@ function buildFiberContext(
   };
 }
 
+/**
+ * TASK-17.6: build a context straight from the case's `context` block (real
+ * question bank checkpoints + hints) for non-fiber regressions. Mirrors the
+ * field set the floors guard reads, with the candidate's full cumulative answer
+ * available as evidence so positive-evidence floors see the real text.
+ */
+function buildGenericContext(
+  caseData: GoldenCalibrationCase,
+): AdaptiveInterviewContextPacket {
+  const ctx = caseData.context;
+  if (!ctx) {
+    throw new Error(`Golden case ${caseData.id} has no context block`);
+  }
+
+  const candidateTurns = caseData.turns.filter(
+    (turn) => turn.role === 'candidate',
+  );
+  const candidateText = candidateTurns.map((turn) => turn.content).join(' ');
+
+  return {
+    companyId: 1,
+    interviewId: 31,
+    attemptId: 102,
+    interviewQuestionId: 55,
+    aiTone: 'friendly',
+    probingDepth: 'shallow',
+    scoringStrictness: ctx.scoringStrictness ?? 'balanced',
+    timeLimitMinutes: null,
+    questionText: ctx.questionText,
+    referenceAnswer: ctx.referenceAnswer ?? '',
+    maxScore: ctx.maxScore,
+    badAnswerExamples: ctx.badAnswerExamples ?? [],
+    latestCandidateAnswer: candidateText,
+    latestCandidateMessageId: 99,
+    latestAnswerMessageKind: ctx.latestAnswerMessageKind ?? 'main_answer',
+    targetCheckpointKey: ctx.targetCheckpointKey ?? null,
+    checkpoints: ctx.checkpoints.map((checkpoint, index) => ({
+      checkpointKey: checkpoint.checkpointKey,
+      title: checkpoint.title ?? checkpoint.checkpointKey,
+      expected: checkpoint.expected ?? checkpoint.checkpointKey,
+      score: checkpoint.score,
+      sortOrder: checkpoint.sortOrder ?? index,
+      evaluationHints:
+        (checkpoint.evaluationHints as CheckpointEvaluationHints | undefined) ??
+        null,
+    })),
+    checkpointStates: (ctx.checkpointStates ?? []).map((state) => ({
+      checkpointKey: state.checkpointKey,
+      status: state.status,
+      scoreAwarded: state.scoreAwarded,
+      maxScore: state.maxScore,
+      followUpCount: state.followUpCount,
+      rationale: state.rationale ?? null,
+    })),
+    evidenceSnippets: [],
+    localTurns: candidateTurns.map((turn, index) => ({
+      role: 'candidate' as const,
+      sequenceOrder: index + 1,
+      content: turn.content,
+      messageKind: turn.messageKind ?? 'main_answer',
+      targetCheckpointKey: turn.targetCheckpointKey ?? null,
+    })),
+    followUpLimits: {
+      maxPerQuestion: 3,
+      maxPerCheckpoint: 1,
+      usedForQuestion: 0,
+    },
+  };
+}
+
+function buildGoldenContext(
+  caseData: GoldenCalibrationCase,
+): AdaptiveInterviewContextPacket {
+  return caseData.context
+    ? buildGenericContext(caseData)
+    : buildFiberContext(caseData);
+}
+
 function toAiResponse(
   caseData: GoldenCalibrationCase,
 ): PerTurnCheckpointEvaluationAiResponse {
@@ -173,7 +254,8 @@ function toAiResponse(
       .candidate_disposition as PerTurnCheckpointEvaluationAiResponse['candidateDisposition'],
     checkpointResults: caseData.aiResponse.checkpoint_results.map((item) => ({
       checkpointKey: item.checkpoint_key,
-      status: item.status as PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number]['status'],
+      status:
+        item.status as PerTurnCheckpointEvaluationAiResponse['checkpointResults'][number]['status'],
       scoreAwarded: item.score_awarded,
       confidence: item.confidence,
       evidenceSummary: item.evidence_summary,
@@ -227,7 +309,7 @@ describe('golden calibration (mocked AI)', () => {
   it.each(cases.map((caseData) => [caseData.id, caseData]))(
     '%s stays within expected score bands after guards',
     (_id, caseData) => {
-      const context = buildFiberContext(caseData);
+      const context = buildGoldenContext(caseData);
       const aiResponse = toAiResponse(caseData);
       const floorOptions = resolveGoldenCaseFloorOptions(caseData);
       const { evaluation } = applyCheckpointScoreFloors(aiResponse, context, {
@@ -289,10 +371,7 @@ describe('golden calibration (mocked AI)', () => {
 describe('golden calibration live AI', () => {
   const liveEnabled = process.env.CALIBRATION_LIVE_AI === '1';
 
-  (liveEnabled ? it : it.skip)(
-    'requires CALIBRATION_LIVE_AI=1',
-    () => {
-      expect(liveEnabled).toBe(true);
-    },
-  );
+  (liveEnabled ? it : it.skip)('requires CALIBRATION_LIVE_AI=1', () => {
+    expect(liveEnabled).toBe(true);
+  });
 });

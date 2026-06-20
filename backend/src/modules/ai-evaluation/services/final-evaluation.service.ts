@@ -7,6 +7,7 @@ import { isAdaptiveInterviewEnabled } from '../../adaptive-interview/config/adap
 import { QuestionSummaryRepository } from '../../adaptive-interview/repositories/question-summary.repository';
 import { AiProviderService } from '../../ai-provider/ai-provider.service';
 import { InterviewCoreRepository } from '../../interview-core/interview-core.repository';
+import { computeAchievedLevel } from '../../scoring/achieved-level.util';
 import { ScoringService } from '../../scoring/scoring.service';
 import type { QuestionScoreInput } from '../../scoring/scoring.types';
 import { AiUsageLogService } from '../../usage-logging/ai-usage-log.service';
@@ -21,6 +22,7 @@ import { QuestionEvaluationRepository } from '../repositories/question-evaluatio
 import type { FinalEvaluationEntity } from '../entities/final-evaluation.entity';
 import { AiResponseValidatorService } from './ai-response-validator.service';
 import { buildFinalEvidenceContext } from '../utils/final-evidence-context.util';
+import { buildScoreInputs } from '../utils/build-score-inputs.util';
 
 @Injectable()
 export class FinalEvaluationService {
@@ -68,7 +70,10 @@ export class FinalEvaluationService {
       isAdaptiveInterviewEnabled() &&
       adaptiveSummaries.length >= interviewQuestions.length;
 
-    if (!useAdaptiveSummaries && questionEvaluations.length < interviewQuestions.length) {
+    if (
+      !useAdaptiveSummaries &&
+      questionEvaluations.length < interviewQuestions.length
+    ) {
       throw new BadRequestException({
         message: 'All question evaluations must be completed first',
         code: 'QUESTION_EVALUATIONS_INCOMPLETE',
@@ -79,36 +84,21 @@ export class FinalEvaluationService {
       interviewQuestions.map((question) => [question.id, question]),
     );
 
-    const scoreInputs: QuestionScoreInput[] = useAdaptiveSummaries
-      ? adaptiveSummaries.map((summary) => {
-          const question = questionMetaById.get(summary.interviewQuestionId);
-          return {
-            interviewQuestionId: summary.interviewQuestionId,
-            topicName: question?.topicName ?? null,
-            difficulty: question?.difficulty ?? 'intermediate',
-            level: question?.level ?? 'middle',
-            score: summary.score,
-            maxScore: summary.maxScore,
-            topicWeight: question?.topicWeight,
-            needsManualReview: summary.needsManualReview,
-          };
-        })
-      : questionEvaluations.map((evaluation) => {
-          const question = questionMetaById.get(evaluation.interviewQuestionId);
-          return {
-            interviewQuestionId: evaluation.interviewQuestionId,
-            topicName: question?.topicName ?? null,
-            difficulty: question?.difficulty ?? 'intermediate',
-            level: question?.level ?? 'middle',
-            score: evaluation.score,
-            maxScore: evaluation.maxScore,
-            topicWeight: question?.topicWeight,
-            needsManualReview: evaluation.needsManualReview,
-          };
-        });
+    const scoreInputs: QuestionScoreInput[] = buildScoreInputs({
+      useAdaptiveSummaries,
+      adaptiveSummaries,
+      questionEvaluations,
+      questionMetaById,
+    });
 
     const scoreResult =
       this.scoringService.calculateInterviewScore(scoreInputs);
+
+    // Achieved level is a SEPARATE axis from the hire recommendation: it reuses the
+    // exact `scoreInputs` (each carries its question's own `level`) but does NOT feed
+    // back into scoring / mapHireRecommendation.
+    const achievedLevelResult = computeAchievedLevel(scoreInputs);
+
     const correlationId = this.aiUsageLogService.createCorrelationId();
 
     const evidenceContext = useAdaptiveSummaries
@@ -149,6 +139,7 @@ export class FinalEvaluationService {
     const completion = await this.aiProviderService.evaluateJson(
       systemPrompt,
       userPrompt,
+      { attemptId, operationType: 'final_summary' },
     );
 
     const validation =
@@ -199,6 +190,8 @@ export class FinalEvaluationService {
       totalScore: scoreResult.finalScore,
       category: scoreResult.category,
       hireRecommendation: scoreResult.hireRecommendation,
+      achievedLevel: achievedLevelResult.achievedLevel,
+      achievedLevelMethod: achievedLevelResult.method,
       summary: validation.data.summary,
       detailedSummary: validation.data.detailedSummary,
       strengths: validation.data.strengths,
@@ -209,6 +202,10 @@ export class FinalEvaluationService {
         promptVersion: FINAL_EVALUATION_PROMPT_VERSION,
         model: completion.model,
         deterministicScore: scoreResult,
+        // Full achieved-level result (perLevel breakdown + note) so the report
+        // layer can expose levelBreakdown without recomputing. The achievedLevel
+        // / method columns remain the source of truth for filtering (talent pool).
+        achievedLevelResult,
         narrative: validation.data,
         evidenceContext,
       },
@@ -221,5 +218,46 @@ export class FinalEvaluationService {
     attemptId: number,
   ): Promise<FinalEvaluationEntity | null> {
     return this.finalEvaluationRepository.findByAttemptId(companyId, attemptId);
+  }
+
+  /**
+   * Collects the same `scoreInputs` (level/score/maxScore per question) that the
+   * live final evaluation uses, WITHOUT running the LLM or the deterministic
+   * scoring. Used by the achieved_level backfill (TASK-18.9) to recompute the
+   * demonstrated level on attempts evaluated before migration 023.
+   *
+   * Returns `null` when the attempt has neither adaptive summaries nor question
+   * evaluations (no per-question data → caller should skip it, not fail).
+   */
+  async collectScoreInputs(
+    companyId: number,
+    attemptId: number,
+    interviewId: number,
+  ): Promise<QuestionScoreInput[] | null> {
+    const [questionEvaluations, interviewQuestions, adaptiveSummaries] =
+      await Promise.all([
+        this.questionEvaluationRepository.findByAttemptId(companyId, attemptId),
+        this.interviewRepository.listQuestionsForInterview(interviewId),
+        isAdaptiveInterviewEnabled()
+          ? this.questionSummaryRepository.findByAttemptId(attemptId)
+          : Promise.resolve([]),
+      ]);
+
+    const useAdaptiveSummaries =
+      isAdaptiveInterviewEnabled() &&
+      adaptiveSummaries.length >= interviewQuestions.length;
+
+    const questionMetaById = new Map(
+      interviewQuestions.map((question) => [question.id, question]),
+    );
+
+    const scoreInputs = buildScoreInputs({
+      useAdaptiveSummaries,
+      adaptiveSummaries,
+      questionEvaluations,
+      questionMetaById,
+    });
+
+    return scoreInputs.length > 0 ? scoreInputs : null;
   }
 }

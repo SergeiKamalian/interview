@@ -14,6 +14,7 @@ export type InterviewAttemptEntity = {
   candidateId: number;
   status: AttemptStatus;
   isShortlisted: boolean;
+  isPreview: boolean;
   startedAt: Date | null;
   completedAt: Date | null;
   createdAt: Date;

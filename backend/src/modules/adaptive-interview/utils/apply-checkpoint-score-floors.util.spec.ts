@@ -1,5 +1,8 @@
 import type { AdaptiveInterviewContextPacket } from '../types/adaptive-interview-context.types';
-import { applyCheckpointScoreFloors } from './apply-checkpoint-score-floors.util';
+import {
+  applyCheckpointScoreFloors,
+  upgradeStrongPartialToCovered,
+} from './apply-checkpoint-score-floors.util';
 import { fiberCheckpoint } from './fiber-evaluation-hints.fixture';
 
 function buildGenericsContext(
@@ -227,16 +230,13 @@ describe('applyCheckpointScoreFloors', () => {
   it('caps AI credit when answer overlaps question bank bad examples', () => {
     const latestAnswer =
       'Можно передать string, а через <T> сказать функции вернуть number, и это будет type safe.';
-    const context = buildGenericsContext(
-      latestAnswer,
-      [
-        {
-          role: 'candidate',
-          sequenceOrder: 1,
-          content: latestAnswer,
-        },
-      ],
-    );
+    const context = buildGenericsContext(latestAnswer, [
+      {
+        role: 'candidate',
+        sequenceOrder: 1,
+        content: latestAnswer,
+      },
+    ]);
     context.badAnswerExamples = [
       'Generics почти как any.',
       'Можно передать string, а через <T> сказать функции вернуть number, и это будет type safe.',
@@ -381,6 +381,102 @@ describe('applyCheckpointScoreFloors', () => {
     expect(reusability?.scoreAwarded).toBe(0.5);
   });
 
+  it('TASK-17.2: does NOT contradiction-cap a correct answer when the model self-contradicts (accuracy=wrong but rationale says «не противоречит»)', () => {
+    const correctAnswer =
+      'Generic добавляет параметр типа: мы параметризуем функцию, интерфейс или класс, чтобы тип входа был связан с типом выхода.';
+
+    const context: AdaptiveInterviewContextPacket = {
+      ...buildGenericsContext(correctAnswer, [
+        { role: 'candidate', sequenceOrder: 1, content: correctAnswer },
+      ]),
+      checkpoints: [
+        {
+          checkpointKey: 'type_parameter',
+          title: 'Понимает параметр типа',
+          expected: 'generic добавляет параметр типа',
+          score: 1,
+          sortOrder: 0,
+          evaluationHints: {
+            falseClaims: ['generic как any', 'почти как any'],
+          },
+        },
+      ],
+    };
+
+    const { evaluation } = applyCheckpointScoreFloors(
+      {
+        candidateDisposition: 'engaged',
+        checkpointResults: [
+          {
+            checkpointKey: 'type_parameter',
+            status: 'covered',
+            scoreAwarded: 1,
+            confidence: 0.85,
+            evidenceSummary: 'параметр типа',
+            rationale:
+              'depth=false_claim coverage=high accuracy=wrong: суть сохранена и не противоречит ожидаемому описанию.',
+          },
+        ],
+      },
+      context,
+    );
+
+    const typeParameter = evaluation.checkpointResults.find(
+      (item) => item.checkpointKey === 'type_parameter',
+    );
+
+    expect(typeParameter?.scoreAwarded).toBe(1);
+    expect(typeParameter?.status).toBe('covered');
+  });
+
+  it('TASK-17.2: still contradiction-caps when the candidate states a configured false claim', () => {
+    const wrongAnswer =
+      'Generic как any: TypeScript просто перестаёт проверять тип, я их использую как any.';
+
+    const context: AdaptiveInterviewContextPacket = {
+      ...buildGenericsContext(wrongAnswer, [
+        { role: 'candidate', sequenceOrder: 1, content: wrongAnswer },
+      ]),
+      checkpoints: [
+        {
+          checkpointKey: 'type_parameter',
+          title: 'Понимает параметр типа',
+          expected: 'generic добавляет параметр типа',
+          score: 1,
+          sortOrder: 0,
+          evaluationHints: {
+            falseClaims: ['generic как any', 'почти как any'],
+          },
+        },
+      ],
+    };
+
+    const { evaluation } = applyCheckpointScoreFloors(
+      {
+        candidateDisposition: 'engaged',
+        checkpointResults: [
+          {
+            checkpointKey: 'type_parameter',
+            status: 'covered',
+            scoreAwarded: 1,
+            confidence: 0.85,
+            evidenceSummary: 'generic как any',
+            rationale:
+              'depth=false_claim coverage=high accuracy=wrong: перепутал generic с any.',
+          },
+        ],
+      },
+      context,
+    );
+
+    const typeParameter = evaluation.checkpointResults.find(
+      (item) => item.checkpointKey === 'type_parameter',
+    );
+
+    expect(typeParameter?.scoreAwarded).toBe(0);
+    expect(typeParameter?.status).toBe('missed');
+  });
+
   it('caps over-awarded Fiber answers to partial when evidence is half-right half-wrong', () => {
     const candidateAnswers = [
       'React Fiber — новый механизм reconciliation в React 16+, прерывать рендер. Virtual DOM, requestIdleCallback. concurrent mode не лагает на тысячах элементов.',
@@ -406,7 +502,8 @@ describe('applyCheckpointScoreFloors', () => {
       interviewId: 4,
       attemptId: 34,
       interviewQuestionId: 7,
-      questionText: 'Как работает React Fiber и процесс обновления Virtual DOM?',
+      questionText:
+        'Как работает React Fiber и процесс обновления Virtual DOM?',
       referenceAnswer: 'Fiber reconciliation engine',
       latestCandidateAnswer: candidateAnswers,
       latestCandidateMessageId: 99,
@@ -422,13 +519,11 @@ describe('applyCheckpointScoreFloors', () => {
       ),
       checkpointStates: [],
       evidenceSnippets: [],
-      localTurns: candidateAnswers
-        .split('. ')
-        .map((content, index) => ({
-          role: 'candidate' as const,
-          sequenceOrder: index + 1,
-          content,
-        })),
+      localTurns: candidateAnswers.split('. ').map((content, index) => ({
+        role: 'candidate' as const,
+        sequenceOrder: index + 1,
+        content,
+      })),
       followUpLimits: {
         maxPerQuestion: 5,
         maxPerCheckpoint: 1,
@@ -643,10 +738,12 @@ describe('applyCheckpointScoreFloors', () => {
       questionText: 'Как работает React Fiber?',
       targetCheckpointKey: 'scheduling',
       latestAnswerMessageKind: 'follow_up_answer',
-      checkpoints: [fiberCheckpoint('scheduling', {
-        title: 'Понимает планирование Fiber',
-        expected: 'scheduler, shouldYield, MessageChannel',
-      })],
+      checkpoints: [
+        fiberCheckpoint('scheduling', {
+          title: 'Понимает планирование Fiber',
+          expected: 'scheduler, shouldYield, MessageChannel',
+        }),
+      ],
     };
 
     const { evaluation } = applyCheckpointScoreFloors(
@@ -735,13 +832,18 @@ describe('applyCheckpointScoreFloors', () => {
   });
 
   it('does not positive-floor lanes when scheduling follow-up mentions priorities but AI says coverage=none', () => {
-    const mainAnswer =
-      'Fiber — reconciliation engine с render и commit phase.';
+    const mainAnswer = 'Fiber — reconciliation engine с render и commit phase.';
     const schedulingFollowUp =
       'Scheduler через MessageChannel и shouldYield. startTransition снижает приоритет. Ввод в инпуте важнее тяжелой перерисовки списка.';
 
-    const scheduling = fiberCheckpoint('scheduling', { score: 2.5, sortOrder: 6 });
-    const lanes = fiberCheckpoint('lanes_priority', { score: 1.5, sortOrder: 7 });
+    const scheduling = fiberCheckpoint('scheduling', {
+      score: 2.5,
+      sortOrder: 6,
+    });
+    const lanes = fiberCheckpoint('lanes_priority', {
+      score: 1.5,
+      sortOrder: 7,
+    });
 
     const context: AdaptiveInterviewContextPacket = {
       companyId: 1,
@@ -839,10 +941,12 @@ describe('applyCheckpointScoreFloors', () => {
       questionText: 'Как работает React Fiber?',
       targetCheckpointKey: 'fiber_pointers',
       latestAnswerMessageKind: 'follow_up_answer',
-      checkpoints: [fiberCheckpoint('fiber_pointers', {
-        title: 'Знает структуру fiber-узла',
-        expected: 'child, sibling, return',
-      })],
+      checkpoints: [
+        fiberCheckpoint('fiber_pointers', {
+          title: 'Знает структуру fiber-узла',
+          expected: 'child, sibling, return',
+        }),
+      ],
     };
 
     const { evaluation } = applyCheckpointScoreFloors(
@@ -1054,7 +1158,8 @@ describe('applyCheckpointScoreFloors', () => {
       interviewId: 4,
       attemptId: 91,
       interviewQuestionId: 7,
-      questionText: 'Как работает React Fiber и процесс обновления Virtual DOM?',
+      questionText:
+        'Как работает React Fiber и процесс обновления Virtual DOM?',
       referenceAnswer: 'Fiber reconciliation engine',
       maxScore: 8,
       badAnswerExamples: [
@@ -1203,5 +1308,76 @@ describe('applyCheckpointScoreFloors', () => {
     expect(fiberPointers?.scoreAwarded).toBeGreaterThan(0);
     expect(fiberPointers?.scoreAwarded).toBeLessThanOrEqual(0.55);
     expect(fiberPointers?.status).toMatch(/partial|missed/);
+  });
+});
+
+describe('upgradeStrongPartialToCovered (TASK-17.4)', () => {
+  const basePartial = {
+    checkpointKey: 'definition',
+    status: 'partial' as const,
+    scoreAwarded: 0.85,
+    confidence: 0.9,
+    evidenceSummary: 'Кандидат подробно объяснил суть.',
+    rationale: 'depth=understands coverage=high accuracy=full. Суть раскрыта.',
+  };
+
+  it('upgrades a confident, near-complete partial to covered', () => {
+    const result = upgradeStrongPartialToCovered(basePartial, 1);
+
+    expect(result.status).toBe('covered');
+    expect(result.scoreAwarded).toBe(0.85);
+  });
+
+  it('keeps a shallow-accepted basic-tier partial at partial despite high score', () => {
+    const result = upgradeStrongPartialToCovered(
+      {
+        ...basePartial,
+        rationale:
+          'depth=partial_knowledge coverage=medium accuracy=partial. Shallow accept floor applied.',
+      },
+      1,
+    );
+
+    expect(result.status).toBe('partial');
+  });
+
+  it('keeps partial when the score ratio is below the threshold', () => {
+    const result = upgradeStrongPartialToCovered(
+      { ...basePartial, scoreAwarded: 0.7 },
+      1,
+    );
+
+    expect(result.status).toBe('partial');
+  });
+
+  it('keeps partial when confidence is below the threshold', () => {
+    const result = upgradeStrongPartialToCovered(
+      { ...basePartial, confidence: 0.5 },
+      1,
+    );
+
+    expect(result.status).toBe('partial');
+  });
+
+  it('never upgrades a partial whose rationale flags a contradiction', () => {
+    const result = upgradeStrongPartialToCovered(
+      {
+        ...basePartial,
+        rationale:
+          'depth=false_claim. Semantic guard capped score because of a direct contradiction.',
+      },
+      1,
+    );
+
+    expect(result.status).toBe('partial');
+  });
+
+  it('does not touch non-partial statuses', () => {
+    const missed = upgradeStrongPartialToCovered(
+      { ...basePartial, status: 'missed', scoreAwarded: 0 },
+      1,
+    );
+
+    expect(missed.status).toBe('missed');
   });
 });

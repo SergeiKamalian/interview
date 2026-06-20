@@ -12,6 +12,7 @@ import { TranscriptPanel } from '@widgets/transcript/TranscriptPanel';
 import { OverallScoreCard } from '@widgets/score/OverallScoreCard';
 import { CategoryBreakdownChart } from '@widgets/score/CategoryBreakdownChart';
 import { RecommendationCard } from '@widgets/score/RecommendationCard';
+import { InterviewManagePanel } from '@widgets/interview/InterviewManagePanel';
 import { formatScore, formatUnixDate } from '@shared/lib/format';
 import { Alert, Button, Card, CheckboxField, Spinner, Tabs, TabsList, TabsTrigger } from '@shared/ui';
 
@@ -198,6 +199,14 @@ export function InterviewDetailsPage() {
           Обновить
         </Button>
       </div>
+
+      <InterviewManagePanel
+        interviewId={interviewId}
+        completedCount={
+          data.attempts.filter((attempt) => attempt.status === 'completed')
+            .length
+        }
+      />
 
       {needsEvaluation && (
         <Alert variant="info" title="AI-оценка не запущена">

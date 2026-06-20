@@ -201,9 +201,11 @@ export class FollowUpPlannerService {
         : null,
     };
 
-    const systemPrompt = buildFollowUpPlannerSystemPrompt();
+    const systemPrompt = buildFollowUpPlannerSystemPrompt(context.aiTone);
     const userPrompt = buildFollowUpPlannerUserPrompt(promptInput);
-    const streamingSystemPrompt = buildFollowUpPlannerStreamingSystemPrompt();
+    const streamingSystemPrompt = buildFollowUpPlannerStreamingSystemPrompt(
+      context.aiTone,
+    );
     const streamingUserPrompt =
       buildFollowUpPlannerStreamingUserPrompt(promptInput);
 

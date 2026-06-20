@@ -8,15 +8,23 @@ import { DatabaseService } from '../../common/database/database.service';
 import type { CreateQuestionInput } from './dto/create-question.input';
 import type { QuestionBankFilterInput } from './dto/question-filter.input';
 import type { UpdateQuestionInput } from './dto/update-question.input';
-import { mapQuestionToGraphql } from './question-bank.mapper';
+import {
+  mapProfessionToGraphql,
+  mapQuestionToGraphql,
+  mapSkillToGraphql,
+  mapTopicToGraphql,
+} from './question-bank.mapper';
 import {
   QuestionBankRepository,
   type QuestionUpsertData,
 } from './question-bank.repository';
+import type { ProfessionType } from './types/profession.type';
 import type {
   QuestionBankListPayload,
   QuestionType,
 } from './types/question.type';
+import type { SkillType } from './types/skill.type';
+import type { TopicType } from './types/topic.type';
 import { validateQuestionInput } from './validation/question-bank.validator';
 
 @Injectable()
@@ -39,6 +47,54 @@ export class QuestionBankService {
       items,
       total: result.total,
     };
+  }
+
+  async listProfessions(): Promise<ProfessionType[]> {
+    const professions = await this.repository.findProfessions();
+    return professions.map(mapProfessionToGraphql);
+  }
+
+  async listSkills(
+    companyId: number,
+    professionIdRaw?: string,
+  ): Promise<SkillType[]> {
+    const professionId = this.parseOptionalId(professionIdRaw);
+    const skills = await this.repository.findSkillsByProfession(
+      companyId,
+      professionId,
+    );
+    return skills.map(mapSkillToGraphql);
+  }
+
+  async listTopics(
+    companyId: number,
+    skillIdRaw?: string,
+    professionIdRaw?: string,
+  ): Promise<TopicType[]> {
+    const skillId = this.parseOptionalId(skillIdRaw);
+    const professionId = this.parseOptionalId(professionIdRaw);
+    const topics = await this.repository.findTopics(
+      companyId,
+      skillId,
+      professionId,
+    );
+    return topics.map(mapTopicToGraphql);
+  }
+
+  private parseOptionalId(raw?: string): number | undefined {
+    if (raw === undefined || raw === null || raw.trim() === '') {
+      return undefined;
+    }
+
+    const parsed = Number(raw);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      throw new BadRequestException({
+        message: 'Invalid lookup id',
+        code: 'INVALID_LOOKUP_ID',
+      });
+    }
+
+    return parsed;
   }
 
   async getById(companyId: number, questionId: number): Promise<QuestionType> {

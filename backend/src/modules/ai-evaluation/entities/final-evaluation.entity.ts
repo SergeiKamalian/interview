@@ -1,7 +1,10 @@
+import type { QuestionLevel } from '../../question-bank/types/question-level.enum';
 import type {
   FinalEvaluationCategory,
   HireRecommendation,
 } from '../types/evaluation.types';
+
+export type AchievedLevelMethod = 'evidence' | 'estimate';
 
 export type FinalEvaluationEntity = {
   id: number;
@@ -10,6 +13,8 @@ export type FinalEvaluationEntity = {
   totalScore: number;
   category: FinalEvaluationCategory;
   hireRecommendation: HireRecommendation;
+  achievedLevel: QuestionLevel | null;
+  achievedLevelMethod: AchievedLevelMethod | null;
   summary: string;
   detailedSummary: string | null;
   strengths: string[];
@@ -27,6 +32,8 @@ export type UpsertFinalEvaluationData = {
   totalScore: number;
   category: FinalEvaluationCategory;
   hireRecommendation: HireRecommendation;
+  achievedLevel: QuestionLevel | null;
+  achievedLevelMethod: AchievedLevelMethod | null;
   summary: string;
   detailedSummary: string | null;
   strengths: string[];
