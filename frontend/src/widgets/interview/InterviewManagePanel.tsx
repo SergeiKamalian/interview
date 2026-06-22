@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import {
   CheckIcon,
+  ChevronDownIcon,
   CopyIcon,
   MoreHorizontalIcon,
   PlayIcon,
@@ -56,6 +57,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@shared/ui/alert-dialog';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@shared/ui/collapsible';
 
 const STATUS_LABELS: Record<InterviewStatus, string> = {
   draft: 'Черновик',
@@ -132,11 +138,15 @@ interface InterviewManagePanelProps {
   interviewId: string;
   /** Number of completed attempts (used to compute the "full" state). */
   completedCount?: number;
+  defaultDetailsOpen?: boolean;
+  headerActions?: ReactNode;
 }
 
 export function InterviewManagePanel({
   interviewId,
   completedCount = 0,
+  defaultDetailsOpen = false,
+  headerActions,
 }: InterviewManagePanelProps) {
   const { data, isLoading, isError } = useManagedInterviewQuery(interviewId, {
     skip: !interviewId,
@@ -272,9 +282,9 @@ export function InterviewManagePanel({
   const canArchive = interview.status !== 'archived';
 
   return (
-    <Card>
-      <CardHeader className="border-b">
-        <CardTitle className="flex items-center gap-2">
+    <Card size="sm">
+      <CardHeader className="border-b pb-3">
+        <CardTitle className="flex flex-wrap items-center gap-2">
           {interview.title}
           <Badge variant={STATUS_VARIANTS[interview.status]}>
             {STATUS_LABELS[interview.status]}
@@ -292,7 +302,8 @@ export function InterviewManagePanel({
         </CardDescription>
         <CardAction>
           <TooltipProvider>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {headerActions}
               <Tooltip>
                 <TooltipTrigger
                   render={
@@ -373,99 +384,102 @@ export function InterviewManagePanel({
         </CardAction>
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        <div>
-          <p className="mb-1 text-xs font-medium text-muted-foreground">
-            Ссылка для кандидата
-          </p>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 truncate rounded-md bg-muted px-2 py-1.5 text-xs">
-              {shareUrl}
-            </code>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      variant="outline"
-                      size="icon-sm"
-                      aria-label="Скопировать ссылку"
-                      onClick={() => void handleCopy()}
-                    />
-                  }
-                >
-                  {copied ? <CheckIcon /> : <CopyIcon />}
-                </TooltipTrigger>
-                <TooltipContent>
-                  {copied ? 'Скопировано' : 'Скопировать ссылку'}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
+      <CardContent className="space-y-3 pt-3">
+        <div className="flex items-center gap-2">
+          <code className="min-w-0 flex-1 truncate rounded-md bg-muted px-2 py-1 text-xs">
+            {shareUrl}
+          </code>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    aria-label="Скопировать ссылку"
+                    onClick={() => void handleCopy()}
+                  />
+                }
+              >
+                {copied ? <CheckIcon /> : <CopyIcon />}
+              </TooltipTrigger>
+              <TooltipContent>
+                {copied ? 'Скопировано' : 'Скопировать ссылку'}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <p className="mb-1 text-xs font-medium text-muted-foreground">
-              ИИ-настройки
-            </p>
-            <dl className="text-sm">
-              <MetaRow label="Тон" value={TONE_LABELS[interview.aiTone]} />
-              <MetaRow
-                label="Глубина уточнений"
-                value={DEPTH_LABELS[interview.probingDepth]}
-              />
-              <MetaRow
-                label="Строгость оценки"
-                value={STRICTNESS_LABELS[interview.scoringStrictness]}
-              />
-            </dl>
-          </div>
+        <Collapsible defaultOpen={defaultDetailsOpen}>
+          <CollapsibleTrigger className="flex w-full cursor-pointer items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
+            <ChevronDownIcon className="size-3.5 transition-transform in-data-panel-open:rotate-180" />
+            Настройки и лимиты
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-3">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <p className="mb-1 text-xs font-medium text-muted-foreground">
+                  ИИ-настройки
+                </p>
+                <dl className="text-sm">
+                  <MetaRow label="Тон" value={TONE_LABELS[interview.aiTone]} />
+                  <MetaRow
+                    label="Глубина уточнений"
+                    value={DEPTH_LABELS[interview.probingDepth]}
+                  />
+                  <MetaRow
+                    label="Строгость оценки"
+                    value={STRICTNESS_LABELS[interview.scoringStrictness]}
+                  />
+                </dl>
+              </div>
 
-          <div>
-            <p className="mb-1 text-xs font-medium text-muted-foreground">
-              Лимиты доступа
-            </p>
-            <dl className="text-sm">
-              <MetaRow
-                label="Завершений"
-                value={
-                  interview.maxCompletions != null
-                    ? `${completedCount} / ${interview.maxCompletions}`
-                    : `${completedCount} / ∞`
-                }
-              />
-              <MetaRow
-                label="Срок действия"
-                value={
-                  interview.expiresAt
-                    ? new Date(interview.expiresAt).toLocaleString('ru-RU')
-                    : 'Без ограничений'
-                }
-              />
-              <MetaRow
-                label="Повторные попытки"
-                value={interview.allowRetake ? 'Разрешены' : 'Запрещены'}
-              />
-              <MetaRow
-                label="Лимит времени"
-                value={
-                  interview.timeLimitMinutes != null
-                    ? `${interview.timeLimitMinutes} мин`
-                    : 'Без ограничений'
-                }
-              />
-              <MetaRow
-                label="Проходной балл"
-                value={
-                  interview.passingScore != null
-                    ? interview.passingScore
-                    : 'Не задан'
-                }
-              />
-            </dl>
-          </div>
-        </div>
+              <div>
+                <p className="mb-1 text-xs font-medium text-muted-foreground">
+                  Лимиты доступа
+                </p>
+                <dl className="text-sm">
+                  <MetaRow
+                    label="Завершений"
+                    value={
+                      interview.maxCompletions != null
+                        ? `${completedCount} / ${interview.maxCompletions}`
+                        : `${completedCount} / ∞`
+                    }
+                  />
+                  <MetaRow
+                    label="Срок действия"
+                    value={
+                      interview.expiresAt
+                        ? new Date(interview.expiresAt).toLocaleString('ru-RU')
+                        : 'Без ограничений'
+                    }
+                  />
+                  <MetaRow
+                    label="Повторные попытки"
+                    value={interview.allowRetake ? 'Разрешены' : 'Запрещены'}
+                  />
+                  <MetaRow
+                    label="Лимит времени"
+                    value={
+                      interview.timeLimitMinutes != null
+                        ? `${interview.timeLimitMinutes} мин`
+                        : 'Без ограничений'
+                    }
+                  />
+                  <MetaRow
+                    label="Проходной балл"
+                    value={
+                      interview.passingScore != null
+                        ? interview.passingScore
+                        : 'Не задан'
+                    }
+                  />
+                </dl>
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </CardContent>
 
       <AlertDialog open={archiveOpen} onOpenChange={setArchiveOpen}>

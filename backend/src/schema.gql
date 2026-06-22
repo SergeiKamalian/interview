@@ -102,6 +102,12 @@ enum AnswerExampleType {
   good
 }
 
+type ApplyPlaybookToInterviewDraftPayload {
+  count: Int!
+  pinnedQuestionIds: [String!]!
+  questionIds: [String!]!
+}
+
 input AttemptReviewDecisionHistoryFilterInput {
   page: Int! = 1
   pageSize: Int! = 20
@@ -235,6 +241,13 @@ input CheckpointEvaluationHintsInput {
   positiveFloorScore: Float
 }
 
+type CheckpointEvaluationHintsType {
+  falseClaims: [String!]
+  minMatchedConcepts: Int
+  mustConcepts: [String!]
+  positiveFloorScore: Float
+}
+
 input CheckpointInput {
   checkpointKey: String!
   evaluationHints: CheckpointEvaluationHintsInput
@@ -272,6 +285,11 @@ type CheckpointResultType {
 type CheckpointResultsByAttemptType {
   attemptId: String!
   questionGroups: [QuestionCheckpointGroupType!]!
+}
+
+input CommitCompanyQuestionImportInput {
+  importToken: String!
+  status: QuestionStatus
 }
 
 enum CompanyAttemptDecision {
@@ -327,6 +345,38 @@ type CompanyDashboardOverviewType {
   shortlistPreview: [DashboardShortlistPreviewItemType!]!
   shortlistTotal: Int!
   weakTopics: [DashboardWeakTopicType!]!
+}
+
+type CompanyImportFieldErrorType {
+  field: String!
+  message: String!
+  row: Int!
+}
+
+type CompanyImportPreviewCreateType {
+  checkpoints: Int!
+  questions: [CompanyImportPreviewItemType!]!
+  skills: [CompanyImportPreviewItemType!]!
+  topics: [CompanyImportPreviewItemType!]!
+}
+
+type CompanyImportPreviewItemType {
+  checkpointCount: Int
+  code: String
+  importKey: String
+  name: String
+  questionText: String
+  topicCode: String
+}
+
+type CompanyImportPreviewUpdateType {
+  questions: [CompanyImportPreviewItemType!]!
+  topics: [CompanyImportPreviewItemType!]!
+}
+
+type CompanyImportWarningType {
+  message: String!
+  row: Int!
 }
 
 type CompanyInterviewListItemType {
@@ -426,6 +476,49 @@ type CompanyInterviewsPayloadType {
   total: Int!
 }
 
+type CompanyQuestionImportCommitPayload {
+  questionsCreated: Int!
+  questionsUpdated: Int!
+  skillsCreated: Int!
+  topicsCreated: Int!
+  topicsUpdated: Int!
+}
+
+type CompanyQuestionOverrideType {
+  createdAt: DateTime!
+  extraAnswerExamples: [OverrideAnswerExampleType!]
+  extraFalseClaims: [String!]
+  extraMustConcepts: [String!]
+  id: ID!
+  sourceQuestionId: ID!
+  topicWeightOverride: Float
+  updatedAt: DateTime!
+}
+
+input CompanyQuestionPlaybookItemInput {
+  isPinned: Boolean! = false
+  questionId: ID!
+  sortOrder: Int! = 0
+}
+
+type CompanyQuestionPlaybookItemType {
+  isPinned: Boolean!
+  questionId: ID!
+  sortOrder: Int!
+}
+
+type CompanyQuestionPlaybookType {
+  id: ID!
+  isActive: Boolean!
+  itemCount: Int!
+  items: [CompanyQuestionPlaybookItemType!]!
+  level: QuestionLevel!
+  name: String!
+  pinnedCount: Int!
+  professionId: ID!
+  skillIds: [ID!]
+}
+
 input CompanyReviewQueueFilterInput {
   evaluationStatus: String
   manualReviewOnly: Boolean
@@ -489,6 +582,26 @@ input CreateAttemptShareLinkInput {
   expiresInDays: Int
 }
 
+input CreateCompanyQuestionPlaybookInput {
+  items: [CompanyQuestionPlaybookItemInput!]!
+  level: QuestionLevel!
+  name: String!
+  professionId: ID!
+  skillIds: [ID!]
+}
+
+input CreateCompanySkillInput {
+  code: String!
+  name: String!
+}
+
+input CreateCompanyTopicInput {
+  code: String!
+  interviewWeight: Float = 5
+  name: String!
+  skillId: String!
+}
+
 input CreateInterviewInput {
   aiTone: AiTone
   allowRetake: Boolean
@@ -540,14 +653,17 @@ input CreateInterviewTemplateInput {
 input CreateQuestionInput {
   answerExamples: [AnswerExampleInput!]!
   checkpoints: [CheckpointInput!]!
+  companyPriority: Int
   difficulty: QuestionDifficulty!
   idealAnswer: String!
+  isRequired: Boolean
   level: QuestionLevel!
   maxScore: Float!
   professionId: String!
   questionText: String!
   shortAnswer: String!
   skillIds: [String!]!
+  status: QuestionStatus
   topicId: String!
 }
 
@@ -599,6 +715,11 @@ type DashboardWeakTopicType {
   sampleCount: Int!
   topicName: String!
 }
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
 
 enum DecisionAuditEventSource {
   attempt_review
@@ -761,6 +882,9 @@ type InterviewDetailsType {
 }
 
 enum InterviewMessageKind {
+  conduct_terminated
+  conduct_violation
+  conduct_warning
   follow_up_answer
   follow_up_question
   main_answer
@@ -925,20 +1049,30 @@ enum MessageRole {
 type Mutation {
   addCandidateRecruiterNote(candidateId: ID!, reason: String!): ShortlistActionPayloadType!
   addCandidateToShortlist(candidateId: ID!, reason: String): ShortlistActionPayloadType!
+  applyPlaybookToInterviewDraft(count: Int, playbookId: ID!): ApplyPlaybookToInterviewDraftPayload!
+  archiveCompanyQuestionPlaybook(id: ID!): Boolean!
+  archiveCompanySkill(id: ID!): SkillType!
+  archiveCompanyTopic(id: ID!): TopicType!
   archiveInterview(id: ID!): InterviewType!
   archiveQuestion(id: ID!): QuestionType!
   beginInterviewAttempt(input: BeginInterviewAttemptInput!): InterviewSessionType!
+  commitCompanyQuestionImport(input: CommitCompanyQuestionImportInput!): CompanyQuestionImportCommitPayload!
   compareInterviewCandidates(input: CompareInterviewCandidatesInput!): CandidateComparisonAdviceType!
   completeInterviewAttempt(attemptId: ID!, publicToken: String!): InterviewSessionType!
   createAttemptReviewNote(input: CreateAttemptReviewNoteInput!): AttemptReviewNoteType!
   createAttemptShareLink(input: CreateAttemptShareLinkInput!): AttemptShareLinkType!
+  createCompanyQuestionPlaybook(input: CreateCompanyQuestionPlaybookInput!): CompanyQuestionPlaybookType!
+  createCompanySkill(input: CreateCompanySkillInput!): SkillType!
+  createCompanyTopic(input: CreateCompanyTopicInput!): TopicType!
   createInterview(input: CreateInterviewInput!): InterviewType!
   createInterviewFromTemplate(templateId: ID!): InterviewType!
   createInterviewTemplate(input: CreateInterviewTemplateInput!): InterviewTemplateType!
   createInterviewTemplateFromInterview(interviewId: ID!, title: String): InterviewTemplateType!
   createQuestion(input: CreateQuestionInput!): QuestionType!
+  deleteCompanyQuestionOverride(sourceQuestionId: ID!): Boolean!
   draftInterviewFromJobDescription(input: DraftInterviewFromJobDescriptionInput!): JobDescriptionDraftPayload!
   evaluateInterviewAttempt(attemptId: ID!): EvaluateInterviewAttemptPayload!
+  forkQuestion(sourceQuestionId: ID!): QuestionType!
   login(input: LoginInput!): AuthPayload!
   logout: LogoutPayload!
   markAttemptReviewStarted(attemptId: ID!): AttemptReviewPayloadType!
@@ -956,7 +1090,18 @@ type Mutation {
   submitInterviewAnswer(input: SubmitInterviewAnswerInput!): SubmitInterviewAnswerPayload!
   suggestInterviewQuestions(input: SuggestInterviewQuestionsInput!): SuggestedInterviewQuestionsPayload!
   updateAttemptReviewNote(input: UpdateAttemptReviewNoteInput!): AttemptReviewNoteType!
+  updateCompanyQuestionPlaybook(input: UpdateCompanyQuestionPlaybookInput!): CompanyQuestionPlaybookType!
+  updateCompanySkill(input: UpdateCompanySkillInput!): SkillType!
+  updateCompanyTopic(input: UpdateCompanyTopicInput!): TopicType!
   updateQuestion(input: UpdateQuestionInput!): QuestionType!
+  upsertCompanyQuestionOverride(input: UpsertCompanyQuestionOverrideInput!): CompanyQuestionOverrideType!
+}
+
+type OverrideAnswerExampleType {
+  checkpointKey: String
+  exampleText: String!
+  exampleType: AnswerExampleType!
+  sortOrder: Int!
 }
 
 enum ProbingDepth {
@@ -992,6 +1137,9 @@ type Query {
   companyInterviewSummaries(filters: CompanyInterviewSummariesFilterInput): CompanyInterviewSummariesPayloadType!
   companyInterviewTemplates(filters: CompanyInterviewTemplatesFilterInput): CompanyInterviewTemplatesPayloadType!
   companyInterviews(filters: CompanyInterviewsFilterInput): CompanyInterviewsPayloadType!
+  companyQuestionOverride(sourceQuestionId: ID!): CompanyQuestionOverrideType
+  companyQuestionPlaybook(id: ID!): CompanyQuestionPlaybookType!
+  companyQuestionPlaybooks: [CompanyQuestionPlaybookType!]!
   companyReviewQueue(filters: CompanyReviewQueueFilterInput): CompanyReviewQueuePayloadType!
   finalEvaluationByAttempt(attemptId: ID!): FinalEvaluationType
   hello: String!
@@ -1030,12 +1178,15 @@ type QuestionAnswerExampleType {
 
 input QuestionBankFilterInput {
   difficulty: QuestionDifficulty
+  includeForkReplacedGlobal: Boolean = false
   level: QuestionLevel
   limit: Int = 20
   offset: Int = 0
   professionId: String
+  scope: QuestionScope
   search: String
   skillIds: [String!]
+  status: QuestionStatus
   topicId: String
 }
 
@@ -1053,6 +1204,7 @@ type QuestionCheckpointGroupType {
 
 type QuestionCheckpointType {
   checkpointKey: String!
+  evaluationHints: CheckpointEvaluationHintsType
   expected: String!
   id: String!
   score: Float!
@@ -1087,20 +1239,36 @@ enum QuestionLevel {
   senior
 }
 
+enum QuestionScope {
+  all
+  company
+  global
+}
+
+enum QuestionStatus {
+  draft
+  published
+}
+
 type QuestionType {
   answerExamples: [QuestionAnswerExampleType!]!
   checkpoints: [QuestionCheckpointType!]!
   companyId: String
+  companyPriority: Int!
   difficulty: QuestionDifficulty!
   id: String!
   idealAnswer: String!
   isActive: Boolean!
+  isCustom: Boolean!
+  isRequired: Boolean!
   level: QuestionLevel!
   maxScore: Float!
   profession: ProfessionType!
   questionText: String!
   shortAnswer: String!
   skills: [SkillType!]!
+  sourceQuestionId: String
+  status: QuestionStatus!
   topic: TopicType!
 }
 
@@ -1155,6 +1323,7 @@ type SkillAnalyticsItemType {
 type SkillType {
   code: String!
   id: String!
+  isCustom: Boolean!
   name: String!
 }
 
@@ -1202,6 +1371,7 @@ type SubmitInterviewAnswerPayload {
 
 input SuggestInterviewQuestionsInput {
   count: Int = 10
+  excludeQuestionIds: [String!]
   level: QuestionLevel
   professionId: String!
   skillIds: [String!]
@@ -1264,6 +1434,7 @@ type TopicType {
   code: String!
   id: String!
   interviewWeight: Float!
+  isCustom: Boolean!
   name: String!
   skill: SkillType
 }
@@ -1283,19 +1454,53 @@ input UpdateAttemptReviewNoteInput {
   noteId: String!
 }
 
+input UpdateCompanyQuestionPlaybookInput {
+  id: ID!
+  items: [CompanyQuestionPlaybookItemInput!]
+  level: QuestionLevel
+  name: String
+  professionId: ID
+  skillIds: [ID!]
+}
+
+input UpdateCompanySkillInput {
+  code: String
+  id: ID!
+  name: String
+}
+
+input UpdateCompanyTopicInput {
+  code: String
+  id: ID!
+  interviewWeight: Float
+  name: String
+  skillId: String
+}
+
 input UpdateQuestionInput {
   answerExamples: [AnswerExampleInput!]!
   checkpoints: [CheckpointInput!]!
+  companyPriority: Int
   difficulty: QuestionDifficulty!
   id: String!
   idealAnswer: String!
+  isRequired: Boolean
   level: QuestionLevel!
   maxScore: Float!
   professionId: String!
   questionText: String!
   shortAnswer: String!
   skillIds: [String!]!
+  status: QuestionStatus
   topicId: String!
+}
+
+input UpsertCompanyQuestionOverrideInput {
+  extraAnswerExamples: [AnswerExampleInput!]
+  extraFalseClaims: [String!]
+  extraMustConcepts: [String!]
+  sourceQuestionId: ID!
+  topicWeightOverride: Float
 }
 
 type UserType {

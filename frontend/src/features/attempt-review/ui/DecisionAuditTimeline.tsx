@@ -4,7 +4,8 @@ import {
   formatDecisionAuditAction,
   formatDecisionAuditActor,
 } from '@entities/candidate/lib/decisionAuditEventLabels';
-import { Badge, Button, Card, Spinner } from '@shared/ui';
+import { Badge, Card, Spinner } from '@shared/ui';
+import { TablePagination } from '@shared/ui/TablePagination';
 import { formatUnixDate } from '@shared/lib/format';
 
 type DecisionAuditTimelineProps = {
@@ -22,7 +23,6 @@ export function DecisionAuditTimeline({ attemptId }: DecisionAuditTimelineProps)
 
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
-  const hasMore = page * pageSize < total;
 
   return (
     <Card header="История решений">
@@ -68,7 +68,7 @@ export function DecisionAuditTimeline({ attemptId }: DecisionAuditTimelineProps)
                 )}
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <Badge variant="outline">
-                    {event.source === 'shortlist' ? 'Shortlist' : 'Проверка'}
+                    {event.source === 'shortlist' ? 'Избранные' : 'Проверка'}
                   </Badge>
                   {event.previousValue && event.newValue && (
                     <Badge variant="secondary">
@@ -80,30 +80,15 @@ export function DecisionAuditTimeline({ attemptId }: DecisionAuditTimelineProps)
             ))}
           </ol>
 
-          {(page > 1 || hasMore) && (
-            <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
-              <p className="text-xs text-muted-foreground">
-                Показано {items.length} из {total}
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={page <= 1 || isFetching}
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
-                >
-                  Назад
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={!hasMore || isFetching}
-                  onClick={() => setPage((current) => current + 1)}
-                >
-                  Ещё
-                </Button>
-              </div>
-            </div>
+          {total > pageSize && (
+            <TablePagination
+              className="border-t border-border pt-3 text-xs"
+              page={page}
+              pageSize={pageSize}
+              total={total}
+              isLoading={isFetching}
+              onPageChange={setPage}
+            />
           )}
         </div>
       )}

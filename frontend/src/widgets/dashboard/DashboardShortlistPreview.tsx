@@ -30,7 +30,7 @@ export function DashboardShortlistPreview({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <StarIcon className="size-4" />
-          Шортлист
+          Избранные
         </CardTitle>
         <CardDescription>
           {total > 0 ? `${total} кандидатов отмечены для следующего этапа` : 'Пока пусто'}

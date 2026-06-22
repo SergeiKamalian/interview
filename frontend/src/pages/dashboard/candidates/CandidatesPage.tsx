@@ -1,9 +1,18 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCompanyCandidatesQuery } from '@entities/candidate/api/candidatesApi';
+import { getShortlistStatusLabel } from '@entities/candidate/lib/companyDecisionLabels';
 import { useDebouncedValue } from '@shared/lib/useDebouncedValue';
 import { formatScore, formatUnixDate } from '@shared/lib/format';
-import { Alert, Badge, Button, Card, CheckboxField, Input, SelectField, Spinner } from '@shared/ui';
+import { Alert, Badge, Button, Card, CheckboxField, Input, PAGE_SECTION_NAV_LAYOUT, PageSectionNav, SelectField, Spinner } from '@shared/ui';
+import { PaginatedTable } from '@shared/ui/table';
+
+const CANDIDATES_SECTIONS = [
+  { id: 'candidates-filters', label: 'Фильтры' },
+  { id: 'candidates-list', label: 'Список' },
+] as const;
+
+const { sectionClassName, pageClassName } = PAGE_SECTION_NAV_LAYOUT;
 
 export function CandidatesPage() {
   const [search, setSearch] = useState('');
@@ -22,19 +31,18 @@ export function CandidatesPage() {
   });
 
   const items = data?.items ?? [];
-  const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 ${pageClassName}`}>
       <div>
-        <h2 className="text-xl font-semibold text-slate-900">Candidates</h2>
+        <h2 className="text-xl font-semibold text-slate-900">Кандидаты</h2>
         <p className="text-sm text-slate-500">
-          Агрегированные метрики кандидатов, shortlist и переход к отчётам.
+          Сводка по кандидатам, избранные и переход к отчётам.
         </p>
       </div>
 
       <Card>
-        <div className="mb-4 grid gap-3 md:grid-cols-4">
+        <div id="candidates-filters" className={`mb-4 grid gap-3 md:grid-cols-4 ${sectionClassName}`}>
           <Input
             value={search}
             onChange={(event) => {
@@ -44,7 +52,7 @@ export function CandidatesPage() {
             placeholder="Поиск по имени или email"
           />
           <CheckboxField
-            label="Только shortlist"
+            label="Только избранные"
             checked={shortlistedOnly}
             onCheckedChange={(checked) => {
               setShortlistedOnly(checked);
@@ -86,17 +94,27 @@ export function CandidatesPage() {
         )}
 
         {!isLoading && !isError && items.length > 0 && (
+          <div id="candidates-list" className={sectionClassName}>
           <>
+            <PaginatedTable
+              pagination={{
+                page: data?.page ?? page,
+                pageSize: data?.pageSize ?? 20,
+                total: data?.total ?? 0,
+                onPageChange: setPage,
+              }}
+              paginationClassName="text-slate-600"
+            >
             <div className="overflow-x-auto rounded-xl border border-slate-200">
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-50 text-left text-slate-600">
                   <tr>
-                    <th className="px-4 py-3 font-medium">Candidate</th>
-                    <th className="px-4 py-3 font-medium">Interviews</th>
-                    <th className="px-4 py-3 font-medium">Avg score</th>
-                    <th className="px-4 py-3 font-medium">Last interview</th>
-                    <th className="px-4 py-3 font-medium">Shortlist</th>
-                    <th className="px-4 py-3 font-medium">Actions</th>
+                    <th className="px-4 py-3 font-medium">Кандидат</th>
+                    <th className="px-4 py-3 font-medium">Интервью</th>
+                    <th className="px-4 py-3 font-medium">Средний балл</th>
+                    <th className="px-4 py-3 font-medium">Последнее интервью</th>
+                    <th className="px-4 py-3 font-medium">Избранный</th>
+                    <th className="px-4 py-3 font-medium">Действия</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
@@ -124,7 +142,7 @@ export function CandidatesPage() {
                             item.shortlistStatus === 'shortlisted' ? 'success' : 'muted'
                           }
                         >
-                          {item.shortlistStatus}
+                          {getShortlistStatusLabel(item.shortlistStatus)}
                         </Badge>
                       </td>
                       <td className="px-4 py-3">
@@ -132,7 +150,7 @@ export function CandidatesPage() {
                           to={`/dashboard/candidates/${item.candidateId}/report`}
                           className="text-sm text-brand-primary hover:underline"
                         >
-                          Report
+                          Отчёт
                         </Link>
                       </td>
                     </tr>
@@ -140,32 +158,13 @@ export function CandidatesPage() {
                 </tbody>
               </table>
             </div>
-            <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
-              <span>
-                Страница {data?.page ?? 1} из {totalPages} · всего {data?.total ?? 0}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((value) => Math.max(1, value - 1))}
-                >
-                  Назад
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((value) => value + 1)}
-                >
-                  Вперёд
-                </Button>
-              </div>
-            </div>
+            </PaginatedTable>
           </>
+          </div>
         )}
       </Card>
+
+      <PageSectionNav sections={CANDIDATES_SECTIONS} />
     </div>
   );
 }

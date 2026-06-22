@@ -9,6 +9,7 @@ import { AuthRepository } from './auth.repository';
 import { AuthResolver } from './auth.resolver';
 import { AuthService } from './auth.service';
 import { GqlAuthGuard } from './guards/gql-auth.guard';
+import { RestAuthGuard } from './guards/rest-auth.guard';
 import { AuthJwtService } from './jwt.service';
 import { SessionsRepository } from './sessions.repository';
 import { PasswordService } from './password.service';
@@ -39,8 +40,9 @@ import { PasswordService } from './password.service';
     AuthJwtService,
     AuthContextService,
     GqlAuthGuard,
+    RestAuthGuard,
     AuthResolver,
   ],
-  exports: [AuthService, GqlAuthGuard],
+  exports: [AuthService, GqlAuthGuard, RestAuthGuard],
 })
 export class AuthModule {}

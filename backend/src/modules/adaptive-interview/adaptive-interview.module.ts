@@ -23,6 +23,7 @@ import { PerTurnEvaluationValidatorService } from './services/per-turn-evaluatio
 import { CandidateTurnClassifierValidatorService } from './services/candidate-turn-classifier-validator.service';
 import { CandidateTurnClassifierService } from './services/candidate-turn-classifier.service';
 import { QuestionSummaryService } from './services/question-summary.service';
+import { CandidateConductGuardService } from './services/candidate-conduct-guard.service';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { QuestionSummaryService } from './services/question-summary.service';
     TopicOpenerScoringGateService,
     AdaptiveInterviewSubmitService,
     QuestionSummaryService,
+    CandidateConductGuardService,
   ],
   exports: [
     CheckpointStateService,
@@ -72,6 +74,7 @@ import { QuestionSummaryService } from './services/question-summary.service';
     TopicOpenerScoringGateService,
     AdaptiveInterviewSubmitService,
     QuestionSummaryService,
+    CandidateConductGuardService,
   ],
 })
 export class AdaptiveInterviewModule {}

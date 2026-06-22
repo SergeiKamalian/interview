@@ -5,10 +5,17 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DatabaseService } from '../../common/database/database.service';
+import { CompanyQuestionOverrideRepository } from './company-question-override.repository';
 import type { CreateQuestionInput } from './dto/create-question.input';
+import type { CreateCompanySkillInput } from './dto/create-company-skill.input';
+import type { CreateCompanyTopicInput } from './dto/create-company-topic.input';
 import type { QuestionBankFilterInput } from './dto/question-filter.input';
 import type { UpdateQuestionInput } from './dto/update-question.input';
+import type { UpdateCompanySkillInput } from './dto/update-company-skill.input';
+import type { UpdateCompanyTopicInput } from './dto/update-company-topic.input';
+import type { UpsertCompanyQuestionOverrideInput } from './dto/upsert-company-question-override.input';
 import {
+  mapCompanyQuestionOverrideToGraphql,
   mapProfessionToGraphql,
   mapQuestionToGraphql,
   mapSkillToGraphql,
@@ -23,14 +30,21 @@ import type {
   QuestionBankListPayload,
   QuestionType,
 } from './types/question.type';
+import type { CompanyQuestionOverrideType } from './types/company-question-override.type';
 import type { SkillType } from './types/skill.type';
 import type { TopicType } from './types/topic.type';
-import { validateQuestionInput } from './validation/question-bank.validator';
+import { validateQuestionInput, validateCompanyQuestionMetadata } from './validation/question-bank.validator';
+import {
+  isDuplicateKeyError,
+  validateInterviewWeight,
+  validateTaxonomyCode,
+} from './validation/taxonomy.validator';
 
 @Injectable()
 export class QuestionBankService {
   constructor(
     private readonly repository: QuestionBankRepository,
+    private readonly overrideRepository: CompanyQuestionOverrideRepository,
     private readonly database: DatabaseService,
   ) {}
 
@@ -40,7 +54,9 @@ export class QuestionBankService {
   ): Promise<QuestionBankListPayload> {
     const result = await this.repository.list(companyId, filters);
     const items = await Promise.all(
-      result.items.map((question) => this.mapQuestionWithLookups(question)),
+      result.items.map((question) =>
+        this.mapQuestionWithLookups(companyId, question),
+      ),
     );
 
     return {
@@ -107,7 +123,7 @@ export class QuestionBankService {
       throw new NotFoundException('Question not found');
     }
 
-    return this.mapQuestionWithLookups(question);
+    return this.mapQuestionWithLookups(companyId, question);
   }
 
   async create(
@@ -115,13 +131,14 @@ export class QuestionBankService {
     input: CreateQuestionInput,
   ): Promise<QuestionType> {
     validateQuestionInput(input);
+    validateCompanyQuestionMetadata(input, { isCompanyOwned: true });
     const data = await this.prepareUpsertData(companyId, input, companyId);
 
     const created = await this.database.withTransaction((query) =>
       this.repository.create(data, query),
     );
 
-    return this.mapQuestionWithLookups(created);
+    return this.mapQuestionWithLookups(companyId, created);
   }
 
   async update(
@@ -129,6 +146,7 @@ export class QuestionBankService {
     input: UpdateQuestionInput,
   ): Promise<QuestionType> {
     validateQuestionInput(input);
+    validateCompanyQuestionMetadata(input, { isCompanyOwned: true });
 
     const questionId = Number(input.id);
     const existing = await this.repository.findOwnedById(companyId, questionId);
@@ -145,7 +163,94 @@ export class QuestionBankService {
       this.repository.update(questionId, data, query),
     );
 
-    return this.mapQuestionWithLookups(updated);
+    return this.mapQuestionWithLookups(companyId, updated);
+  }
+
+  async getCompanyQuestionOverride(
+    companyId: number,
+    sourceQuestionIdRaw: string,
+  ): Promise<CompanyQuestionOverrideType | null> {
+    const sourceQuestionId = this.parseSourceQuestionId(sourceQuestionIdRaw);
+    const override = await this.overrideRepository.findByCompanyAndSourceQuestionId(
+      companyId,
+      sourceQuestionId,
+    );
+
+    return override ? mapCompanyQuestionOverrideToGraphql(override) : null;
+  }
+
+  async upsertCompanyQuestionOverride(
+    companyId: number,
+    input: UpsertCompanyQuestionOverrideInput,
+  ): Promise<CompanyQuestionOverrideType> {
+    const sourceQuestionId = this.parseSourceQuestionId(input.sourceQuestionId);
+    await this.assertGlobalSourceQuestion(sourceQuestionId);
+
+    if (input.topicWeightOverride !== undefined) {
+      validateInterviewWeight(input.topicWeightOverride);
+    }
+
+    const extraMustConcepts = this.normalizeStringList(input.extraMustConcepts);
+    const extraFalseClaims = this.normalizeStringList(input.extraFalseClaims);
+    const extraAnswerExamples = input.extraAnswerExamples?.length
+      ? input.extraAnswerExamples.map((example) => ({
+          exampleType: example.exampleType,
+          exampleText: example.exampleText.trim(),
+          sortOrder: example.sortOrder,
+          checkpointKey: example.checkpointKey?.trim() ?? null,
+        }))
+      : null;
+
+    const override = await this.overrideRepository.upsert(companyId, {
+      sourceQuestionId,
+      extraMustConcepts,
+      extraFalseClaims,
+      extraAnswerExamples,
+      topicWeightOverride: input.topicWeightOverride ?? null,
+    });
+
+    return mapCompanyQuestionOverrideToGraphql(override);
+  }
+
+  async deleteCompanyQuestionOverride(
+    companyId: number,
+    sourceQuestionIdRaw: string,
+  ): Promise<boolean> {
+    const sourceQuestionId = this.parseSourceQuestionId(sourceQuestionIdRaw);
+    const deleted = await this.overrideRepository.delete(
+      companyId,
+      sourceQuestionId,
+    );
+
+    if (!deleted) {
+      throw new NotFoundException('Question override not found');
+    }
+
+    return true;
+  }
+
+  async forkQuestion(
+    companyId: number,
+    sourceQuestionIdRaw: string,
+  ): Promise<QuestionType> {
+    const sourceQuestionId = Number(sourceQuestionIdRaw);
+    if (!Number.isInteger(sourceQuestionId) || sourceQuestionId <= 0) {
+      throw new BadRequestException({
+        message: 'Invalid source question id',
+        code: 'INVALID_SOURCE_QUESTION_ID',
+      });
+    }
+
+    const source = await this.repository.findGlobalQuestionById(sourceQuestionId);
+    if (!source) {
+      throw new NotFoundException('Global question not found');
+    }
+
+    const forked = await this.database.withTransaction((query) =>
+      this.repository.forkQuestion(companyId, sourceQuestionId, query),
+    );
+
+    return this.mapQuestionWithLookups(companyId, forked);
   }
 
   async archive(
@@ -164,7 +269,7 @@ export class QuestionBankService {
       );
     }
 
-    const snapshot = await this.mapQuestionWithLookups(existing);
+    const snapshot = await this.mapQuestionWithLookups(companyId, existing);
     const archived = await this.repository.archive(companyId, questionId);
 
     if (!archived) {
@@ -175,6 +280,308 @@ export class QuestionBankService {
       ...snapshot,
       isActive: false,
     };
+  }
+
+  async createCompanySkill(
+    companyId: number,
+    input: CreateCompanySkillInput,
+  ): Promise<SkillType> {
+    const code = input.code.trim();
+    const name = input.name.trim();
+    validateTaxonomyCode(code);
+
+    try {
+      const skill = await this.repository.createCompanySkill({
+        companyId,
+        code,
+        name,
+      });
+      return mapSkillToGraphql(skill);
+    } catch (error) {
+      if (isDuplicateKeyError(error)) {
+        throw new BadRequestException({
+          message: `Skill code already exists: ${code}`,
+          code: 'DUPLICATE_SKILL_CODE',
+        });
+      }
+      throw error;
+    }
+  }
+
+  async updateCompanySkill(
+    companyId: number,
+    input: UpdateCompanySkillInput,
+  ): Promise<SkillType> {
+    const skillId = Number(input.id);
+    await this.assertCompanyOwnedSkill(companyId, skillId);
+
+    const updates: { code?: string; name?: string } = {};
+    if (input.code !== undefined) {
+      const code = input.code.trim();
+      validateTaxonomyCode(code);
+      updates.code = code;
+    }
+    if (input.name !== undefined) {
+      updates.name = input.name.trim();
+    }
+
+    try {
+      const skill = await this.repository.updateCompanySkill(
+        companyId,
+        skillId,
+        updates,
+      );
+
+      if (!skill) {
+        throw new NotFoundException('Skill not found');
+      }
+
+      return mapSkillToGraphql(skill);
+    } catch (error) {
+      if (isDuplicateKeyError(error)) {
+        throw new BadRequestException({
+          message: `Skill code already exists: ${input.code}`,
+          code: 'DUPLICATE_SKILL_CODE',
+        });
+      }
+      throw error;
+    }
+  }
+
+  async archiveCompanySkill(
+    companyId: number,
+    skillIdRaw: string,
+  ): Promise<SkillType> {
+    const skillId = Number(skillIdRaw);
+    const existing = await this.repository.findOwnedSkillById(
+      companyId,
+      skillId,
+    );
+
+    if (!existing) {
+      const row = await this.repository.findSkillRowById(skillId);
+      if (row?.companyId === null) {
+        throw new ForbiddenException('Global skills cannot be modified');
+      }
+      throw new NotFoundException('Skill not found');
+    }
+
+    const snapshot = mapSkillToGraphql(existing);
+    const archived = await this.repository.archiveCompanySkill(
+      companyId,
+      skillId,
+    );
+
+    if (!archived) {
+      throw new NotFoundException('Skill not found');
+    }
+
+    return snapshot;
+  }
+
+  async createCompanyTopic(
+    companyId: number,
+    input: CreateCompanyTopicInput,
+  ): Promise<TopicType> {
+    const code = input.code.trim();
+    const name = input.name.trim();
+    const skillId = Number(input.skillId);
+    const interviewWeight = input.interviewWeight ?? 5;
+
+    validateTaxonomyCode(code);
+    validateInterviewWeight(interviewWeight);
+
+    const skill = await this.repository.findSkillVisibleToCompany(
+      companyId,
+      skillId,
+    );
+    if (!skill) {
+      throw new BadRequestException({
+        message: 'Skill not found',
+        code: 'SKILL_NOT_FOUND',
+      });
+    }
+
+    try {
+      const topic = await this.repository.createCompanyTopic({
+        companyId,
+        code,
+        name,
+        skillId,
+        interviewWeight,
+      });
+      return mapTopicToGraphql(topic);
+    } catch (error) {
+      if (isDuplicateKeyError(error)) {
+        throw new BadRequestException({
+          message: `Topic code already exists: ${code}`,
+          code: 'DUPLICATE_TOPIC_CODE',
+        });
+      }
+      throw error;
+    }
+  }
+
+  async updateCompanyTopic(
+    companyId: number,
+    input: UpdateCompanyTopicInput,
+  ): Promise<TopicType> {
+    const topicId = Number(input.id);
+    await this.assertCompanyOwnedTopic(companyId, topicId);
+
+    const updates: {
+      code?: string;
+      name?: string;
+      skillId?: number;
+      interviewWeight?: number;
+    } = {};
+
+    if (input.code !== undefined) {
+      const code = input.code.trim();
+      validateTaxonomyCode(code);
+      updates.code = code;
+    }
+    if (input.name !== undefined) {
+      updates.name = input.name.trim();
+    }
+    if (input.skillId !== undefined) {
+      const skillId = Number(input.skillId);
+      const skill = await this.repository.findSkillVisibleToCompany(
+        companyId,
+        skillId,
+      );
+      if (!skill) {
+        throw new BadRequestException({
+          message: 'Skill not found',
+          code: 'SKILL_NOT_FOUND',
+        });
+      }
+      updates.skillId = skillId;
+    }
+    if (input.interviewWeight !== undefined) {
+      validateInterviewWeight(input.interviewWeight);
+      updates.interviewWeight = input.interviewWeight;
+    }
+
+    try {
+      const topic = await this.repository.updateCompanyTopic(
+        companyId,
+        topicId,
+        updates,
+      );
+
+      if (!topic) {
+        throw new NotFoundException('Topic not found');
+      }
+
+      return mapTopicToGraphql(topic);
+    } catch (error) {
+      if (isDuplicateKeyError(error)) {
+        throw new BadRequestException({
+          message: `Topic code already exists: ${input.code}`,
+          code: 'DUPLICATE_TOPIC_CODE',
+        });
+      }
+      throw error;
+    }
+  }
+
+  async archiveCompanyTopic(
+    companyId: number,
+    topicIdRaw: string,
+  ): Promise<TopicType> {
+    const topicId = Number(topicIdRaw);
+    const existing = await this.repository.findOwnedTopicById(
+      companyId,
+      topicId,
+    );
+
+    if (!existing) {
+      const row = await this.repository.findTopicRowById(topicId);
+      if (row?.companyId === null) {
+        throw new ForbiddenException('Global topics cannot be modified');
+      }
+      throw new NotFoundException('Topic not found');
+    }
+
+    const snapshot = mapTopicToGraphql(existing);
+    const archived = await this.repository.archiveCompanyTopic(
+      companyId,
+      topicId,
+    );
+
+    if (!archived) {
+      throw new NotFoundException('Topic not found');
+    }
+
+    return snapshot;
+  }
+
+  private parseSourceQuestionId(raw: string): number {
+    const sourceQuestionId = Number(raw);
+    if (!Number.isInteger(sourceQuestionId) || sourceQuestionId <= 0) {
+      throw new BadRequestException({
+        message: 'Invalid source question id',
+        code: 'INVALID_SOURCE_QUESTION_ID',
+      });
+    }
+
+    return sourceQuestionId;
+  }
+
+  private normalizeStringList(values?: string[]): string[] | null {
+    if (!values || values.length === 0) {
+      return null;
+    }
+
+    const normalized = values
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0);
+
+    return normalized.length > 0 ? normalized : null;
+  }
+
+  private async assertGlobalSourceQuestion(
+    sourceQuestionId: number,
+  ): Promise<void> {
+    const source = await this.repository.findGlobalQuestionById(sourceQuestionId);
+    if (!source) {
+      throw new NotFoundException('Global question not found');
+    }
+  }
+
+  private async assertCompanyOwnedSkill(
+    companyId: number,
+    skillId: number,
+  ): Promise<void> {
+    const owned = await this.repository.findOwnedSkillById(companyId, skillId);
+    if (owned) {
+      return;
+    }
+
+    const row = await this.repository.findSkillRowById(skillId);
+    if (row?.companyId === null) {
+      throw new ForbiddenException('Global skills cannot be modified');
+    }
+
+    throw new NotFoundException('Skill not found');
+  }
+
+  private async assertCompanyOwnedTopic(
+    companyId: number,
+    topicId: number,
+  ): Promise<void> {
+    const owned = await this.repository.findOwnedTopicById(companyId, topicId);
+    if (owned) {
+      return;
+    }
+
+    const row = await this.repository.findTopicRowById(topicId);
+    if (row?.companyId === null) {
+      throw new ForbiddenException('Global topics cannot be modified');
+    }
+
+    throw new NotFoundException('Topic not found');
   }
 
   private async prepareUpsertData(
@@ -188,8 +595,8 @@ export class QuestionBankService {
 
     const [profession, topic, skills] = await Promise.all([
       this.repository.findProfessionById(professionId),
-      this.repository.findTopicById(topicId),
-      this.repository.findSkillsByIds(skillIds),
+      this.repository.findTopicById(companyId, topicId),
+      this.repository.findSkillsByIds(companyId, skillIds),
     ]);
 
     if (!profession) {
@@ -215,6 +622,10 @@ export class QuestionBankService {
 
     return {
       companyId: ownerCompanyId,
+      sourceQuestionId: null,
+      status: input.status,
+      companyPriority: input.companyPriority,
+      isRequired: input.isRequired,
       professionId,
       topicId,
       level: input.level,
@@ -230,6 +641,7 @@ export class QuestionBankService {
   }
 
   private async mapQuestionWithLookups(
+    companyId: number,
     question: Awaited<ReturnType<QuestionBankRepository['findVisibleById']>>,
   ): Promise<QuestionType> {
     if (!question) {
@@ -238,8 +650,8 @@ export class QuestionBankService {
 
     const [profession, topic, skills] = await Promise.all([
       this.repository.findProfessionById(question.professionId),
-      this.repository.findTopicById(question.topicId),
-      this.repository.findSkillsByIds(question.skillIds),
+      this.repository.findTopicById(companyId, question.topicId),
+      this.repository.findSkillsByIds(companyId, question.skillIds),
     ]);
 
     if (!profession || !topic) {

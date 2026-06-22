@@ -1,4 +1,5 @@
 import { Field, Float, Int, ObjectType } from '@nestjs/graphql';
+import { CheckpointEvaluationHintsType } from './checkpoint-evaluation-hints-output.type';
 
 @ObjectType()
 export class QuestionCheckpointType {
@@ -19,4 +20,7 @@ export class QuestionCheckpointType {
 
   @Field(() => Int)
   sortOrder!: number;
+
+  @Field(() => CheckpointEvaluationHintsType, { nullable: true })
+  evaluationHints?: CheckpointEvaluationHintsType | null;
 }

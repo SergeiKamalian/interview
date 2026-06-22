@@ -90,7 +90,11 @@ Ideal answers хранятся **в самой таблице** (`short_answer`,
 | `max_score` | DECIMAL(5,2) | Sum of checkpoint scores |
 | `deleted_at` | TIMESTAMP NULL | Soft delete for question bank |
 
-**Indexes:** `(profession_id, level, difficulty)`, `(topic_id)`, `(company_id)`
+Company overlay columns (migration `027_company_question_bank_overlay.sql`): `source_question_id`, `status`, `company_priority`, `is_required` — см. [`company-question-bank.md`](company-question-bank.md).
+
+Taxonomy overlay: `skills.company_id`, `topics.company_id` (NULL = global) — same migration.
+
+**Indexes:** `(profession_id, level, difficulty)`, `(topic_id)`, `(company_id)`, `(company_id, status, is_required)`
 
 ### `question_skills` — M2M
 
@@ -157,5 +161,6 @@ Deployed in `backend/migrations/005_create_question_bank.sql`.
 
 ## Related
 
+- [`company-question-bank.md`](company-question-bank.md) — company overlay (custom topics, fork, overrides, import)
 - [`interview-core.md`](interview-core.md) — snapshot tables
 - [`ai-evaluation.md`](ai-evaluation.md) — checkpoint_results keys must match snapshot

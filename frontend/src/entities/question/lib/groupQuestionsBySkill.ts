@@ -95,3 +95,62 @@ export function groupQuestionsByPrimarySkill(
       return left.skill.name.localeCompare(right.skill.name, 'ru');
     });
 }
+
+type CustomSkillRef = {
+  id: string;
+  code: string;
+  name: string;
+  isCustom: boolean;
+};
+
+/** Пустые company-стеки видны в банке до первого вопроса. */
+export function mergeEmptyCustomSkillGroups(
+  groups: QuestionSkillGroup[],
+  customSkills: CustomSkillRef[],
+): QuestionSkillGroup[] {
+  const existingIds = new Set(groups.map((group) => group.skill.id));
+  const existingCodes = new Set(groups.map((group) => group.skill.code));
+
+  const emptyGroups = customSkills
+    .filter(
+      (skill) =>
+        skill.isCustom &&
+        !existingIds.has(skill.id) &&
+        !existingCodes.has(skill.code),
+    )
+    .map((skill) => ({
+      skill: {
+        id: skill.id,
+        code: skill.code,
+        name: skill.name,
+        isCustom: true,
+      },
+      items: [] as QuestionListItem[],
+    }));
+
+  return [...emptyGroups, ...groups].sort((left, right) => {
+    if (left.items.length === 0 && right.items.length > 0) {
+      return -1;
+    }
+
+    if (left.items.length > 0 && right.items.length === 0) {
+      return 1;
+    }
+
+    const leftCustom = left.skill.isCustom ? 0 : 1;
+    const rightCustom = right.skill.isCustom ? 0 : 1;
+
+    if (leftCustom !== rightCustom) {
+      return leftCustom - rightCustom;
+    }
+
+    const orderDiff =
+      skillSortIndex(left.skill.code) - skillSortIndex(right.skill.code);
+
+    if (orderDiff !== 0) {
+      return orderDiff;
+    }
+
+    return left.skill.name.localeCompare(right.skill.name, 'ru');
+  });
+}

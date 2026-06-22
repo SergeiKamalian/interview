@@ -35,7 +35,7 @@ export function QuestionBankFiltersBar({
             label="Поиск"
             value={filters.search}
             onChange={(event) => patch({ search: event.target.value })}
-            placeholder="Текст, тема, технология…"
+            placeholder="Текст, стек, технология…"
           />
         </div>
 
@@ -64,21 +64,21 @@ export function QuestionBankFiltersBar({
           placeholder="Вся сложность"
           options={[
             { value: '', label: 'Вся сложность' },
-            { value: 'basic', label: 'Basic' },
-            { value: 'intermediate', label: 'Intermediate' },
-            { value: 'advanced', label: 'Advanced' },
+            { value: 'basic', label: 'Базовый' },
+            { value: 'intermediate', label: 'Средний' },
+            { value: 'advanced', label: 'Продвинутый' },
           ]}
         />
 
         <SelectField
-          label="Weight"
+          label="Приоритет"
           value={filters.weightTier}
           onValueChange={(value) =>
             patch({ weightTier: value as QuestionBankWeightTier })
           }
-          placeholder="Любой weight"
+          placeholder="Любой приоритет"
           options={[
-            { value: '', label: 'Любой weight' },
+            { value: '', label: 'Любой приоритет' },
             { value: 'low', label: '1–3 (низкий)' },
             { value: 'medium', label: '4–6 (средний)' },
             { value: 'high', label: '7–10 (высокий)' },

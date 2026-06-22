@@ -178,6 +178,7 @@ export type CreateInterviewData = {
   questions: QuestionWithDetailsEntity[];
   topicNames: Map<number, string>;
   topicWeights: Map<number, number>;
+  questionTopicWeights?: Map<number, number>;
 };
 
 @Injectable()
@@ -230,7 +231,10 @@ export class InterviewCoreRepository {
     for (let index = 0; index < data.questions.length; index += 1) {
       const question = data.questions[index];
       const topicName = data.topicNames.get(question.topicId) ?? null;
-      const topicWeight = data.topicWeights.get(question.topicId) ?? 1;
+      const topicWeight =
+        data.questionTopicWeights?.get(question.id) ??
+        data.topicWeights.get(question.topicId) ??
+        1;
 
       const questionResult = await query<ResultSetHeader>(
         `INSERT INTO interview_questions (

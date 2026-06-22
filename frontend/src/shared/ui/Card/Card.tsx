@@ -14,11 +14,12 @@ type CardProps = {
   footer?: ReactNode;
   children: ReactNode;
   className?: string;
+  id?: string;
 };
 
-export function Card({ header, footer, children, className = '' }: CardProps) {
+export function Card({ header, footer, children, className = '', id }: CardProps) {
   return (
-    <ShadcnCard className={cn(className)}>
+    <ShadcnCard id={id} className={cn(className)}>
       {header && (
         <CardHeader className="border-b border-border">
           <CardTitle>{header}</CardTitle>

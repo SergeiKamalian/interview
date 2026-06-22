@@ -1,4 +1,6 @@
 import { getHireRecommendationMeta } from '@entities/candidate/lib/hireRecommendationMeta';
+import { getCompanyDecisionLabel } from '@entities/candidate/lib/companyDecisionLabels';
+import { getCandidateReviewProgressDetail } from '@entities/candidate/lib/candidateAttemptStatus';
 import { formatScore, formatUnixDate } from '@shared/lib/format';
 import type { AttemptExportBundle } from './attemptExport.types';
 
@@ -26,16 +28,24 @@ function getLevelLabel(value?: string | null): string {
   return labels[value] ?? value;
 }
 
-function getReviewStatusLabel(value: string): string {
-  if (value === 'in_review') {
-    return 'В работе';
+function getReviewProgressLabel(record: AttemptExportBundle['candidates'][number]): string {
+  const detail = getCandidateReviewProgressDetail({
+    status: record.attempt.status,
+    reviewStatus: record.companyReview.reviewStatus,
+    companyDecision: record.companyReview.companyDecision,
+    shortlistStatus: record.attempt.shortlistStatus,
+    evaluationStatus: record.attempt.overallScore != null ? 'ready' : 'evaluation_pending',
+  });
+
+  if (detail) {
+    return detail;
   }
 
-  if (value === 'reviewed') {
-    return 'Просмотрено';
+  if (record.companyReview.reviewStatus === 'reviewed') {
+    return 'Проверка завершена';
   }
 
-  return 'Не смотрели';
+  return '—';
 }
 
 function getAiVerdictLabel(value: string): string {
@@ -48,30 +58,6 @@ function getAiVerdictLabel(value: string): string {
   }
 
   return 'Ожидает оценки';
-}
-
-function getCompanyDecisionLabel(value: string): string {
-  if (value === 'reject') {
-    return 'Отклонён';
-  }
-
-  if (value === 'invite_live') {
-    return 'На live';
-  }
-
-  if (value === 'shortlist') {
-    return 'Shortlist';
-  }
-
-  if (value === 'hold') {
-    return 'На паузе';
-  }
-
-  if (value === 'none') {
-    return '—';
-  }
-
-  return value;
 }
 
 function renderList(items: string[]): string {
@@ -120,11 +106,11 @@ function renderCandidateSection(
       </div>
       <div class="grid review">
         <div>
-          <p class="label">Review</p>
-          <p class="value">${escapeHtml(getReviewStatusLabel(record.companyReview.reviewStatus))}</p>
+          <p class="label">Прогресс проверки</p>
+          <p class="value">${escapeHtml(getReviewProgressLabel(record))}</p>
         </div>
         <div>
-          <p class="label">Verdict по ИИ</p>
+          <p class="label">Оценка ИИ (ваше мнение)</p>
           <p class="value">${escapeHtml(getAiVerdictLabel(record.companyReview.aiAssessmentVerdict))}</p>
         </div>
         <div>
@@ -132,8 +118,8 @@ function renderCandidateSection(
           <p class="value">${escapeHtml(getCompanyDecisionLabel(record.companyReview.companyDecision))}</p>
         </div>
         <div>
-          <p class="label">Shortlist</p>
-          <p class="value">${escapeHtml(record.attempt.shortlistStatus === 'shortlisted' ? 'Shortlist' : '—')}</p>
+          <p class="label">Избранный кандидат</p>
+          <p class="value">${escapeHtml(record.attempt.shortlistStatus === 'shortlisted' ? 'Да' : '—')}</p>
         </div>
       </div>
       ${

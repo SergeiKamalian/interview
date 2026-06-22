@@ -4,7 +4,7 @@ import { CheckIcon, CopyIcon, ExternalLinkIcon, Loader2Icon, SaveIcon } from 'lu
 
 import { useCreateInterviewTemplateFromInterviewMutation } from '@entities/interview-template/api/interviewTemplatesApi';
 import type { CompanyInterviewSummaryItem } from '@entities/interview/model/interview.types';
-import { formatCompletionRate, formatScore, formatUnixDate } from '@shared/lib/format';
+import { formatUnixDate } from '@shared/lib/format';
 import { Badge } from '@shared/ui/badge';
 import { Button } from '@shared/ui/button';
 import {
@@ -14,12 +14,14 @@ import {
   TooltipTrigger,
 } from '@shared/ui/tooltip';
 import {
+  PaginatedTable,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
+  type TablePaginationConfig,
 } from '@shared/ui/table';
 
 const interviewStatusLabels: Record<string, string> = {
@@ -119,7 +121,7 @@ function ResultBadges({ item }: { item: CompanyInterviewSummaryItem }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {item.shortlistedCount > 0 && (
-        <Badge variant="success">{item.shortlistedCount} в шортлисте</Badge>
+        <Badge variant="success">{item.shortlistedCount} избранных</Badge>
       )}
       {item.strongInviteCount > 0 && (
         <Badge variant="info">{item.strongInviteCount} сильн. рекомендация</Badge>
@@ -243,11 +245,13 @@ function OpenInterviewButton({ interviewId }: { interviewId: string }) {
 type InterviewSummariesTableProps = {
   items: CompanyInterviewSummaryItem[];
   containerQuery?: string;
+  pagination?: TablePaginationConfig;
 };
 
 export function InterviewSummariesTable({
   items,
   containerQuery = '@container/card',
+  pagination,
 }: InterviewSummariesTableProps) {
   const [createTemplateFromInterview, { error, reset }] =
     useCreateInterviewTemplateFromInterviewMutation();
@@ -276,6 +280,7 @@ export function InterviewSummariesTable({
           {getApiErrorMessage(error)}
         </p>
       )}
+      <PaginatedTable pagination={pagination}>
       <Table className="min-w-[920px] table-fixed">
         <TableHeader>
           <TableRow className="hover:bg-transparent">
@@ -285,12 +290,9 @@ export function InterviewSummariesTable({
               Кандидаты
             </TableHead>
             <TableHead className="hidden w-[88px] @[750px]/card:table-cell @[750px]/main:table-cell">
-              Завершение
+              Ждут оценки
             </TableHead>
-            <TableHead className="hidden w-[72px] @[700px]/card:table-cell @[700px]/main:table-cell">
-              Балл
-            </TableHead>
-            <TableHead className="hidden w-[200px] @[850px]/card:table-cell @[850px]/main:table-cell">
+            <TableHead className="hidden w-[220px] @[680px]/card:table-cell @[680px]/main:table-cell">
               Результат
             </TableHead>
             <TableHead className="hidden w-[140px] @[1000px]/card:table-cell @[1000px]/main:table-cell">
@@ -312,12 +314,13 @@ export function InterviewSummariesTable({
                 <AttemptsSummary item={item} />
               </TableCell>
               <TableCell className="hidden align-middle font-medium tabular-nums @[750px]/card:table-cell @[750px]/main:table-cell">
-                {formatCompletionRate(item.completionRate)}
+                {item.attemptsPending > 0 ? (
+                  <Badge variant="warning">{item.attemptsPending}</Badge>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
               </TableCell>
-              <TableCell className="hidden align-middle font-medium tabular-nums @[700px]/card:table-cell @[700px]/main:table-cell">
-                {formatScore(item.avgScore)}
-              </TableCell>
-              <TableCell className="hidden align-middle whitespace-normal @[850px]/card:table-cell @[850px]/main:table-cell">
+              <TableCell className="hidden align-middle whitespace-normal @[680px]/card:table-cell @[680px]/main:table-cell">
                 <ResultBadges item={item} />
               </TableCell>
               <TableCell className="hidden align-middle whitespace-normal text-muted-foreground @[1000px]/card:table-cell @[1000px]/main:table-cell">
@@ -343,6 +346,7 @@ export function InterviewSummariesTable({
           ))}
         </TableBody>
       </Table>
+      </PaginatedTable>
     </div>
   );
 }

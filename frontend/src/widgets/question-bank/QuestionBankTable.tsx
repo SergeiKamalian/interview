@@ -1,146 +1,97 @@
-import { useQuestionByIdQuery } from '@features/question-bank/api/questionBankApi';
+import { Link } from 'react-router-dom';
 import type { QuestionListItem } from '@entities/question/model/types';
-import { QuestionExamples } from '@entities/question/ui/QuestionExamples';
-import { Alert, Badge, Button, Spinner } from '@shared/ui';
+import {
+  QuestionMetaBadges,
+  QuestionScopeBadges,
+} from '@entities/question/ui/QuestionBadges';
+import { CustomScopeBadge } from '@entities/question/ui/CustomScopeBadge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@shared/ui/table';
 
 type QuestionBankTableProps = {
   items: QuestionListItem[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  showDetails?: boolean;
 };
 
-function truncate(text: string, max = 72): string {
+function truncate(text: string, max = 96): string {
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
-export function QuestionBankTable({
-  items,
-  selectedId,
-  onSelect,
-  showDetails = true,
-}: QuestionBankTableProps) {
+export function QuestionBankTable({ items }: QuestionBankTableProps) {
   return (
-    <div className="space-y-6">
-      <div className="overflow-x-auto rounded-xl border border-slate-200">
-        <table className="min-w-full divide-y divide-slate-200 text-sm">
-          <thead className="bg-slate-50 text-left text-slate-600">
-            <tr>
-              <th className="px-4 py-3 font-medium">Вопрос</th>
-              <th className="px-4 py-3 font-medium">Тема</th>
-              <th className="px-4 py-3 font-medium">Уровень</th>
-              <th className="px-4 py-3 font-medium">Сложность</th>
-              <th className="px-4 py-3 font-medium">Weight</th>
-              <th className="px-4 py-3 font-medium">Статус</th>
-              <th className="px-4 py-3 font-medium">Действия</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 bg-white">
-            {items.map((item) => (
-              <tr
-                key={item.id}
-                className={
-                  selectedId === item.id ? 'bg-blue-50/60' : 'hover:bg-slate-50'
-                }
-              >
-                <td className="px-4 py-3 text-slate-900">
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="min-w-[16rem]">Вопрос</TableHead>
+            <TableHead className="min-w-[9rem]">Стек</TableHead>
+            <TableHead className="min-w-[8rem]">Уровень</TableHead>
+            <TableHead className="min-w-[5rem]">Вес темы</TableHead>
+            <TableHead className="min-w-[6rem]">Метки</TableHead>
+            <TableHead className="min-w-[6rem] text-right">Действия</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {items.map((item) => (
+            <TableRow key={item.id}>
+              <TableCell className="align-top whitespace-normal">
+                <p className="font-medium text-foreground wrap-break-word">
                   {truncate(item.questionText)}
-                </td>
-                <td className="px-4 py-3 text-slate-600">{item.topic.name}</td>
-                <td className="px-4 py-3 text-slate-600">{item.level}</td>
-                <td className="px-4 py-3 text-slate-600">{item.difficulty}</td>
-                <td className="px-4 py-3 text-slate-600">
-                  {item.topic.interviewWeight ?? '—'}
-                </td>
-                <td className="px-4 py-3">
-                  <Badge variant={item.isActive ? 'success' : 'muted'}>
-                    {item.isActive ? 'active' : 'archived'}
-                  </Badge>
-                </td>
-                <td className="px-4 py-3">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onSelect(item.id)}
-                  >
-                    Подробнее
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {showDetails && selectedId && (
-        <QuestionBankDetails questionId={selectedId} />
-      )}
-    </div>
-  );
-}
-
-type QuestionBankDetailsProps = {
-  questionId: string;
-};
-
-export function QuestionBankDetails({ questionId }: QuestionBankDetailsProps) {
-  const { data: selected, isLoading, isError } = useQuestionByIdQuery(questionId);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600">
-        <Spinner />
-        Загрузка деталей вопроса…
-      </div>
-    );
-  }
-
-  if (isError || !selected) {
-    return (
-      <Alert variant="error" title="Не удалось загрузить вопрос">
-        Попробуйте выбрать вопрос ещё раз.
-      </Alert>
-    );
-  }
-
-  return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5">
-      <h3 className="text-base font-medium text-slate-900">
-        {selected.questionText}
-      </h3>
-      <p className="mt-1 text-sm text-slate-500">
-        {selected.profession.name} · {selected.topic.name} · вес{' '}
-        {selected.topic.interviewWeight ?? '—'}
-      </p>
-
-      <div className="mt-4">
-        <h4 className="mb-2 text-sm font-medium text-slate-800">
-          Checkpoints (веса)
-        </h4>
-        <ul className="space-y-2">
-          {selected.checkpoints.map((checkpoint) => (
-            <li
-              key={checkpoint.id}
-              className="flex items-start justify-between gap-4 rounded-lg bg-slate-50 px-3 py-2 text-sm"
-            >
-              <span className="text-slate-800">{checkpoint.title}</span>
-              <span className="shrink-0 font-medium text-brand-primary">
-                {checkpoint.score} pts
-              </span>
-            </li>
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {item.profession.name}
+                </p>
+              </TableCell>
+              <TableCell className="align-top whitespace-normal">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <p className="text-sm font-medium text-foreground">
+                    {item.topic.skill?.name ??
+                      item.skills?.[0]?.name ??
+                      '—'}
+                  </p>
+                  {(item.topic.skill?.isCustom || item.skills?.[0]?.isCustom) && (
+                    <CustomScopeBadge className="px-1 py-0 text-[10px]" />
+                  )}
+                </div>
+                {item.topic.isCustom ? (
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <p className="text-xs text-muted-foreground">
+                      {item.topic.name}
+                    </p>
+                    <CustomScopeBadge className="px-1 py-0 text-[10px]" />
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {item.topic.name}
+                  </p>
+                )}
+              </TableCell>
+              <TableCell className="align-top whitespace-normal">
+                <QuestionMetaBadges item={item} />
+              </TableCell>
+              <TableCell className="align-top text-sm text-muted-foreground">
+                {item.topic.interviewWeight ?? '—'}
+              </TableCell>
+              <TableCell className="align-top whitespace-normal">
+                <QuestionScopeBadges item={item} />
+              </TableCell>
+              <TableCell className="align-top text-right whitespace-nowrap">
+                <Link
+                  to={`/dashboard/question-bank/${item.id}/edit`}
+                  className="text-sm text-brand-primary hover:underline"
+                >
+                  {item.isCustom ? 'Редактировать' : 'Открыть'}
+                </Link>
+              </TableCell>
+            </TableRow>
           ))}
-          {selected.checkpoints.length === 0 && (
-            <li className="text-sm text-slate-500">Checkpoints не заданы.</li>
-          )}
-        </ul>
-      </div>
-
-      <div className="mt-4">
-        <h4 className="mb-2 text-sm font-medium text-slate-800">
-          Примеры ответов
-        </h4>
-        <QuestionExamples examples={selected.answerExamples} />
-      </div>
-    </section>
+        </TableBody>
+      </Table>
+    </div>
   );
 }

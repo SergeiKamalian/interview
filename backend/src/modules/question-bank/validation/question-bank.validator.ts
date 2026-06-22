@@ -3,6 +3,39 @@ import type { CreateQuestionInput } from '../dto/create-question.input';
 
 const CHECKPOINT_KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
 
+export function validateCompanyQuestionMetadata(
+  input: Pick<
+    CreateQuestionInput,
+    'status' | 'companyPriority' | 'isRequired'
+  >,
+  options: { isCompanyOwned: boolean },
+): void {
+  const hasMetadata =
+    input.status !== undefined ||
+    input.companyPriority !== undefined ||
+    input.isRequired !== undefined;
+
+  if (!options.isCompanyOwned && hasMetadata) {
+    throw new BadRequestException({
+      message:
+        'status, companyPriority and isRequired are only allowed for company-owned questions',
+      code: 'GLOBAL_QUESTION_METADATA_FORBIDDEN',
+    });
+  }
+
+  if (
+    input.companyPriority !== undefined &&
+    (!Number.isInteger(input.companyPriority) ||
+      input.companyPriority < 0 ||
+      input.companyPriority > 10)
+  ) {
+    throw new BadRequestException({
+      message: 'companyPriority must be an integer between 0 and 10',
+      code: 'INVALID_COMPANY_PRIORITY',
+    });
+  }
+}
+
 export function validateQuestionInput(input: CreateQuestionInput): void {
   const checkpointKeys = new Set<string>();
 

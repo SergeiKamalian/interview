@@ -3,6 +3,10 @@
 import * as React from "react"
 
 import { cn } from "@shared/lib/utils"
+import {
+  TablePagination,
+  type TablePaginationConfig,
+} from "@shared/ui/TablePagination"
 
 function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
@@ -83,7 +87,7 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
     <td
       data-slot="table-cell"
       className={cn(
-        "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0",
+        "p-2 align-middle [&:has([role=checkbox])]:pr-0",
         className
       )}
       {...props}
@@ -113,4 +117,27 @@ export {
   TableRow,
   TableCell,
   TableCaption,
+  PaginatedTable,
+  type TablePaginationConfig,
+}
+
+function PaginatedTable({
+  children,
+  pagination,
+  className,
+  paginationClassName,
+}: {
+  children: React.ReactNode
+  pagination?: TablePaginationConfig
+  className?: string
+  paginationClassName?: string
+}) {
+  return (
+    <div className={cn("flex w-full flex-col gap-3", className)}>
+      {children}
+      {pagination ? (
+        <TablePagination {...pagination} className={paginationClassName} />
+      ) : null}
+    </div>
+  )
 }

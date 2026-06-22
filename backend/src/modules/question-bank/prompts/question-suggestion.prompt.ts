@@ -1,7 +1,7 @@
 import type { SuggestionCandidateEntity } from '../question-bank.repository';
 
 export const QUESTION_SUGGESTION_PROMPT_KEY = 'question_suggestion';
-export const QUESTION_SUGGESTION_PROMPT_VERSION = '1.0.0';
+export const QUESTION_SUGGESTION_PROMPT_VERSION = '1.1.0';
 
 const RESPONSE_JSON_SCHEMA = `{
   "questionIds": ["<id from candidates>", "..."]
@@ -20,7 +20,8 @@ export function buildQuestionSuggestionSystemPrompt(): string {
     '- relevance to the target level and (if given) the target skills;',
     '- topic diversity — avoid many questions from the same topic;',
     '- a sensible difficulty progression (easier first, harder later);',
-    '- prefer topics with higher interview_weight when choosing between equals.',
+    '- prefer topics with higher interview_weight when choosing between equals;',
+    '- when equally relevant, prefer candidates with isCustom=true and higher companyPriority.',
     '',
     'Hard rules:',
     '- Return EXACTLY the requested number of ids when enough candidates exist;',
@@ -63,7 +64,7 @@ export function buildQuestionSuggestionUserPrompt(params: {
     const skills =
       candidate.skillCodes.length > 0 ? candidate.skillCodes.join('/') : '-';
     lines.push(
-      `- id=${candidate.id} | topic="${candidate.topicName}" | level=${candidate.level} | difficulty=${candidate.difficulty} | maxScore=${candidate.maxScore} | weight=${candidate.interviewWeight} | skills=${skills} | text="${text}"`,
+      `- id=${candidate.id} | topic="${candidate.topicName}" | level=${candidate.level} | difficulty=${candidate.difficulty} | maxScore=${candidate.maxScore} | weight=${candidate.interviewWeight} | isCustom=${candidate.isCustom} | companyPriority=${candidate.companyPriority} | isRequired=${candidate.isRequired} | skills=${skills} | text="${text}"`,
     );
   }
 

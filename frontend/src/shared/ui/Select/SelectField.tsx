@@ -7,27 +7,14 @@ import {
   SelectValue,
 } from '../select';
 import { cn } from '@shared/lib/utils';
+import { SelectOptionLabel } from './SelectOptionLabel';
 
 export type SelectOption = {
   value: string;
   label: string;
   flag?: string;
+  isCustom?: boolean;
 };
-
-function SelectOptionLabel({ option }: { option: SelectOption }) {
-  if (!option.flag) {
-    return option.label;
-  }
-
-  return (
-    <span className="inline-flex items-center gap-2">
-      <span aria-hidden className="text-base leading-none">
-        {option.flag}
-      </span>
-      <span>{option.label}</span>
-    </span>
-  );
-}
 
 type SelectFieldProps = {
   label?: string;

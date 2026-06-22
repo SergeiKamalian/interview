@@ -1,114 +1,230 @@
 import { useMemo, useState } from 'react';
-import { useQuestionBankListQuery } from '@features/question-bank/api/questionBankApi';
+import { FileSpreadsheet, Plus } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { CompanyQuestionImportDialog } from '@features/company-question-import/ui/CompanyQuestionImportDialog';
+import { CompanyQuestionPlaybooksSection } from '@features/company-question-playbooks/ui/CompanyQuestionPlaybooksSection';
+import { CompanySkillDialog } from '@features/company-question-bank/ui/CompanySkillDialog';
+import {
+  useQuestionBankListQuery,
+  useSkillsQuery,
+} from '@features/question-bank/api/questionBankApi';
+import type { QuestionScope, QuestionStatus } from '@entities/question/model/types';
 import {
   EMPTY_QUESTION_BANK_FILTERS,
   filterQuestionBankItems,
   hasActiveQuestionBankFilters,
   type QuestionBankClientFilters,
 } from '@entities/question/lib/filterQuestionBankItems';
-import { groupQuestionsByPrimarySkill } from '@entities/question/lib/groupQuestionsBySkill';
 import { QuestionBankFiltersBar } from '@widgets/question-bank/QuestionBankFiltersBar';
 import { QuestionBankSkillAccordion } from '@widgets/question-bank/QuestionBankSkillAccordion';
-import { QuestionBankDetails } from '@widgets/question-bank/QuestionBankTable';
-import { Alert, Button, Card, Spinner } from '@shared/ui';
+import { cn } from '@shared/lib/utils';
+import {
+  COMPANY_SCOPE_FILTER_LABEL,
+  PLATFORM_SCOPE_FILTER_LABEL,
+} from '@entities/question/lib/questionScopeLabels';
+import {
+  Alert,
+  Button,
+  Card,
+  PAGE_SECTION_NAV_LAYOUT,
+  PageSectionNav,
+  SelectField,
+  Spinner,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@shared/ui';
+import { Button as ShadcnButton } from '@shared/ui/button';
+
+type ScopeTab = QuestionScope;
+type StatusFilter = 'published' | 'draft' | 'all';
+
+const scopeTabs: Array<{ value: ScopeTab; label: string }> = [
+  { value: 'all', label: 'Все' },
+  { value: 'company', label: COMPANY_SCOPE_FILTER_LABEL },
+  { value: 'global', label: PLATFORM_SCOPE_FILTER_LABEL },
+];
+
+const statusOptions = [
+  { value: 'published', label: 'Опубликованные' },
+  { value: 'draft', label: 'Черновики' },
+  { value: 'all', label: 'Все статусы' },
+];
+
+const QUESTION_BANK_SECTIONS = [
+  { id: 'qb-playbooks', label: 'Плейбуки' },
+  { id: 'qb-questions', label: 'Вопросы' },
+] as const;
+
+const { sectionClassName, pageClassName } = PAGE_SECTION_NAV_LAYOUT;
 
 export function QuestionBankPage() {
+  const [scope, setScope] = useState<ScopeTab>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('published');
+  const [importOpen, setImportOpen] = useState(false);
+  const [skillDialogOpen, setSkillDialogOpen] = useState(false);
   const [filters, setFilters] = useState<QuestionBankClientFilters>(
     EMPTY_QUESTION_BANK_FILTERS,
   );
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const { data, isLoading, isError, error, refetch } = useQuestionBankListQuery();
+
+  const serverFilters = useMemo(
+    () => ({
+      scope: scope === 'all' ? undefined : scope,
+      status:
+        statusFilter === 'all'
+          ? undefined
+          : (statusFilter as QuestionStatus),
+    }),
+    [scope, statusFilter],
+  );
+
+  const { data, isLoading, isError, error, refetch } =
+    useQuestionBankListQuery(serverFilters);
+  const { data: allSkills = [] } = useSkillsQuery();
 
   const items = useMemo(() => data?.items ?? [], [data?.items]);
-  const filteredItems = useMemo(
-    () => filterQuestionBankItems(items, filters),
+  const filteredCount = useMemo(
+    () => filterQuestionBankItems(items, filters).length,
     [items, filters],
   );
-  const skillGroups = useMemo(
-    () => groupQuestionsByPrimarySkill(filteredItems),
-    [filteredItems],
+  const emptyCustomSkillCount = useMemo(
+    () => allSkills.filter((skill) => skill.isCustom).length,
+    [allSkills],
   );
-
-  const handleFiltersChange = (next: QuestionBankClientFilters) => {
-    setFilters(next);
-
-    if (selectedId) {
-      const stillVisible = filterQuestionBankItems(items, next).some(
-        (item) => item.id === selectedId,
-      );
-      if (!stillVisible) {
-        setSelectedId(null);
-      }
-    }
-  };
+  const showSkillAccordion =
+    !isLoading && !isError && (filteredCount > 0 || emptyCustomSkillCount > 0);
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className={cn('space-y-4', pageClassName)}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-slate-900">Question Bank</h2>
-          <p className="text-sm text-slate-500">
-            Вопросы по технологиям — фильтруйте по уровню, сложности и weight.
+          <h2 className="text-xl font-semibold text-foreground">
+            Банк вопросов
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Платформенные и ваши вопросы — по стекам, с red/green flags и
+            приоритетом при подборе.
           </p>
         </div>
-        <Button variant="primary" disabled title="Будет в следующих блоках">
-          Создать вопрос
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => void refetch()}>
+            Обновить
+          </Button>
+          <ShadcnButton variant="secondary" onClick={() => setSkillDialogOpen(true)}>
+            <Plus className="size-4" />
+            Создать стек
+          </ShadcnButton>
+          <ShadcnButton
+            variant="secondary"
+            onClick={() => setImportOpen(true)}
+          >
+            <FileSpreadsheet className="size-4" />
+            Импорт из Excel
+          </ShadcnButton>
+          <ShadcnButton variant="default" render={<Link to="/dashboard/question-bank/new" />}>
+            Создать вопрос
+          </ShadcnButton>
+        </div>
       </div>
 
-      <Card>
-        <QuestionBankFiltersBar
-          filters={filters}
-          onChange={handleFiltersChange}
-          onRefresh={() => void refetch()}
-          onReset={() => {
-            handleFiltersChange(EMPTY_QUESTION_BANK_FILTERS);
-          }}
-          showReset={hasActiveQuestionBankFilters(filters)}
-        />
+      <CompanySkillDialog
+        open={skillDialogOpen}
+        onOpenChange={setSkillDialogOpen}
+      />
 
-        {isLoading && (
-          <div className="flex items-center gap-2 text-sm text-slate-600">
-            <Spinner />
-            Загрузка вопросов…
+      <CompanyQuestionImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onViewDrafts={() => {
+          setScope('company');
+          setStatusFilter('draft');
+        }}
+      />
+
+      <div id="qb-playbooks" className={sectionClassName}>
+        <CompanyQuestionPlaybooksSection />
+      </div>
+
+      <Card id="qb-questions" className={sectionClassName}>
+        <Tabs
+          value={scope}
+          onValueChange={(value) => setScope(value as ScopeTab)}
+        >
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <TabsList>
+              {scopeTabs.map((tab) => (
+                <TabsTrigger key={tab.value} value={tab.value}>
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
+            <div className="w-full max-w-xs">
+              <SelectField
+                label="Статус"
+                value={statusFilter}
+                onValueChange={(value) =>
+                  setStatusFilter(value as StatusFilter)
+                }
+                options={statusOptions}
+              />
+            </div>
           </div>
-        )}
 
-        {isError && (
-          <Alert variant="error" title="Не удалось загрузить question bank">
-            {'message' in (error as object)
-              ? String((error as { message: string }).message)
-              : 'Unknown error'}
-          </Alert>
-        )}
+          {scopeTabs.map((tab) => (
+            <TabsContent key={tab.value} value={tab.value} className="space-y-4">
+              <QuestionBankFiltersBar
+                filters={filters}
+                onChange={setFilters}
+                onRefresh={() => void refetch()}
+                onReset={() => setFilters(EMPTY_QUESTION_BANK_FILTERS)}
+                showReset={hasActiveQuestionBankFilters(filters)}
+              />
 
-        {!isLoading && !isError && items.length === 0 && (
-          <Alert variant="info" title="Пусто">
-            Вопросов пока нет. Запустите seed:{' '}
-            <code>cd backend && pnpm seed:rebank</code>
-          </Alert>
-        )}
+              {isLoading && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Spinner />
+                  Загрузка вопросов…
+                </div>
+              )}
 
-        {!isLoading && !isError && items.length > 0 && (
-          <>
-            <p className="mb-3 text-sm text-slate-500">
-              Показано {filteredItems.length} из {data?.total ?? items.length}{' '}
-              вопросов · разделов: {skillGroups.length}
-            </p>
-            <QuestionBankSkillAccordion
-              items={items}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              filters={filters}
-            />
-            {selectedId && (
-              <div className="mt-6">
-                <QuestionBankDetails questionId={selectedId} />
-              </div>
-            )}
-          </>
-        )}
+              {isError && (
+                <Alert variant="error" title="Не удалось загрузить банк вопросов">
+                  {'message' in (error as object)
+                    ? String((error as { message: string }).message)
+                    : 'Неизвестная ошибка'}
+                </Alert>
+              )}
+
+              {!isLoading && !isError && filteredCount === 0 && emptyCustomSkillCount === 0 && (
+                <Alert variant="info" title="Ничего не найдено">
+                  {items.length === 0
+                    ? 'Вопросов пока нет — создайте свой вопрос или измените фильтры.'
+                    : 'Нет вопросов по текущим фильтрам.'}
+                </Alert>
+              )}
+
+              {showSkillAccordion && (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    {filteredCount > 0
+                      ? `Показано ${filteredCount} из ${data?.total ?? items.length} вопросов · сгруппировано по стекам`
+                      : 'Ваши стеки без вопросов — создайте первый вопрос в нужном стеке'}
+                  </p>
+                  <QuestionBankSkillAccordion
+                    items={items}
+                    filters={filters}
+                    allSkills={allSkills}
+                  />
+                </>
+              )}
+            </TabsContent>
+          ))}
+        </Tabs>
       </Card>
+
+      <PageSectionNav sections={QUESTION_BANK_SECTIONS} />
     </div>
   );
 }

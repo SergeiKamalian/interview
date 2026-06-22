@@ -1,7 +1,11 @@
 import { CheckIcon, PlusIcon, XIcon } from 'lucide-react';
 import {
+  deriveWizardSkillsFromPool,
+  wizardQuestionPoolFilters,
+} from '@features/interview-create/lib/wizardQuestionPool';
+import {
   useProfessionsQuery,
-  useSkillsQuery,
+  useQuestionBankQuery,
 } from '@features/question-bank/api/questionBankApi';
 import { Input, SelectField, Textarea, Label, Badge, Spinner } from '@shared/ui';
 import { cn } from '@shared/lib/utils';
@@ -29,9 +33,15 @@ const SELECTED_BADGE_VARIANTS = [
 export function Step1Vacancy({ data, update }: WizardStepProps) {
   const { data: professions = [], isLoading: professionsLoading } =
     useProfessionsQuery();
-  const { data: skills = [], isLoading: skillsLoading } = useSkillsQuery(
-    data.professionId ? { professionId: data.professionId } : undefined,
-  );
+  const { data: questionBankResult, isFetching: skillsLoading } =
+    useQuestionBankQuery(
+      data.professionId
+        ? wizardQuestionPoolFilters(data.professionId)
+        : undefined,
+      { skip: !data.professionId },
+    );
+
+  const skills = deriveWizardSkillsFromPool(questionBankResult?.items ?? []);
 
   const handleProfessionChange = (value: string) => {
     // Profession drives the relevant skill list; reset skills that no longer apply.
@@ -116,7 +126,8 @@ export function Step1Vacancy({ data, update }: WizardStepProps) {
             {data.professionId ? ' — релевантные профессии' : ''}
           </Label>
           <p className="text-xs text-muted-foreground">
-            Выбранные навыки поднимут связанные вопросы наверх на следующем шаге.
+            Стеки совпадают с шагом «Вопросы». Выбранные поднимут связанные
+            вопросы наверх.
           </p>
         </div>
 
@@ -154,7 +165,9 @@ export function Step1Vacancy({ data, update }: WizardStepProps) {
           </div>
         ) : skills.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
-            Сначала выберите профессию, чтобы увидеть релевантные навыки.
+            {data.professionId
+              ? 'Для этой профессии в банке пока нет вопросов — стеки появятся после добавления вопросов.'
+              : 'Сначала выберите профессию, чтобы увидеть стеки из банка вопросов.'}
           </p>
         ) : (
           <div className="flex flex-wrap gap-2">

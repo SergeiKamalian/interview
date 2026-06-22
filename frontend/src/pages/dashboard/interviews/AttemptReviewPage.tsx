@@ -15,20 +15,36 @@ import { AttemptQuickActions } from '@features/attempt-review/ui/AttemptQuickAct
 import { DecisionAuditTimeline } from '@features/attempt-review/ui/DecisionAuditTimeline';
 import { AttemptTeamNotesPanel } from '@features/attempt-review/ui/AttemptTeamNotesPanel';
 import { AttemptShareDialog } from '@features/attempt-review/ui/AttemptShareDialog';
+import { CandidateAttemptStatusBadge } from '@entities/candidate/ui/CandidateAttemptStatusBadge';
+import { getCandidateTableStatus } from '@entities/candidate/lib/candidateAttemptStatus';
 import { CandidateContextPanel } from '@widgets/candidate/CandidateContextPanel';
 import {
   Alert,
   Badge,
   Button,
   Card,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+  PageSectionNav,
   Spinner,
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from '@shared/ui';
+import { TooltipProvider } from '@shared/ui/tooltip';
 import { formatScore, formatUnixDate } from '@shared/lib/format';
 import { cn } from '@shared/lib/utils';
+import { ChevronDownIcon } from 'lucide-react';
+
+const ATTEMPT_REVIEW_SECTIONS = [
+  { id: 'review-decision', label: 'Решение' },
+  { id: 'review-insights', label: 'Выводы' },
+  { id: 'review-verdict', label: 'Оценка ИИ' },
+  { id: 'review-signals', label: 'Навыки' },
+  { id: 'review-details', label: 'Детали' },
+] as const;
 
 type FinalEvaluationDisplay = {
   totalScore: number;
@@ -162,7 +178,6 @@ function recommendationMeta(value?: string | null): {
   label: string;
   badge: 'success' | 'info' | 'warning' | 'destructive' | 'muted';
   decision: string;
-  nextStep: string;
 } {
   switch (value) {
     case 'strong_invite':
@@ -170,21 +185,18 @@ function recommendationMeta(value?: string | null): {
         label: 'Сильно пригласить',
         badge: 'success',
         decision: 'Сильный сигнал: стоит быстро переводить в следующий этап.',
-        nextStep: 'Назначить живое интервью и проверить только отмеченные риски.',
       };
     case 'invite':
       return {
         label: 'Пригласить',
         badge: 'info',
         decision: 'Положительный сигнал: кандидат выглядит релевантно.',
-        nextStep: 'Позвать на следующий этап и пройтись по зонам проверки.',
       };
     case 'maybe':
       return {
         label: 'Под вопросом',
         badge: 'warning',
         decision: 'Смешанный сигнал: есть полезные знания, но нужны уточнения.',
-        nextStep: 'Проверить риски на живом интервью перед решением.',
       };
     case 'reject':
     case 'strong_reject':
@@ -192,28 +204,13 @@ function recommendationMeta(value?: string | null): {
         label: value === 'strong_reject' ? 'Сильно отказать' : 'Отказать',
         badge: 'destructive',
         decision: 'Слабый сигнал: есть существенные пробелы для текущей роли.',
-        nextStep: 'Не тратить много времени, если требования роли не снизятся.',
       };
     default:
       return {
         label: value ? value.replaceAll('_', ' ') : 'Нет рекомендации',
         badge: 'muted',
         decision: 'Решение пока не сформировано.',
-        nextStep: 'Сначала дождаться полной ИИ-оценки или проверить вручную.',
       };
-  }
-}
-
-function attemptStatusLabel(value?: string | null): string {
-  switch (value) {
-    case 'completed':
-      return 'завершено';
-    case 'in_progress':
-      return 'в процессе';
-    case 'abandoned':
-      return 'прервано';
-    default:
-      return value ?? '—';
   }
 }
 
@@ -573,6 +570,7 @@ export function AttemptReviewPage() {
   const needsEvaluation =
     selectedAttempt.status === 'completed' &&
     selectedAttempt.evaluationStatus === 'evaluation_pending';
+  const headerStatus = getCandidateTableStatus(selectedAttempt);
 
   const handleRunEvaluation = async () => {
     setEvalError(null);
@@ -591,42 +589,52 @@ export function AttemptReviewPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 pb-24">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <Link
             to={`/dashboard/interviews/${interviewId}`}
             className="text-sm text-brand-primary hover:underline"
           >
             ← Назад к интервью
           </Link>
-          <h2 className="mt-2 text-xl font-semibold text-foreground">
-            {selectedAttempt.candidateName}
-          </h2>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <h2 className="text-xl font-semibold text-foreground">
+              {selectedAttempt.candidateName}
+            </h2>
+            {headerStatus.showBadge ? (
+              <CandidateAttemptStatusBadge
+                label={headerStatus.label}
+                variant={headerStatus.variant}
+                companyDecision={headerStatus.companyDecision}
+                size="md"
+                className="px-2.5 py-1 text-sm"
+              />
+            ) : null}
+          </div>
           <p className="text-sm text-muted-foreground">
             {selectedAttempt.candidateEmail} · {data.title} · {data.jobRole}
           </p>
         </div>
-        <div className="flex flex-col gap-2">
-          <AttemptShareDialog attemptId={selectedAttempt.attemptId} />
-          <AttemptQuickActions
-          attemptId={selectedAttempt.attemptId}
-          candidateId={selectedAttempt.candidateId}
-          candidateName={selectedAttempt.candidateName}
-          shortlistStatus={selectedAttempt.shortlistStatus}
-          overallScore={displayScore}
-          hireRecommendation={displayHireRecommendation}
-          summary={displaySummary}
-          layout="stack"
-          />
-        </div>
+        <TooltipProvider delay={200}>
+          <div className="flex flex-wrap items-center gap-0.5">
+            <AttemptShareDialog
+              attemptId={selectedAttempt.attemptId}
+              compact
+            />
+            <AttemptQuickActions
+              attemptId={selectedAttempt.attemptId}
+              candidateId={selectedAttempt.candidateId}
+              candidateName={selectedAttempt.candidateName}
+              shortlistStatus={selectedAttempt.shortlistStatus}
+              companyDecision={selectedAttempt.companyDecision}
+              overallScore={displayScore}
+              hireRecommendation={displayHireRecommendation}
+              summary={displaySummary}
+            />
+          </div>
+        </TooltipProvider>
       </div>
-
-      <CandidateContextPanel
-        candidateId={selectedAttempt.candidateId}
-        currentAttemptId={attemptId}
-        currentInterviewId={interviewId}
-      />
 
       {needsEvaluation && (
         <Alert variant="info" title="ИИ-оценка не запущена">
@@ -654,20 +662,12 @@ export function AttemptReviewPage() {
         </div>
       )}
 
-      <AiAssessmentVerdictPanel
-        attemptId={selectedAttempt.attemptId}
-        aiAssessmentVerdict={selectedAttempt.aiAssessmentVerdict}
-        reviewedAt={selectedAttempt.reviewedAt}
-        evaluationReady={evaluationReady}
-      />
-
-      <AttemptTeamNotesPanel attemptId={selectedAttempt.attemptId} />
-
-      <DecisionAuditTimeline attemptId={selectedAttempt.attemptId} />
-
-      <section className="overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-sm">
+      <section
+        id="review-decision"
+        className="scroll-mt-28 overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-sm"
+      >
         <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="space-y-5 p-5 md:p-6">
+          <div className="space-y-4 p-4 md:p-5">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={recommendation.badge}>{recommendation.label}</Badge>
               {displayNeedsManualReview && (
@@ -681,31 +681,23 @@ export function AttemptReviewPage() {
               <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
                 Краткое решение по кандидату
               </p>
-              <h3 className="mt-2 text-2xl font-semibold text-foreground">
+              <h3 className="mt-1 text-xl font-semibold text-foreground md:text-2xl">
                 {recommendation.decision}
               </h3>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
                 {displaySummary ??
                   displayEvaluation?.detailedSummary ??
                   'Короткое резюме появится после финальной ИИ-оценки.'}
               </p>
             </div>
-            <div className="rounded-xl border border-border bg-muted/25 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Следующее действие
-              </p>
-              <p className="mt-1 text-sm font-medium text-foreground">
-                {recommendation.nextStep}
-              </p>
-            </div>
           </div>
-          <div className="border-t border-border bg-muted/20 p-5 md:p-6 lg:border-l lg:border-t-0">
+          <div className="border-t border-border bg-muted/20 p-4 md:p-5 lg:border-l lg:border-t-0">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-              <div className="rounded-2xl border border-border bg-card p-5">
+              <div className="rounded-2xl border border-border bg-card p-4">
                 <div className="flex items-end justify-between gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Итоговая оценка</p>
-                    <p className="mt-1 text-4xl font-semibold tabular-nums text-foreground">
+                    <p className="mt-1 text-3xl font-semibold tabular-nums text-foreground md:text-4xl">
                       {scorePercent === null ? '—' : scorePercent}
                       <span className="text-base text-muted-foreground">/100</span>
                     </p>
@@ -715,24 +707,24 @@ export function AttemptReviewPage() {
                     <p>{evaluationStatusLabel(selectedAttempt.evaluationStatus)}</p>
                   </div>
                 </div>
-                <div className="mt-4 h-3 rounded-full bg-muted">
+                <div className="mt-3 h-2.5 rounded-full bg-muted">
                   <div
-                    className={cn('h-3 rounded-full', scoreTone(scorePercent))}
+                    className={cn('h-2.5 rounded-full', scoreTone(scorePercent))}
                     style={{ width: `${scorePercent ?? 0}%` }}
                   />
                 </div>
               </div>
-              <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-2">
+              <dl className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-2">
+                <div className="rounded-xl border border-border bg-card p-3">
+                  <dt className="text-muted-foreground">Начато</dt>
+                  <dd className="font-medium text-foreground">
+                    {formatUnixDate(selectedAttempt.startedAt)}
+                  </dd>
+                </div>
                 <div className="rounded-xl border border-border bg-card p-3">
                   <dt className="text-muted-foreground">Завершено</dt>
                   <dd className="font-medium text-foreground">
                     {formatUnixDate(selectedAttempt.completedAt)}
-                  </dd>
-                </div>
-                <div className="rounded-xl border border-border bg-card p-3">
-                  <dt className="text-muted-foreground">Попытка</dt>
-                  <dd className="font-medium text-foreground">
-                    {attemptStatusLabel(selectedAttempt.status)}
                   </dd>
                 </div>
               </dl>
@@ -741,7 +733,7 @@ export function AttemptReviewPage() {
         </div>
       </section>
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div id="review-insights" className="scroll-mt-28 grid gap-3 xl:grid-cols-3">
         <InsightColumn
           title="Плюсы"
           description="На что можно опираться при решении."
@@ -762,7 +754,34 @@ export function AttemptReviewPage() {
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+      <div id="review-verdict" className="scroll-mt-28">
+        <AiAssessmentVerdictPanel
+          attemptId={selectedAttempt.attemptId}
+          aiAssessmentVerdict={selectedAttempt.aiAssessmentVerdict}
+          reviewedAt={selectedAttempt.reviewedAt}
+          evaluationReady={evaluationReady}
+        />
+      </div>
+
+      <Collapsible defaultOpen={false}>
+        <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
+          <CollapsibleTrigger className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-2.5 text-left text-sm font-medium text-foreground hover:bg-muted/30">
+            <span>Контекст кандидата и история</span>
+            <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform in-data-panel-open:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-4 border-t border-border p-4">
+            <CandidateContextPanel
+              candidateId={selectedAttempt.candidateId}
+              currentAttemptId={attemptId}
+              currentInterviewId={interviewId}
+            />
+            <AttemptTeamNotesPanel attemptId={selectedAttempt.attemptId} />
+            <DecisionAuditTimeline attemptId={selectedAttempt.attemptId} />
+          </CollapsibleContent>
+        </div>
+      </Collapsible>
+
+      <div id="review-signals" className="scroll-mt-28 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <Card header="Сигналы по навыкам">
           <div className="space-y-3">
             {displayCategoryBreakdown.length > 0 ? (
@@ -840,6 +859,7 @@ export function AttemptReviewPage() {
         </Card>
       </div>
 
+      <div id="review-details" className="scroll-mt-28">
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Решение</TabsTrigger>
@@ -918,6 +938,9 @@ export function AttemptReviewPage() {
           )}
         </TabsContent>
       </Tabs>
+      </div>
+
+      <PageSectionNav sections={ATTEMPT_REVIEW_SECTIONS} />
     </div>
   );
 }

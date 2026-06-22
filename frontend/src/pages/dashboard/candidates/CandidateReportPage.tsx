@@ -1,12 +1,22 @@
 import { Link, useParams } from 'react-router-dom';
 import { useCandidateReportQuery } from '@entities/candidate/api/candidateReportApi';
+import { getShortlistStatusLabel } from '@entities/candidate/lib/companyDecisionLabels';
 import { ShortlistToggleButton } from '@features/shortlist/ui/ShortlistToggleButton';
 import { OverallScoreCard } from '@widgets/score/OverallScoreCard';
 import { CategoryBreakdownChart } from '@widgets/score/CategoryBreakdownChart';
 import { RecommendationCard } from '@widgets/score/RecommendationCard';
 import { DemonstratedLevelCard } from '@widgets/score/DemonstratedLevelCard';
 import { formatScore, formatUnixDate } from '@shared/lib/format';
-import { Alert, Card, Spinner } from '@shared/ui';
+import { Alert, Card, PAGE_SECTION_NAV_LAYOUT, PageSectionNav, Spinner } from '@shared/ui';
+
+const CANDIDATE_REPORT_SECTIONS = [
+  { id: 'report-profile', label: 'Профиль' },
+  { id: 'report-scores', label: 'Оценка' },
+  { id: 'report-insights', label: 'Выводы' },
+  { id: 'report-history', label: 'История' },
+] as const;
+
+const { sectionClassName, pageClassName } = PAGE_SECTION_NAV_LAYOUT;
 
 export function CandidateReportPage() {
   const { candidateId = '' } = useParams();
@@ -40,17 +50,17 @@ export function CandidateReportPage() {
   const evaluation = data.latestFinalEvaluation;
 
   return (
-    <div className="space-y-4">
-      <div>
+    <div className={`space-y-4 ${pageClassName}`}>
+      <div id="report-profile" className={sectionClassName}>
         <h2 className="text-xl font-semibold text-slate-900">{data.fullName}</h2>
         <p className="text-sm text-slate-500">{data.email}</p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card header="Profile">
+      <div className={`grid gap-4 lg:grid-cols-3 ${sectionClassName}`}>
+        <Card header="Профиль">
           <dl className="space-y-2 text-sm">
             <div>
-              <dt className="text-slate-500">Phone</dt>
+              <dt className="text-slate-500">Телефон</dt>
               <dd>{data.phone ?? '—'}</dd>
             </div>
             <div>
@@ -62,13 +72,15 @@ export function CandidateReportPage() {
               <dd>{data.githubUrl ?? '—'}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">Shortlist</dt>
-              <dd className="font-medium">{data.shortlistStatus}</dd>
+              <dt className="text-slate-500">Избранный</dt>
+              <dd className="font-medium">
+                {getShortlistStatusLabel(data.shortlistStatus)}
+              </dd>
             </div>
           </dl>
         </Card>
 
-        <Card header="Shortlist actions" className="lg:col-span-2">
+        <Card header="Избранные" className="lg:col-span-2">
           <ShortlistToggleButton
             candidateId={data.candidateId}
             shortlistStatus={data.shortlistStatus}
@@ -76,7 +88,7 @@ export function CandidateReportPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div id="report-scores" className={`grid gap-4 lg:grid-cols-3 ${sectionClassName}`}>
         <OverallScoreCard score={evaluation?.totalScore} />
         <RecommendationCard
           hireRecommendation={evaluation?.hireRecommendation}
@@ -87,16 +99,18 @@ export function CandidateReportPage() {
       </div>
 
       {evaluation && (
-        <DemonstratedLevelCard
+        <div className={sectionClassName}>
+          <DemonstratedLevelCard
           targetLevel={evaluation.targetLevel}
           achievedLevel={evaluation.achievedLevel}
           achievedLevelMethod={evaluation.achievedLevelMethod}
           achievedLevelNote={evaluation.achievedLevelNote}
           levelBreakdown={evaluation.levelBreakdown}
         />
+        </div>
       )}
 
-      <Card header="Recommendations">
+      <Card id="report-insights" header="Recommendations" className={sectionClassName}>
         {evaluation ? (
           <div className="grid gap-4 md:grid-cols-3 text-sm">
             <div>
@@ -129,7 +143,7 @@ export function CandidateReportPage() {
         )}
       </Card>
 
-      <Card header="Interview history">
+      <Card id="report-history" header="Interview history" className={sectionClassName}>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
@@ -162,6 +176,8 @@ export function CandidateReportPage() {
           </table>
         </div>
       </Card>
+
+      <PageSectionNav sections={CANDIDATE_REPORT_SECTIONS} />
     </div>
   );
 }

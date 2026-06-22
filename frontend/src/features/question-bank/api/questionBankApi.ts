@@ -1,6 +1,11 @@
 import { baseApi } from '@shared/api/baseApi';
 import { GraphqlOperations } from '@shared/api/graphql/operations.registry';
 import type {
+  ArchiveQuestionMutation,
+  ArchiveQuestionMutationVariables,
+  CreateQuestionInput,
+  CreateQuestionMutation,
+  CreateQuestionMutationVariables,
   DraftInterviewFromJobDescriptionInput,
   DraftInterviewFromJobDescriptionMutation,
   DraftInterviewFromJobDescriptionMutationVariables,
@@ -14,6 +19,9 @@ import type {
   SuggestInterviewQuestionsMutation,
   SuggestInterviewQuestionsMutationVariables,
   TopicsQuery,
+  UpdateQuestionInput,
+  UpdateQuestionMutation,
+  UpdateQuestionMutationVariables,
 } from '@shared/api/graphql/generated/graphql';
 import type {
   QuestionBankListResult,
@@ -50,11 +58,18 @@ export const questionBankApi = baseApi.injectEndpoints({
       transformResponse: (response: QuestionBankQuery) => response.questionBank,
       providesTags: ['QuestionBank'],
     }),
-    questionBankList: builder.query<QuestionBankListResult, void>({
-      query: () => ({
+    questionBankList: builder.query<
+      QuestionBankListResult,
+      QuestionBankFilters | void
+    >({
+      query: (filters) => ({
         ...GraphqlOperations.QuestionBankList,
         variables: {
-          filters: { limit: QUESTION_BANK_LIST_LIMIT, offset: 0 },
+          filters: {
+            limit: QUESTION_BANK_LIST_LIMIT,
+            offset: 0,
+            ...filters,
+          },
         },
       }),
       transformResponse: (response: QuestionBankListQuery) =>
@@ -120,6 +135,42 @@ export const questionBankApi = baseApi.injectEndpoints({
       transformResponse: (response: DraftInterviewFromJobDescriptionMutation) =>
         response.draftInterviewFromJobDescription,
     }),
+    createQuestion: builder.mutation<
+      { id: string },
+      CreateQuestionInput
+    >({
+      query: (input) => ({
+        ...GraphqlOperations.CreateQuestion,
+        variables: { input } satisfies CreateQuestionMutationVariables,
+      }),
+      transformResponse: (response: CreateQuestionMutation) =>
+        response.createQuestion,
+      invalidatesTags: ['QuestionBank'],
+    }),
+    updateQuestion: builder.mutation<
+      { id: string },
+      UpdateQuestionInput
+    >({
+      query: (input) => ({
+        ...GraphqlOperations.UpdateQuestion,
+        variables: { input } satisfies UpdateQuestionMutationVariables,
+      }),
+      transformResponse: (response: UpdateQuestionMutation) =>
+        response.updateQuestion,
+      invalidatesTags: (_result, _error, input) => [
+        'QuestionBank',
+        { type: 'QuestionBank', id: input.id },
+      ],
+    }),
+    archiveQuestion: builder.mutation<{ id: string }, string>({
+      query: (id) => ({
+        ...GraphqlOperations.ArchiveQuestion,
+        variables: { id } satisfies ArchiveQuestionMutationVariables,
+      }),
+      transformResponse: (response: ArchiveQuestionMutation) =>
+        response.archiveQuestion,
+      invalidatesTags: ['QuestionBank'],
+    }),
   }),
 });
 
@@ -132,4 +183,7 @@ export const {
   useTopicsQuery,
   useSuggestInterviewQuestionsMutation,
   useDraftInterviewFromJobDescriptionMutation,
+  useCreateQuestionMutation,
+  useUpdateQuestionMutation,
+  useArchiveQuestionMutation,
 } = questionBankApi;

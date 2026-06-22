@@ -6,6 +6,17 @@ import {
 import { useMicrophonePermission } from '@features/media-permissions/microphone/useMicrophonePermission';
 import { InterviewAiAudioControls } from '@features/voice-interview/tts/InterviewAiAudioControls';
 import type { InterviewAiAudioState } from '@features/voice-interview/tts/useInterviewAiAudio';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@shared/ui/alert-dialog';
 import { Button, Input, Spinner } from '@shared/ui';
 
 type Message = {
@@ -37,20 +48,33 @@ type TextInterviewChatProps = {
 
 function resolveMessageLabel(message: Message): string {
   if (message.role === 'candidate') {
-    return message.messageKind === 'follow_up_answer'
-      ? 'Уточняющий ответ'
-      : 'Ваш ответ';
+    if (message.messageKind === 'follow_up_answer') return 'Уточняющий ответ';
+    if (message.messageKind === 'conduct_violation') return 'Ваш ответ';
+    return 'Ваш ответ';
   }
 
-  if (message.messageKind === 'follow_up_question') {
-    return 'Уточняющий вопрос';
-  }
-
-  if (message.messageKind === 'welcome') {
-    return 'Приветствие';
-  }
+  if (message.messageKind === 'follow_up_question') return 'Уточняющий вопрос';
+  if (message.messageKind === 'welcome') return 'Приветствие';
+  if (message.messageKind === 'conduct_warning') return 'Предупреждение';
+  if (message.messageKind === 'conduct_terminated') return 'Интервью завершено';
 
   return 'Основной вопрос';
+}
+
+function resolveMessageStyle(message: Message): string {
+  if (message.role === 'candidate') {
+    return 'bg-slate-100 text-slate-800 ml-8';
+  }
+
+  if (message.messageKind === 'conduct_warning') {
+    return 'bg-amber-50 text-amber-900 border border-amber-200';
+  }
+
+  if (message.messageKind === 'conduct_terminated') {
+    return 'bg-red-50 text-red-900 border border-red-200';
+  }
+
+  return 'bg-blue-50 text-slate-900';
 }
 
 export function TextInterviewChat({
@@ -68,6 +92,7 @@ export function TextInterviewChat({
   onComplete,
 }: TextInterviewChatProps) {
   const [answer, setAnswer] = useState('');
+  const [isCompleting, setIsCompleting] = useState(false);
   const microphone = useMicrophonePermission();
   const showCurrentQuestion =
     Boolean(currentQuestionText) &&
@@ -83,6 +108,15 @@ export function TextInterviewChat({
     setAnswer('');
   };
 
+  const handleConfirmComplete = async () => {
+    setIsCompleting(true);
+    try {
+      await onComplete();
+    } finally {
+      setIsCompleting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="max-h-96 space-y-3 overflow-y-auto rounded-xl border border-slate-200 bg-white p-4">
@@ -91,9 +125,7 @@ export function TextInterviewChat({
             key={message.id}
             className={[
               'rounded-lg px-3 py-2 text-sm',
-              message.role === 'ai'
-                ? 'bg-blue-50 text-slate-900'
-                : 'bg-slate-100 text-slate-800 ml-8',
+              resolveMessageStyle(message),
             ].join(' ')}
           >
             <p className="mb-1 text-xs font-medium uppercase text-slate-500">
@@ -110,7 +142,12 @@ export function TextInterviewChat({
           </div>
         ))}
         {streamingMessage ? (
-          <div className="rounded-lg bg-blue-50 px-3 py-2 text-sm text-slate-900">
+          <div
+            className={[
+              'rounded-lg px-3 py-2 text-sm',
+              resolveMessageStyle(streamingMessage),
+            ].join(' ')}
+          >
             <p className="mb-1 text-xs font-medium uppercase text-slate-500">
               {resolveMessageLabel(streamingMessage)}
             </p>
@@ -170,13 +207,47 @@ export function TextInterviewChat({
             placeholder="Введите ответ…"
             disabled={isSubmitting}
           />
-          <Button
-            onClick={() => void handleSubmit()}
-            loading={isSubmitting}
-            disabled={!answer.trim() || isSubmitting}
-          >
-            Отправить ответ
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => void handleSubmit()}
+              loading={isSubmitting}
+              disabled={!answer.trim() || isSubmitting}
+            >
+              Отправить ответ
+            </Button>
+
+            <AlertDialog>
+              <AlertDialogTrigger>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={isSubmitting || isCompleting}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  Завершить интервью
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Завершить интервью?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Вы уверены, что хотите завершить интервью досрочно? Ответы
+                    на оставшиеся вопросы не будут засчитаны, и это может
+                    повлиять на итоговую оценку.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Нет, продолжить</AlertDialogCancel>
+                  <AlertDialogAction
+                    variant="destructive"
+                    onClick={() => void handleConfirmComplete()}
+                  >
+                    Да, завершить
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </div>
       )}
 

@@ -2,6 +2,8 @@ import { Field, InputType, Int } from '@nestjs/graphql';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
@@ -11,7 +13,9 @@ import {
 import {
   QuestionDifficultyEnum,
   QuestionLevelEnum,
+  QuestionStatusEnum,
 } from '../types/question.type';
+import { QuestionScopeEnum } from '../types/question-scope.type';
 
 @InputType()
 export class QuestionBankFilterInput {
@@ -57,4 +61,20 @@ export class QuestionBankFilterInput {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @Field(() => QuestionScopeEnum, { nullable: true })
+  @IsOptional()
+  @IsEnum(QuestionScopeEnum)
+  scope?: QuestionScopeEnum;
+
+  @Field(() => QuestionStatusEnum, { nullable: true })
+  @IsOptional()
+  @IsEnum(QuestionStatusEnum)
+  status?: QuestionStatusEnum;
+
+  /** When true, global questions replaced by a published company fork stay visible. */
+  @Field({ nullable: true, defaultValue: false })
+  @IsOptional()
+  @IsBoolean()
+  includeForkReplacedGlobal?: boolean;
 }

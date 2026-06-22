@@ -35,3 +35,8 @@ export { Separator } from './separator';
 export { ScrollArea, ScrollBar } from './scroll-area';
 export { Label } from './label';
 export { ThemeToggle } from './ThemeToggle/ThemeToggle';
+export { PageSectionDock, type PageSectionDockItem } from './PageSectionDock';
+export {
+  PageSectionNav,
+  PAGE_SECTION_NAV_LAYOUT,
+} from './PageSectionNav';

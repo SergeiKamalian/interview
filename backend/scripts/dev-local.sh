@@ -46,6 +46,7 @@ COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-ai-interviewer-local}"
 COMPOSE_SERVICES="${COMPOSE_SERVICES:-mysql redis}"
 SKIP_DOCKER="${SKIP_DOCKER:-0}"
 SKIP_MIGRATE="${SKIP_MIGRATE:-0}"
+DOCKER_START_TIMEOUT="${DOCKER_START_TIMEOUT:-120}"
 
 children=()
 
@@ -81,18 +82,111 @@ docker_compose() {
   docker compose -p "$COMPOSE_PROJECT_NAME" -f "$MONOREPO_ROOT/docker-compose.yml" "$@"
 }
 
+docker_daemon_ready() {
+  docker info >/dev/null 2>&1
+}
+
+start_docker_daemon() {
+  case "$(uname -s)" in
+    Darwin)
+      if [[ -d /Applications/Docker.app ]]; then
+        open -ga Docker
+      elif [[ -d "/Applications/Docker Desktop.app" ]]; then
+        open -ga "Docker Desktop"
+      else
+        echo "Docker Desktop not found in /Applications. Install or start Docker manually." >&2
+        return 1
+      fi
+      ;;
+    Linux)
+      if command -v systemctl >/dev/null 2>&1; then
+        if systemctl start docker >/dev/null 2>&1; then
+          :
+        elif sudo -n systemctl start docker >/dev/null 2>&1; then
+          :
+        else
+          echo "Could not start docker service. Try: sudo systemctl start docker" >&2
+          return 1
+        fi
+      else
+        echo "Please start the Docker daemon manually." >&2
+        return 1
+      fi
+      ;;
+    MINGW* | MSYS* | CYGWIN*)
+      local docker_desktop_exe="${ProgramFiles:-/c/Program Files}/Docker/Docker/Docker Desktop.exe"
+      if [[ -f "$docker_desktop_exe" ]]; then
+        cmd.exe /c start "" "$docker_desktop_exe" >/dev/null 2>&1 || true
+      else
+        echo "Docker Desktop not found. Start it manually." >&2
+        return 1
+      fi
+      ;;
+    *)
+      echo "Unsupported OS for auto-starting Docker. Start the daemon manually." >&2
+      return 1
+      ;;
+  esac
+}
+
+ensure_docker_daemon() {
+  if docker_daemon_ready; then
+    return 0
+  fi
+
+  echo "Docker daemon is not running — starting it..."
+  if ! start_docker_daemon; then
+    exit 1
+  fi
+
+  local waited=0
+  echo "Waiting for Docker daemon (timeout: ${DOCKER_START_TIMEOUT}s)..."
+  while ! docker_daemon_ready; do
+    if (( waited >= DOCKER_START_TIMEOUT )); then
+      echo "Timed out waiting for Docker daemon after ${DOCKER_START_TIMEOUT}s." >&2
+      echo "Open Docker Desktop manually and retry." >&2
+      exit 1
+    fi
+    sleep 2
+    waited=$((waited + 2))
+  done
+
+  echo "Docker daemon is ready."
+}
+
+ensure_compose_services() {
+  local -a services=("$@")
+  local service
+  local -a missing=()
+
+  for service in "${services[@]}"; do
+    if ! docker_compose ps --status running --services 2>/dev/null | grep -qx "$service"; then
+      missing+=("$service")
+    fi
+  done
+
+  if ((${#missing[@]} == 0)); then
+    echo "Compose services already running in project $COMPOSE_PROJECT_NAME: $COMPOSE_SERVICES"
+    return 0
+  fi
+
+  echo "Starting Docker services in project $COMPOSE_PROJECT_NAME: ${missing[*]}"
+  (
+    cd "$MONOREPO_ROOT"
+    docker_compose up -d --wait "${missing[@]}"
+  )
+}
+
 if [[ "$SKIP_DOCKER" != "1" ]]; then
   if ! command -v docker >/dev/null 2>&1; then
     echo "docker is required for local MySQL/Redis (or set SKIP_DOCKER=1)" >&2
     exit 1
   fi
 
+  ensure_docker_daemon
+
   read -r -a compose_services <<< "$COMPOSE_SERVICES"
-  echo "Starting Docker services in project $COMPOSE_PROJECT_NAME: $COMPOSE_SERVICES"
-  (
-    cd "$MONOREPO_ROOT"
-    docker_compose up -d --wait "${compose_services[@]}"
-  )
+  ensure_compose_services "${compose_services[@]}"
 else
   echo "SKIP_DOCKER=1 — assuming MySQL/Redis are already available"
 fi

@@ -40,7 +40,7 @@ const navMain = [
     icon: <ListIcon />,
   },
   {
-    title: 'Review queue',
+    title: 'Очередь проверки',
     url: '/dashboard/review',
     icon: <ListChecksIcon />,
   },
@@ -59,7 +59,7 @@ const navMain = [
 const documents = [
   {
     name: 'Банк вопросов',
-    url: '/dashboard/questions',
+    url: '/dashboard/question-bank',
     icon: <DatabaseIcon />,
   },
   {

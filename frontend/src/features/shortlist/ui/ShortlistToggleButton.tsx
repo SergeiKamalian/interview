@@ -42,7 +42,7 @@ export function ShortlistToggleButton({
       <Input
         value={reason}
         onChange={(event) => setReason(event.target.value)}
-        placeholder="Причина / recruiter note (optional)"
+        placeholder="Причина или заметка (необязательно)"
       />
       {isShortlisted ? (
         <div className="flex flex-wrap gap-2">
@@ -52,22 +52,22 @@ export function ShortlistToggleButton({
               disabled={isPending}
               onClick={() => setShowConfirmRemove(true)}
             >
-              Remove from shortlist
+              Убрать из избранных
             </Button>
           ) : (
             <>
               <Button variant="primary" disabled={isPending} onClick={() => void handleRemove()}>
-                Confirm remove
+                Подтвердить удаление
               </Button>
               <Button variant="ghost" onClick={() => setShowConfirmRemove(false)}>
-                Cancel
+                Отмена
               </Button>
             </>
           )}
         </div>
       ) : (
         <Button variant="primary" disabled={isPending} onClick={() => void handleAdd()}>
-          {isPending ? 'Saving…' : 'Add to shortlist'}
+          {isPending ? 'Сохранение…' : 'Добавить в избранные'}
         </Button>
       )}
     </div>

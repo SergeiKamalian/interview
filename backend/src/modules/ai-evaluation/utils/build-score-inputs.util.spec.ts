@@ -125,6 +125,66 @@ describe('buildScoreInputs', () => {
     ]);
   });
 
+  it('adds zero-score inputs for interview questions without evaluations', () => {
+    const questionMetaById = new Map([
+      [38, makeQuestion({ id: 38, level: 'middle', maxScore: 9 })],
+      [39, makeQuestion({ id: 39, level: 'senior', maxScore: 7 })],
+    ]);
+
+    const inputs = buildScoreInputs({
+      useAdaptiveSummaries: false,
+      adaptiveSummaries: [],
+      questionEvaluations: [
+        makeEvaluation({ interviewQuestionId: 38, score: 6.27, maxScore: 9 }),
+      ],
+      questionMetaById,
+    });
+
+    expect(inputs).toEqual([
+      expect.objectContaining({
+        interviewQuestionId: 38,
+        score: 6.27,
+        maxScore: 9,
+      }),
+      expect.objectContaining({
+        interviewQuestionId: 39,
+        score: 0,
+        maxScore: 7,
+        level: 'senior',
+      }),
+    ]);
+  });
+
+  it('adds zero-score inputs for interview questions without adaptive summaries', () => {
+    const questionMetaById = new Map([
+      [38, makeQuestion({ id: 38, level: 'middle', maxScore: 9 })],
+      [39, makeQuestion({ id: 39, level: 'senior', maxScore: 7 })],
+    ]);
+
+    const inputs = buildScoreInputs({
+      useAdaptiveSummaries: true,
+      adaptiveSummaries: [
+        makeSummary({ interviewQuestionId: 38, score: 6.27, maxScore: 9 }),
+      ],
+      questionEvaluations: [],
+      questionMetaById,
+    });
+
+    expect(inputs).toEqual([
+      expect.objectContaining({
+        interviewQuestionId: 38,
+        score: 6.27,
+        maxScore: 9,
+      }),
+      expect.objectContaining({
+        interviewQuestionId: 39,
+        score: 0,
+        maxScore: 7,
+        level: 'senior',
+      }),
+    ]);
+  });
+
   it('defaults level/difficulty when question meta is missing', () => {
     const inputs = buildScoreInputs({
       useAdaptiveSummaries: true,

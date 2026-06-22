@@ -35,4 +35,12 @@ export class SuggestInterviewQuestionsInput {
   @Min(1)
   @Max(50)
   count?: number;
+
+  /** Question ids to exclude from AI/fallback pool (e.g. playbook items already selected). */
+  @Field(() => [String], { nullable: true })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsString({ each: true })
+  excludeQuestionIds?: string[];
 }

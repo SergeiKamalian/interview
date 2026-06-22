@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCompanyReviewQueueQuery } from '@entities/candidate/api/reviewQueueApi';
+import { getShortlistStatusLabel } from '@entities/candidate/lib/companyDecisionLabels';
+import { getHireRecommendationMeta } from '@entities/candidate/lib/hireRecommendationMeta';
 import { useDebouncedValue } from '@shared/lib/useDebouncedValue';
 import { formatScore, formatUnixDate } from '@shared/lib/format';
-import { Alert, Badge, Button, Card, CheckboxField, Input, SelectField, Spinner } from '@shared/ui';
+import { Alert, Badge, Button, Card, CheckboxField, Input, PAGE_SECTION_NAV_LAYOUT, PageSectionNav, SelectField, Spinner } from '@shared/ui';
 import {
+  PaginatedTable,
   Table,
   TableBody,
   TableCell,
@@ -30,7 +33,7 @@ function evaluationStatusLabel(status: string) {
   }
 
   if (status === 'evaluation_pending') {
-    return 'Нужна AI-оценка';
+    return 'Ожидает оценки';
   }
 
   return status;
@@ -41,8 +44,15 @@ function recommendationLabel(value: string | null | undefined) {
     return '—';
   }
 
-  return value.replaceAll('_', ' ');
+  return getHireRecommendationMeta(value).label;
 }
+
+const REVIEW_QUEUE_SECTIONS = [
+  { id: 'review-queue-filters', label: 'Фильтры' },
+  { id: 'review-queue-list', label: 'Список' },
+] as const;
+
+const { sectionClassName, pageClassName } = PAGE_SECTION_NAV_LAYOUT;
 
 export function ReviewQueuePage() {
   const [search, setSearch] = useState('');
@@ -79,13 +89,12 @@ export function ReviewQueuePage() {
     useCompanyReviewQueueQuery(filters);
 
   const items = data?.items ?? [];
-  const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 ${pageClassName}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-foreground">Review queue</h2>
+          <h2 className="text-xl font-semibold text-foreground">Очередь проверки</h2>
           <p className="text-sm text-muted-foreground">
             Завершённые интервью, которые компания должна посмотреть после прохождения.
           </p>
@@ -96,7 +105,7 @@ export function ReviewQueuePage() {
       </div>
 
       <Card>
-        <div className="mb-4 grid gap-3 md:grid-cols-5">
+        <div id="review-queue-filters" className={`mb-4 grid gap-3 md:grid-cols-5 ${sectionClassName}`}>
           <Input
             value={search}
             onChange={(event) => {
@@ -122,7 +131,7 @@ export function ReviewQueuePage() {
             options={sortOptions}
           />
           <CheckboxField
-            label="Только shortlist"
+            label="Только избранные"
             checked={shortlistedOnly}
             onCheckedChange={(checked) => {
               setShortlistedOnly(checked);
@@ -142,12 +151,12 @@ export function ReviewQueuePage() {
         {isLoading && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Spinner />
-            Загрузка review queue…
+            Загрузка очереди проверки…
           </div>
         )}
 
         {isError && (
-          <Alert variant="error" title="Не удалось загрузить review queue">
+          <Alert variant="error" title="Не удалось загрузить очередь проверки">
             {'message' in (error as object)
               ? String((error as { message: string }).message)
               : 'Unknown error'}
@@ -161,20 +170,29 @@ export function ReviewQueuePage() {
         )}
 
         {!isLoading && !isError && items.length > 0 && (
+          <div id="review-queue-list" className={sectionClassName}>
           <>
+            <PaginatedTable
+              pagination={{
+                page: data?.page ?? page,
+                pageSize: data?.pageSize ?? 20,
+                total: data?.total ?? 0,
+                onPageChange: setPage,
+              }}
+            >
             <div className="rounded-xl border border-border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Candidate</TableHead>
-                    <TableHead>Interview</TableHead>
-                    <TableHead>Completed</TableHead>
-                    <TableHead>Evaluation</TableHead>
-                    <TableHead>Score</TableHead>
-                    <TableHead>Recommendation</TableHead>
-                    <TableHead>Level</TableHead>
-                    <TableHead>Shortlist</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead>Кандидат</TableHead>
+                    <TableHead>Интервью</TableHead>
+                    <TableHead>Завершено</TableHead>
+                    <TableHead>Оценка</TableHead>
+                    <TableHead>Балл</TableHead>
+                    <TableHead>Рекомендация</TableHead>
+                    <TableHead>Уровень</TableHead>
+                    <TableHead>Избранный</TableHead>
+                    <TableHead>Действия</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -237,7 +255,7 @@ export function ReviewQueuePage() {
                               : 'muted'
                           }
                         >
-                          {item.shortlistStatus}
+                          {getShortlistStatusLabel(item.shortlistStatus)}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -246,13 +264,13 @@ export function ReviewQueuePage() {
                             to={`/dashboard/candidates/${item.candidateId}/report`}
                             className="text-sm text-brand-primary hover:underline"
                           >
-                            Report
+                            Отчёт
                           </Link>
                           <Link
                             to={`/dashboard/interviews/${item.interviewId}/attempts/${item.attemptId}/review`}
                             className="text-sm text-brand-primary hover:underline"
                           >
-                            Details
+                            Проверить
                           </Link>
                         </div>
                       </TableCell>
@@ -261,33 +279,13 @@ export function ReviewQueuePage() {
                 </TableBody>
               </Table>
             </div>
-
-            <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-              <span>
-                Страница {data?.page ?? 1} из {totalPages} · всего {data?.total ?? 0}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((value) => Math.max(1, value - 1))}
-                >
-                  Назад
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((value) => value + 1)}
-                >
-                  Вперёд
-                </Button>
-              </div>
-            </div>
+            </PaginatedTable>
           </>
+          </div>
         )}
       </Card>
+
+      <PageSectionNav sections={REVIEW_QUEUE_SECTIONS} />
     </div>
   );
 }

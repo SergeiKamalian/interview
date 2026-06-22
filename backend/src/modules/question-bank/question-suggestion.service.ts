@@ -59,17 +59,35 @@ export class QuestionSuggestionService {
       MAX_CANDIDATE_POOL,
     );
 
-    const candidates = await this.repository.findSuggestionCandidates(
-      companyId,
-      {
-        professionId,
-        level: input.level,
-        skillIds,
-        limit: poolLimit,
-      },
+    const filterParams = {
+      professionId,
+      level: input.level,
+      skillIds,
+    };
+
+    const excludeIdSet = new Set(
+      (input.excludeQuestionIds ?? [])
+        .map((id) => Number(id))
+        .filter((id) => Number.isInteger(id) && id > 0),
     );
 
-    if (candidates.length === 0) {
+    const requiredCandidates = (
+      await this.repository.findRequiredSuggestionCandidates(
+        companyId,
+        filterParams,
+      )
+    ).filter((candidate) => !excludeIdSet.has(candidate.id));
+    const requiredIds = requiredCandidates.map((candidate) => candidate.id);
+    const requiredIdSet = new Set(requiredIds);
+
+    const candidates = (
+      await this.repository.findSuggestionCandidates(companyId, {
+        ...filterParams,
+        limit: poolLimit,
+      })
+    ).filter((candidate) => !excludeIdSet.has(candidate.id));
+
+    if (candidates.length === 0 && requiredIds.length === 0) {
       return {
         questionIds: [],
         questions: [],
@@ -79,21 +97,31 @@ export class QuestionSuggestionService {
       };
     }
 
-    const candidateIds = new Set(candidates.map((candidate) => candidate.id));
-
-    const aiSelection = await this.selectWithAi(
-      professionId,
-      input.level,
-      skillIds,
-      count,
-      candidates,
-      candidateIds,
+    const poolCandidates = candidates.filter(
+      (candidate) => !requiredIdSet.has(candidate.id),
     );
+    const candidateIds = new Set(poolCandidates.map((candidate) => candidate.id));
+    const remainingCount = Math.max(0, count - requiredIds.length);
 
-    const selectedIds =
+    const aiSelection =
+      remainingCount > 0 && poolCandidates.length > 0
+        ? await this.selectWithAi(
+            companyId,
+            professionId,
+            input.level,
+            skillIds,
+            remainingCount,
+            poolCandidates,
+            candidateIds,
+          )
+        : [];
+
+    const remainderIds =
       aiSelection.length > 0
         ? aiSelection
-        : this.fallbackSelection(candidates, count);
+        : this.fallbackSelection(poolCandidates, remainingCount);
+
+    const selectedIds = this.mergeSelection(requiredIds, remainderIds, count);
 
     const questions = await this.loadQuestions(companyId, selectedIds);
 
@@ -107,6 +135,7 @@ export class QuestionSuggestionService {
   }
 
   private async selectWithAi(
+    companyId: number,
     professionId: number,
     level: SuggestInterviewQuestionsInput['level'],
     skillIds: number[],
@@ -117,7 +146,7 @@ export class QuestionSuggestionService {
     try {
       const skillCodes =
         skillIds.length > 0
-          ? (await this.repository.findSkillsByIds(skillIds)).map(
+          ? (await this.repository.findSkillsByIds(companyId, skillIds)).map(
               (skill) => skill.code,
             )
           : [];
@@ -199,8 +228,34 @@ export class QuestionSuggestionService {
   }
 
   /**
+   * Prepend pinned required ids, then append remainder without duplicates.
+   */
+  private mergeSelection(
+    requiredIds: number[],
+    remainderIds: number[],
+    count: number,
+  ): number[] {
+    const seen = new Set<number>();
+    const merged: number[] = [];
+
+    for (const id of [...requiredIds, ...remainderIds]) {
+      if (seen.has(id)) {
+        continue;
+      }
+      seen.add(id);
+      merged.push(id);
+      if (merged.length >= count) {
+        break;
+      }
+    }
+
+    return merged;
+  }
+
+  /**
    * Deterministic, topic-diverse selection used when the LLM is unavailable.
-   * Candidates arrive ordered by interview_weight DESC, id ASC.
+   * Candidates arrive ordered by is_required, company boost, company_priority,
+   * interview_weight DESC, id ASC.
    */
   private fallbackSelection(
     candidates: SuggestionCandidateEntity[],

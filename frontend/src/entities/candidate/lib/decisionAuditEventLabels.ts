@@ -1,3 +1,5 @@
+import { getCompanyDecisionActionLabel } from './companyDecisionLabels';
+
 type DecisionAuditEvent = {
   source: string;
   action: string;
@@ -6,10 +8,10 @@ type DecisionAuditEvent = {
 };
 
 const companyDecisionLabels: Record<string, string> = {
-  shortlist: 'shortlist',
-  reject: 'отклонить',
-  invite_live: 'на live',
-  hold: 'отложить',
+  shortlist: getCompanyDecisionActionLabel('shortlist'),
+  reject: getCompanyDecisionActionLabel('reject'),
+  invite_live: getCompanyDecisionActionLabel('invite_live'),
+  hold: getCompanyDecisionActionLabel('hold'),
 };
 
 const aiVerdictLabels: Record<string, string> = {
@@ -20,18 +22,18 @@ const aiVerdictLabels: Record<string, string> = {
 export function formatDecisionAuditAction(event: DecisionAuditEvent): string {
   if (event.source === 'shortlist') {
     if (event.action === 'added') {
-      return 'Добавлен в shortlist';
+      return 'Добавлен в список избранных';
     }
 
     if (event.action === 'removed') {
-      return 'Убран из shortlist';
+      return 'Убран из списка избранных';
     }
 
     if (event.action === 'note_added') {
-      return 'Добавлена заметка в shortlist';
+      return 'Добавлена заметка к избранному кандидату';
     }
 
-    return `Shortlist: ${event.action}`;
+    return `Избранные: ${event.action}`;
   }
 
   if (event.action === 'review_started') {
@@ -39,7 +41,7 @@ export function formatDecisionAuditAction(event: DecisionAuditEvent): string {
   }
 
   if (event.action === 'ai_verdict_set' && event.newValue) {
-    return aiVerdictLabels[event.newValue] ?? `Вердикт ИИ: ${event.newValue}`;
+    return aiVerdictLabels[event.newValue] ?? `Оценка ИИ: ${event.newValue}`;
   }
 
   if (event.action === 'company_decision_set' && event.newValue) {

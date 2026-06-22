@@ -5,7 +5,9 @@ import type {
   QuestionLevel,
 } from '@entities/question/model/types';
 
-type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>['variant']>;
+export type BadgeVariant = NonNullable<
+  VariantProps<typeof badgeVariants>['variant']
+>;
 
 /**
  * Shared, semantic colors for question meta badges so difficulty/level read at a

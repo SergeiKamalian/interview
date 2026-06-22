@@ -8,7 +8,15 @@ import { ThinkingSoundService } from './thinking-sound.service';
 @Module({
   imports: [UsageLoggingModule],
   controllers: [ThinkingSoundController],
-  providers: [ElevenLabsConfigService, ElevenLabsTtsService, ThinkingSoundService],
-  exports: [ElevenLabsConfigService, ElevenLabsTtsService, ThinkingSoundService],
+  providers: [
+    ElevenLabsConfigService,
+    ElevenLabsTtsService,
+    ThinkingSoundService,
+  ],
+  exports: [
+    ElevenLabsConfigService,
+    ElevenLabsTtsService,
+    ThinkingSoundService,
+  ],
 })
 export class ElevenLabsModule {}

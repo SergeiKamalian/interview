@@ -80,6 +80,7 @@ describe('FinalEvaluationService achieved level persistence', () => {
       interviewRepository,
       questionEvaluationRepository,
       upsertByAttemptId,
+      scoringService,
     };
   }
 
@@ -194,5 +195,65 @@ describe('FinalEvaluationService achieved level persistence', () => {
 
     expect(payload.achievedLevel).toBeNull();
     expect(payload.achievedLevelMethod).toBe('estimate');
+  });
+
+  it('scores unanswered interview questions as zero instead of blocking final evaluation', async () => {
+    const {
+      service,
+      interviewRepository,
+      questionEvaluationRepository,
+      upsertByAttemptId,
+      scoringService,
+    } = setup();
+
+    interviewRepository.findAttemptByIdForCompany.mockResolvedValue({
+      status: 'completed',
+      interviewId: 7,
+    });
+    interviewRepository.listQuestionsForInterview.mockResolvedValue([
+      {
+        id: 1,
+        level: 'junior',
+        topicName: 't1',
+        difficulty: 'easy',
+        maxScore: 10,
+        topicWeight: 1,
+      },
+      {
+        id: 2,
+        level: 'middle',
+        topicName: 't2',
+        difficulty: 'medium',
+        maxScore: 10,
+        topicWeight: 1,
+      },
+    ]);
+    questionEvaluationRepository.findByAttemptId.mockResolvedValue([
+      {
+        interviewQuestionId: 1,
+        score: 6,
+        maxScore: 10,
+        needsManualReview: false,
+        shortSummary: 'Answered first question',
+      },
+    ]);
+
+    upsertByAttemptId.mockResolvedValue({ id: 3 });
+
+    await service.evaluateAndPersistFinalEvaluation(1, 104);
+
+    expect(scoringService.calculateInterviewScore).toHaveBeenCalledWith([
+      expect.objectContaining({
+        interviewQuestionId: 1,
+        score: 6,
+        maxScore: 10,
+      }),
+      expect.objectContaining({
+        interviewQuestionId: 2,
+        score: 0,
+        maxScore: 10,
+      }),
+    ]);
+    expect(upsertByAttemptId).toHaveBeenCalledTimes(1);
   });
 });

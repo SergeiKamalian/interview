@@ -3,6 +3,7 @@ type Env = {
   readonly apiUrl: string;
   readonly appName: string;
   readonly interviewAudioEnabled: boolean;
+  readonly interviewThinkingSoundEnabled: boolean;
   readonly dashboardMock: boolean;
 };
 
@@ -12,6 +13,8 @@ function readEnv(): Env {
   const appName = import.meta.env.VITE_APP_NAME ?? 'AI Interviewer';
   const interviewAudioEnabled =
     import.meta.env.VITE_INTERVIEW_AUDIO_ENABLED !== 'false';
+  const interviewThinkingSoundEnabled =
+    import.meta.env.VITE_INTERVIEW_THINKING_SOUND_ENABLED === 'true';
   const dashboardMock = import.meta.env.VITE_DASHBOARD_MOCK === 'true';
 
   if (import.meta.env.DEV && !graphqlUrl) {
@@ -23,6 +26,7 @@ function readEnv(): Env {
     apiUrl,
     appName,
     interviewAudioEnabled,
+    interviewThinkingSoundEnabled,
     dashboardMock,
   };
 }

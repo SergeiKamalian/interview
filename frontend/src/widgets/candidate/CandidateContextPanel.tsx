@@ -6,6 +6,7 @@ import {
   PhoneIcon,
 } from 'lucide-react';
 import { useCandidateReportQuery } from '@entities/candidate/api/candidateReportApi';
+import { getShortlistStatusLabel } from '@entities/candidate/lib/companyDecisionLabels';
 import { Badge, Card, Spinner } from '@shared/ui';
 import { formatScore, formatUnixDate } from '@shared/lib/format';
 import { cn } from '@shared/lib/utils';
@@ -53,16 +54,6 @@ function attemptStatusLabel(value?: string | null): string {
   }
 }
 
-function shortlistLabel(value?: string | null): string {
-  switch (value) {
-    case 'shortlisted':
-      return 'В shortlist';
-    case 'not_shortlisted':
-      return 'Не в shortlist';
-    default:
-      return value ?? '—';
-  }
-}
 
 function ContactLink({
   href,
@@ -200,7 +191,7 @@ export function CandidateContextPanel({
                 data.shortlistStatus === 'shortlisted' ? 'success' : 'muted'
               }
             >
-              {shortlistLabel(data.shortlistStatus)}
+              {getShortlistStatusLabel(data.shortlistStatus ?? '')}
             </Badge>
             {evaluation?.achievedLevel ? (
               <Badge variant="secondary">

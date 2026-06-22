@@ -23,33 +23,62 @@ export function buildScoreInputs(input: {
   const { useAdaptiveSummaries, adaptiveSummaries, questionEvaluations } =
     input;
 
+  const interviewQuestionIds = [...input.questionMetaById.keys()];
+
   if (useAdaptiveSummaries) {
-    return adaptiveSummaries.map((summary) => {
-      const question = input.questionMetaById.get(summary.interviewQuestionId);
+    const summaryByQuestionId = new Map(
+      adaptiveSummaries.map((summary) => [summary.interviewQuestionId, summary]),
+    );
+    const ids = [
+      ...interviewQuestionIds,
+      ...adaptiveSummaries
+        .map((summary) => summary.interviewQuestionId)
+        .filter((id) => !input.questionMetaById.has(id)),
+    ];
+
+    return ids.map((interviewQuestionId) => {
+      const question = input.questionMetaById.get(interviewQuestionId);
+      const summary = summaryByQuestionId.get(interviewQuestionId);
+
       return {
-        interviewQuestionId: summary.interviewQuestionId,
+        interviewQuestionId,
         topicName: question?.topicName ?? null,
         difficulty: question?.difficulty ?? 'intermediate',
         level: question?.level ?? 'middle',
-        score: summary.score,
-        maxScore: summary.maxScore,
+        score: summary?.score ?? 0,
+        maxScore: summary?.maxScore ?? question?.maxScore ?? 0,
         topicWeight: question?.topicWeight,
-        needsManualReview: summary.needsManualReview,
+        needsManualReview: summary?.needsManualReview ?? false,
       };
     });
   }
 
-  return questionEvaluations.map((evaluation) => {
-    const question = input.questionMetaById.get(evaluation.interviewQuestionId);
+  const evaluationByQuestionId = new Map(
+    questionEvaluations.map((evaluation) => [
+      evaluation.interviewQuestionId,
+      evaluation,
+    ]),
+  );
+  const ids = [
+    ...interviewQuestionIds,
+    ...questionEvaluations
+      .map((evaluation) => evaluation.interviewQuestionId)
+      .filter((id) => !input.questionMetaById.has(id)),
+  ];
+
+  return ids.map((interviewQuestionId) => {
+    const question = input.questionMetaById.get(interviewQuestionId);
+    const evaluation = evaluationByQuestionId.get(interviewQuestionId);
+
     return {
-      interviewQuestionId: evaluation.interviewQuestionId,
+      interviewQuestionId,
       topicName: question?.topicName ?? null,
       difficulty: question?.difficulty ?? 'intermediate',
       level: question?.level ?? 'middle',
-      score: evaluation.score,
-      maxScore: evaluation.maxScore,
+      score: evaluation?.score ?? 0,
+      maxScore: evaluation?.maxScore ?? question?.maxScore ?? 0,
       topicWeight: question?.topicWeight,
-      needsManualReview: evaluation.needsManualReview,
+      needsManualReview: evaluation?.needsManualReview ?? false,
     };
   });
 }

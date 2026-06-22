@@ -1,4 +1,5 @@
 import type { AnswerExampleEntity } from './entities/answer-example.entity';
+import type { CompanyQuestionOverrideEntity } from './entities/company-question-override.entity';
 import type { ProfessionEntity } from './entities/profession.entity';
 import type { QuestionCheckpointEntity } from './entities/question-checkpoint.entity';
 import type { QuestionWithDetailsEntity } from './entities/question.entity';
@@ -12,8 +13,13 @@ import type { QuestionCheckpointType } from './types/question-checkpoint.type';
 import {
   QuestionDifficultyEnum,
   QuestionLevelEnum,
+  QuestionStatusEnum,
   type QuestionType,
 } from './types/question.type';
+import type {
+  CompanyQuestionOverrideType,
+  OverrideAnswerExampleType,
+} from './types/company-question-override.type';
 import type { ProfessionType } from './types/profession.type';
 import type { SkillType } from './types/skill.type';
 import type { TopicType } from './types/topic.type';
@@ -35,6 +41,7 @@ export function mapTopicToGraphql(topic: TopicEntity): TopicType {
     name: topic.name,
     interviewWeight: topic.interviewWeight,
     skill: topic.skill ? mapSkillToGraphql(topic.skill) : null,
+    isCustom: topic.companyId != null,
   };
 }
 
@@ -43,12 +50,15 @@ export function mapSkillToGraphql(skill: SkillEntity): SkillType {
     id: String(skill.id),
     code: skill.code,
     name: skill.name,
+    isCustom: skill.companyId != null,
   };
 }
 
 export function mapCheckpointToGraphql(
   checkpoint: QuestionCheckpointEntity,
 ): QuestionCheckpointType {
+  const hints = checkpoint.evaluationHints;
+
   return {
     id: String(checkpoint.id),
     checkpointKey: checkpoint.checkpointKey,
@@ -56,6 +66,42 @@ export function mapCheckpointToGraphql(
     expected: checkpoint.expected,
     score: checkpoint.score,
     sortOrder: checkpoint.sortOrder,
+    evaluationHints: hints
+      ? {
+          mustConcepts: hints.mustConcepts,
+          falseClaims: hints.falseClaims,
+          minMatchedConcepts: hints.minMatchedConcepts,
+          positiveFloorScore: hints.positiveFloorScore,
+        }
+      : null,
+  };
+}
+
+export function mapOverrideAnswerExampleToGraphql(
+  example: NonNullable<CompanyQuestionOverrideEntity['extraAnswerExamples']>[number],
+): OverrideAnswerExampleType {
+  return {
+    exampleType: example.exampleType as AnswerExampleTypeEnum,
+    exampleText: example.exampleText,
+    sortOrder: example.sortOrder,
+    checkpointKey: example.checkpointKey,
+  };
+}
+
+export function mapCompanyQuestionOverrideToGraphql(
+  override: CompanyQuestionOverrideEntity,
+): CompanyQuestionOverrideType {
+  return {
+    id: String(override.id),
+    sourceQuestionId: String(override.sourceQuestionId),
+    extraMustConcepts: override.extraMustConcepts,
+    extraFalseClaims: override.extraFalseClaims,
+    extraAnswerExamples: override.extraAnswerExamples
+      ? override.extraAnswerExamples.map(mapOverrideAnswerExampleToGraphql)
+      : null,
+    topicWeightOverride: override.topicWeightOverride,
+    createdAt: override.createdAt,
+    updatedAt: override.updatedAt,
   };
 }
 
@@ -79,6 +125,13 @@ export function mapQuestionToGraphql(
   return {
     id: String(question.id),
     companyId: question.companyId ? String(question.companyId) : null,
+    sourceQuestionId: question.sourceQuestionId
+      ? String(question.sourceQuestionId)
+      : null,
+    status: question.status as QuestionStatusEnum,
+    companyPriority: question.companyPriority,
+    isRequired: question.isRequired,
+    isCustom: question.companyId != null,
     questionText: question.questionText,
     shortAnswer: question.shortAnswer,
     idealAnswer: question.idealAnswer,

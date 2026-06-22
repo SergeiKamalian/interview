@@ -41,6 +41,9 @@ export enum InterviewMessageKindEnum {
   follow_up_question = 'follow_up_question',
   follow_up_answer = 'follow_up_answer',
   system_note = 'system_note',
+  conduct_violation = 'conduct_violation',
+  conduct_warning = 'conduct_warning',
+  conduct_terminated = 'conduct_terminated',
 }
 
 registerEnumType(InterviewStatusEnum, { name: 'InterviewStatus' });

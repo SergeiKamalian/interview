@@ -4,12 +4,22 @@ export type QuestionDifficulty = 'basic' | 'intermediate' | 'advanced';
 
 export type AnswerExampleType = 'good' | 'bad';
 
+export type QuestionStatus = 'draft' | 'published';
+
+export type QuestionScope = 'all' | 'company' | 'global';
+
 export type QuestionLookup = {
   id: string;
   code: string;
   name: string;
   interviewWeight?: number;
+  isCustom?: boolean;
   skill?: QuestionLookup | null;
+};
+
+export type CheckpointEvaluationHints = {
+  mustConcepts?: string[] | null;
+  falseClaims?: string[] | null;
 };
 
 export type QuestionCheckpoint = {
@@ -19,6 +29,7 @@ export type QuestionCheckpoint = {
   expected: string;
   score: number;
   sortOrder: number;
+  evaluationHints?: CheckpointEvaluationHints | null;
 };
 
 export type QuestionAnswerExample = {
@@ -34,6 +45,11 @@ export type QuestionListItem = {
   level: QuestionLevel;
   difficulty: QuestionDifficulty;
   isActive: boolean;
+  isCustom: boolean;
+  isRequired: boolean;
+  companyPriority: number;
+  status: QuestionStatus;
+  sourceQuestionId?: string | null;
   topic: QuestionLookup;
   profession: QuestionLookup;
   skills?: QuestionLookup[];
@@ -47,10 +63,17 @@ export type QuestionDetail = {
   level: QuestionLevel;
   difficulty: QuestionDifficulty;
   isActive: boolean;
+  isCustom: boolean;
+  isRequired: boolean;
+  companyPriority: number;
+  status: QuestionStatus;
+  maxScore: number;
   shortAnswer: string;
   idealAnswer: string;
+  sourceQuestionId?: string | null;
   topic: QuestionLookup;
   profession: QuestionLookup;
+  skills: QuestionLookup[];
   checkpoints: QuestionCheckpoint[];
   answerExamples: QuestionAnswerExample[];
 };

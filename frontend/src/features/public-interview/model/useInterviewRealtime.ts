@@ -1,19 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useInterviewAiAudio } from '@features/voice-interview/tts/useInterviewAiAudio';
-import { useInterviewThinkingSound } from '@features/voice-interview/tts/useInterviewThinkingSound';
-import { env } from '@shared/config/env';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useInterviewAiAudio } from "@features/voice-interview/tts/useInterviewAiAudio";
+import { useInterviewThinkingSound } from "@features/voice-interview/tts/useInterviewThinkingSound";
+import { env } from "@shared/config/env";
 import {
   createInterviewRealtimeClient,
   joinInterviewAttemptRoom,
   requestSpeakCurrentQuestion,
   requestSpeakWelcome,
   subscribeInterviewEvents,
-} from '@shared/api/realtime/interviewRealtimeClient';
+} from "@shared/api/realtime/interviewRealtimeClient";
 import type {
   InterviewRealtimeEvent,
   InterviewRealtimePhase,
   InterviewStreamingMessage,
-} from '@shared/api/realtime/types';
+} from "@shared/api/realtime/types";
 
 type UseInterviewRealtimeInput = {
   publicToken: string;
@@ -23,32 +23,32 @@ type UseInterviewRealtimeInput = {
 };
 
 function mapEventToPhase(
-  eventType: InterviewRealtimeEvent['eventType'],
+  eventType: InterviewRealtimeEvent["eventType"],
 ): InterviewRealtimePhase {
   switch (eventType) {
-    case 'answer.received':
-      return 'answer_received';
-    case 'ai.evaluation_started':
-      return 'ai_analyzing';
-    case 'ai.follow_up_planned':
-      return 'follow_up_planned';
-    case 'ai.message.stream_started':
-    case 'ai.message.stream_delta':
-      return 'message_streaming';
-    case 'ai.message.stream_completed':
-      return 'message_incoming';
-    case 'message.appended':
-      return 'message_incoming';
-    case 'question.completed':
-      return 'question_completed';
-    case 'attempt.completed':
-      return 'attempt_completed';
-    case 'evaluation.ready':
-      return 'evaluation_ready';
-    case 'adaptive.error_recovered':
-      return 'recovered';
+    case "answer.received":
+      return "answer_received";
+    case "ai.evaluation_started":
+      return "ai_analyzing";
+    case "ai.follow_up_planned":
+      return "follow_up_planned";
+    case "ai.message.stream_started":
+    case "ai.message.stream_delta":
+      return "message_streaming";
+    case "ai.message.stream_completed":
+      return "message_incoming";
+    case "message.appended":
+      return "message_incoming";
+    case "question.completed":
+      return "question_completed";
+    case "attempt.completed":
+      return "attempt_completed";
+    case "evaluation.ready":
+      return "evaluation_ready";
+    case "adaptive.error_recovered":
+      return "recovered";
     default:
-      return 'idle';
+      return "idle";
   }
 }
 
@@ -61,38 +61,38 @@ function applyStreamEvent(
     return current;
   }
 
-  if (event.eventType === 'ai.message.stream_started') {
+  if (event.eventType === "ai.message.stream_started") {
     return {
       streamId: stream.streamId,
-      role: 'ai',
-      content: '',
+      role: "ai",
+      content: "",
       messageKind: event.messageKind ?? null,
     };
   }
 
-  if (event.eventType === 'ai.message.stream_delta') {
+  if (event.eventType === "ai.message.stream_delta") {
     if (current?.streamId !== stream.streamId) {
       return {
         streamId: stream.streamId,
-        role: 'ai',
-        content: stream.contentSoFar ?? stream.delta ?? '',
+        role: "ai",
+        content: stream.contentSoFar ?? stream.delta ?? "",
         messageKind: event.messageKind ?? null,
       };
     }
 
     return {
       ...current,
-      content: stream.contentSoFar ?? `${current.content}${stream.delta ?? ''}`,
+      content: stream.contentSoFar ?? `${current.content}${stream.delta ?? ""}`,
       messageKind: event.messageKind ?? current.messageKind,
     };
   }
 
-  if (event.eventType === 'ai.message.stream_completed') {
+  if (event.eventType === "ai.message.stream_completed") {
     if (current?.streamId !== stream.streamId) {
       return {
         streamId: stream.streamId,
-        role: 'ai',
-        content: stream.content ?? stream.contentSoFar ?? '',
+        role: "ai",
+        content: stream.content ?? stream.contentSoFar ?? "",
         messageKind: event.messageKind ?? null,
       };
     }
@@ -108,7 +108,7 @@ function applyStreamEvent(
 
 export function useInterviewRealtime(input: UseInterviewRealtimeInput) {
   const { publicToken, attemptId, enabled = true, onResync } = input;
-  const [phase, setPhase] = useState<InterviewRealtimePhase>('idle');
+  const [phase, setPhase] = useState<InterviewRealtimePhase>("idle");
   const [lastEvent, setLastEvent] = useState<InterviewRealtimeEvent | null>(
     null,
   );
@@ -116,35 +116,35 @@ export function useInterviewRealtime(input: UseInterviewRealtimeInput) {
     useState<InterviewStreamingMessage | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const seenEventIdsRef = useRef<Set<string>>(new Set());
-  const socketRef = useRef(
-    enabled ? createInterviewRealtimeClient() : null,
-  );
-  const {
-    audioState,
-    handleAudioEvent,
-    replayAiAudio,
-    resetAiAudio,
-  } = useInterviewAiAudio();
+  const socketRef = useRef(enabled ? createInterviewRealtimeClient() : null);
+  const { audioState, handleAudioEvent, replayAiAudio, resetAiAudio } =
+    useInterviewAiAudio();
   const handleAudioEventRef = useRef(handleAudioEvent);
   handleAudioEventRef.current = handleAudioEvent;
-  const { stopThinking, preloadThinkingSound } = useInterviewThinkingSound(phase);
+  const { stopThinking, preloadThinkingSound } =
+    useInterviewThinkingSound(phase);
   const stopThinkingRef = useRef(stopThinking);
   stopThinkingRef.current = stopThinking;
 
   useEffect(() => {
-    if (enabled && env.interviewAudioEnabled && publicToken && attemptId) {
+    if (
+      enabled &&
+      env.interviewThinkingSoundEnabled &&
+      publicToken &&
+      attemptId
+    ) {
       void preloadThinkingSound();
     }
   }, [attemptId, enabled, preloadThinkingSound, publicToken]);
 
   const markAnswerSending = useCallback(() => {
-    setPhase('answer_sending');
+    setPhase("answer_sending");
     setStreamingMessage(null);
     resetAiAudio();
   }, [resetAiAudio]);
 
   const resetPhase = useCallback(() => {
-    setPhase('idle');
+    setPhase("idle");
     setStreamingMessage(null);
     resetAiAudio();
   }, [resetAiAudio]);
@@ -170,8 +170,8 @@ export function useInterviewRealtime(input: UseInterviewRealtimeInput) {
           return;
         }
 
-        socket.once('connect', () => resolve());
-        socket.once('connect_error', (error) => reject(error));
+        socket.once("connect", () => resolve());
+        socket.once("connect_error", (error) => reject(error));
       });
 
       if (disposed) {
@@ -189,48 +189,48 @@ export function useInterviewRealtime(input: UseInterviewRealtimeInput) {
         seenEventIdsRef.current.add(event.eventId);
         setLastEvent(event);
 
-        if (!event.eventType.startsWith('ai.audio.')) {
+        if (!event.eventType.startsWith("ai.audio.")) {
           setPhase(mapEventToPhase(event.eventType));
         }
 
         if (
-          event.eventType === 'ai.message.stream_started' ||
-          event.eventType === 'ai.message.stream_delta' ||
-          event.eventType === 'ai.message.stream_completed'
+          event.eventType === "ai.message.stream_started" ||
+          event.eventType === "ai.message.stream_delta" ||
+          event.eventType === "ai.message.stream_completed"
         ) {
           setStreamingMessage((current) => applyStreamEvent(current, event));
         }
 
         if (
           env.interviewAudioEnabled &&
-          (event.eventType === 'ai.audio.stream_started' ||
-            event.eventType === 'ai.audio.stream_chunk' ||
-            event.eventType === 'ai.audio.stream_completed')
+          (event.eventType === "ai.audio.stream_started" ||
+            event.eventType === "ai.audio.stream_chunk" ||
+            event.eventType === "ai.audio.stream_completed")
         ) {
-          if (event.eventType === 'ai.audio.stream_started') {
+          if (event.eventType === "ai.audio.stream_started") {
             stopThinkingRef.current();
           }
           handleAudioEventRef.current(event);
         }
 
         if (
-          event.eventType === 'ai.message.stream_started' ||
-          event.eventType === 'message.appended'
+          event.eventType === "ai.message.stream_started" ||
+          event.eventType === "message.appended"
         ) {
           stopThinkingRef.current();
         }
 
-        if (event.eventType === 'message.appended') {
+        if (event.eventType === "message.appended") {
           setStreamingMessage(null);
-          setPhase('idle');
+          setPhase("idle");
         }
 
-        if (event.eventType === 'ai.message.stream_completed') {
-          setPhase('idle');
+        if (event.eventType === "ai.message.stream_completed") {
+          setPhase("idle");
         }
       });
 
-      socket.on('reconnect', () => {
+      socket.on("reconnect", () => {
         void onResync?.();
       });
     };
@@ -242,7 +242,7 @@ export function useInterviewRealtime(input: UseInterviewRealtimeInput) {
     return () => {
       disposed = true;
       unsubscribeEvents?.();
-      socket.off('reconnect');
+      socket.off("reconnect");
       socket.disconnect();
       socketRef.current = null;
       setIsConnected(false);
@@ -251,26 +251,26 @@ export function useInterviewRealtime(input: UseInterviewRealtimeInput) {
 
   const statusLabel = useMemo(() => {
     switch (phase) {
-      case 'answer_sending':
-        return 'Отправляем ответ…';
-      case 'answer_received':
-        return 'Ответ получен';
-      case 'ai_analyzing':
-        return 'AI анализирует ответ…';
-      case 'follow_up_planned':
-        return 'Готовим уточняющий вопрос…';
-      case 'message_streaming':
-        return 'AI печатает ответ…';
-      case 'message_incoming':
-        return 'Новое сообщение…';
-      case 'recovered':
-        return 'Продолжаем интервью…';
-      case 'question_completed':
-        return 'Вопрос завершён';
-      case 'attempt_completed':
-        return 'Интервью завершено';
-      case 'evaluation_ready':
-        return 'Оценка готова';
+      case "answer_sending":
+        return "Отправляем ответ…";
+      case "answer_received":
+        return "Ответ получен";
+      case "ai_analyzing":
+        return "AI анализирует ответ…";
+      case "follow_up_planned":
+        return "Готовим уточняющий вопрос…";
+      case "message_streaming":
+        return "AI печатает ответ…";
+      case "message_incoming":
+        return "Новое сообщение…";
+      case "recovered":
+        return "Продолжаем интервью…";
+      case "question_completed":
+        return "Вопрос завершён";
+      case "attempt_completed":
+        return "Интервью завершено";
+      case "evaluation_ready":
+        return "Оценка готова";
       default:
         return null;
     }

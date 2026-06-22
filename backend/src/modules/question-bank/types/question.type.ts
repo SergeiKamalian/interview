@@ -1,11 +1,17 @@
-import { Field, Float, ObjectType, registerEnumType } from '@nestjs/graphql';
+import { Field, Float, Int, ObjectType, registerEnumType } from '@nestjs/graphql';
 import { QUESTION_DIFFICULTIES } from './question-difficulty.enum';
 import { QUESTION_LEVELS } from './question-level.enum';
+import { QUESTION_STATUSES } from './question-status.enum';
 import { ProfessionType } from './profession.type';
 import { QuestionAnswerExampleType } from './question-answer-example.type';
 import { QuestionCheckpointType } from './question-checkpoint.type';
 import { SkillType } from './skill.type';
 import { TopicType } from './topic.type';
+
+export enum QuestionStatusEnum {
+  draft = 'draft',
+  published = 'published',
+}
 
 export enum QuestionLevelEnum {
   junior = 'junior',
@@ -22,6 +28,7 @@ export enum QuestionDifficultyEnum {
 
 registerEnumType(QuestionLevelEnum, { name: 'QuestionLevel' });
 registerEnumType(QuestionDifficultyEnum, { name: 'QuestionDifficulty' });
+registerEnumType(QuestionStatusEnum, { name: 'QuestionStatus' });
 
 @ObjectType()
 export class QuestionType {
@@ -30,6 +37,21 @@ export class QuestionType {
 
   @Field(() => String, { nullable: true })
   companyId?: string | null;
+
+  @Field(() => String, { nullable: true })
+  sourceQuestionId?: string | null;
+
+  @Field(() => QuestionStatusEnum)
+  status!: QuestionStatusEnum;
+
+  @Field(() => Int)
+  companyPriority!: number;
+
+  @Field()
+  isRequired!: boolean;
+
+  @Field()
+  isCustom!: boolean;
 
   @Field()
   questionText!: string;
@@ -79,3 +101,4 @@ export class QuestionBankListPayload {
 
 export const GRAPHQL_QUESTION_LEVELS = QUESTION_LEVELS;
 export const GRAPHQL_QUESTION_DIFFICULTIES = QUESTION_DIFFICULTIES;
+export const GRAPHQL_QUESTION_STATUSES = QUESTION_STATUSES;

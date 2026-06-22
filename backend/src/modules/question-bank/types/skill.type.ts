@@ -10,4 +10,7 @@ export class SkillType {
 
   @Field()
   name!: string;
+
+  @Field()
+  isCustom!: boolean;
 }

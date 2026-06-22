@@ -117,9 +117,9 @@ export function SectionCards({
       icon: <LoaderIcon className="size-4" />,
     },
     {
-      title: "Шортлист",
+      title: "Избранные",
       value: metrics?.shortlistedTotal ?? null,
-      footerTitle: "Открыть шортлист",
+      footerTitle: "Открыть избранных",
       footerDescription: "Отмечены для следующего этапа",
       href: "/dashboard/candidates?shortlist=1",
       icon: <StarIcon className="size-4" />,

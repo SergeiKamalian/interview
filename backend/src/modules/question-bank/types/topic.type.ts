@@ -17,4 +17,7 @@ export class TopicType {
 
   @Field(() => SkillType, { nullable: true })
   skill?: SkillType | null;
+
+  @Field()
+  isCustom!: boolean;
 }

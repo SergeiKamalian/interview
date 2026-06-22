@@ -53,6 +53,7 @@ docs/tasks/
     17-✅-interview-evaluation-quality/
     18-✅-achieved-level-talent-pool/
     19-✅-post-interview-company-flow/
+    20-✅-company-question-bank/
 ```
 
 ---
@@ -77,6 +78,7 @@ docs/tasks/
 14 — evaluation-accuracy-analytics (scoring honesty, HR analytics, golden set)
 15 — interview-templates (reusable interview blueprints)
 19 — post-interview-company-flow (company review queue после прохождения интервью)
+20 — company-question-bank (свои темы/вопросы, fork, overrides, Excel import, playbooks) ✅
 ```
 
 Важно: design docs в `docs/database/` и SQL migrations — source of truth для feature-блоков 04+.
@@ -243,11 +245,11 @@ Cursor НЕ должен выполнять весь блок сразу.
 ## Текущий активный блок
 
 ```txt
-19-✅-post-interview-company-flow (✅ done — Wave 1 + Wave 2 complete)
+15-🟡-interview-templates (TASK-15.6)
 ```
 
-Следующий рекомендуемый блок:
+Закрыт недавно:
 
 ```txt
-15-🟡-interview-templates (TASK-15.6)
+20-✅-company-question-bank (TASK-20.1–20.12 complete)
 ```

@@ -17,6 +17,7 @@ import {
   PopoverTrigger,
 } from '../popover';
 import type { SelectOption } from './SelectField';
+import { SelectOptionLabel } from './SelectOptionLabel';
 
 type SearchableSelectFieldProps = {
   label?: string;
@@ -58,11 +59,15 @@ export function SearchableSelectField({
             >
               <span
                 className={cn(
-                  'line-clamp-1 text-left',
+                  'line-clamp-1 min-w-0 text-left',
                   !selectedOption && 'text-muted-foreground',
                 )}
               >
-                {selectedOption?.label ?? placeholder ?? 'Выберите…'}
+                {selectedOption ? (
+                  <SelectOptionLabel option={selectedOption} />
+                ) : (
+                  (placeholder ?? 'Выберите…')
+                )}
               </span>
               <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground" />
             </button>
@@ -88,7 +93,7 @@ export function SearchableSelectField({
                       setOpen(false);
                     }}
                   >
-                    {option.label}
+                    <SelectOptionLabel option={option} />
                   </CommandItem>
                 ))}
               </CommandGroup>

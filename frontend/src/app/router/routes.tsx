@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- route module mixes lazy page imports with router config */
 import { lazy } from 'react';
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { PublicLayout } from '@widgets/layouts/PublicLayout';
 import { AuthLayout } from '@widgets/layouts/AuthLayout';
 import { DashboardLayout } from '@widgets/layouts/DashboardLayout';
@@ -8,6 +8,8 @@ import { HomePage } from '@pages/home/HomePage';
 import { LoginPage } from '@pages/auth/LoginPage';
 import { RegisterPage } from '@pages/auth/RegisterPage';
 import { QuestionBankPage } from '@pages/dashboard/QuestionBankPage';
+import { QuestionBankEditorPage } from '@pages/dashboard/QuestionBankEditorPage';
+import { QuestionBankTaxonomyPage } from '@pages/dashboard/QuestionBankTaxonomyPage';
 import { CreateInterviewPage } from '@pages/dashboard/CreateInterviewPage';
 import { PublicInterviewStartPage } from '@pages/public/PublicInterviewStartPage';
 import { PublicInterviewSessionPage } from '@pages/public/PublicInterviewSessionPage';
@@ -114,7 +116,17 @@ export const router = createBrowserRouter([
           { path: '/dashboard/candidates', element: <CandidatesPage /> },
           { path: '/dashboard/candidates/:candidateId/report', element: <CandidateReportPage /> },
           { path: '/dashboard/analytics', element: <AnalyticsPage /> },
-          { path: '/dashboard/questions', element: <QuestionBankPage /> },
+          { path: '/dashboard/question-bank', element: <QuestionBankPage /> },
+          { path: '/dashboard/question-bank/taxonomy', element: <QuestionBankTaxonomyPage /> },
+          { path: '/dashboard/question-bank/new', element: <QuestionBankEditorPage /> },
+          {
+            path: '/dashboard/question-bank/:questionId/edit',
+            element: <QuestionBankEditorPage />,
+          },
+          {
+            path: '/dashboard/questions',
+            element: <Navigate to="/dashboard/question-bank" replace />,
+          },
           { path: '/dashboard/interviews/create', element: <CreateInterviewPage /> },
         ],
       },

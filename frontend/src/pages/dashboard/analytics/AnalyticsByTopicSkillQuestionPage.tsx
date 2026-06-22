@@ -1,6 +1,14 @@
 import { useTopicSkillQuestionAnalyticsQuery } from '@entities/analytics/api/topicSkillQuestionApi';
 import { formatScore } from '@shared/lib/format';
-import { Alert, Card, Spinner } from '@shared/ui';
+import { Alert, Card, PAGE_SECTION_NAV_LAYOUT, PageSectionNav, Spinner } from '@shared/ui';
+
+const ANALYTICS_QUALITY_SECTIONS = [
+  { id: 'analytics-topics', label: 'Topics' },
+  { id: 'analytics-skills', label: 'Skills' },
+  { id: 'analytics-questions', label: 'Questions' },
+] as const;
+
+const { sectionClassName, pageClassName } = PAGE_SECTION_NAV_LAYOUT;
 
 export function AnalyticsByTopicSkillQuestionPage() {
   const { data, isLoading, isError, error } = useTopicSkillQuestionAnalyticsQuery({});
@@ -33,7 +41,7 @@ export function AnalyticsByTopicSkillQuestionPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 ${pageClassName}`}>
       {data.lowSampleWarning && (
         <Alert variant="info" title="Мало данных для выводов">
           Завершённых интервью: {data.totalCompletedAttempts}. Минимальный порог — 5.
@@ -41,7 +49,7 @@ export function AnalyticsByTopicSkillQuestionPage() {
       )}
 
       <div className="grid gap-4 xl:grid-cols-3">
-        <Card header="Topics (weak first)">
+        <Card id="analytics-topics" header="Topics (weak first)" className={sectionClassName}>
           <div className="space-y-2 text-sm">
             {data.topics.map((topic) => (
               <div key={topic.topicName} className="flex justify-between gap-2">
@@ -54,7 +62,7 @@ export function AnalyticsByTopicSkillQuestionPage() {
           </div>
         </Card>
 
-        <Card header="Strongest skills">
+        <Card id="analytics-skills" header="Strongest skills" className={sectionClassName}>
           <div className="space-y-2 text-sm">
             {data.skills.map((skill) => (
               <div key={skill.skillName} className="flex justify-between gap-2">
@@ -67,7 +75,7 @@ export function AnalyticsByTopicSkillQuestionPage() {
           </div>
         </Card>
 
-        <Card header="Questions (weak first)">
+        <Card id="analytics-questions" header="Questions (weak first)" className={sectionClassName}>
           <div className="space-y-3 text-sm">
             {data.questions.map((question) => (
               <div key={question.questionId}>
@@ -80,6 +88,8 @@ export function AnalyticsByTopicSkillQuestionPage() {
           </div>
         </Card>
       </div>
+
+      <PageSectionNav sections={ANALYTICS_QUALITY_SECTIONS} />
     </div>
   );
 }

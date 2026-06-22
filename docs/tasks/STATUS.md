@@ -20,22 +20,22 @@
 Active block:
 
 ```txt
-19-✅-post-interview-company-flow
+15-🟡-interview-templates
 ```
 
 Block status:
 
 ```txt
-✅ done (Wave 1 + Wave 2: TASK-19.1–19.18 complete)
+🟡 in progress (TASK-15.6 save as template remaining)
 ```
 
 Block title:
 
 ```txt
-Post-interview company flow
+Interview Templates
 ```
 
-Note: Блок **19 закрыт целиком**. Следующий активный блок → см. roadmap (`15-🟡` на TASK-15.6).
+Note: Блок **20 закрыт целиком** (Company Question Bank — overlay, import, playbooks). Следующий активный блок — **15** (resume TASK-15.6).
 
 ---
 
@@ -44,19 +44,49 @@ Note: Блок **19 закрыт целиком**. Следующий актив
 Active subtask ID:
 
 ```txt
-(none — block 19 complete)
+TASK-15.6
 ```
 
 File:
 
 ```txt
-(none)
+docs/tasks/list/15-🟡-interview-templates/subtasks/006-⬜-save-interview-as-template.md
 ```
 
 Last completed subtask:
 
 ```txt
-TASK-19.18 — Decision audit history: GraphQL attemptReviewDecisionHistory (UNION review + shortlist events); DecisionAuditTimeline на AttemptReviewPage. Wave 2 полностью закрыта после TASK-19.12/19.13 (verdict UI + quick actions). Verify: backend build+test (10 passed), frontend graphql:sync (61 ops)+build OK.
+TASK-20.12 — Company playbook packs: migration 029 playbooks+items; GraphQL CRUD + applyPlaybookToInterviewDraft; frontend Playbooks section on Question Bank, Save as playbook + Apply dropdown in wizard step 2; excludeQuestionIds in suggest. Verify: backend build+jest 11 passed, migrate 029 OK, graphql:sync 78 ops, frontend build OK, GraphQL smoke create 2 pinned + apply count=10, tenant company12 [].
+```
+
+Archived — previous last completed:
+
+```txt
+TASK-20.11 — Frontend Excel import wizard: кнопка «Импорт из Excel» на Question Bank; Dialog upload→preview (create/update/errors)→commit; шаблон xlsx в public/templates/ (Данные+Инструкция RU); REST preview multipart + GraphQL commitCompanyQuestionImport; CTA черновики. Verify: graphql:sync 74 ops exit0, frontend build exit0, eslint company-question-import exit0, xlsx template 2 rows OK.
+```
+
+Archived — previous last completed:
+
+```txt
+TASK-20.10 — Backend Excel/CSV bulk import: parse xlsx/csv flat columns → group topics/questions/checkpoints; validation Σ weights=10, enums, snake_case; REST POST /api/company/question-bank/import/preview multipart; GraphQL commitCompanyQuestionImport(importToken); Redis importToken 15min; default status=draft. Verify: backend build exit0, jest 9 passed, curl preview 2 topics/2 questions/4 checkpoints + commit + re-import update diff OK.
+```
+
+Archived — previous last completed:
+
+```txt
+TASK-20.9 — Interview wizard Step2 custom-first UX: Tabs «Наши вопросы|Платформа|Все» (default Наши), QuestionScopeBadges (Custom/Required/Draft), секция «Обязательные» pinned+locked, sort company→companyPriority, AI suggest toast+Alert «N из M — ваши вопросы» + highlight custom; GraphQL suggest extended questions{isCustom,isRequired,companyPriority,status}. Verify: graphql:sync 73 ops exit0, frontend build exit0, eslint Step2+sort helper exit0.
+```
+
+Archived — previous last completed:
+
+```txt
+TASK-20.3 — Backend company topics/skills CRUD: repository create/update/archive для company skills/topics; extended lookups (global + company) с isCustom; GraphQL mutations createCompanySkill/Topic, update*, archive*; tenant scope @CurrentUser().companyId; validation snake_case + duplicate reject + global forbidden. Verify: backend build exit0, jest 15 passed (repository+service+suggestion), GraphQL smoke create/list/isolation/duplicate/forbidden OK, schema.gql regen.
+```
+
+Archived — previous last completed:
+
+```txt
+TASK-20.2 — DB migration 027_company_question_bank_overlay.sql: skills/topics company_id + scoped unique, questions metadata (source_question_id, status, company_priority, is_required), company_question_overrides table. Verify: migrate Applied OK, re-run idempotent skip, DESCRIBE/SHOW CREATE via docker mysql, 20 global skills + 564 topics company_id NULL.
 ```
 
 Archived — previous last completed:
@@ -116,7 +146,7 @@ TASK-18.6 — Backend: talent pool query. Новый GraphQL query matchingCandi
 Next recommended subtask:
 
 ```txt
-TASK-19.12 — AI assessment verdict UI
+TASK-15.6 — Save interview as template
 ```
 
 Optional / deferred:
@@ -276,6 +306,7 @@ Last updated:
 
 - [x] Block `18-✅-achieved-level-talent-pool` — achieved level + talent pool по стеку + backfill (18.1–18.9 ✅)
 - [x] Block `17-✅-interview-evaluation-quality` — калибровка оценки + model routing (17.1–17.6, 17.8 ✅; 17.7 опц. отложен)
+- [x] Block `20-✅-company-question-bank` — company overlay, Excel import, playbooks (20.1–20.12 ✅)
 - [ ] Block `15-🟡-interview-templates` — возобновить на TASK-15.6 (save as template) ← активный
 - [ ] Block `11-⬜-video` — Video interview recording
 - [ ] Block `12-⬜-ats-integrations` — ATS integrations

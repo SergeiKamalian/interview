@@ -11,8 +11,9 @@ import {
 import { env } from '@shared/config/env';
 import { useDebouncedValue } from '@shared/lib/useDebouncedValue';
 import { getDashboardMockInterviewSummaries } from '@shared/mocks/dashboard-overview.mock';
-import { Alert, Card, Spinner } from '@shared/ui';
+import { Alert, Card, PAGE_SECTION_NAV_LAYOUT, PageSectionNav, Spinner } from '@shared/ui';
 import { Button } from '@shared/ui/button';
+import type { TablePaginationConfig } from '@shared/ui/table';
 import { InterviewSummariesFiltersBar } from '@widgets/dashboard/InterviewSummariesFiltersBar';
 import {
   InterviewSummariesActiveFilterTags,
@@ -21,6 +22,13 @@ import {
 } from '@widgets/dashboard/InterviewSummariesPageChrome';
 import { InterviewSummariesTable } from '@widgets/dashboard/InterviewSummariesTable';
 import { CreateInterviewStartButton } from '@widgets/dashboard/CreateInterviewStartButton';
+
+const INTERVIEWS_SECTIONS = [
+  { id: 'interviews-stats', label: 'Сводка' },
+  { id: 'interviews-list', label: 'Список' },
+] as const;
+
+const { sectionClassName, pageClassName } = PAGE_SECTION_NAV_LAYOUT;
 
 export function InterviewsPage() {
   const [filters, setFilters] = useState(DEFAULT_INTERVIEW_SUMMARIES_FILTERS);
@@ -61,7 +69,6 @@ export function InterviewsPage() {
       });
   const pageSize = useMock ? mockPageSize : (data?.pageSize ?? mockPageSize);
   const page = useMock ? mockPage : (data?.page ?? 1);
-  const totalPages = Math.max(1, Math.ceil(filteredTotal / pageSize));
   const loading = useMock ? false : isLoading;
   const hasFilters = hasActiveInterviewListFilters({
     ...filters,
@@ -69,9 +76,20 @@ export function InterviewsPage() {
   });
   const isEmptyCompany = facets.total === 0;
   const isFilteredEmpty = !loading && !isError && items.length === 0;
+  const tablePagination: TablePaginationConfig = {
+    page,
+    pageSize,
+    total: hasFilters ? filteredTotal : facets.total,
+    totalLabel: hasFilters ? 'найдено' : 'всего',
+    onPageChange: (nextPage) =>
+      setFilters((current) => ({
+        ...current,
+        page: nextPage,
+      })),
+  };
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 ${pageClassName}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-foreground">Интервью</h2>
@@ -83,7 +101,7 @@ export function InterviewsPage() {
       </div>
 
       {!loading && !isError && !isEmptyCompany && (
-        <div className="space-y-3">
+        <div id="interviews-stats" className={`${sectionClassName} space-y-3`}>
           <InterviewSummariesSummaryStrip
             facets={facets}
             filteredTotal={filteredTotal}
@@ -97,7 +115,7 @@ export function InterviewsPage() {
         </div>
       )}
 
-      <Card>
+      <Card id="interviews-list" className={sectionClassName}>
         <div className="mb-4 space-y-3">
           <InterviewSummariesFiltersBar
             filters={filters}
@@ -157,45 +175,15 @@ export function InterviewsPage() {
         )}
 
         {!loading && !isError && items.length > 0 && (
-          <>
-            <InterviewSummariesTable items={items} containerQuery="@container/main" />
-            <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-              <span>
-                Страница {page} из {totalPages}
-                {hasFilters ? ` · найдено ${filteredTotal}` : ` · всего ${facets.total}`}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() =>
-                    setFilters((current) => ({
-                      ...current,
-                      page: Math.max(1, (current.page ?? 1) - 1),
-                    }))
-                  }
-                >
-                  Назад
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={page >= totalPages}
-                  onClick={() =>
-                    setFilters((current) => ({
-                      ...current,
-                      page: (current.page ?? 1) + 1,
-                    }))
-                  }
-                >
-                  Вперёд
-                </Button>
-              </div>
-            </div>
-          </>
+          <InterviewSummariesTable
+            items={items}
+            containerQuery="@container/main"
+            pagination={tablePagination}
+          />
         )}
       </Card>
+
+      <PageSectionNav sections={INTERVIEWS_SECTIONS} />
     </div>
   );
 }

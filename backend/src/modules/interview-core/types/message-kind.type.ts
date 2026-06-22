@@ -7,6 +7,9 @@ export const MESSAGE_KINDS = [
   'follow_up_question',
   'follow_up_answer',
   'system_note',
+  'conduct_violation',
+  'conduct_warning',
+  'conduct_terminated',
 ] as const;
 
 export type MessageKind = (typeof MESSAGE_KINDS)[number];

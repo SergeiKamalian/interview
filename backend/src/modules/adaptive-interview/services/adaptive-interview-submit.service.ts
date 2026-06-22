@@ -45,6 +45,7 @@ import { MediaAssetService } from '../../media/media-asset.service';
 import { MainQuestionOpenerService } from './main-question-opener.service';
 import { TopicOpenerScoringGateService } from './topic-opener-scoring-gate.service';
 import { shouldScoreTopicOpenerAnswer } from '../utils/topic-opener-scoring.util';
+import { CandidateConductGuardService } from './candidate-conduct-guard.service';
 
 @Injectable()
 export class AdaptiveInterviewSubmitService {
@@ -67,6 +68,7 @@ export class AdaptiveInterviewSubmitService {
     private readonly mainQuestionOpenerService: MainQuestionOpenerService,
     private readonly candidateTurnClassifierService: CandidateTurnClassifierService,
     private readonly topicOpenerScoringGateService: TopicOpenerScoringGateService,
+    private readonly conductGuardService: CandidateConductGuardService,
   ) {}
 
   async assertCanSubmit(
@@ -271,6 +273,42 @@ export class AdaptiveInterviewSubmitService {
     if (!currentQuestion) {
       throw new Error('Current interview question not found');
     }
+
+    // ── Conduct guard ─────────────────────────────────────────────────────────
+    // Run a fast profanity/abuse check before any heavy AI work.
+    // On the first violation we warn the candidate and return without advancing
+    // the question. On the second violation we terminate the interview early.
+    const conductDecision = await this.conductGuardService.checkAndDecide(
+      attemptId,
+      trimmedAnswer,
+    );
+
+    if (conductDecision !== 'none') {
+      logAdaptiveAiDebug(this.logger, 'submit_answer.conduct_violation', {
+        attemptId,
+        interviewQuestionId: currentQuestion.id,
+        decision: conductDecision,
+      });
+      const followUpCount = await this.followUpRepository.countUsedForQuestion(
+        attemptId,
+        currentQuestion.id,
+      );
+      const result = await this.handleConductViolation({
+        attempt,
+        currentQuestion,
+        trimmedAnswer,
+        answeredMainBefore,
+        totalMainQuestions,
+        currentQuestionFollowUpCount: followUpCount,
+        conductDecision,
+      });
+      submitTimer.finish({
+        outcome: result.status,
+        conductViolation: conductDecision,
+      });
+      return result;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     const saveTimer = startAdaptiveAiPhaseTimer(
       this.logger,
@@ -679,6 +717,137 @@ export class AdaptiveInterviewSubmitService {
       answeredMainQuestions: input.answeredMainQuestions,
       totalMainQuestions: input.totalMainQuestions,
       currentQuestionFollowUpCount: followUpCount,
+    };
+  }
+
+  private async handleConductViolation(input: {
+    attempt: AdaptiveSubmitInput['attempt'];
+    currentQuestion: InterviewQuestionEntity;
+    trimmedAnswer: string;
+    answeredMainBefore: number;
+    totalMainQuestions: number;
+    currentQuestionFollowUpCount: number;
+    conductDecision: 'warn' | 'terminate';
+  }): Promise<AdaptiveSubmitResult> {
+    const { attempt, currentQuestion, conductDecision } = input;
+    const attemptId = attempt.id;
+
+    // Save as 'conduct_violation' — NOT counted by countMainAnswerMessages,
+    // so the question index stays unchanged and the candidate can re-answer.
+    const candidateMessage = await this.database.withTransaction(
+      async (query) => {
+        const sequenceOrder = await this.repository.getNextSequenceOrder(
+          attemptId,
+          query,
+        );
+        return this.repository.appendMessage(
+          {
+            companyId: attempt.companyId,
+            attemptId,
+            interviewQuestionId: currentQuestion.id,
+            role: 'candidate',
+            content: input.trimmedAnswer,
+            sequenceOrder,
+            messageKind: 'conduct_violation',
+          },
+          query,
+        );
+      },
+    );
+
+    this.interviewRealtimeService.emit({
+      attemptId,
+      eventType: 'answer.received',
+      interviewQuestionId: currentQuestion.id,
+      messageId: candidateMessage.id,
+      sequenceOrder: candidateMessage.sequenceOrder,
+      messageKind: 'conduct_violation',
+    });
+
+    const aiText =
+      conductDecision === 'warn'
+        ? 'Я заметил, что ваш ответ содержит неуважительные выражения. Пожалуйста, придерживайтесь профессионального тона в общении. Это предупреждение — при повторении интервью будет завершено досрочно. Попробуйте ответить на вопрос снова.'
+        : 'К сожалению, после повторного нарушения правил корректного общения интервью вынуждено завершиться досрочно. Спасибо за ваше время.';
+
+    const aiKind =
+      conductDecision === 'warn'
+        ? InterviewMessageKindEnum.conduct_warning
+        : InterviewMessageKindEnum.conduct_terminated;
+
+    const streamedText = this.aiMessageStreamService.isEnabled()
+      ? await this.aiMessageStreamService.streamStaticText({
+          attemptId,
+          interviewQuestionId: currentQuestion.id,
+          messageKind: aiKind,
+          text: aiText,
+        })
+      : aiText;
+
+    const aiMessage = await this.database.withTransaction(async (query) => {
+      const sequenceOrder = await this.repository.getNextSequenceOrder(
+        attemptId,
+        query,
+      );
+      const message = await this.repository.appendMessage(
+        {
+          companyId: attempt.companyId,
+          attemptId,
+          interviewQuestionId: currentQuestion.id,
+          role: 'ai',
+          content: streamedText,
+          sequenceOrder,
+          messageKind: aiKind,
+        },
+        query,
+      );
+
+      if (conductDecision === 'terminate') {
+        await this.repository.completeAttempt(attemptId, query);
+      }
+
+      return message;
+    });
+
+    this.interviewRealtimeService.emit({
+      attemptId,
+      eventType: 'message.appended',
+      interviewQuestionId: currentQuestion.id,
+      messageId: aiMessage.id,
+      sequenceOrder: aiMessage.sequenceOrder,
+      messageKind: aiKind,
+    });
+
+    if (conductDecision === 'terminate') {
+      this.interviewRealtimeService.emit({
+        attemptId,
+        eventType: 'attempt.completed',
+        interviewQuestionId: currentQuestion.id,
+      });
+
+      return {
+        status: 'completed',
+        nextQuestionText: null,
+        pendingMessageText: streamedText,
+        messageKind: aiKind,
+        currentInterviewQuestionId: currentQuestion.id,
+        isFollowUp: false,
+        answeredMainQuestions: input.answeredMainBefore,
+        totalMainQuestions: input.totalMainQuestions,
+        currentQuestionFollowUpCount: input.currentQuestionFollowUpCount,
+      };
+    }
+
+    // First warning — stay on the same question so candidate can re-answer.
+    return {
+      status: 'in_progress',
+      nextQuestionText: streamedText,
+      pendingMessageText: streamedText,
+      messageKind: aiKind,
+      currentInterviewQuestionId: currentQuestion.id,
+      isFollowUp: false,
+      answeredMainQuestions: input.answeredMainBefore,
+      totalMainQuestions: input.totalMainQuestions,
+      currentQuestionFollowUpCount: input.currentQuestionFollowUpCount,
     };
   }
 

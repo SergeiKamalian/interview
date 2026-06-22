@@ -5,7 +5,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DatabaseService } from '../../common/database/database.service';
+import { CompanyQuestionOverrideRepository } from '../question-bank/company-question-override.repository';
 import { QuestionBankRepository } from '../question-bank/question-bank.repository';
+import { mergeQuestionWithOverride } from '../question-bank/utils/merge-question-with-override';
 import type { CreateInterviewInput } from './dto/create-interview.input';
 import { mapInterviewToGraphql } from './interview-core.mapper';
 import { InterviewCoreRepository } from './interview-core.repository';
@@ -23,6 +25,7 @@ export class InterviewCoreService {
   constructor(
     private readonly repository: InterviewCoreRepository,
     private readonly questionBankRepository: QuestionBankRepository,
+    private readonly overrideRepository: CompanyQuestionOverrideRepository,
     private readonly database: DatabaseService,
     private readonly publicTokenService: PublicTokenService,
   ) {}
@@ -59,11 +62,45 @@ export class InterviewCoreService {
         question !== null,
     );
 
+    const globalQuestionIds = loadedQuestions
+      .filter((question) => question.companyId === null)
+      .map((question) => question.id);
+    const overrides = await this.overrideRepository.findBySourceQuestionIds(
+      companyId,
+      globalQuestionIds,
+    );
+
+    const mergedQuestions = loadedQuestions.map((question) => {
+      if (question.companyId !== null) {
+        return question;
+      }
+
+      const override = overrides.get(question.id);
+      if (!override) {
+        return question;
+      }
+
+      return mergeQuestionWithOverride(question, override).question;
+    });
+
+    const questionTopicWeights = new Map<number, number>();
+    for (const question of loadedQuestions) {
+      if (question.companyId !== null) {
+        continue;
+      }
+
+      const override = overrides.get(question.id);
+      if (override?.topicWeightOverride != null) {
+        questionTopicWeights.set(question.id, override.topicWeightOverride);
+      }
+    }
+
     const topicNames = new Map<number, string>();
     const topicWeights = new Map<number, number>();
     await Promise.all(
-      loadedQuestions.map(async (question) => {
+      mergedQuestions.map(async (question) => {
         const topic = await this.questionBankRepository.findTopicById(
+          companyId,
           question.topicId,
         );
         if (topic) {
@@ -103,9 +140,10 @@ export class InterviewCoreService {
           requirePhone: input.requirePhone ?? false,
           requireLinkedin: input.requireLinkedin ?? false,
           requireGithub: input.requireGithub ?? false,
-          questions: loadedQuestions,
+          questions: mergedQuestions,
           topicNames,
           topicWeights,
+          questionTopicWeights,
         },
         query,
       ),

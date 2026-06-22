@@ -29,6 +29,13 @@ export type AiTone =
   | 'neutral'
   | 'strict';
 
+export type AnswerExampleInput = {
+  checkpointKey?: string | null | undefined;
+  exampleText: string;
+  exampleType: AnswerExampleType;
+  sortOrder: number;
+};
+
 export type AnswerExampleType =
   | 'bad'
   | 'good';
@@ -54,10 +61,31 @@ export type BeginInterviewAttemptInput = {
   publicToken: string;
 };
 
+export type CheckpointEvaluationHintsInput = {
+  falseClaims?: Array<string> | null | undefined;
+  minMatchedConcepts?: number | null | undefined;
+  mustConcepts?: Array<string> | null | undefined;
+  positiveFloorScore?: number | null | undefined;
+};
+
+export type CheckpointInput = {
+  checkpointKey: string;
+  evaluationHints?: CheckpointEvaluationHintsInput | null | undefined;
+  expected: string;
+  score: number;
+  sortOrder: number;
+  title: string;
+};
+
 export type CheckpointMatchStatus =
   | 'met'
   | 'not_met'
   | 'partially_met';
+
+export type CommitCompanyQuestionImportInput = {
+  importToken: string;
+  status?: QuestionStatus | null | undefined;
+};
 
 export type CompanyAttemptDecision =
   | 'hold'
@@ -116,6 +144,12 @@ export type CompanyInterviewsFilterInput = {
   status?: AttemptStatus | null | undefined;
 };
 
+export type CompanyQuestionPlaybookItemInput = {
+  isPinned?: boolean;
+  questionId: string | number;
+  sortOrder?: number;
+};
+
 export type CompanyReviewQueueFilterInput = {
   evaluationStatus?: string | null | undefined;
   manualReviewOnly?: boolean | null | undefined;
@@ -141,6 +175,26 @@ export type CreateAttemptReviewNoteInput = {
 export type CreateAttemptShareLinkInput = {
   attemptId: string;
   expiresInDays?: number | null | undefined;
+};
+
+export type CreateCompanyQuestionPlaybookInput = {
+  items: Array<CompanyQuestionPlaybookItemInput>;
+  level: QuestionLevel;
+  name: string;
+  professionId: string | number;
+  skillIds?: Array<string | number> | null | undefined;
+};
+
+export type CreateCompanySkillInput = {
+  code: string;
+  name: string;
+};
+
+export type CreateCompanyTopicInput = {
+  code: string;
+  interviewWeight?: number | null | undefined;
+  name: string;
+  skillId: string;
 };
 
 export type CreateInterviewInput = {
@@ -191,6 +245,23 @@ export type CreateInterviewTemplateInput = {
   welcomeMessageTemplate?: string | null | undefined;
 };
 
+export type CreateQuestionInput = {
+  answerExamples: Array<AnswerExampleInput>;
+  checkpoints: Array<CheckpointInput>;
+  companyPriority?: number | null | undefined;
+  difficulty: QuestionDifficulty;
+  idealAnswer: string;
+  isRequired?: boolean | null | undefined;
+  level: QuestionLevel;
+  maxScore: number;
+  professionId: string;
+  questionText: string;
+  shortAnswer: string;
+  skillIds: Array<string>;
+  status?: QuestionStatus | null | undefined;
+  topicId: string;
+};
+
 export type DashboardAttentionKind =
   | 'abandoned'
   | 'in_progress'
@@ -233,6 +304,9 @@ export type InterviewAttemptsFilterInput = {
 };
 
 export type InterviewMessageKind =
+  | 'conduct_terminated'
+  | 'conduct_violation'
+  | 'conduct_warning'
   | 'follow_up_answer'
   | 'follow_up_question'
   | 'main_answer'
@@ -273,12 +347,15 @@ export type ProbingDepth =
 
 export type QuestionBankFilterInput = {
   difficulty?: QuestionDifficulty | null | undefined;
+  includeForkReplacedGlobal?: boolean | null | undefined;
   level?: QuestionLevel | null | undefined;
   limit?: number | null | undefined;
   offset?: number | null | undefined;
   professionId?: string | null | undefined;
+  scope?: QuestionScope | null | undefined;
   search?: string | null | undefined;
   skillIds?: Array<string> | null | undefined;
+  status?: QuestionStatus | null | undefined;
   topicId?: string | null | undefined;
 };
 
@@ -292,6 +369,15 @@ export type QuestionLevel =
   | 'lead'
   | 'middle'
   | 'senior';
+
+export type QuestionScope =
+  | 'all'
+  | 'company'
+  | 'global';
+
+export type QuestionStatus =
+  | 'draft'
+  | 'published';
 
 export type RegisterInput = {
   companyName: string;
@@ -339,6 +425,7 @@ export type SubmitInterviewAnswerInput = {
 
 export type SuggestInterviewQuestionsInput = {
   count?: number | null | undefined;
+  excludeQuestionIds?: Array<string> | null | undefined;
   level?: QuestionLevel | null | undefined;
   professionId: string;
   skillIds?: Array<string> | null | undefined;
@@ -354,6 +441,46 @@ export type TopicSkillQuestionFilterInput = {
 export type UpdateAttemptReviewNoteInput = {
   body: string;
   noteId: string;
+};
+
+export type UpdateCompanySkillInput = {
+  code?: string | null | undefined;
+  id: string | number;
+  name?: string | null | undefined;
+};
+
+export type UpdateCompanyTopicInput = {
+  code?: string | null | undefined;
+  id: string | number;
+  interviewWeight?: number | null | undefined;
+  name?: string | null | undefined;
+  skillId?: string | null | undefined;
+};
+
+export type UpdateQuestionInput = {
+  answerExamples: Array<AnswerExampleInput>;
+  checkpoints: Array<CheckpointInput>;
+  companyPriority?: number | null | undefined;
+  difficulty: QuestionDifficulty;
+  id: string;
+  idealAnswer: string;
+  isRequired?: boolean | null | undefined;
+  level: QuestionLevel;
+  maxScore: number;
+  professionId: string;
+  questionText: string;
+  shortAnswer: string;
+  skillIds: Array<string>;
+  status?: QuestionStatus | null | undefined;
+  topicId: string;
+};
+
+export type UpsertCompanyQuestionOverrideInput = {
+  extraAnswerExamples?: Array<AnswerExampleInput> | null | undefined;
+  extraFalseClaims?: Array<string> | null | undefined;
+  extraMustConcepts?: Array<string> | null | undefined;
+  sourceQuestionId: string | number;
+  topicWeightOverride?: number | null | undefined;
 };
 
 export type AdaptiveCheckpointReviewByAttemptQueryVariables = Exact<{
@@ -378,12 +505,48 @@ export type AiCostAnalyticsQueryVariables = Exact<{
 
 export type AiCostAnalyticsQuery = { aiCostAnalytics: { kpi: { totalCostUsd: number, costPerInterview: number, costPerCandidate: number, totalRequests: number }, byModel: Array<{ model: string, promptTokens: number, completionTokens: number, totalCostUsd: number }>, topExpensiveInterviews: Array<{ interviewAttemptId: string, interviewTitle: string | null, totalCostUsd: number, latencyMs: number | null }>, elevenLabs: { kpi: { totalCostUsd: number, totalCharacters: number, totalRequests: number }, byOperation: Array<{ operationType: string, characterCount: number, totalCostUsd: number }> } } };
 
+export type ApplyPlaybookToInterviewDraftMutationVariables = Exact<{
+  playbookId: string | number;
+  count?: number | null | undefined;
+}>;
+
+
+export type ApplyPlaybookToInterviewDraftMutation = { applyPlaybookToInterviewDraft: { questionIds: Array<string>, pinnedQuestionIds: Array<string>, count: number } };
+
+export type ArchiveCompanyQuestionPlaybookMutationVariables = Exact<{
+  id: string | number;
+}>;
+
+
+export type ArchiveCompanyQuestionPlaybookMutation = { archiveCompanyQuestionPlaybook: boolean };
+
+export type ArchiveCompanySkillMutationVariables = Exact<{
+  id: string | number;
+}>;
+
+
+export type ArchiveCompanySkillMutation = { archiveCompanySkill: { id: string, code: string, name: string, isCustom: boolean } };
+
+export type ArchiveCompanyTopicMutationVariables = Exact<{
+  id: string | number;
+}>;
+
+
+export type ArchiveCompanyTopicMutation = { archiveCompanyTopic: { id: string, code: string, name: string, interviewWeight: number, isCustom: boolean } };
+
 export type ArchiveInterviewMutationVariables = Exact<{
   id: string | number;
 }>;
 
 
 export type ArchiveInterviewMutation = { archiveInterview: { id: string, status: InterviewStatus, publicUrl: string } };
+
+export type ArchiveQuestionMutationVariables = Exact<{
+  id: string | number;
+}>;
+
+
+export type ArchiveQuestionMutation = { archiveQuestion: { id: string, isActive: boolean } };
 
 export type AttemptReviewDecisionHistoryQueryVariables = Exact<{
   attemptId: string | number;
@@ -428,6 +591,13 @@ export type CheckpointResultsByAttemptQueryVariables = Exact<{
 
 export type CheckpointResultsByAttemptQuery = { checkpointResultsByAttempt: { attemptId: string, questionGroups: Array<{ interviewQuestionId: string, questionText: string, needsManualReview: boolean, checkpoints: Array<{ id: string, checkpointKey: string, checkpointTitle: string, status: CheckpointMatchStatus, scoreAwarded: number, maxScore: number, evidenceQuote: string | null, reasoningShort: string | null }> }> } };
 
+export type CommitCompanyQuestionImportMutationVariables = Exact<{
+  input: CommitCompanyQuestionImportInput;
+}>;
+
+
+export type CommitCompanyQuestionImportMutation = { commitCompanyQuestionImport: { topicsCreated: number, topicsUpdated: number, skillsCreated: number, questionsCreated: number, questionsUpdated: number } };
+
 export type CompanyCandidatesQueryVariables = Exact<{
   filters?: CompanyCandidatesFilterInput | null | undefined;
 }>;
@@ -460,6 +630,18 @@ export type CompanyInterviewsQueryVariables = Exact<{
 
 
 export type CompanyInterviewsQuery = { companyInterviews: { total: number, page: number, pageSize: number, items: Array<{ attemptId: string, interviewId: string, interviewTitle: string, jobRole: string, candidateName: string, candidateEmail: string, status: AttemptStatus, startedAt: number | null, completedAt: number | null, overallScore: number | null }> } };
+
+export type CompanyQuestionOverrideQueryVariables = Exact<{
+  sourceQuestionId: string | number;
+}>;
+
+
+export type CompanyQuestionOverrideQuery = { companyQuestionOverride: { id: string, sourceQuestionId: string, extraMustConcepts: Array<string> | null, extraFalseClaims: Array<string> | null, topicWeightOverride: number | null, updatedAt: unknown } | null };
+
+export type CompanyQuestionPlaybooksQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type CompanyQuestionPlaybooksQuery = { companyQuestionPlaybooks: Array<{ id: string, name: string, professionId: string, level: QuestionLevel, skillIds: Array<string> | null, isActive: boolean, itemCount: number, pinnedCount: number, items: Array<{ questionId: string, sortOrder: number, isPinned: boolean }> }> };
 
 export type CompanyReviewQueueQueryVariables = Exact<{
   filters?: CompanyReviewQueueFilterInput | null | undefined;
@@ -497,6 +679,27 @@ export type CreateAttemptShareLinkMutationVariables = Exact<{
 
 export type CreateAttemptShareLinkMutation = { createAttemptShareLink: { attemptId: string, token: string, sharePath: string, expiresAt: number | null } };
 
+export type CreateCompanyQuestionPlaybookMutationVariables = Exact<{
+  input: CreateCompanyQuestionPlaybookInput;
+}>;
+
+
+export type CreateCompanyQuestionPlaybookMutation = { createCompanyQuestionPlaybook: { id: string, name: string, professionId: string, level: QuestionLevel, skillIds: Array<string> | null, itemCount: number, pinnedCount: number, items: Array<{ questionId: string, sortOrder: number, isPinned: boolean }> } };
+
+export type CreateCompanySkillMutationVariables = Exact<{
+  input: CreateCompanySkillInput;
+}>;
+
+
+export type CreateCompanySkillMutation = { createCompanySkill: { id: string, code: string, name: string, isCustom: boolean } };
+
+export type CreateCompanyTopicMutationVariables = Exact<{
+  input: CreateCompanyTopicInput;
+}>;
+
+
+export type CreateCompanyTopicMutation = { createCompanyTopic: { id: string, code: string, name: string, interviewWeight: number, isCustom: boolean, skill: { id: string, code: string, name: string } | null } };
+
 export type CreateInterviewFromTemplateMutationVariables = Exact<{
   templateId: string | number;
 }>;
@@ -526,6 +729,13 @@ export type CreateInterviewMutationVariables = Exact<{
 
 export type CreateInterviewMutation = { createInterview: { id: string, title: string, jobRole: string, level: QuestionLevel, status: InterviewStatus, publicToken: string, publicUrl: string, questionCount: number, interviewerName: string | null, welcomeMessageTemplate: string | null } };
 
+export type CreateQuestionMutationVariables = Exact<{
+  input: CreateQuestionInput;
+}>;
+
+
+export type CreateQuestionMutation = { createQuestion: { id: string, questionText: string, status: QuestionStatus, isCustom: boolean, isRequired: boolean, companyPriority: number } };
+
 export type DraftInterviewFromJobDescriptionMutationVariables = Exact<{
   input: DraftInterviewFromJobDescriptionInput;
 }>;
@@ -546,6 +756,13 @@ export type FinalEvaluationByAttemptQueryVariables = Exact<{
 
 
 export type FinalEvaluationByAttemptQuery = { finalEvaluationByAttempt: { id: string, interviewAttemptId: string, totalScore: number, finalScore: number, totalWeight: number, averageScore: number | null, strengthCategory: InterviewStrengthCategory, category: FinalEvaluationCategory, hireRecommendation: HireRecommendation, summary: string, detailedSummary: string | null, strengths: Array<string>, weaknesses: Array<string>, risks: Array<string>, needsManualReview: boolean, categoryBreakdown: Array<{ categoryKey: string, categoryLabel: string, scoreNormalized: number, weight: number, contribution: number }>, topicEvaluations: Array<{ topic: string, score: number, weight: number, weightedScore: number, strengthCategory: InterviewStrengthCategory }> } | null };
+
+export type ForkQuestionMutationVariables = Exact<{
+  sourceQuestionId: string | number;
+}>;
+
+
+export type ForkQuestionMutation = { forkQuestion: { id: string, questionText: string, status: QuestionStatus, isCustom: boolean, sourceQuestionId: string | null } };
 
 export type HelloQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -660,21 +877,21 @@ export type QuestionBankListQueryVariables = Exact<{
 }>;
 
 
-export type QuestionBankListQuery = { questionBank: { total: number, items: Array<{ id: string, questionText: string, level: QuestionLevel, difficulty: QuestionDifficulty, isActive: boolean, topic: { id: string, code: string, name: string, interviewWeight: number, skill: { id: string, code: string, name: string } | null }, profession: { id: string, code: string, name: string } }> } };
+export type QuestionBankListQuery = { questionBank: { total: number, items: Array<{ id: string, questionText: string, level: QuestionLevel, difficulty: QuestionDifficulty, isActive: boolean, isCustom: boolean, isRequired: boolean, companyPriority: number, status: QuestionStatus, sourceQuestionId: string | null, topic: { id: string, code: string, name: string, interviewWeight: number, isCustom: boolean, skill: { id: string, code: string, name: string, isCustom: boolean } | null }, profession: { id: string, code: string, name: string }, skills: Array<{ id: string, code: string, name: string, isCustom: boolean }> }> } };
 
 export type QuestionBankQueryVariables = Exact<{
   filters?: QuestionBankFilterInput | null | undefined;
 }>;
 
 
-export type QuestionBankQuery = { questionBank: { total: number, items: Array<{ id: string, questionText: string, level: QuestionLevel, difficulty: QuestionDifficulty, isActive: boolean, topic: { id: string, code: string, name: string, interviewWeight: number, skill: { id: string, code: string, name: string } | null }, profession: { id: string, code: string, name: string }, skills: Array<{ id: string, code: string, name: string }>, checkpoints: Array<{ id: string, checkpointKey: string, title: string, expected: string, score: number, sortOrder: number }>, answerExamples: Array<{ id: string, exampleType: AnswerExampleType, exampleText: string, sortOrder: number }> }> } };
+export type QuestionBankQuery = { questionBank: { total: number, items: Array<{ id: string, questionText: string, level: QuestionLevel, difficulty: QuestionDifficulty, isActive: boolean, isCustom: boolean, isRequired: boolean, companyPriority: number, status: QuestionStatus, sourceQuestionId: string | null, topic: { id: string, code: string, name: string, interviewWeight: number, isCustom: boolean, skill: { id: string, code: string, name: string, isCustom: boolean } | null }, profession: { id: string, code: string, name: string }, skills: Array<{ id: string, code: string, name: string, isCustom: boolean }>, checkpoints: Array<{ id: string, checkpointKey: string, title: string, expected: string, score: number, sortOrder: number, evaluationHints: { mustConcepts: Array<string> | null, falseClaims: Array<string> | null } | null }>, answerExamples: Array<{ id: string, exampleType: AnswerExampleType, exampleText: string, sortOrder: number }> }> } };
 
 export type QuestionQueryVariables = Exact<{
   id: string | number;
 }>;
 
 
-export type QuestionQuery = { question: { id: string, questionText: string, level: QuestionLevel, difficulty: QuestionDifficulty, isActive: boolean, shortAnswer: string, idealAnswer: string, topic: { id: string, code: string, name: string, interviewWeight: number }, profession: { id: string, code: string, name: string }, checkpoints: Array<{ id: string, checkpointKey: string, title: string, expected: string, score: number, sortOrder: number }>, answerExamples: Array<{ id: string, exampleType: AnswerExampleType, exampleText: string, sortOrder: number }> } };
+export type QuestionQuery = { question: { id: string, questionText: string, level: QuestionLevel, difficulty: QuestionDifficulty, isActive: boolean, isCustom: boolean, isRequired: boolean, companyPriority: number, status: QuestionStatus, maxScore: number, shortAnswer: string, idealAnswer: string, sourceQuestionId: string | null, topic: { id: string, code: string, name: string, interviewWeight: number, skill: { id: string, code: string, name: string } | null }, profession: { id: string, code: string, name: string }, skills: Array<{ id: string, code: string, name: string }>, checkpoints: Array<{ id: string, checkpointKey: string, title: string, expected: string, score: number, sortOrder: number, evaluationHints: { mustConcepts: Array<string> | null, falseClaims: Array<string> | null } | null }>, answerExamples: Array<{ id: string, exampleType: AnswerExampleType, exampleText: string, sortOrder: number }> } };
 
 export type RefreshTokensMutationVariables = Exact<{ [key: string]: never; }>;
 
@@ -729,7 +946,7 @@ export type SkillsQueryVariables = Exact<{
 }>;
 
 
-export type SkillsQuery = { skills: Array<{ id: string, code: string, name: string }> };
+export type SkillsQuery = { skills: Array<{ id: string, code: string, name: string, isCustom: boolean }> };
 
 export type StartInterviewPreviewMutationVariables = Exact<{
   interviewId: string | number;
@@ -757,7 +974,7 @@ export type SuggestInterviewQuestionsMutationVariables = Exact<{
 }>;
 
 
-export type SuggestInterviewQuestionsMutation = { suggestInterviewQuestions: { count: number, candidateCount: number, generatedByAi: boolean, questionIds: Array<string> } };
+export type SuggestInterviewQuestionsMutation = { suggestInterviewQuestions: { count: number, candidateCount: number, generatedByAi: boolean, questionIds: Array<string>, questions: Array<{ id: string, isCustom: boolean, isRequired: boolean, companyPriority: number, status: QuestionStatus }> } };
 
 export type TopicSkillQuestionAnalyticsQueryVariables = Exact<{
   filters?: TopicSkillQuestionFilterInput | null | undefined;
@@ -772,7 +989,7 @@ export type TopicsQueryVariables = Exact<{
 }>;
 
 
-export type TopicsQuery = { topics: Array<{ id: string, code: string, name: string, interviewWeight: number, skill: { id: string, code: string, name: string } | null }> };
+export type TopicsQuery = { topics: Array<{ id: string, code: string, name: string, interviewWeight: number, isCustom: boolean, skill: { id: string, code: string, name: string, isCustom: boolean } | null }> };
 
 export type UpdateAttemptReviewNoteMutationVariables = Exact<{
   input: UpdateAttemptReviewNoteInput;
@@ -780,6 +997,34 @@ export type UpdateAttemptReviewNoteMutationVariables = Exact<{
 
 
 export type UpdateAttemptReviewNoteMutation = { updateAttemptReviewNote: { id: string, attemptId: string, body: string, authorId: string, authorName: string, createdAt: number, updatedAt: number } };
+
+export type UpdateCompanySkillMutationVariables = Exact<{
+  input: UpdateCompanySkillInput;
+}>;
+
+
+export type UpdateCompanySkillMutation = { updateCompanySkill: { id: string, code: string, name: string, isCustom: boolean } };
+
+export type UpdateCompanyTopicMutationVariables = Exact<{
+  input: UpdateCompanyTopicInput;
+}>;
+
+
+export type UpdateCompanyTopicMutation = { updateCompanyTopic: { id: string, code: string, name: string, interviewWeight: number, isCustom: boolean, skill: { id: string, code: string, name: string } | null } };
+
+export type UpdateQuestionMutationVariables = Exact<{
+  input: UpdateQuestionInput;
+}>;
+
+
+export type UpdateQuestionMutation = { updateQuestion: { id: string, questionText: string, status: QuestionStatus, isCustom: boolean, isRequired: boolean, companyPriority: number } };
+
+export type UpsertCompanyQuestionOverrideMutationVariables = Exact<{
+  input: UpsertCompanyQuestionOverrideInput;
+}>;
+
+
+export type UpsertCompanyQuestionOverrideMutation = { upsertCompanyQuestionOverride: { id: string, sourceQuestionId: string, extraMustConcepts: Array<string> | null, extraFalseClaims: Array<string> | null, topicWeightOverride: number | null, updatedAt: unknown } };
 
 export class TypedDocumentString<TResult, TVariables>
   extends String
@@ -880,6 +1125,41 @@ export const AiCostAnalyticsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<AiCostAnalyticsQuery, AiCostAnalyticsQueryVariables>;
+export const ApplyPlaybookToInterviewDraftDocument = new TypedDocumentString(`
+    mutation ApplyPlaybookToInterviewDraft($playbookId: ID!, $count: Int) {
+  applyPlaybookToInterviewDraft(playbookId: $playbookId, count: $count) {
+    questionIds
+    pinnedQuestionIds
+    count
+  }
+}
+    `) as unknown as TypedDocumentString<ApplyPlaybookToInterviewDraftMutation, ApplyPlaybookToInterviewDraftMutationVariables>;
+export const ArchiveCompanyQuestionPlaybookDocument = new TypedDocumentString(`
+    mutation ArchiveCompanyQuestionPlaybook($id: ID!) {
+  archiveCompanyQuestionPlaybook(id: $id)
+}
+    `) as unknown as TypedDocumentString<ArchiveCompanyQuestionPlaybookMutation, ArchiveCompanyQuestionPlaybookMutationVariables>;
+export const ArchiveCompanySkillDocument = new TypedDocumentString(`
+    mutation ArchiveCompanySkill($id: ID!) {
+  archiveCompanySkill(id: $id) {
+    id
+    code
+    name
+    isCustom
+  }
+}
+    `) as unknown as TypedDocumentString<ArchiveCompanySkillMutation, ArchiveCompanySkillMutationVariables>;
+export const ArchiveCompanyTopicDocument = new TypedDocumentString(`
+    mutation ArchiveCompanyTopic($id: ID!) {
+  archiveCompanyTopic(id: $id) {
+    id
+    code
+    name
+    interviewWeight
+    isCustom
+  }
+}
+    `) as unknown as TypedDocumentString<ArchiveCompanyTopicMutation, ArchiveCompanyTopicMutationVariables>;
 export const ArchiveInterviewDocument = new TypedDocumentString(`
     mutation ArchiveInterview($id: ID!) {
   archiveInterview(id: $id) {
@@ -889,6 +1169,14 @@ export const ArchiveInterviewDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ArchiveInterviewMutation, ArchiveInterviewMutationVariables>;
+export const ArchiveQuestionDocument = new TypedDocumentString(`
+    mutation ArchiveQuestion($id: ID!) {
+  archiveQuestion(id: $id) {
+    id
+    isActive
+  }
+}
+    `) as unknown as TypedDocumentString<ArchiveQuestionMutation, ArchiveQuestionMutationVariables>;
 export const AttemptReviewDecisionHistoryDocument = new TypedDocumentString(`
     query AttemptReviewDecisionHistory($attemptId: ID!, $filters: AttemptReviewDecisionHistoryFilterInput) {
   attemptReviewDecisionHistory(attemptId: $attemptId, filters: $filters) {
@@ -1039,6 +1327,17 @@ export const CheckpointResultsByAttemptDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<CheckpointResultsByAttemptQuery, CheckpointResultsByAttemptQueryVariables>;
+export const CommitCompanyQuestionImportDocument = new TypedDocumentString(`
+    mutation CommitCompanyQuestionImport($input: CommitCompanyQuestionImportInput!) {
+  commitCompanyQuestionImport(input: $input) {
+    topicsCreated
+    topicsUpdated
+    skillsCreated
+    questionsCreated
+    questionsUpdated
+  }
+}
+    `) as unknown as TypedDocumentString<CommitCompanyQuestionImportMutation, CommitCompanyQuestionImportMutationVariables>;
 export const CompanyCandidatesDocument = new TypedDocumentString(`
     query CompanyCandidates($filters: CompanyCandidatesFilterInput) {
   companyCandidates(filters: $filters) {
@@ -1223,6 +1522,37 @@ export const CompanyInterviewsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<CompanyInterviewsQuery, CompanyInterviewsQueryVariables>;
+export const CompanyQuestionOverrideDocument = new TypedDocumentString(`
+    query CompanyQuestionOverride($sourceQuestionId: ID!) {
+  companyQuestionOverride(sourceQuestionId: $sourceQuestionId) {
+    id
+    sourceQuestionId
+    extraMustConcepts
+    extraFalseClaims
+    topicWeightOverride
+    updatedAt
+  }
+}
+    `) as unknown as TypedDocumentString<CompanyQuestionOverrideQuery, CompanyQuestionOverrideQueryVariables>;
+export const CompanyQuestionPlaybooksDocument = new TypedDocumentString(`
+    query CompanyQuestionPlaybooks {
+  companyQuestionPlaybooks {
+    id
+    name
+    professionId
+    level
+    skillIds
+    isActive
+    itemCount
+    pinnedCount
+    items {
+      questionId
+      sortOrder
+      isPinned
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<CompanyQuestionPlaybooksQuery, CompanyQuestionPlaybooksQueryVariables>;
 export const CompanyReviewQueueDocument = new TypedDocumentString(`
     query CompanyReviewQueue($filters: CompanyReviewQueueFilterInput) {
   companyReviewQueue(filters: $filters) {
@@ -1317,6 +1647,50 @@ export const CreateAttemptShareLinkDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<CreateAttemptShareLinkMutation, CreateAttemptShareLinkMutationVariables>;
+export const CreateCompanyQuestionPlaybookDocument = new TypedDocumentString(`
+    mutation CreateCompanyQuestionPlaybook($input: CreateCompanyQuestionPlaybookInput!) {
+  createCompanyQuestionPlaybook(input: $input) {
+    id
+    name
+    professionId
+    level
+    skillIds
+    itemCount
+    pinnedCount
+    items {
+      questionId
+      sortOrder
+      isPinned
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<CreateCompanyQuestionPlaybookMutation, CreateCompanyQuestionPlaybookMutationVariables>;
+export const CreateCompanySkillDocument = new TypedDocumentString(`
+    mutation CreateCompanySkill($input: CreateCompanySkillInput!) {
+  createCompanySkill(input: $input) {
+    id
+    code
+    name
+    isCustom
+  }
+}
+    `) as unknown as TypedDocumentString<CreateCompanySkillMutation, CreateCompanySkillMutationVariables>;
+export const CreateCompanyTopicDocument = new TypedDocumentString(`
+    mutation CreateCompanyTopic($input: CreateCompanyTopicInput!) {
+  createCompanyTopic(input: $input) {
+    id
+    code
+    name
+    interviewWeight
+    isCustom
+    skill {
+      id
+      code
+      name
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<CreateCompanyTopicMutation, CreateCompanyTopicMutationVariables>;
 export const CreateInterviewFromTemplateDocument = new TypedDocumentString(`
     mutation CreateInterviewFromTemplate($templateId: ID!) {
   createInterviewFromTemplate(templateId: $templateId) {
@@ -1417,6 +1791,18 @@ export const CreateInterviewDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<CreateInterviewMutation, CreateInterviewMutationVariables>;
+export const CreateQuestionDocument = new TypedDocumentString(`
+    mutation CreateQuestion($input: CreateQuestionInput!) {
+  createQuestion(input: $input) {
+    id
+    questionText
+    status
+    isCustom
+    isRequired
+    companyPriority
+  }
+}
+    `) as unknown as TypedDocumentString<CreateQuestionMutation, CreateQuestionMutationVariables>;
 export const DraftInterviewFromJobDescriptionDocument = new TypedDocumentString(`
     mutation DraftInterviewFromJobDescription($input: DraftInterviewFromJobDescriptionInput!) {
   draftInterviewFromJobDescription(input: $input) {
@@ -1498,6 +1884,17 @@ export const FinalEvaluationByAttemptDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<FinalEvaluationByAttemptQuery, FinalEvaluationByAttemptQueryVariables>;
+export const ForkQuestionDocument = new TypedDocumentString(`
+    mutation ForkQuestion($sourceQuestionId: ID!) {
+  forkQuestion(sourceQuestionId: $sourceQuestionId) {
+    id
+    questionText
+    status
+    isCustom
+    sourceQuestionId
+  }
+}
+    `) as unknown as TypedDocumentString<ForkQuestionMutation, ForkQuestionMutationVariables>;
 export const HelloDocument = new TypedDocumentString(`
     query Hello {
   hello
@@ -1813,21 +2210,34 @@ export const QuestionBankListDocument = new TypedDocumentString(`
       level
       difficulty
       isActive
+      isCustom
+      isRequired
+      companyPriority
+      status
+      sourceQuestionId
       topic {
         id
         code
         name
         interviewWeight
+        isCustom
         skill {
           id
           code
           name
+          isCustom
         }
       }
       profession {
         id
         code
         name
+      }
+      skills {
+        id
+        code
+        name
+        isCustom
       }
     }
   }
@@ -1843,15 +2253,22 @@ export const QuestionBankDocument = new TypedDocumentString(`
       level
       difficulty
       isActive
+      isCustom
+      isRequired
+      companyPriority
+      status
+      sourceQuestionId
       topic {
         id
         code
         name
         interviewWeight
+        isCustom
         skill {
           id
           code
           name
+          isCustom
         }
       }
       profession {
@@ -1863,6 +2280,7 @@ export const QuestionBankDocument = new TypedDocumentString(`
         id
         code
         name
+        isCustom
       }
       checkpoints {
         id
@@ -1871,6 +2289,10 @@ export const QuestionBankDocument = new TypedDocumentString(`
         expected
         score
         sortOrder
+        evaluationHints {
+          mustConcepts
+          falseClaims
+        }
       }
       answerExamples {
         id
@@ -1890,15 +2312,31 @@ export const QuestionDocument = new TypedDocumentString(`
     level
     difficulty
     isActive
+    isCustom
+    isRequired
+    companyPriority
+    status
+    maxScore
     shortAnswer
     idealAnswer
+    sourceQuestionId
     topic {
       id
       code
       name
       interviewWeight
+      skill {
+        id
+        code
+        name
+      }
     }
     profession {
+      id
+      code
+      name
+    }
+    skills {
       id
       code
       name
@@ -1910,6 +2348,10 @@ export const QuestionDocument = new TypedDocumentString(`
       expected
       score
       sortOrder
+      evaluationHints {
+        mustConcepts
+        falseClaims
+      }
     }
     answerExamples {
       id
@@ -1999,6 +2441,7 @@ export const SkillsDocument = new TypedDocumentString(`
     id
     code
     name
+    isCustom
   }
 }
     `) as unknown as TypedDocumentString<SkillsQuery, SkillsQueryVariables>;
@@ -2044,6 +2487,13 @@ export const SuggestInterviewQuestionsDocument = new TypedDocumentString(`
     candidateCount
     generatedByAi
     questionIds
+    questions {
+      id
+      isCustom
+      isRequired
+      companyPriority
+      status
+    }
   }
 }
     `) as unknown as TypedDocumentString<SuggestInterviewQuestionsMutation, SuggestInterviewQuestionsMutationVariables>;
@@ -2081,10 +2531,12 @@ export const TopicsDocument = new TypedDocumentString(`
     code
     name
     interviewWeight
+    isCustom
     skill {
       id
       code
       name
+      isCustom
     }
   }
 }
@@ -2102,3 +2554,53 @@ export const UpdateAttemptReviewNoteDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<UpdateAttemptReviewNoteMutation, UpdateAttemptReviewNoteMutationVariables>;
+export const UpdateCompanySkillDocument = new TypedDocumentString(`
+    mutation UpdateCompanySkill($input: UpdateCompanySkillInput!) {
+  updateCompanySkill(input: $input) {
+    id
+    code
+    name
+    isCustom
+  }
+}
+    `) as unknown as TypedDocumentString<UpdateCompanySkillMutation, UpdateCompanySkillMutationVariables>;
+export const UpdateCompanyTopicDocument = new TypedDocumentString(`
+    mutation UpdateCompanyTopic($input: UpdateCompanyTopicInput!) {
+  updateCompanyTopic(input: $input) {
+    id
+    code
+    name
+    interviewWeight
+    isCustom
+    skill {
+      id
+      code
+      name
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<UpdateCompanyTopicMutation, UpdateCompanyTopicMutationVariables>;
+export const UpdateQuestionDocument = new TypedDocumentString(`
+    mutation UpdateQuestion($input: UpdateQuestionInput!) {
+  updateQuestion(input: $input) {
+    id
+    questionText
+    status
+    isCustom
+    isRequired
+    companyPriority
+  }
+}
+    `) as unknown as TypedDocumentString<UpdateQuestionMutation, UpdateQuestionMutationVariables>;
+export const UpsertCompanyQuestionOverrideDocument = new TypedDocumentString(`
+    mutation UpsertCompanyQuestionOverride($input: UpsertCompanyQuestionOverrideInput!) {
+  upsertCompanyQuestionOverride(input: $input) {
+    id
+    sourceQuestionId
+    extraMustConcepts
+    extraFalseClaims
+    topicWeightOverride
+    updatedAt
+  }
+}
+    `) as unknown as TypedDocumentString<UpsertCompanyQuestionOverrideMutation, UpsertCompanyQuestionOverrideMutationVariables>;

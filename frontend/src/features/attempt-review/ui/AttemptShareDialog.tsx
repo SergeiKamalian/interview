@@ -5,11 +5,8 @@ import {
   useRevokeAttemptShareLinkMutation,
 } from '@entities/candidate/api/attemptShareApi';
 import { buildShareUrl } from '@entities/candidate/api/attemptSharePublicApi';
-import {
-  Button,
-  Input,
-  Spinner,
-} from '@shared/ui';
+import { Input, SelectField, Spinner } from '@shared/ui';
+import { Button } from '@shared/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -19,15 +16,30 @@ import {
   DialogTitle,
 } from '@shared/ui/dialog';
 import { formatUnixDate } from '@shared/lib/format';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@shared/ui/tooltip';
 import { Copy, Link2, RefreshCw, Share2, Trash2 } from 'lucide-react';
 
 type ExpiryOption = 'never' | '7' | '30';
 
+const SHARE_EXPIRY_OPTIONS = [
+  { value: '7', label: '7 дней' },
+  { value: '30', label: '30 дней' },
+  { value: 'never', label: 'Без срока' },
+] as const;
+
 type AttemptShareDialogProps = {
   attemptId: string;
+  compact?: boolean;
 };
 
-export function AttemptShareDialog({ attemptId }: AttemptShareDialogProps) {
+export function AttemptShareDialog({
+  attemptId,
+  compact = false,
+}: AttemptShareDialogProps) {
   const [open, setOpen] = useState(false);
   const [expiry, setExpiry] = useState<ExpiryOption>('30');
   const [copied, setCopied] = useState(false);
@@ -93,10 +105,33 @@ export function AttemptShareDialog({ attemptId }: AttemptShareDialogProps) {
 
   return (
     <>
-      <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
-        <Share2 className="size-3.5" />
-        Поделиться
-      </Button>
+      {compact ? (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                aria-label="Поделиться обзором"
+                onClick={() => setOpen(true)}
+              >
+                <Share2 className="size-3.5" />
+              </Button>
+            }
+          />
+          <TooltipContent side="bottom" className="max-w-56">
+            <p className="font-medium">Поделиться</p>
+            <p className="text-xs text-muted-foreground">
+              Read-only ссылка для коллег без доступа к dashboard
+            </p>
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
+          <Share2 className="size-3.5" />
+          Поделиться
+        </Button>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-lg">
@@ -109,26 +144,12 @@ export function AttemptShareDialog({ attemptId }: AttemptShareDialogProps) {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="space-y-2">
-              <label
-                htmlFor="share-expiry"
-                className="text-sm font-medium text-foreground"
-              >
-                Срок действия
-              </label>
-              <select
-                id="share-expiry"
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={expiry}
-                onChange={(event) =>
-                  setExpiry(event.target.value as ExpiryOption)
-                }
-              >
-                <option value="7">7 дней</option>
-                <option value="30">30 дней</option>
-                <option value="never">Без срока</option>
-              </select>
-            </div>
+            <SelectField
+              label="Срок действия"
+              value={expiry}
+              onValueChange={(value) => setExpiry(value as ExpiryOption)}
+              options={[...SHARE_EXPIRY_OPTIONS]}
+            />
 
             {isLoading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -191,7 +212,7 @@ export function AttemptShareDialog({ attemptId }: AttemptShareDialogProps) {
             </div>
             <Button
               size="sm"
-              variant="primary"
+              variant="default"
               disabled={isPending}
               onClick={() => void handleCreateOrRegenerate()}
             >

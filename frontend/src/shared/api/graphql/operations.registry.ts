@@ -22,10 +22,35 @@ export const GraphqlOperations = {
     document: "query AiCostAnalytics($filters: AiCostFilterInput) { aiCostAnalytics(filters: $filters) { kpi { totalCostUsd costPerInterview costPerCandidate totalRequests } byModel { model promptTokens completionTokens totalCostUsd } topExpensiveInterviews { interviewAttemptId interviewTitle totalCostUsd latencyMs } elevenLabs { kpi { totalCostUsd totalCharacters totalRequests } byOperation { operationType characterCount totalCostUsd } } } }",
     sha256Hash: '974d996d3ab9c10f6b6eeac46c5a6a84114d35df066f715d37375c03b0f1a0de',
   },
+  ApplyPlaybookToInterviewDraft: {
+    operationName: 'ApplyPlaybookToInterviewDraft',
+    document: "mutation ApplyPlaybookToInterviewDraft($playbookId: ID!, $count: Int) { applyPlaybookToInterviewDraft(playbookId: $playbookId, count: $count) { questionIds pinnedQuestionIds count } }",
+    sha256Hash: '9c33c14802d78807c7ea473516aa2404dbb5185895666091a6c3b138d83e321a',
+  },
+  ArchiveCompanyQuestionPlaybook: {
+    operationName: 'ArchiveCompanyQuestionPlaybook',
+    document: "mutation ArchiveCompanyQuestionPlaybook($id: ID!) { archiveCompanyQuestionPlaybook(id: $id) }",
+    sha256Hash: '7d7a54f4c1a0cae95a7949653c60e24e57c64f1fe76e9658eecb0c7ddab6c3fd',
+  },
+  ArchiveCompanySkill: {
+    operationName: 'ArchiveCompanySkill',
+    document: "mutation ArchiveCompanySkill($id: ID!) { archiveCompanySkill(id: $id) { id code name isCustom } }",
+    sha256Hash: '6b528d916541e1b2b2da09b1ae260ff4b9be8e8595335b57a248e54537f1c174',
+  },
+  ArchiveCompanyTopic: {
+    operationName: 'ArchiveCompanyTopic',
+    document: "mutation ArchiveCompanyTopic($id: ID!) { archiveCompanyTopic(id: $id) { id code name interviewWeight isCustom } }",
+    sha256Hash: '03e5f3d637efa5ef4d5a60f90989af85ca7235d5696bf755fbb5e632ead9122b',
+  },
   ArchiveInterview: {
     operationName: 'ArchiveInterview',
     document: "mutation ArchiveInterview($id: ID!) { archiveInterview(id: $id) { id status publicUrl } }",
     sha256Hash: '8a07c6cf003bf6fae30396828feac82d425890c88f69d9b2ad296b79b3526fcf',
+  },
+  ArchiveQuestion: {
+    operationName: 'ArchiveQuestion',
+    document: "mutation ArchiveQuestion($id: ID!) { archiveQuestion(id: $id) { id isActive } }",
+    sha256Hash: 'ba26404b2fe33f9896863a1ea8e5cbd646aed6ba2f6a8f662d6e832d66012044',
   },
   AttemptReviewDecisionHistory: {
     operationName: 'AttemptReviewDecisionHistory',
@@ -57,6 +82,11 @@ export const GraphqlOperations = {
     document: "query CheckpointResultsByAttempt($attemptId: ID!) { checkpointResultsByAttempt(attemptId: $attemptId) { attemptId questionGroups { interviewQuestionId questionText needsManualReview checkpoints { id checkpointKey checkpointTitle status scoreAwarded maxScore evidenceQuote reasoningShort } } } }",
     sha256Hash: '00b197d53add2a43719d52da38185c665ad2f49a7166454146d7cc372a38d7b1',
   },
+  CommitCompanyQuestionImport: {
+    operationName: 'CommitCompanyQuestionImport',
+    document: "mutation CommitCompanyQuestionImport($input: CommitCompanyQuestionImportInput!) { commitCompanyQuestionImport(input: $input) { topicsCreated topicsUpdated skillsCreated questionsCreated questionsUpdated } }",
+    sha256Hash: 'f4fb9793fb309da94b5b604342ce60fef65c0b3fd432207b815c133a8215e1e1',
+  },
   CompanyCandidates: {
     operationName: 'CompanyCandidates',
     document: "query CompanyCandidates($filters: CompanyCandidatesFilterInput) { companyCandidates(filters: $filters) { items { candidateId fullName email interviewsCount avgScore lastInterviewDate shortlistStatus } total page pageSize } }",
@@ -81,6 +111,16 @@ export const GraphqlOperations = {
     operationName: 'CompanyInterviews',
     document: "query CompanyInterviews($filters: CompanyInterviewsFilterInput) { companyInterviews(filters: $filters) { items { attemptId interviewId interviewTitle jobRole candidateName candidateEmail status startedAt completedAt overallScore } total page pageSize } }",
     sha256Hash: 'acd78f7d9f08e5defd9b44b023f12874b001086d70b32ec324cd292d48b48e12',
+  },
+  CompanyQuestionOverride: {
+    operationName: 'CompanyQuestionOverride',
+    document: "query CompanyQuestionOverride($sourceQuestionId: ID!) { companyQuestionOverride(sourceQuestionId: $sourceQuestionId) { id sourceQuestionId extraMustConcepts extraFalseClaims topicWeightOverride updatedAt } }",
+    sha256Hash: '54471577b9211a7619f36b009327249d38b4a4789f3a2a42f3a92894bca5fdaf',
+  },
+  CompanyQuestionPlaybooks: {
+    operationName: 'CompanyQuestionPlaybooks',
+    document: "query CompanyQuestionPlaybooks { companyQuestionPlaybooks { id name professionId level skillIds isActive itemCount pinnedCount items { questionId sortOrder isPinned } } }",
+    sha256Hash: 'db10efc8a6115861ab65a13a583972dc698ca555d08bac347e3ac3e5db2c1d73',
   },
   CompanyReviewQueue: {
     operationName: 'CompanyReviewQueue',
@@ -107,6 +147,21 @@ export const GraphqlOperations = {
     document: "mutation CreateAttemptShareLink($input: CreateAttemptShareLinkInput!) { createAttemptShareLink(input: $input) { attemptId token sharePath expiresAt } }",
     sha256Hash: '48e263dfdedec5da1c5fc51e0708b6e07906c66f1f3ca718c248827165449a9d',
   },
+  CreateCompanyQuestionPlaybook: {
+    operationName: 'CreateCompanyQuestionPlaybook',
+    document: "mutation CreateCompanyQuestionPlaybook($input: CreateCompanyQuestionPlaybookInput!) { createCompanyQuestionPlaybook(input: $input) { id name professionId level skillIds itemCount pinnedCount items { questionId sortOrder isPinned } } }",
+    sha256Hash: '0832d9a38fd1da6c9941c99eaf3a10cd61ca3ddca62932ddb29d0ab8d293484f',
+  },
+  CreateCompanySkill: {
+    operationName: 'CreateCompanySkill',
+    document: "mutation CreateCompanySkill($input: CreateCompanySkillInput!) { createCompanySkill(input: $input) { id code name isCustom } }",
+    sha256Hash: '04a5070ba9abca9cbd368f86b8be117fa21097a7bb533592b009a8133d83f830',
+  },
+  CreateCompanyTopic: {
+    operationName: 'CreateCompanyTopic',
+    document: "mutation CreateCompanyTopic($input: CreateCompanyTopicInput!) { createCompanyTopic(input: $input) { id code name interviewWeight isCustom skill { id code name } } }",
+    sha256Hash: '5324942d9708dfc2dd4fee03536839a312b5375968a9d015e943448dbaca2be7',
+  },
   CreateInterviewFromTemplate: {
     operationName: 'CreateInterviewFromTemplate',
     document: "mutation CreateInterviewFromTemplate($templateId: ID!) { createInterviewFromTemplate(templateId: $templateId) { id title jobRole level status publicToken publicUrl questionCount interviewerName welcomeMessageTemplate } }",
@@ -127,6 +182,11 @@ export const GraphqlOperations = {
     document: "mutation CreateInterview($input: CreateInterviewInput!) { createInterview(input: $input) { id title jobRole level status publicToken publicUrl questionCount interviewerName welcomeMessageTemplate } }",
     sha256Hash: 'b6b1596454218a45eabacfe27ada9cb66ad2df7b15459e9483f14d45da2c29d0',
   },
+  CreateQuestion: {
+    operationName: 'CreateQuestion',
+    document: "mutation CreateQuestion($input: CreateQuestionInput!) { createQuestion(input: $input) { id questionText status isCustom isRequired companyPriority } }",
+    sha256Hash: '78cc485746ab6e9c34d2ef696a38fc04933668a18a26337224ca014260ab6e47',
+  },
   DraftInterviewFromJobDescription: {
     operationName: 'DraftInterviewFromJobDescription',
     document: "mutation DraftInterviewFromJobDescription($input: DraftInterviewFromJobDescriptionInput!) { draftInterviewFromJobDescription(input: $input) { title jobRole professionId level skillIds questionIds generatedByAi } }",
@@ -141,6 +201,11 @@ export const GraphqlOperations = {
     operationName: 'FinalEvaluationByAttempt',
     document: "query FinalEvaluationByAttempt($attemptId: ID!) { finalEvaluationByAttempt(attemptId: $attemptId) { id interviewAttemptId totalScore finalScore totalWeight averageScore strengthCategory category hireRecommendation summary detailedSummary strengths weaknesses risks needsManualReview categoryBreakdown { categoryKey categoryLabel scoreNormalized weight contribution } topicEvaluations { topic score weight weightedScore strengthCategory } } }",
     sha256Hash: '49d58bccde94872474e29fdc631ea7558b711ffa83fb3890c341f842ef88615b',
+  },
+  ForkQuestion: {
+    operationName: 'ForkQuestion',
+    document: "mutation ForkQuestion($sourceQuestionId: ID!) { forkQuestion(sourceQuestionId: $sourceQuestionId) { id questionText status isCustom sourceQuestionId } }",
+    sha256Hash: 'c74d7b82b6ad240d2cb8cd48652f95ebbc5cd3c0bf1fb71f76300d5155d03fec',
   },
   Hello: {
     operationName: 'Hello',
@@ -224,18 +289,18 @@ export const GraphqlOperations = {
   },
   QuestionBankList: {
     operationName: 'QuestionBankList',
-    document: "query QuestionBankList($filters: QuestionBankFilterInput) { questionBank(filters: $filters) { total items { id questionText level difficulty isActive topic { id code name interviewWeight skill { id code name } } profession { id code name } } } }",
-    sha256Hash: '9445f438a051d1d060bb2b59855e4360643fe01b92b725a1a96d003f7deaf20f',
+    document: "query QuestionBankList($filters: QuestionBankFilterInput) { questionBank(filters: $filters) { total items { id questionText level difficulty isActive isCustom isRequired companyPriority status sourceQuestionId topic { id code name interviewWeight isCustom skill { id code name isCustom } } profession { id code name } skills { id code name isCustom } } } }",
+    sha256Hash: 'ab7edcdfca997865b0542fdd51e144127c48bb96f5530d63be8e3fe8255ed990',
   },
   QuestionBank: {
     operationName: 'QuestionBank',
-    document: "query QuestionBank($filters: QuestionBankFilterInput) { questionBank(filters: $filters) { total items { id questionText level difficulty isActive topic { id code name interviewWeight skill { id code name } } profession { id code name } skills { id code name } checkpoints { id checkpointKey title expected score sortOrder } answerExamples { id exampleType exampleText sortOrder } } } }",
-    sha256Hash: '36be24907580d5f02b5eeba46b40f015efda81dccf86f2853b3a9fb2807675ff',
+    document: "query QuestionBank($filters: QuestionBankFilterInput) { questionBank(filters: $filters) { total items { id questionText level difficulty isActive isCustom isRequired companyPriority status sourceQuestionId topic { id code name interviewWeight isCustom skill { id code name isCustom } } profession { id code name } skills { id code name isCustom } checkpoints { id checkpointKey title expected score sortOrder evaluationHints { mustConcepts falseClaims } } answerExamples { id exampleType exampleText sortOrder } } } }",
+    sha256Hash: '914cb3441f7ea3f691bfdf036501d073e743043a274bb37cf7c866e7409d40b4',
   },
   Question: {
     operationName: 'Question',
-    document: "query Question($id: ID!) { question(id: $id) { id questionText level difficulty isActive shortAnswer idealAnswer topic { id code name interviewWeight } profession { id code name } checkpoints { id checkpointKey title expected score sortOrder } answerExamples { id exampleType exampleText sortOrder } } }",
-    sha256Hash: '2e836e6b0fe930c4adedecc0d4df24f044aa611fe820ed9093995ae684dfab00',
+    document: "query Question($id: ID!) { question(id: $id) { id questionText level difficulty isActive isCustom isRequired companyPriority status maxScore shortAnswer idealAnswer sourceQuestionId topic { id code name interviewWeight skill { id code name } } profession { id code name } skills { id code name } checkpoints { id checkpointKey title expected score sortOrder evaluationHints { mustConcepts falseClaims } } answerExamples { id exampleType exampleText sortOrder } } }",
+    sha256Hash: '450bd855911f506c1ef332cf381b4377434e5625fae3e880eba2c1051caeb023',
   },
   RefreshTokens: {
     operationName: 'RefreshTokens',
@@ -274,8 +339,8 @@ export const GraphqlOperations = {
   },
   Skills: {
     operationName: 'Skills',
-    document: "query Skills($professionId: String) { skills(professionId: $professionId) { id code name } }",
-    sha256Hash: '148ef1051043f9005da10edfbbfc985b02e4ca8dfcd44b96516683e2138c4ff5',
+    document: "query Skills($professionId: String) { skills(professionId: $professionId) { id code name isCustom } }",
+    sha256Hash: '6b4f2a0f22e18e10bad484f3dcaff1cc67bc30568954d5306854966bf49b810e',
   },
   StartInterviewPreview: {
     operationName: 'StartInterviewPreview',
@@ -294,8 +359,8 @@ export const GraphqlOperations = {
   },
   SuggestInterviewQuestions: {
     operationName: 'SuggestInterviewQuestions',
-    document: "mutation SuggestInterviewQuestions($input: SuggestInterviewQuestionsInput!) { suggestInterviewQuestions(input: $input) { count candidateCount generatedByAi questionIds } }",
-    sha256Hash: '548e97bfb30507f661119cd0bfcb368f2ab97e0d5a0d41b37bcd6aa0fbecb372',
+    document: "mutation SuggestInterviewQuestions($input: SuggestInterviewQuestionsInput!) { suggestInterviewQuestions(input: $input) { count candidateCount generatedByAi questionIds questions { id isCustom isRequired companyPriority status } } }",
+    sha256Hash: '04b9df445b93fe81b23cad6365f72125b451c8509bd4f622c8342fe7fea43407',
   },
   TopicSkillQuestionAnalytics: {
     operationName: 'TopicSkillQuestionAnalytics',
@@ -304,13 +369,33 @@ export const GraphqlOperations = {
   },
   Topics: {
     operationName: 'Topics',
-    document: "query Topics($skillId: String, $professionId: String) { topics(skillId: $skillId, professionId: $professionId) { id code name interviewWeight skill { id code name } } }",
-    sha256Hash: 'a78c2e047042507f75586d4941996475caccad3655195013f2a02043f903bb4c',
+    document: "query Topics($skillId: String, $professionId: String) { topics(skillId: $skillId, professionId: $professionId) { id code name interviewWeight isCustom skill { id code name isCustom } } }",
+    sha256Hash: '2a1715b650ed538885e901232e2d2effa0ee64fe66639825ecae5da0feac4012',
   },
   UpdateAttemptReviewNote: {
     operationName: 'UpdateAttemptReviewNote',
     document: "mutation UpdateAttemptReviewNote($input: UpdateAttemptReviewNoteInput!) { updateAttemptReviewNote(input: $input) { id attemptId body authorId authorName createdAt updatedAt } }",
     sha256Hash: '3538883d1ec053970e31246767c806082c664f6d0a926acbbe4fa2edb730ffed',
+  },
+  UpdateCompanySkill: {
+    operationName: 'UpdateCompanySkill',
+    document: "mutation UpdateCompanySkill($input: UpdateCompanySkillInput!) { updateCompanySkill(input: $input) { id code name isCustom } }",
+    sha256Hash: '27b179c3d28f729b1d54dede8172ab311e0df18617243f5b01757b647fd519a5',
+  },
+  UpdateCompanyTopic: {
+    operationName: 'UpdateCompanyTopic',
+    document: "mutation UpdateCompanyTopic($input: UpdateCompanyTopicInput!) { updateCompanyTopic(input: $input) { id code name interviewWeight isCustom skill { id code name } } }",
+    sha256Hash: '84cc3f028847e646af1aca7acb87535c902d1c9e5acab5deb78c574527403f93',
+  },
+  UpdateQuestion: {
+    operationName: 'UpdateQuestion',
+    document: "mutation UpdateQuestion($input: UpdateQuestionInput!) { updateQuestion(input: $input) { id questionText status isCustom isRequired companyPriority } }",
+    sha256Hash: 'ac696536192f5fc997fa36bf9f6f7edfe4e1e31a8ce4e30304c9a770d76c51fc',
+  },
+  UpsertCompanyQuestionOverride: {
+    operationName: 'UpsertCompanyQuestionOverride',
+    document: "mutation UpsertCompanyQuestionOverride( $input: UpsertCompanyQuestionOverrideInput! ) { upsertCompanyQuestionOverride(input: $input) { id sourceQuestionId extraMustConcepts extraFalseClaims topicWeightOverride updatedAt } }",
+    sha256Hash: '4715a6c530e40d171dfde767f4f3175e94d00943e6469ce511340201e7c73105',
   }
 } as const satisfies Record<string, GraphqlOperationDef>;
 

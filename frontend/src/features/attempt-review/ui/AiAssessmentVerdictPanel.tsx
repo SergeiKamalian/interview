@@ -72,12 +72,12 @@ export function AiAssessmentVerdictPanel({
         </div>
         {!evaluationReady ? (
           <p className="text-sm text-muted-foreground">
-            Оценка ИИ ещё не готова — verdict можно будет поставить после
-            финальной оценки.
+            Оценка ИИ ещё не готова — согласие или несогласие можно будет
+            указать после финальной оценки.
           </p>
         ) : hasVerdict ? (
           <p className="text-sm text-muted-foreground">
-            Ваш verdict сохранён. Можно изменить, выбрав другой вариант ниже.
+            Ваша оценка сохранена. Можно изменить, выбрав другой вариант ниже.
           </p>
         ) : (
           <p className="text-sm text-muted-foreground">

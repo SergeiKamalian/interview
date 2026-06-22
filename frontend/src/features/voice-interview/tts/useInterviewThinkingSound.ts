@@ -14,12 +14,17 @@ function resolveThinkingSoundUrl(): string {
 }
 
 export function useInterviewThinkingSound(phase: string) {
+  const enabled = env.interviewThinkingSoundEnabled;
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const playedInCycleRef = useRef(false);
   const loadPromiseRef = useRef<Promise<string | null> | null>(null);
 
   const ensureLoaded = useCallback(async (): Promise<string | null> => {
+    if (!enabled) {
+      return null;
+    }
+
     if (objectUrlRef.current) {
       return objectUrlRef.current;
     }
@@ -46,7 +51,7 @@ export function useInterviewThinkingSound(phase: string) {
     }
 
     return loadPromiseRef.current;
-  }, []);
+  }, [enabled]);
 
   const stopThinking = useCallback(() => {
     const audio = audioRef.current;
@@ -81,6 +86,10 @@ export function useInterviewThinkingSound(phase: string) {
   }, [ensureLoaded]);
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     if (!LOADING_PHASES.has(phase)) {
       playedInCycleRef.current = false;
       stopThinking();
@@ -93,7 +102,7 @@ export function useInterviewThinkingSound(phase: string) {
 
     playedInCycleRef.current = true;
     void startThinking();
-  }, [phase, startThinking, stopThinking]);
+  }, [enabled, phase, startThinking, stopThinking]);
 
   useEffect(
     () => () => {

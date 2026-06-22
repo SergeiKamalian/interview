@@ -68,17 +68,7 @@ export class FinalEvaluationService {
 
     const useAdaptiveSummaries =
       isAdaptiveInterviewEnabled() &&
-      adaptiveSummaries.length >= interviewQuestions.length;
-
-    if (
-      !useAdaptiveSummaries &&
-      questionEvaluations.length < interviewQuestions.length
-    ) {
-      throw new BadRequestException({
-        message: 'All question evaluations must be completed first',
-        code: 'QUESTION_EVALUATIONS_INCOMPLETE',
-      });
-    }
+      adaptiveSummaries.length > 0;
 
     const questionMetaById = new Map(
       interviewQuestions.map((question) => [question.id, question]),
@@ -226,8 +216,9 @@ export class FinalEvaluationService {
    * scoring. Used by the achieved_level backfill (TASK-18.9) to recompute the
    * demonstrated level on attempts evaluated before migration 023.
    *
-   * Returns `null` when the attempt has neither adaptive summaries nor question
-   * evaluations (no per-question data → caller should skip it, not fail).
+   * Missing per-question data is represented as zero-score inputs, matching the
+   * live final evaluation path. Returns `null` only when the interview has no
+   * question rows to score.
    */
   async collectScoreInputs(
     companyId: number,
@@ -245,7 +236,7 @@ export class FinalEvaluationService {
 
     const useAdaptiveSummaries =
       isAdaptiveInterviewEnabled() &&
-      adaptiveSummaries.length >= interviewQuestions.length;
+      adaptiveSummaries.length > 0;
 
     const questionMetaById = new Map(
       interviewQuestions.map((question) => [question.id, question]),

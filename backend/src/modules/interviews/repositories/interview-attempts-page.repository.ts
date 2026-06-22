@@ -93,6 +93,15 @@ export class InterviewAttemptsPageRepository {
     const sortDirection =
       filters.sortDirection?.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
+    const unreadFirstOrder = `CASE
+      WHEN ia.status = 'completed'
+        AND fe.total_score IS NOT NULL
+        AND (iar.company_decision IS NULL OR iar.company_decision IN ('pending', 'none'))
+        AND (iar.review_status IS NULL OR iar.review_status = 'pending')
+      THEN 0
+      ELSE 1
+    END ASC`;
+
     const fromClause = `
       FROM interview_attempts ia
       INNER JOIN candidates c ON c.id = ia.candidate_id AND c.company_id = ia.company_id
@@ -133,7 +142,7 @@ export class InterviewAttemptsPageRepository {
               ) AS has_team_notes
        ${fromClause}
        WHERE ${whereClause}
-       ORDER BY ${sortField} ${sortDirection}, ia.id DESC
+       ORDER BY ${unreadFirstOrder}, ${sortField} ${sortDirection}, ia.id DESC
        LIMIT ${pageSize} OFFSET ${offset}`,
       params,
     );

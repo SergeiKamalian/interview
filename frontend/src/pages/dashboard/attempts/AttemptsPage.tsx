@@ -4,7 +4,15 @@ import { useCompanyInterviewsQuery } from '@entities/interview/api/interviewsApi
 import type { AttemptStatus } from '@shared/api/graphql/generated/graphql';
 import { useDebouncedValue } from '@shared/lib/useDebouncedValue';
 import { formatScore, formatUnixDate } from '@shared/lib/format';
-import { Alert, Button, Card, Input, SelectField, Spinner } from '@shared/ui';
+import { Alert, Button, Card, Input, PAGE_SECTION_NAV_LAYOUT, PageSectionNav, SelectField, Spinner } from '@shared/ui';
+import { PaginatedTable } from '@shared/ui/table';
+
+const ATTEMPTS_SECTIONS = [
+  { id: 'attempts-filters', label: 'Фильтры' },
+  { id: 'attempts-list', label: 'Список' },
+] as const;
+
+const { sectionClassName, pageClassName } = PAGE_SECTION_NAV_LAYOUT;
 
 const attemptStatusLabels: Record<string, string> = {
   pending: 'Ожидает',
@@ -30,10 +38,9 @@ export function AttemptsPage() {
   });
 
   const items = data?.items ?? [];
-  const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 ${pageClassName}`}>
       <div>
         <h2 className="text-xl font-semibold text-foreground">Кандидаты интервью</h2>
         <p className="text-sm text-muted-foreground">
@@ -42,7 +49,7 @@ export function AttemptsPage() {
       </div>
 
       <Card>
-        <div className="mb-4 grid gap-3 md:grid-cols-4">
+        <div id="attempts-filters" className={`mb-4 grid gap-3 md:grid-cols-4 ${sectionClassName}`}>
           <Input
             value={search}
             onChange={(event) => {
@@ -101,7 +108,16 @@ export function AttemptsPage() {
         )}
 
         {!isLoading && !isError && items.length > 0 && (
+          <div id="attempts-list" className={sectionClassName}>
           <>
+            <PaginatedTable
+              pagination={{
+                page: data?.page ?? page,
+                pageSize: data?.pageSize ?? 20,
+                total: data?.total ?? 0,
+                onPageChange: setPage,
+              }}
+            >
             <div className="overflow-x-auto rounded-xl border">
               <table className="min-w-full divide-y text-sm">
                 <thead className="bg-muted/50 text-left text-muted-foreground">
@@ -147,32 +163,13 @@ export function AttemptsPage() {
                 </tbody>
               </table>
             </div>
-            <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-              <span>
-                Страница {data?.page ?? 1} из {totalPages} · всего {data?.total ?? 0}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((value) => Math.max(1, value - 1))}
-                >
-                  Назад
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((value) => value + 1)}
-                >
-                  Вперёд
-                </Button>
-              </div>
-            </div>
+            </PaginatedTable>
           </>
+          </div>
         )}
       </Card>
+
+      <PageSectionNav sections={ATTEMPTS_SECTIONS} />
     </div>
   );
 }

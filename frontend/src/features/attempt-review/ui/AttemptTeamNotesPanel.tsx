@@ -172,7 +172,7 @@ export function AttemptTeamNotesPanel({ attemptId }: AttemptTeamNotesPanelProps)
           <Textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            placeholder="Например: согласен с оценкой, но слабый English на live-этапе"
+            placeholder="Например: согласен с оценкой, но слабый English на собеседовании"
             rows={4}
           />
           <Button

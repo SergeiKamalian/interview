@@ -201,19 +201,19 @@ export function ChartAreaInteractive() {
                 />
                 <Area
                   dataKey="completed"
-                  type="natural"
+                  type="monotone"
                   fill="url(#fillCompleted)"
                   stroke="var(--color-completed)"
                 />
                 <Area
                   dataKey="abandoned"
-                  type="natural"
+                  type="monotone"
                   fill="url(#fillAbandoned)"
                   stroke="var(--color-abandoned)"
                 />
                 <Area
                   dataKey="started"
-                  type="natural"
+                  type="monotone"
                   fill="url(#fillStarted)"
                   stroke="var(--color-started)"
                 />
